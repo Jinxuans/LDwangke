@@ -1,0 +1,340 @@
+<script lang="ts" setup>
+import type { NotificationItem } from '@vben/layouts';
+
+import { computed, ref, watch, onMounted, onUnmounted, h } from 'vue';
+
+import { AuthenticationLoginExpiredModal } from '@vben/common-ui';
+import { useWatermark } from '@vben/hooks';
+import { CircleUserRound, ArrowRightLeft } from '@vben/icons';
+import {
+  BasicLayout,
+  LockScreen,
+  Notification,
+  UserDropdown,
+} from '@vben/layouts';
+import { preferences, updatePreferences } from '@vben/preferences';
+import { useAccessStore, useUserStore } from '@vben/stores';
+import { useRouter } from 'vue-router';
+
+import { Modal, Input, InputNumber, message } from 'ant-design-vue';
+import { $t } from '#/locales';
+import { useAuthStore } from '#/store';
+import { getSiteConfigApi } from '#/api/admin';
+import { migrateSuperiorApi } from '#/api/user-center';
+import { getAccessCodesApi, getUserInfoApi } from '#/api';
+import { getChatSessionsApi, markChatReadApi } from '#/api/chat';
+import LoginForm from '#/views/_core/authentication/login.vue';
+
+const siteVersion = ref('');
+const migrateEnabled = ref(false);
+
+const notifications = ref<NotificationItem[]>([]);
+const notifySessionMap = ref<Map<string, number>>(new Map());
+let notifyTimer: ReturnType<typeof setInterval> | null = null;
+
+async function loadChatNotifications() {
+  try {
+    const raw = await getChatSessionsApi();
+    const sessions = raw;
+    if (!Array.isArray(sessions)) return;
+    const map = new Map<string, number>();
+    notifications.value = sessions
+      .filter((s: any) => s.unread_count > 0)
+      .map((s: any) => {
+        const key = `chat_${s.list_id}`;
+        map.set(key, s.list_id);
+        return {
+          avatar: `https://q1.qlogo.cn/g?b=qq&nk=${s.uid || s.name}&s=640`,
+          date: formatNotifyTime(s.last_time),
+          isRead: false,
+          message: s.last_msg || '',
+          title: `${s.name}（${s.unread_count}条未读）`,
+          _key: key,
+        } as NotificationItem & { _key: string };
+      });
+    notifySessionMap.value = map;
+  } catch { /* ignore */ }
+}
+
+function formatNotifyTime(t: string) {
+  if (!t) return '';
+  const d = new Date(t);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return t.slice(11, 16);
+  return t.slice(5, 16);
+}
+
+const userStore = useUserStore();
+const authStore = useAuthStore();
+const accessStore = useAccessStore();
+const { destroyWatermark, updateWatermark } = useWatermark();
+const showDot = computed(() =>
+  notifications.value.some((item) => !item.isRead),
+);
+
+const router = useRouter();
+
+const menus = computed(() => [
+  {
+    handler: () => { router.push('/user/profile'); },
+    icon: CircleUserRound,
+    text: '我的资料',
+  },
+  {
+    handler: () => { openMigrateModal(); },
+    icon: ArrowRightLeft,
+    text: '上级迁移',
+  },
+]);
+
+const avatar = computed(() => {
+  const username = userStore.userInfo?.username || '';
+  if (username) {
+    return `https://q1.qlogo.cn/g?b=qq&nk=${username}&s=640`;
+  }
+  return preferences.app.defaultAvatar;
+});
+
+async function handleLogout() {
+  await authStore.logout(false);
+}
+
+function handleNoticeClear() {
+  notifications.value = [];
+}
+
+function handleMakeAll() {
+  notifications.value.forEach((item) => (item.isRead = true));
+  notifySessionMap.value.forEach((listId) => {
+    markChatReadApi(listId).catch(() => {});
+  });
+}
+
+function handleNoticeRead(item: NotificationItem) {
+  item.isRead = true;
+  const key = (item as any)._key;
+  const listId = key ? notifySessionMap.value.get(key) : undefined;
+  if (listId) {
+    markChatReadApi(listId).catch(() => {});
+  }
+  router.push('/chat');
+}
+
+function handleViewAll() {
+  router.push('/chat');
+}
+
+// 上级迁移弹窗
+const migrateUidVal = ref<number | null>(null);
+const migrateYqmVal = ref('');
+function openMigrateModal() {
+  migrateUidVal.value = null;
+  migrateYqmVal.value = '';
+  Modal.confirm({
+    title: '上级迁移',
+    icon: null,
+    content: h('div', { style: 'display:flex;flex-direction:column;gap:12px;margin-top:12px' }, [
+      h('div', {}, [
+        h('label', { style: 'font-size:13px;font-weight:500;display:block;margin-bottom:4px' }, '新上级UID'),
+        h(InputNumber, { min: 1, style: 'width:100%', placeholder: '输入UID', onChange: (v: any) => { migrateUidVal.value = v; } }),
+      ]),
+      h('div', {}, [
+        h('label', { style: 'font-size:13px;font-weight:500;display:block;margin-bottom:4px' }, '新上级邀请码'),
+        h(Input, { placeholder: '输入邀请码', onChange: (e: any) => { migrateYqmVal.value = e.target.value; } }),
+      ]),
+    ]),
+    okText: '确认迁移',
+    cancelText: '取消',
+    async onOk() {
+      if (!migrateUidVal.value || !migrateYqmVal.value) {
+        message.warning('请填写完整');
+        return Promise.reject();
+      }
+      try {
+        const raw = await migrateSuperiorApi(migrateUidVal.value, migrateYqmVal.value);
+        const res = raw;
+        message.success(res?.message || '迁移成功');
+      } catch {
+        // 全局拦截器已弹出错误提示，这里只阻止弹窗关闭
+        return Promise.reject();
+      }
+    },
+  });
+}
+const siteName = ref('');
+const hasBackupToken = ref(!!localStorage.getItem('admin_backup_token'));
+
+async function handleSwitchBack() {
+  const backupToken = localStorage.getItem('admin_backup_token');
+  if (!backupToken) return;
+  accessStore.setAccessToken(backupToken);
+  localStorage.removeItem('admin_backup_token');
+  try {
+    const [userRes, codesRes] = await Promise.all([
+      getUserInfoApi(),
+      getAccessCodesApi(),
+    ]);
+    const userInfo = userRes;
+    const codes = codesRes;
+    userStore.setUserInfo(userInfo);
+    accessStore.setAccessCodes(codes);
+  } catch { /* ignore */ }
+  window.location.href = '/';
+}
+
+onMounted(async () => {
+  try {
+    const cfg = await getSiteConfigApi();
+    siteVersion.value = cfg?.version || '';
+    siteName.value = cfg?.sitename || '';
+    // 启用 footer 并显示站点名称+版本号
+    if (siteVersion.value || siteName.value) {
+      updatePreferences({
+        footer: { enable: true, fixed: true },
+        copyright: {
+          enable: true,
+          companyName: siteName.value + (siteVersion.value ? ` v${siteVersion.value}` : ''),
+          companySiteLink: '',
+          date: new Date().getFullYear().toString(),
+        },
+      });
+    }
+    // 上级迁移开关
+    migrateEnabled.value = cfg?.sjqykg === '1';
+    // 水印：sykg 未设置或为 '1' 时默认开启
+    if (!cfg?.sykg || cfg.sykg === '1') {
+      updatePreferences({ app: { watermark: true } });
+    }
+    // SEO meta 标签
+    if (cfg?.keywords) {
+      let el = document.querySelector('meta[name="keywords"]') as HTMLMetaElement;
+      if (!el) { el = document.createElement('meta'); el.name = 'keywords'; document.head.appendChild(el); }
+      el.content = cfg.keywords;
+    }
+    if (cfg?.description) {
+      let el = document.querySelector('meta[name="description"]') as HTMLMetaElement;
+      if (!el) { el = document.createElement('meta'); el.name = 'description'; document.head.appendChild(el); }
+      el.content = cfg.description;
+    }
+    // 反调试保护
+    if (cfg?.anti_debug !== '0' && !document.getElementById('__anti_debug')) {
+      const s = document.createElement('script');
+      s.id = '__anti_debug';
+      s.textContent = `(function(){
+        // 1. debugger 计时检测
+        setInterval(function(){
+          var t=performance.now();debugger;
+          if(performance.now()-t>100){window.location.href='about:blank';}
+        },1000);
+        // 2. 屏蔽 F12 / Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+U
+        document.addEventListener('keydown',function(e){
+          if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&(e.key==='I'||e.key==='J'||e.key==='C'))||(e.ctrlKey&&e.key==='u')){e.preventDefault();e.stopPropagation();return false;}
+        },true);
+        // 3. 屏蔽右键菜单
+        document.addEventListener('contextmenu',function(e){e.preventDefault();},true);
+      })();`;
+      document.head.appendChild(s);
+    }
+    // 自定义特效注入
+    if (cfg?.webVfx_open === '1' && cfg?.webVfx) {
+      const el = document.createElement('div');
+      el.id = '__web_vfx';
+      el.innerHTML = cfg.webVfx;
+      if (!document.getElementById('__web_vfx')) document.body.appendChild(el);
+      // 执行内联 script
+      el.querySelectorAll('script').forEach((old) => {
+        const ns = document.createElement('script');
+        if (old.src) { ns.src = old.src; } else { ns.textContent = old.textContent; }
+        old.replaceWith(ns);
+      });
+    }
+  } catch { /* ignore */ }
+  loadChatNotifications();
+  notifyTimer = setInterval(loadChatNotifications, 30000);
+});
+
+onUnmounted(() => {
+  if (notifyTimer) {
+    clearInterval(notifyTimer);
+    notifyTimer = null;
+  }
+});
+
+watch(
+  () => preferences.app.watermark,
+  async (enable) => {
+    if (enable) {
+      const uid = userStore.userInfo?.userId || '';
+      const username = userStore.userInfo?.username || '';
+      const name = siteName.value || preferences.app.name || '';
+      await updateWatermark({
+        content: [name, username, uid].filter(Boolean).join('\n'),
+        width: 200,
+        height: 140,
+        globalAlpha: 0.18,
+        gridLayoutOptions: {
+          cols: 3,
+          gap: [10, 10],
+          matrix: [
+            [1, 0, 1],
+            [0, 1, 0],
+            [1, 0, 1],
+          ],
+          rows: 3,
+        },
+      });
+    } else {
+      destroyWatermark();
+    }
+  },
+  {
+    immediate: true,
+  },
+);
+</script>
+
+<template>
+  <BasicLayout @clear-preferences-and-logout="handleLogout">
+    <template #user-dropdown>
+      <UserDropdown
+        :avatar
+        :menus
+        :text="userStore.userInfo?.realName"
+        :description="(userStore.userInfo as any)?.desc || ''"
+        @logout="handleLogout"
+      />
+    </template>
+    <template #notification>
+      <Notification
+        :dot="showDot"
+        :notifications="notifications"
+        @clear="handleNoticeClear"
+        @make-all="handleMakeAll"
+        @read="handleNoticeRead"
+        @view-all="handleViewAll"
+      />
+    </template>
+    <template #extra>
+      <AuthenticationLoginExpiredModal
+        v-model:open="accessStore.loginExpired"
+        :avatar
+      >
+        <LoginForm />
+      </AuthenticationLoginExpiredModal>
+    </template>
+    <template #lock-screen>
+      <LockScreen :avatar @to-login="handleLogout" />
+    </template>
+  </BasicLayout>
+  <div
+    v-if="hasBackupToken"
+    style="position:fixed;bottom:80px;right:24px;z-index:9999;"
+  >
+    <button
+      style="padding:10px 20px;background:#ff4d4f;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.3);"
+      @click="handleSwitchBack"
+    >
+      切回管理员
+    </button>
+  </div>
+</template>

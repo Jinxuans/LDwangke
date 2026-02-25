@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+*/dist/
+go-api/server
+go-api/go-api
+go-api/go-api-bin
+go-api/bin/
+*.log
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+
+# Sisyphus / AI tools
+.sisyphus/
+.clinerules/
+.opencode/
+Cline/
+
+# Temp
+*.bak
+*.bak2

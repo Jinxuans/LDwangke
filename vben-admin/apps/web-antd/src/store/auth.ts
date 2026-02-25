@@ -1,0 +1,166 @@
+import type { Recordable, UserInfo } from '@vben/types';
+
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+
+import { DEFAULT_HOME_PATH, LOGIN_PATH } from '@vben/constants';
+import { updatePreferences } from '@vben/preferences';
+import { resetAllStores, useAccessStore, useUserStore } from '@vben/stores';
+
+import { notification } from 'ant-design-vue';
+import { defineStore } from 'pinia';
+
+import { getAccessCodesApi, getUserInfoApi, loginApi, logoutApi, registerApi } from '#/api';
+import { getSiteConfigApi } from '#/api/admin';
+import { $t } from '#/locales';
+
+export const useAuthStore = defineStore('auth', () => {
+  const accessStore = useAccessStore();
+  const userStore = useUserStore();
+  const router = useRouter();
+
+  const loginLoading = ref(false);
+
+  /**
+   * 异步处理注册操作
+   * @param params 注册表单数据
+   */
+  async function authRegister(params: any) {
+    try {
+      loginLoading.value = true;
+      await registerApi(params);
+      notification.success({
+        message: '注册成功',
+        description: '请使用新账号登录',
+        duration: 3,
+      });
+      await router.push(LOGIN_PATH);
+    } finally {
+      loginLoading.value = false;
+    }
+  }
+
+  /**
+   * 异步处理登录操作
+   * Asynchronously handle the login process
+   * @param params 登录表单数据
+   */
+  async function authLogin(
+    params: Recordable<any>,
+    onSuccess?: () => Promise<void> | void,
+  ) {
+    // 异步处理用户登录操作并获取 accessToken
+    let userInfo: null | UserInfo = null;
+    try {
+      loginLoading.value = true;
+      const res = await loginApi(params);
+
+      // 如果返回 code 为 5，表示需要管理员二次验证
+      if ((res as any).code === 5) {
+        const pass2 = window.prompt('检测到管理员账号，请输入管理员二级密码：');
+        if (!pass2) {
+          loginLoading.value = false;
+          return { userInfo: null };
+        }
+        // 再次发起登录请求，带上 pass2
+        return await authLogin({ ...params, pass2 }, onSuccess);
+      }
+
+      const { accessToken } = res as AuthApi.LoginResult;
+
+      // 如果成功获取到 accessToken
+      if (accessToken) {
+        accessStore.setAccessToken(accessToken);
+
+        // 获取用户信息并存储到 accessStore 中
+        const [fetchUserInfoResult, accessCodesResult] = await Promise.all([
+          fetchUserInfo(),
+          getAccessCodesApi(),
+        ]);
+
+        userInfo = fetchUserInfoResult;
+        const accessCodes = accessCodesResult;
+
+        userStore.setUserInfo(userInfo);
+        accessStore.setAccessCodes(accessCodes);
+
+        if (accessStore.loginExpired) {
+          accessStore.setLoginExpired(false);
+        } else {
+          onSuccess
+            ? await onSuccess?.()
+            : await router.push(userInfo.homePath || DEFAULT_HOME_PATH);
+        }
+
+        // 动态加载站点配置
+        try {
+          const siteConfig = await getSiteConfigApi();
+          if (siteConfig?.sitename) {
+            updatePreferences({ app: { name: siteConfig.sitename } });
+            document.title = siteConfig.sitename;
+          }
+          if (siteConfig?.hlogo) {
+            updatePreferences({ logo: { source: siteConfig.hlogo } });
+          } else if (siteConfig?.logo) {
+            updatePreferences({ logo: { source: siteConfig.logo } });
+          }
+        } catch { /* ignore */ }
+
+        if (userInfo?.realName) {
+          notification.success({
+            description: `${$t('authentication.loginSuccessDesc')}:${userInfo?.realName}`,
+            duration: 3,
+            message: $t('authentication.loginSuccess'),
+          });
+        }
+      }
+    } finally {
+      loginLoading.value = false;
+    }
+
+    return {
+      userInfo,
+    };
+  }
+
+  async function logout(redirect: boolean = true) {
+    try {
+      await logoutApi();
+    } catch {
+      // 不做任何处理
+    }
+    resetAllStores();
+    accessStore.setLoginExpired(false);
+
+    // 回登录页带上当前路由地址
+    await router.replace({
+      path: LOGIN_PATH,
+      query: redirect
+        ? {
+            redirect: encodeURIComponent(router.currentRoute.value.fullPath),
+          }
+        : {},
+    });
+  }
+
+  async function fetchUserInfo() {
+    let userInfo: null | UserInfo = null;
+    const res = await getUserInfoApi();
+    userInfo = res;
+    userStore.setUserInfo(userInfo);
+    return userInfo;
+  }
+
+  function $reset() {
+    loginLoading.value = false;
+  }
+
+  return {
+    $reset,
+    authLogin,
+    authRegister,
+    fetchUserInfo,
+    loginLoading,
+    logout,
+  };
+});

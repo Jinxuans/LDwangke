@@ -1,0 +1,38 @@
+server:
+  port: 8080
+  mode: debug  # debug / release
+  php_backend: "http://127.0.0.1:9000"  # PHP 后端地址（Go代理用）
+  php_public_url: ""                     # PHP 公网地址（浏览器iframe用），留空=同域相对路径
+  bridge_secret: "qingka_bridge_secret_2024"  # iframe 认证桥接签名密钥（与 auth_bridge.php 一致）
+
+database:
+  host: 127.0.0.1
+  port: 3306
+  user: 29_colnt_com
+  password: "ifMezaaH5FEP31Z8"
+  dbname: "29_colnt_com"
+  max_open_conns: 50
+  max_idle_conns: 25
+
+redis:
+  host: 127.0.0.1
+  port: 6379
+  password: ""
+  db: 0
+
+jwt:
+  secret: "x9Kf2mPqR7vL4wNj8sTbYc5hAeUdGi3o"
+  access_ttl: 604800     # 7天
+  refresh_ttl: 2592000   # 30天
+
+cache:
+  order_list_ttl: 30     # 订单列表缓存30秒
+  class_list_ttl: 300    # 课程列表缓存5分钟
+
+smtp:
+  host: "smtp.qq.com"              # QQ: smtp.qq.com | 163: smtp.163.com | Gmail: smtp.gmail.com | Outlook: smtp-mail.outlook.com
+  port: 465                        # SSL: 465 | STARTTLS: 587 | None: 25
+  user: ""                         # 发件邮箱地址
+  password: ""                     # 邮箱授权码（非登录密码）
+  from_name: "系统通知"             # 发件人显示名
+  encryption: "ssl"                # ssl | starttls | none

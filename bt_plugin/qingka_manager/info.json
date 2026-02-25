@@ -1,0 +1,11 @@
+{
+    "title": "青卡管理器",
+    "name": "qingka_manager",
+    "ps": "一键部署、远程更新、回滚、数据库迁移、域名反代、卸载、插件自更新",
+    "versions": "2.3",
+    "checks": "/www/server/panel/plugin/qingka_manager",
+    "author": "QingKa",
+    "home": "https://29.colnt.com",
+    "type": "0",
+    "min_bt": "7.0.0"
+}

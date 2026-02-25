@@ -1,0 +1,35 @@
+{
+    "QK-FB3C5C24A0474BE9F13B0FC5129D62B1": {
+        "domain": "*",
+        "note": "测试授权",
+        "created": "2026-02-24 09:44",
+        "active": true,
+        "machine_id": "404b003bfc651f6b2c8bcb90d5908de5"
+    },
+    "QK-CF039877936648565C8A53A88B8D195F": {
+        "domain": "xuemei.cloud",
+        "note": "自用",
+        "created": "2026-02-24 10:30",
+        "active": true
+    },
+    "QK-30F89B4996B5B3D2FFE44FD3364414A3": {
+        "domain": "*",
+        "note": "花火",
+        "created": "2026-02-25 04:23",
+        "active": true,
+        "machine_id": "c59c0c83e10dbbefa98ce89a9cc34998"
+    },
+    "QK-232155DD3BA29409B10A32A66FB9EED8": {
+        "domain": "example.com",
+        "note": "yanmu",
+        "created": "2026-02-25 06:08",
+        "active": true
+    },
+    "QK-6ED272AC32BDA80B61A851B9F92D2B7B": {
+        "domain": "swk666.cn",
+        "note": "1",
+        "created": "2026-02-25 06:21",
+        "active": true,
+        "machine_id": "57d911ea74b35a43a122b2ce8cc9858b"
+    }
+}
