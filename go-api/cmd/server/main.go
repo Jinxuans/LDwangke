@@ -199,6 +199,7 @@ func main() {
 		{
 			uc.GET("/profile", handler.UserProfile)
 			uc.POST("/change-password", handler.UserChangePassword)
+			uc.POST("/change-pass2", handler.UserChangePass2)
 			uc.POST("/change-email/code", handler.SendChangeEmailCode)
 			uc.POST("/change-email", handler.ChangeEmail)
 			uc.GET("/pay/channels", handler.UserPayChannels)
@@ -397,7 +398,7 @@ func main() {
 	// ===== B端后台（登录用户）=====
 	tenant := api.Group("/tenant")
 	{
-				tenant.GET("/mall-open-price", handler.TenantMallOpenPrice)
+		tenant.GET("/mall-open-price", handler.TenantMallOpenPrice)
 		tenant.POST("/mall-open", handler.TenantMallOpen)
 		tenant.GET("/shop", handler.TenantShopGet)
 		tenant.POST("/shop", handler.TenantShopSave)

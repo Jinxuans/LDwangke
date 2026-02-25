@@ -86,7 +86,6 @@ INSERT INTO `qingka_platform_config` (`pt`, `name`, `success_codes`, `query_act`
 ('27',       '春秋',       '0',     'local_time',   'add', 1, 0, 'chadan2', 'chadan', '', 'POST', 0, 0, 0, 0, 'zt', '', 'gaimi', 'newPwd', 'id', '', '', 'xq', '', 'POST', 'id', 0),
 ('zy',       '志塬',       '0',     'local_time',   'add', 0, 0, 'chadan2', 'chadan', '', 'POST', 0, 0, 0, 0, 'zt', '', 'gaimi', 'newPwd', 'id', '', '', 'xq', '', 'POST', 'id', 0),
 ('haha',     '乐学',       '0',     'get',          'add', 1, 1, 'chadan2', 'chadan', '/api/search', 'GET', 0, 0, 0, 0, 'zt', '', 'gaimi', 'newPwd', 'id', '', '', 'xq', '', 'POST', 'id', 0),
-('qhkj',     '青狐科技',   '0',     'get',          'add', 1, 0, 'chadan2', 'chadan', '', 'POST', 0, 0, 0, 0, 'zt', '', 'gaimi', 'newPwd', 'id', '', '', 'xq', '', 'POST', 'id', 0),
 ('WKTM',     'WKTM',       '0',     'get',          'add', 0, 1, 'chadanoid', 'chadan', '', 'POST', 0, 0, 0, 0, 'zt', '', 'gaimi', 'newPwd', 'id', '', '', 'xq', '', 'POST', 'id', 0),
 ('hzw',      'HZW',        '1',     'get',          'add', 0, 1, 'chadan', 'chadan', '', 'POST', 1, 0, 1, 0, 'stop', '', 'gaimi', 'newPwd', 'id', '', '', 'cha_logwk', '', 'POST', 'id', 0),
 ('longlong', '龙龙',       '0',     'get',          'add', 0, 1, 'chadan', 'chadan', '', 'POST', 0, 1, 0, 1, 'zanting', '', 'gaimi', 'newPwd', 'id', '', '', 'xq', '', 'POST', 'id', 0),
@@ -104,7 +103,6 @@ INSERT INTO `qingka_platform_config` (`pt`, `name`, `success_codes`, `query_act`
 ('lg',       'LG学习',     '0',     'get',          'add', 0, 1, 'chadan2', 'chadan', '', 'POST', 0, 0, 0, 0, 'zt', '', 'gaimi', 'newPwd', 'id', '', '', 'xq', '', 'POST', 'id', 0),
 ('nx',       '奶昔',       '0',     'nx_custom',    'add', 0, 1, 'chadan2', 'chadan', '', 'POST', 0, 0, 0, 0, 'zt', '', 'gaimi', 'newPwd', 'id', '', '', 'xq', '', 'POST', 'id', 0),
 ('pup',      'PUP',        '0',     'get',          'add', 0, 1, 'chadan2', 'chadan', '', 'POST', 0, 0, 0, 0, 'zt', '', 'updateorderpwd', 'newpwd', 'oid', '', '', 'orderlog', '', 'POST', 'oid', 0),
-('duck',     'Duck',       '0',     'get',          'add', 0, 1, 'chadan2', 'chadan', '', 'POST', 0, 0, 0, 0, 'zt', '', 'gaimi', 'newPwd', 'id', '', '', 'xq', '', 'POST', 'id', 0),
 ('wanzi',    '丸子',       '0',     'get',          'add', 0, 1, 'chadan2', 'chadan', '', 'POST', 0, 0, 0, 0, 'zt', '', 'gaimi', 'newPwd', 'id', '', '', 'xq', '', 'POST', 'id', 0),
 ('sxlm',     '数学联盟',   '0',     'get',         'sxadd', 0, 0, 'chadan2', 'chadan', '', 'POST', 0, 0, 0, 0, 'zt', '', 'gaimi', 'newPwd', 'id', '', '', 'xq', '', 'POST', 'id', 0),
 ('lgwk',     'LGWK',       '0',     'lgwk_custom',  'add', 0, 0, 'chadan2', 'chadan', '', 'POST', 0, 0, 0, 0, 'zt', '', 'gaimi', 'newPwd', 'id', '', '', 'xq', '', 'POST', 'id', 0)

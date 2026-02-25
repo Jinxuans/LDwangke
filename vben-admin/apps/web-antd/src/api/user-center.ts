@@ -41,6 +41,10 @@ export async function changePasswordApi(oldpass: string, newpass: string) {
   return requestClient.post('/user/change-password', { oldpass, newpass });
 }
 
+export async function changePass2Api(old_pass2: string, new_pass2: string) {
+  return requestClient.post('/user/change-pass2', { old_pass2, new_pass2 });
+}
+
 // ===== 充值 =====
 export interface PayOrder {
   oid: number;

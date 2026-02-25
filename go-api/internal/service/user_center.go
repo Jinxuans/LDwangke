@@ -13,6 +13,8 @@ import (
 
 	"go-api/internal/database"
 	"go-api/internal/model"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type UserCenterService struct{}
@@ -452,6 +454,37 @@ func (s *UserCenterService) ChangePassword(uid int, oldPass, newPass string) err
 	}()
 
 	return nil
+}
+
+// 设置/修改二级密码（管理员专用）
+func (s *UserCenterService) ChangePass2(uid int, oldPass2, newPass2 string) error {
+	var grade, dbPass2 string
+	err := database.DB.QueryRow("SELECT grade, IFNULL(pass2,'') FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&grade, &dbPass2)
+	if err != nil {
+		return errors.New("用户不存在")
+	}
+	if grade != "3" {
+		return errors.New("仅管理员可设置二级密码")
+	}
+	// 如果已有二级密码，需要验证旧密码
+	if dbPass2 != "" {
+		if strings.HasPrefix(dbPass2, "$2a$") || strings.HasPrefix(dbPass2, "$2b$") {
+			if err := bcrypt.CompareHashAndPassword([]byte(dbPass2), []byte(oldPass2)); err != nil {
+				return errors.New("旧二级密码错误")
+			}
+		} else if dbPass2 != oldPass2 {
+			return errors.New("旧二级密码错误")
+		}
+	}
+	if len(newPass2) < 6 {
+		return errors.New("新二级密码至少6位")
+	}
+	hashed, err := bcrypt.GenerateFromPassword([]byte(newPass2), bcrypt.DefaultCost)
+	if err != nil {
+		return errors.New("加密失败")
+	}
+	_, err = database.DB.Exec("UPDATE qingka_wangke_user SET pass2 = ? WHERE uid = ?", string(hashed), uid)
+	return err
 }
 
 // SendChangeEmailCode 发送邮箱变更验证码到新邮箱

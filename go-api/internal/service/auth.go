@@ -32,9 +32,9 @@ func NewAuthService() *AuthService {
 func (s *AuthService) Login(req model.LoginRequest) (*model.VbenLoginResponse, string, error) {
 	var user model.User
 	err := database.DB.QueryRow(
-		"SELECT uid, uuid, user, pass, name, money, grade, active FROM qingka_wangke_user WHERE user = ?",
+		"SELECT uid, uuid, user, pass, IFNULL(pass2,''), name, money, grade, active FROM qingka_wangke_user WHERE user = ?",
 		req.Username,
-	).Scan(&user.UID, &user.UUID, &user.User, &user.Pass, &user.Name, &user.Money, &user.Grade, &user.Active)
+	).Scan(&user.UID, &user.UUID, &user.User, &user.Pass, &user.Pass2, &user.Name, &user.Money, &user.Grade, &user.Active)
 
 	if err == sql.ErrNoRows {
 		return nil, "", errors.New("用户不存在")
@@ -70,13 +70,15 @@ func (s *AuthService) Login(req model.LoginRequest) (*model.VbenLoginResponse, s
 		return nil, "", errors.New("NEED_ADMIN_AUTH")
 	}
 
-	// 如果提供了二级密码，校验是否正确
+	// 如果提供了二级密码，校验是否正确（使用独立的 pass2 字段）
 	if user.Grade == "3" && req.Pass2 != "" {
-		if strings.HasPrefix(user.Pass, "$2a$") || strings.HasPrefix(user.Pass, "$2b$") {
-			if err := bcrypt.CompareHashAndPassword([]byte(user.Pass), []byte(req.Pass2)); err != nil {
+		if user.Pass2 == "" {
+			// 尚未设置二级密码，跳过校验（首次登录自动通过）
+		} else if strings.HasPrefix(user.Pass2, "$2a$") || strings.HasPrefix(user.Pass2, "$2b$") {
+			if err := bcrypt.CompareHashAndPassword([]byte(user.Pass2), []byte(req.Pass2)); err != nil {
 				return nil, "", errors.New("管理员验证失败")
 			}
-		} else if user.Pass != req.Pass2 {
+		} else if user.Pass2 != req.Pass2 {
 			return nil, "", errors.New("管理员验证失败")
 		}
 	}

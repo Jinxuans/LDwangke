@@ -42,6 +42,24 @@ func UserChangePassword(c *gin.Context) {
 	response.SuccessMsg(c, "密码修改成功")
 }
 
+// 修改二级密码（管理员专用）
+func UserChangePass2(c *gin.Context) {
+	uid := c.GetInt("uid")
+	var body struct {
+		OldPass2 string `json:"old_pass2"`
+		NewPass2 string `json:"new_pass2" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "请填写新二级密码")
+		return
+	}
+	if err := userCenterService.ChangePass2(uid, body.OldPass2, body.NewPass2); err != nil {
+		response.BusinessError(c, 1002, err.Error())
+		return
+	}
+	response.SuccessMsg(c, "二级密码修改成功")
+}
+
 // 发送邮箱变更验证码
 func SendChangeEmailCode(c *gin.Context) {
 	uid := c.GetInt("uid")

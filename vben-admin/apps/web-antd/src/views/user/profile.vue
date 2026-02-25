@@ -12,7 +12,7 @@ import {
   LinkOutlined, BellOutlined,
 } from '@ant-design/icons-vue';
 import {
-  getUserProfileApi, changePasswordApi, setInviteRateApi, changeSecretKeyApi,
+  getUserProfileApi, changePasswordApi, changePass2Api, setInviteRateApi, changeSecretKeyApi,
   setPushTokenApi, getUserGradeListApi, setMyGradeApi, setInviteCodeApi,
   migrateSuperiorApi,
   type UserProfile, type GradeOption,
@@ -41,6 +41,13 @@ const passLoading = ref(false);
 const oldPass = ref('');
 const newPass = ref('');
 const newPass2 = ref('');
+
+// 二级密码弹窗
+const pass2Visible = ref(false);
+const pass2Loading = ref(false);
+const oldPass2 = ref('');
+const newPass2Input = ref('');
+const newPass2Confirm = ref('');
 
 // 邀请费率
 const rateVisible = ref(false);
@@ -93,6 +100,20 @@ async function handleChangePass() {
     oldPass.value = newPass.value = newPass2.value = '';
   } catch (e: any) { message.error(e?.message || '修改失败'); }
   finally { passLoading.value = false; }
+}
+
+async function handleChangePass2() {
+  if (!newPass2Input.value) { message.warning('请填写新二级密码'); return; }
+  if (newPass2Input.value.length < 6) { message.warning('二级密码至少6位'); return; }
+  if (newPass2Input.value !== newPass2Confirm.value) { message.warning('两次输入的密码不一致'); return; }
+  pass2Loading.value = true;
+  try {
+    await changePass2Api(oldPass2.value, newPass2Input.value);
+    message.success('二级密码修改成功');
+    pass2Visible.value = false;
+    oldPass2.value = newPass2Input.value = newPass2Confirm.value = '';
+  } catch (e: any) { message.error(e?.message || '修改失败'); }
+  finally { pass2Loading.value = false; }
 }
 
 async function handleSetRate() {
@@ -305,6 +326,7 @@ onMounted(loadProfile);
         <Card title="账户操作">
           <Space wrap>
             <Button type="primary" @click="passVisible = true"><KeyOutlined /> 修改密码</Button>
+            <Button v-if="profile?.grade === '3'" type="primary" ghost @click="pass2Visible = true"><KeyOutlined /> 二级密码</Button>
             <Button @click="rateVisible = true"><TeamOutlined /> 设置邀请费率</Button>
             <Button v-if="migrateEnabled" @click="migrateVisible = true"><LinkOutlined /> 上级迁移</Button>
           </Space>
@@ -318,6 +340,16 @@ onMounted(loadProfile);
         <div><label class="block text-sm font-medium mb-1">旧密码</label><Input.Password v-model:value="oldPass" placeholder="请输入旧密码" /></div>
         <div><label class="block text-sm font-medium mb-1">新密码</label><Input.Password v-model:value="newPass" placeholder="请输入新密码（至少6位）" /></div>
         <div><label class="block text-sm font-medium mb-1">确认新密码</label><Input.Password v-model:value="newPass2" placeholder="请再次输入新密码" /></div>
+      </div>
+    </Modal>
+
+    <!-- 二级密码弹窗 -->
+    <Modal v-model:open="pass2Visible" title="设置/修改二级密码" :confirm-loading="pass2Loading" @ok="handleChangePass2" ok-text="确认修改">
+      <Alert message="二级密码用于管理员登录二次验证，首次设置无需填写旧密码" type="info" show-icon class="mb-4" />
+      <div class="space-y-4">
+        <div><label class="block text-sm font-medium mb-1">旧二级密码</label><Input.Password v-model:value="oldPass2" placeholder="首次设置可留空" /></div>
+        <div><label class="block text-sm font-medium mb-1">新二级密码</label><Input.Password v-model:value="newPass2Input" placeholder="请输入新二级密码（至少6位）" /></div>
+        <div><label class="block text-sm font-medium mb-1">确认新密码</label><Input.Password v-model:value="newPass2Confirm" placeholder="请再次输入新二级密码" /></div>
       </div>
     </Modal>
 

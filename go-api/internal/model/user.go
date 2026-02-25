@@ -5,6 +5,7 @@ type User struct {
 	UUID   int     `json:"uuid" db:"uuid"`
 	User   string  `json:"user" db:"user"`
 	Pass   string  `json:"-" db:"pass"`
+	Pass2  string  `json:"-" db:"pass2"`
 	Name   string  `json:"name" db:"name"`
 	Money  float64 `json:"money" db:"money"`
 	Grade  string  `json:"grade" db:"grade"`
