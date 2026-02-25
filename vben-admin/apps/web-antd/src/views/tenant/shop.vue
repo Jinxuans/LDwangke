@@ -101,7 +101,7 @@ onMounted(load);
             </div>
             <div class="text-3xl font-bold text-blue-500">
               ¥{{ openPrice }}
-              <span class="text-base font-normal text-gray-400">一次性开通</span>
+              <span class="text-base font-normal text-gray-400 dark:text-gray-500">一次性开通</span>
             </div>
             <div style="max-width: 280px; margin: 0 auto">
               <Input v-model:value="openShopName" placeholder="请输入店铺名称" size="large" class="mb-3" />

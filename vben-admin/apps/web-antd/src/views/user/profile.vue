@@ -234,7 +234,7 @@ onMounted(loadProfile);
             </DescriptionsItem>
             <DescriptionsItem label="邀请码">
               <div class="flex items-center gap-1 flex-wrap">
-                <code v-if="profile.yqm" class="bg-gray-100 px-2 py-1 rounded text-sm">{{ profile.yqm }}</code>
+                <code v-if="profile.yqm" class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm">{{ profile.yqm }}</code>
                 <span v-else class="text-gray-400">未设置</span>
                 <Button v-if="profile.yqm" type="link" size="small" @click="copyText(profile.yqm)"><CopyOutlined /></Button>
                 <Button type="link" size="small" @click="yqmInput = profile.yqm || ''; yqmVisible = true">{{ profile.yqm ? '修改' : '设置' }}</Button>
@@ -246,7 +246,7 @@ onMounted(loadProfile);
             </DescriptionsItem>
             <DescriptionsItem label="邀请链接">
               <div v-if="inviteUrl" class="flex items-center gap-1 flex-wrap">
-                <code class="bg-gray-100 px-2 py-1 rounded text-xs break-all" style="max-width: 90vw">{{ inviteUrl }}</code>
+                <code class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs break-all" style="max-width: 90vw">{{ inviteUrl }}</code>
                 <Button type="link" size="small" @click="copyText(inviteUrl)"><CopyOutlined /> 复制链接</Button>
               </div>
               <span v-else class="text-gray-400">请先设置邀请码</span>
@@ -262,20 +262,20 @@ onMounted(loadProfile);
           <Descriptions bordered :column="1" size="small">
             <DescriptionsItem label="对接账号">
               <div class="flex items-center gap-2">
-                <code class="bg-gray-100 px-2 py-1 rounded text-sm">{{ profile.uid }}</code>
+                <code class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm">{{ profile.uid }}</code>
                 <Button type="link" size="small" @click="copyText(String(profile.uid))"><CopyOutlined /></Button>
               </div>
             </DescriptionsItem>
             <DescriptionsItem label="对接密钥">
               <div class="flex items-center gap-2">
-                <code v-if="profile.key && profile.key !== '0'" class="bg-gray-100 px-2 py-1 rounded text-sm">{{ profile.key }}</code>
+                <code v-if="profile.key && profile.key !== '0'" class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm">{{ profile.key }}</code>
                 <span v-else class="text-gray-400">未开通</span>
                 <Button v-if="profile.key && profile.key !== '0'" type="link" size="small" @click="copyText(profile.key)"><CopyOutlined /></Button>
               </div>
             </DescriptionsItem>
             <DescriptionsItem label="推送Token">
               <div class="flex items-center gap-2">
-                <code v-if="profile.push_token" class="bg-gray-100 px-2 py-1 rounded text-sm">{{ profile.push_token }}</code>
+                <code v-if="profile.push_token" class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm">{{ profile.push_token }}</code>
                 <span v-else class="text-gray-400">未设置</span>
               </div>
             </DescriptionsItem>

@@ -90,25 +90,25 @@ const apis = [
       </template>
       <Descriptions bordered :column="1" size="small" v-if="profile">
         <DescriptionsItem label="接口地址">
-          <code class="bg-gray-100 px-2 py-0.5 rounded text-sm">{{ baseUrl }}</code>
+          <code class="bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-sm">{{ baseUrl }}</code>
           <Button type="link" size="small" @click="copy(baseUrl)"><CopyOutlined /></Button>
         </DescriptionsItem>
         <DescriptionsItem label="用户ID (uid)">
-          <code class="bg-gray-100 px-2 py-0.5 rounded text-sm font-bold">{{ profile.uid }}</code>
+          <code class="bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-sm font-bold">{{ profile.uid }}</code>
           <Button type="link" size="small" @click="copy(String(profile.uid))"><CopyOutlined /></Button>
         </DescriptionsItem>
         <DescriptionsItem label="API密钥 (key)">
           <template v-if="profile.key && profile.key !== '0'">
-            <code class="bg-gray-100 px-2 py-0.5 rounded text-sm font-bold">{{ profile.key }}</code>
+            <code class="bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-sm font-bold">{{ profile.key }}</code>
             <Button type="link" size="small" @click="copy(profile.key)"><CopyOutlined /></Button>
           </template>
           <template v-else>
             <Tag color="red">未开通</Tag>
-            <span class="text-gray-400 text-sm ml-2">请在「个人中心」开通API密钥</span>
+            <span class="text-gray-400 dark:text-gray-500 text-sm ml-2">请在「个人中心」开通API密钥</span>
           </template>
         </DescriptionsItem>
         <DescriptionsItem label="认证方式">
-          所有接口均通过 <code class="bg-gray-100 px-1 rounded">uid</code> + <code class="bg-gray-100 px-1 rounded">key</code> 参数认证，支持 GET 参数或 POST 表单
+          所有接口均通过 <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">uid</code> + <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">key</code> 参数认证，支持 GET 参数或 POST 表单
         </DescriptionsItem>
       </Descriptions>
     </Card>
@@ -119,7 +119,7 @@ const apis = [
         <div class="flex items-center gap-2">
           <Tag color="green">{{ api.method }}</Tag>
           <span class="font-bold">{{ api.title }}</span>
-          <code class="text-sm text-gray-500">{{ api.path }}</code>
+          <code class="text-sm text-gray-500 dark:text-gray-400">{{ api.path }}</code>
         </div>
       </template>
       <template #extra>
@@ -127,12 +127,12 @@ const apis = [
           <LinkOutlined /> 复制完整URL
         </Button>
 </template>
-      <p class="text-gray-500 mb-3">{{ api.desc }}</p>
+      <p class="text-gray-500 dark:text-gray-400 mb-3">{{ api.desc }}</p>
 
       <div class="text-sm font-medium mb-2">请求参数</div>
       <table class="w-full text-sm border-collapse mb-4">
         <thead>
-          <tr class="bg-gray-50">
+          <tr class="bg-gray-50 dark:bg-gray-800">
             <th class="border px-3 py-1.5 text-left">参数</th>
             <th class="border px-3 py-1.5 text-left">必填</th>
             <th class="border px-3 py-1.5 text-left">说明</th>

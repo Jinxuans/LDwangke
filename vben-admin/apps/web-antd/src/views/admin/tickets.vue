@@ -260,7 +260,7 @@ onMounted(() => { loadStats(); loadTickets(1); });
     <Modal v-model:open="detailVisible" title="工单详情" :width="650" style="max-width: 95vw" :footer="null">
       <div v-if="currentTicket" class="space-y-4">
         <!-- 基本信息 -->
-        <div class="p-3 bg-gray-50 rounded">
+        <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded">
           <div class="flex justify-between items-center mb-2">
             <Space>
               <Tag :color="statusColor(currentTicket.status)">{{ statusText(currentTicket.status) }}</Tag>
@@ -273,7 +273,7 @@ onMounted(() => { loadStats(); loadTickets(1); });
         </div>
 
         <!-- 关联订单 -->
-        <div v-if="currentTicket.oid > 0" class="p-3 bg-blue-50 rounded">
+        <div v-if="currentTicket.oid > 0" class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
           <div class="text-sm font-medium mb-1">关联订单 #{{ currentTicket.oid }}</div>
           <div class="text-xs text-gray-500 space-y-1">
             <div>平台: {{ currentTicket.order_pt || '-' }}</div>

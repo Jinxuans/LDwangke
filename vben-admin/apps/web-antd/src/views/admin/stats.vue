@@ -102,7 +102,7 @@ onMounted(loadStats);
                 <Tag :color="statusColors[item.status] || 'default'" class="min-w-[60px] text-center">
                   {{ item.status }}
                 </Tag>
-                <div class="flex-1 bg-gray-100 rounded h-5 overflow-hidden">
+                <div class="flex-1 bg-gray-100 dark:bg-gray-800 rounded h-5 overflow-hidden">
                   <div
                     class="h-full bg-blue-400 rounded transition-all"
                     :style="{ width: `${(item.count / Math.max(...data.by_status.map(s => s.count), 1)) * 100}%` }"

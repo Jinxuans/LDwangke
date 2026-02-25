@@ -672,7 +672,7 @@ onMounted(loadData);
 
       <!-- 解析结果 -->
       <template v-if="phpResult">
-        <div class="mt-4 rounded border p-3" style="background: #fafafa">
+        <div class="mt-4 rounded border p-3 bg-gray-50 dark:bg-gray-800">
           <div class="mb-2 flex items-center gap-2">
             <CheckCircleOutlined v-if="phpResult.confidence >= 50" style="color: #52c41a" />
             <WarningOutlined v-else style="color: #faad14" />
@@ -750,7 +750,7 @@ onMounted(loadData);
 
       <!-- 检测结果 -->
       <template v-if="detectResult">
-        <div class="mt-2 rounded border p-4" :style="{ background: detectResult.success ? '#f6ffed' : '#fff2f0' }">
+        <div class="mt-2 rounded border p-4" :class="detectResult.success ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'">
           <div class="mb-3 flex items-center justify-between">
             <div class="flex items-center gap-2">
               <CheckCircleOutlined v-if="detectResult.success" style="color: #52c41a; font-size: 18px" />
@@ -808,7 +808,7 @@ onMounted(loadData);
                   v-for="(p, idx) in detectResult.probes"
                   :key="idx"
                   class="flex items-center gap-2 rounded px-2 py-1 text-xs"
-                  :style="{ background: p.status === 'ok' ? '#f6ffed' : '#fafafa' }"
+                  :class="p.status === 'ok' ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-800'"
                 >
                   <Tag :color="statusColor[p.status] || 'default'" style="min-width: 40px; text-align: center">
                     {{ p.status }}

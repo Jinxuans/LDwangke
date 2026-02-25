@@ -49,7 +49,7 @@ onMounted(loadStatus);
       </Result>
       <div v-else style="text-align: center; padding: 40px 0">
         <GiftOutlined style="font-size: 64px; color: #faad14; margin-bottom: 24px" />
-        <div style="margin-bottom: 24px; font-size: 16px; color: #666">
+        <div class="mb-6 text-base text-gray-600 dark:text-gray-400">
           每日签到可获得随机奖励
         </div>
         <Button type="primary" size="large" :loading="loading" @click="doCheckin">

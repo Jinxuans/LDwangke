@@ -138,12 +138,12 @@ onMounted(loadAll);
                     <SelectOption value="1">开启（仅管理员可访问）</SelectOption>
                     <SelectOption value="0">关闭</SelectOption>
                   </Select>
-                  <div class="text-xs text-gray-400 mt-1">开启后普通用户将无法访问前台，仅管理员可用</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">开启后普通用户将无法访问前台，仅管理员可用</div>
                 </Col>
                 <Col :xs="24" :lg="12">
                   <label class="field-label">资源版本号</label>
                   <Input :value="getVal('version')" @update:value="(v: string) => setVal('version', v)" placeholder="如 1.0.1" />
-                  <div class="text-xs text-gray-400 mt-1">显示在页面底部，用于标识当前系统版本</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">显示在页面底部，用于标识当前系统版本</div>
                 </Col>
                 <Col :span="24">
                   <label class="field-label">公告</label>
@@ -190,7 +190,7 @@ onMounted(loadAll);
                 <Col :xs="24" :lg="12">
                   <label class="field-label">商城开通价格</label>
                   <Input :value="getVal('mall_open_price')" @update:value="(v: string) => setVal('mall_open_price', v)" placeholder="99" prefix="¥" />
-                  <div class="text-xs text-gray-400 mt-1">代理开通商城所需余额，默认 99 元</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">代理开通商城所需余额，默认 99 元</div>
                 </Col>
                 <Col :xs="24" :lg="12">
                   <label class="field-label">代理平开控制</label>
@@ -200,12 +200,12 @@ onMounted(loadAll);
                     <SelectOption value="2">顶级平开需双倍余额</SelectOption>
                     <SelectOption value="3">所有等级平开需双倍余额</SelectOption>
                   </Select>
-                  <div class="text-xs text-gray-400 mt-1">控制代理开设同级下级时的限制规则</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">控制代理开设同级下级时的限制规则</div>
                 </Col>
                 <Col :xs="24" :lg="12">
                   <label class="field-label">顶级代理费率</label>
                   <Input :value="getVal('djfl')" @update:value="(v: string) => setVal('djfl', v)" placeholder="如 0.5" />
-                  <div class="text-xs text-gray-400 mt-1">用于判断是否为顶级代理（addprice 等于此值即为顶级）</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">用于判断是否为顶级代理（addprice 等于此值即为顶级）</div>
                 </Col>
               </Row>
             </div>
@@ -225,7 +225,7 @@ onMounted(loadAll);
                     <label class="field-label !mb-0">非直系代理充值</label>
                     <Switch :checked="getVal('non_direct_recharge_enable') === '1'" @change="(v: any) => setVal('non_direct_recharge_enable', v ? '1' : '0')" />
                   </div>
-                  <div class="text-xs text-gray-400 mt-1">关闭后非直系代理无法在线充值</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">关闭后非直系代理无法在线充值</div>
                 </Col>
                 <Col :span="24"><Divider class="!my-2">支付渠道开关</Divider></Col>
                 <Col :xs="24" :lg="12">
@@ -362,7 +362,7 @@ onMounted(loadAll);
                     <label class="field-label !mb-0">代理登入跳转</label>
                     <Switch :checked="getVal('onlineStore_trdltz') === '1'" @change="(v: any) => setVal('onlineStore_trdltz', v ? '1' : '0')" />
                   </div>
-                  <div class="text-xs text-gray-400 mt-1">开启后管理员可从前台跳转代理登入页</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">开启后管理员可从前台跳转代理登入页</div>
                 </Col>
                 <Col :xs="24" :lg="12">
                   <div class="switch-row">
@@ -387,7 +387,7 @@ onMounted(loadAll);
                   <div class="switch-row">
                     <div>
                       <label class="field-label !mb-0">滑块验证</label>
-                      <div class="text-xs text-gray-400">开启后登录页面需要完成滑块验证才能登录</div>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后登录页面需要完成滑块验证才能登录</div>
                     </div>
                     <Switch :checked="getVal('login_slider_verify', '1') === '1'" @change="(v: any) => setVal('login_slider_verify', v ? '1' : '0')" />
                   </div>
@@ -396,7 +396,7 @@ onMounted(loadAll);
                   <div class="switch-row">
                     <div>
                       <label class="field-label !mb-0">邮箱验证</label>
-                      <div class="text-xs text-gray-400">开启后注册时需要填写邮箱并验证邮箱验证码</div>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后注册时需要填写邮箱并验证邮箱验证码</div>
                     </div>
                     <Switch :checked="getVal('login_email_verify', '0') === '1'" @change="(v: any) => setVal('login_email_verify', v ? '1' : '0')" />
                   </div>
@@ -414,7 +414,7 @@ onMounted(loadAll);
                   <div class="switch-row">
                     <div>
                       <label class="field-label !mb-0">签到功能</label>
-                      <div class="text-xs text-gray-400">开启后用户可每日签到领取随机奖励</div>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后用户可每日签到领取随机奖励</div>
                     </div>
                     <Switch :checked="getVal('checkin_enabled', '0') === '1'" @change="(v: any) => setVal('checkin_enabled', v ? '1' : '0')" />
                   </div>
@@ -423,7 +423,7 @@ onMounted(loadAll);
                   <div class="switch-row">
                     <div>
                       <label class="field-label !mb-0">需要有订单</label>
-                      <div class="text-xs text-gray-400">开启后用户必须有历史订单才能签到</div>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后用户必须有历史订单才能签到</div>
                     </div>
                     <Switch :checked="getVal('checkin_order_required', '0') === '1'" @change="(v: any) => setVal('checkin_order_required', v ? '1' : '0')" />
                   </div>
@@ -431,12 +431,12 @@ onMounted(loadAll);
                 <Col :xs="24" :lg="12">
                   <label class="field-label">最低余额要求</label>
                   <Input :value="getVal('checkin_min_balance', '10')" @update:value="(v: string) => setVal('checkin_min_balance', v)" placeholder="10" prefix="¥" />
-                  <div class="text-xs text-gray-400 mt-1">用户余额不低于此值才能签到</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">用户余额不低于此值才能签到</div>
                 </Col>
                 <Col :xs="24" :lg="12">
                   <label class="field-label">每日签到名额</label>
                   <Input :value="getVal('checkin_max_users', '10')" @update:value="(v: string) => setVal('checkin_max_users', v)" placeholder="10" suffix="人" />
-                  <div class="text-xs text-gray-400 mt-1">每天最多允许签到的人数</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">每天最多允许签到的人数</div>
                 </Col>
                 <Col :xs="24" :lg="12">
                   <label class="field-label">最小奖励金额</label>
@@ -461,7 +461,7 @@ onMounted(loadAll);
                     <SelectOption value="1">开启</SelectOption>
                     <SelectOption value="0">关闭</SelectOption>
                   </Select>
-                  <div class="text-xs text-gray-400 mt-1">关闭后移动端将不再因误判而自动跳转，PC端也不再拦截开发者工具</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">关闭后移动端将不再因误判而自动跳转，PC端也不再拦截开发者工具</div>
                 </Col>
               </Row>
             </div>
@@ -503,6 +503,7 @@ onMounted(loadAll);
   color: #555;
   margin-bottom: 6px;
 }
+html.dark .field-label { color: #aaa; }
 .switch-row {
   display: flex;
   align-items: center;
@@ -512,6 +513,7 @@ onMounted(loadAll);
   background: #fafafa;
   border: 1px solid #f0f0f0;
 }
+html.dark .switch-row { background: #1f1f1f; border-color: #333; }
 .save-bar {
   display: flex;
   justify-content: flex-end;
@@ -520,4 +522,5 @@ onMounted(loadAll);
   border-top: 1px solid #f0f0f0;
   background: #fafafa;
 }
+html.dark .save-bar { background: #1f1f1f; border-top-color: #333; }
 </style>

@@ -163,7 +163,7 @@ onUnmounted(() => {
     <!-- 顶部操作栏 -->
     <div class="mb-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <span class="text-sm text-gray-400" v-if="lastRefreshTime">
+        <span class="text-sm text-gray-400 dark:text-gray-500" v-if="lastRefreshTime">
           <ClockCircleOutlined class="mr-1" />更新于 {{ lastRefreshTime }}
         </span>
       </div>
@@ -253,7 +253,7 @@ onUnmounted(() => {
               <div class="status-dot status-dot--blue"><SyncOutlined spin /></div>
               <div>
                 <div class="text-xl font-semibold">{{ stats.processing_orders }}</div>
-                <div class="text-xs text-gray-400">进行中</div>
+                <div class="text-xs text-gray-400 dark:text-gray-500">进行中</div>
               </div>
             </div>
           </Card>
@@ -264,7 +264,7 @@ onUnmounted(() => {
               <div class="status-dot status-dot--green"><CheckCircleOutlined /></div>
               <div>
                 <div class="text-xl font-semibold">{{ stats.completed_orders }}</div>
-                <div class="text-xs text-gray-400">已完成</div>
+                <div class="text-xs text-gray-400 dark:text-gray-500">已完成</div>
               </div>
             </div>
           </Card>
@@ -275,7 +275,7 @@ onUnmounted(() => {
               <div class="status-dot status-dot--red"><WarningOutlined /></div>
               <div>
                 <div class="text-xl font-semibold">{{ stats.failed_orders }}</div>
-                <div class="text-xs text-gray-400">异常</div>
+                <div class="text-xs text-gray-400 dark:text-gray-500">异常</div>
               </div>
             </div>
           </Card>
@@ -287,7 +287,7 @@ onUnmounted(() => {
                 <Progress type="circle" :percent="completionRate" :width="42" :stroke-width="8" :format="() => `${completionRate}%`" />
               </div>
               <div>
-                <div class="text-xs text-gray-400">完成率</div>
+                <div class="text-xs text-gray-400 dark:text-gray-500">完成率</div>
               </div>
             </div>
           </Card>
@@ -319,7 +319,7 @@ onUnmounted(() => {
                 <span class="chart-bar-label">{{ item.date?.slice(5) }}</span>
               </div>
             </div>
-            <div v-else class="text-center text-gray-400 py-10">暂无数据</div>
+            <div v-else class="text-center text-gray-400 dark:text-gray-500 py-10">暂无数据</div>
           </Card>
         </Col>
         <Col :xs="24" :lg="10">
@@ -341,7 +341,7 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            <div v-else class="text-center text-gray-400 py-10">暂无数据</div>
+            <div v-else class="text-center text-gray-400 dark:text-gray-500 py-10">暂无数据</div>
           </Card>
         </Col>
       </Row>
@@ -371,7 +371,7 @@ onUnmounted(() => {
                 <span class="chart-bar-label">{{ item.date?.slice(5) }}</span>
               </div>
             </div>
-            <div v-else class="text-center text-gray-400 py-10">暂无数据</div>
+            <div v-else class="text-center text-gray-400 dark:text-gray-500 py-10">暂无数据</div>
           </Card>
         </Col>
       </Row>
@@ -386,7 +386,7 @@ onUnmounted(() => {
         </template>
         <template #extra>
           <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-400">并发数:</span>
+            <span class="text-xs text-gray-400 dark:text-gray-500">并发数:</span>
             <template v-if="editingConcurrency">
               <InputNumber v-model:value="newWorkers" :min="1" :max="100" size="small" style="width: 80px;" />
               <Button size="small" type="primary" :loading="savingWorkers" @click="handleSetConcurrency">确定</Button>
@@ -437,7 +437,7 @@ onUnmounted(() => {
           </Col>
         </Row>
         <div class="mt-3">
-          <div class="text-xs text-gray-400 mb-1">Worker 使用率</div>
+          <div class="text-xs text-gray-400 dark:text-gray-500 mb-1">Worker 使用率</div>
           <Progress
             :percent="queueStats.max_workers ? Math.round((queueStats.active / queueStats.max_workers) * 100) : 0"
             :stroke-color="'#1677ff'"
@@ -489,6 +489,9 @@ onUnmounted(() => {
 .stat-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+html.dark .stat-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 .stat-card--blue { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
 .stat-card--green { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
@@ -553,6 +556,9 @@ onUnmounted(() => {
 .status-mini-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
+html.dark .status-mini-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
 .status-dot {
   width: 42px;
   height: 42px;
@@ -566,6 +572,9 @@ onUnmounted(() => {
 .status-dot--blue { background: #e6f7ff; color: #1890ff; }
 .status-dot--green { background: #f6ffed; color: #52c41a; }
 .status-dot--red { background: #fff1f0; color: #ff4d4f; }
+html.dark .status-dot--blue { background: rgba(24,144,255,0.15); }
+html.dark .status-dot--green { background: rgba(82,196,26,0.15); }
+html.dark .status-dot--red { background: rgba(255,77,79,0.15); }
 .completion-ring { flex-shrink: 0; }
 
 /* 柱状图 */
@@ -599,6 +608,7 @@ onUnmounted(() => {
   margin-bottom: 4px;
   white-space: nowrap;
 }
+html.dark .chart-bar-value { color: #666; }
 .chart-bar {
   width: 100%;
   max-width: 48px;
@@ -622,6 +632,7 @@ onUnmounted(() => {
   color: #aaa;
   margin-top: 6px;
 }
+html.dark .chart-bar-label { color: #666; }
 
 /* 状态分布 */
 .status-bar-track {
@@ -631,6 +642,7 @@ onUnmounted(() => {
   overflow: hidden;
   background: #f5f5f5;
 }
+html.dark .status-bar-track { background: #333; }
 .status-bar-segment {
   height: 100%;
   min-width: 4px;
@@ -663,10 +675,12 @@ onUnmounted(() => {
   color: #666;
   flex: 1;
 }
+html.dark .status-legend-label { color: #999; }
 .status-legend-count {
   font-weight: 600;
   color: #333;
 }
+html.dark .status-legend-count { color: #e5e7eb; }
 
 /* 队列统计 */
 .queue-stat-item {
@@ -683,4 +697,5 @@ onUnmounted(() => {
   color: #999;
   margin-top: 4px;
 }
+html.dark .queue-stat-label { color: #666; }
 </style>

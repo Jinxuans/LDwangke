@@ -345,9 +345,9 @@ onMounted(async () => {
             <SelectOption v-for="f in categories" :key="f.id" :value="f.id" :label="f.name">{{ f.name }}</SelectOption>
           </Select>
 
-          <div v-if="categoryProducts.length > 0" class="mt-3 p-3 rounded" style="background: #f0f9eb; border-left: 4px solid #67c23a;">
+          <div v-if="categoryProducts.length > 0" class="mt-3 p-3 rounded bg-green-50 dark:bg-green-900/20" style="border-left: 4px solid #67c23a;">
             <div><strong>分类包含商品：</strong>共 {{ categoryProducts.length }} 个商品</div>
-            <div class="mt-2" style="max-height: 120px; overflow: auto; font-size: 12px; color: #666;">
+            <div class="mt-2 text-gray-600 dark:text-gray-400" style="max-height: 120px; overflow: auto; font-size: 12px;">
               <div v-for="p in categoryProducts" :key="p.cid">{{ p.name }}（原价：{{ p.price }}币）</div>
             </div>
           </div>
@@ -374,21 +374,21 @@ onMounted(async () => {
         </div>
 
         <!-- 单商品倍率预览 -->
-        <div v-if="addForm.setType === 'single' && addForm.pricingMethod === 'multiplier' && addForm.cid && addForm.multiplier" class="p-3 rounded" style="background: #f0f9ff; border-left: 4px solid #1890ff;">
+        <div v-if="addForm.setType === 'single' && addForm.pricingMethod === 'multiplier' && addForm.cid && addForm.multiplier" class="p-3 rounded bg-blue-50 dark:bg-blue-900/20" style="border-left: 4px solid #1890ff;">
           <strong>价格预览：</strong>
           原价 {{ selectedProductPrice }} 币 × {{ addForm.multiplier }} 倍 =
           <span style="color: #f56c6c; font-weight: bold;">{{ calculatedPrice }} 币</span>
         </div>
 
         <!-- 分类倍率预览 -->
-        <div v-if="addForm.setType === 'batch' && addForm.pricingMethod === 'multiplier' && addForm.fenlei && addForm.multiplier && categoryProducts.length > 0" class="p-3 rounded" style="background: #f0f9ff; border-left: 4px solid #1890ff;">
+        <div v-if="addForm.setType === 'batch' && addForm.pricingMethod === 'multiplier' && addForm.fenlei && addForm.multiplier && categoryProducts.length > 0" class="p-3 rounded bg-blue-50 dark:bg-blue-900/20" style="border-left: 4px solid #1890ff;">
           <strong>批量价格预览（前5个商品）：</strong>
           <div class="mt-2" style="font-size: 12px;">
             <div v-for="p in categoryProducts.slice(0, 5)" :key="p.cid" class="mb-1">
               {{ p.name }}：{{ p.price }}币 × {{ addForm.multiplier }}倍 =
               <span style="color: #f56c6c; font-weight: bold;">{{ (Number(p.price || 0) * Number(addForm.multiplier || 0)).toFixed(2) }}币</span>
             </div>
-            <div v-if="categoryProducts.length > 5" style="color: #999;">... 还有 {{ categoryProducts.length - 5 }} 个商品</div>
+            <div v-if="categoryProducts.length > 5" class="text-gray-400 dark:text-gray-500">... 还有 {{ categoryProducts.length - 5 }} 个商品</div>
           </div>
         </div>
       </div>

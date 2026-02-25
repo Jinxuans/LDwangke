@@ -765,7 +765,7 @@ onMounted(() => {
           v-for="(log, idx) in logData"
           :key="idx"
           class="border-b border-gray-100 py-2 px-2 text-sm"
-          :class="idx % 2 === 0 ? 'bg-gray-50' : ''"
+          :class="idx % 2 === 0 ? 'bg-gray-50 dark:bg-gray-800/50' : ''"
         >
           <div class="flex items-center gap-3 flex-wrap">
             <Tag v-if="log.time" color="blue" class="text-xs">{{ log.time }}</Tag>

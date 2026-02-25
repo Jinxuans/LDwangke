@@ -213,7 +213,7 @@ onMounted(() => loadTickets(1));
     <!-- 工单详情 -->
     <Modal v-model:open="detailVisible" title="工单详情" :width="600" style="max-width: 95vw" :footer="null">
       <div v-if="currentTicket" class="space-y-4">
-        <div class="p-3 bg-gray-50 rounded">
+        <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded">
           <div class="flex justify-between items-center mb-2">
             <Tag :color="statusColor(currentTicket.status)">{{ statusText(currentTicket.status) }}</Tag>
             <span class="text-xs text-gray-400">{{ currentTicket.addtime }}</span>
@@ -221,7 +221,7 @@ onMounted(() => loadTickets(1));
           <div class="text-sm whitespace-pre-wrap">{{ currentTicket.content }}</div>
         </div>
 
-        <div v-if="currentTicket.reply" class="p-3 bg-blue-50 rounded">
+        <div v-if="currentTicket.reply" class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
           <div class="flex justify-between items-center mb-2">
             <Tag color="blue">管理员回复</Tag>
             <span class="text-xs text-gray-400">{{ currentTicket.reply_time }}</span>

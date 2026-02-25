@@ -197,7 +197,7 @@ onUnmounted(() => {
     <!-- 顶部操作栏 -->
     <div class="mb-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <span class="text-sm text-gray-400" v-if="lastRefresh">
+        <span class="text-sm text-gray-400 dark:text-gray-500" v-if="lastRefresh">
           <ClockCircleOutlined class="mr-1" />更新于 {{ lastRefresh }}
         </span>
         <Tag v-if="dash" :color="dash.system.uptime_seconds > 86400 ? 'green' : 'blue'">
@@ -227,7 +227,7 @@ onUnmounted(() => {
               <Tag :color="turbo.enabled ? 'red' : 'blue'">
                 {{ turbo.profile.name.toUpperCase() }}
               </Tag>
-              <span class="text-xs text-gray-400" v-if="turbo.applied_at">
+              <span class="text-xs text-gray-400 dark:text-gray-500" v-if="turbo.applied_at">
                 {{ turbo.applied_at }}
               </span>
             </div>
@@ -241,7 +241,7 @@ onUnmounted(() => {
           <Row :gutter="[16, 12]">
             <Col :xs="24" :lg="10">
               <div class="flex items-center gap-2 mb-3">
-                <span class="text-sm text-gray-500">硬件: {{ turbo.profile.cpu_cores }} 核 / {{ turbo.profile.mem_total_mb }} MB</span>
+                <span class="text-sm text-gray-500 dark:text-gray-400">硬件: {{ turbo.profile.cpu_cores }} 核 / {{ turbo.profile.mem_total_mb }} MB</span>
                 <Tag size="small">{{ turbo.profile.goos }}/{{ turbo.profile.goarch }}</Tag>
               </div>
               <div class="flex gap-2 flex-wrap">
@@ -440,20 +440,20 @@ onUnmounted(() => {
                   </div>
                 </Col>
               </Row>
-              <div class="mt-4 border-t border-gray-100 pt-3">
-                <div class="text-xs text-gray-400 mb-2">运行时计数器（自启动以来）</div>
+              <div class="mt-4 border-t border-gray-100 dark:border-gray-700 pt-3">
+                <div class="text-xs text-gray-400 dark:text-gray-500 mb-2">运行时计数器（自启动以来）</div>
                 <div class="flex gap-6">
                   <div class="text-center">
                     <div class="text-lg font-semibold">{{ dash.errors.error_counter }}</div>
-                    <div class="text-xs text-gray-400">错误</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500">错误</div>
                   </div>
                   <div class="text-center">
                     <div class="text-lg font-semibold">{{ dash.errors.dock_fail_count }}</div>
-                    <div class="text-xs text-gray-400">对接失败</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500">对接失败</div>
                   </div>
                   <div class="text-center">
                     <div class="text-lg font-semibold">{{ dash.errors.http_error_count }}</div>
-                    <div class="text-xs text-gray-400">HTTP错误</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500">HTTP错误</div>
                   </div>
                 </div>
               </div>
@@ -503,7 +503,7 @@ onUnmounted(() => {
                 </div>
               </div>
               <div class="mt-3">
-                <div class="text-xs text-gray-400 mb-1">连接池 ({{ dash.db.in_use }} 使用 / {{ dash.db.open_conns }} 打开 / {{ dash.db.max_open_conns }} 最大)</div>
+                <div class="text-xs text-gray-400 dark:text-gray-500 mb-1">连接池 ({{ dash.db.in_use }} 使用 / {{ dash.db.open_conns }} 打开 / {{ dash.db.max_open_conns }} 最大)</div>
                 <Progress
                   :percent="dash.db.max_open_conns ? Math.round((dash.db.open_conns / dash.db.max_open_conns) * 100) : 0"
                   :stroke-color="dash.db.open_conns / dash.db.max_open_conns > 0.8 ? '#ff4d4f' : '#13c2c2'"
@@ -601,7 +601,7 @@ onUnmounted(() => {
                 </Col>
               </Row>
               <div class="mt-3">
-                <div class="text-xs text-gray-400 mb-1">Worker ({{ dash.queue?.active || 0 }}/{{ dash.queue?.max_workers || 0 }})</div>
+                <div class="text-xs text-gray-400 dark:text-gray-500 mb-1">Worker ({{ dash.queue?.active || 0 }}/{{ dash.queue?.max_workers || 0 }})</div>
                 <Progress
                   :percent="(dash.queue?.max_workers) ? Math.round(((dash.queue?.active || 0) / dash.queue.max_workers) * 100) : 0"
                   :stroke-color="'#1677ff'" size="small" status="active"
@@ -636,7 +636,7 @@ onUnmounted(() => {
                   <span class="hourly-bar-label">{{ item.hour }}</span>
                 </div>
               </div>
-              <div v-else class="text-center text-gray-400 py-8">暂无数据</div>
+              <div v-else class="text-center text-gray-400 dark:text-gray-500 py-8">暂无数据</div>
             </Card>
           </Col>
         </Row>
@@ -686,11 +686,11 @@ onUnmounted(() => {
                   <Tag v-if="record.http_code" :color="record.http_code >= 200 && record.http_code < 400 ? 'green' : 'red'">
                     {{ record.http_code }}
                   </Tag>
-                  <span v-else class="text-gray-300">-</span>
+                  <span v-else class="text-gray-300 dark:text-gray-600">-</span>
                 </template>
               </template>
             </Table>
-            <div v-else class="text-center text-gray-400 py-6">
+            <div v-else class="text-center text-gray-400 dark:text-gray-500 py-6">
               点击"开始探测"检测所有启用的供应商接口可用性
             </div>
           </Spin>
@@ -767,8 +767,15 @@ onUnmounted(() => {
   background: #fff;
   transition: all 0.2s;
 }
+html.dark .health-card {
+  background: #141414;
+  border-color: #333;
+}
 .health-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+html.dark .health-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 .health-card--ok {
   border-left: 4px solid #52c41a;
@@ -791,15 +798,20 @@ onUnmounted(() => {
   color: #595959;
   flex-shrink: 0;
 }
+html.dark .health-card__icon { background: #333; color: #999; }
 .health-card--ok .health-card__icon { background: #f6ffed; color: #52c41a; }
 .health-card--err .health-card__icon { background: #fff1f0; color: #ff4d4f; }
 .health-card--warn .health-card__icon { background: #fffbe6; color: #faad14; }
+html.dark .health-card--ok .health-card__icon { background: rgba(82,196,26,0.15); }
+html.dark .health-card--err .health-card__icon { background: rgba(255,77,79,0.15); }
+html.dark .health-card--warn .health-card__icon { background: rgba(250,173,20,0.15); }
 .health-card__title {
   font-weight: 600;
   font-size: 14px;
   color: #262626;
   margin-bottom: 2px;
 }
+html.dark .health-card__title { color: #e5e7eb; }
 .health-card__status {
   font-size: 13px;
   color: #8c8c8c;
@@ -837,6 +849,7 @@ onUnmounted(() => {
   font-weight: 500;
   color: #262626;
 }
+html.dark .info-value { color: #e5e7eb; }
 
 /* 异常统计卡 */
 .err-stat-card {
@@ -845,6 +858,7 @@ onUnmounted(() => {
   border-radius: 8px;
   background: #fafafa;
 }
+html.dark .err-stat-card { background: #1f1f1f; }
 .err-stat-value {
   font-size: 28px;
   font-weight: 700;
@@ -871,6 +885,7 @@ onUnmounted(() => {
   color: #999;
   margin-top: 2px;
 }
+html.dark .q-stat-lbl { color: #666; }
 
 /* 小时柱状图 */
 .hourly-chart {
@@ -903,6 +918,7 @@ onUnmounted(() => {
   margin-bottom: 2px;
   white-space: nowrap;
 }
+html.dark .hourly-bar-val { color: #666; }
 .hourly-bar {
   width: 100%;
   max-width: 28px;
@@ -920,6 +936,7 @@ onUnmounted(() => {
   color: #aaa;
   margin-top: 4px;
 }
+html.dark .hourly-bar-label { color: #666; }
 
 /* 狂暴模式参数网格 */
 .turbo-params {
@@ -934,6 +951,7 @@ onUnmounted(() => {
   border-radius: 6px;
   background: #fafafa;
 }
+html.dark .turbo-param { background: #1f1f1f; }
 .turbo-param-label {
   font-size: 11px;
   color: #8c8c8c;
@@ -944,4 +962,5 @@ onUnmounted(() => {
   font-weight: 600;
   color: #262626;
 }
+html.dark .turbo-param-value { color: #e5e7eb; }
 </style>

@@ -79,7 +79,7 @@ onUnmounted(() => {
   <Page auto-content-height content-class="p-0">
     <div class="flex h-full flex-col">
       <!-- 顶部工具栏 -->
-      <div class="flex items-center gap-3 px-4 py-2" style="border-bottom: 1px solid #f0f0f0; background: #fafafa;">
+      <div class="flex items-center gap-3 px-4 py-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-[#1f1f1f]">
         <Button size="small" @click="goBack">返回大厅</Button>
         <span v-if="moduleName" class="font-medium">{{ moduleName }}</span>
         <Button v-if="error" size="small" type="link" @click="retry">重试</Button>

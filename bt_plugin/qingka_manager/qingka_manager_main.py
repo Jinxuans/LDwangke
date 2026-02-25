@@ -74,35 +74,61 @@ class qingka_manager_main:
             return public.readFile(self.__license_file).strip()
         return ''
 
+    def _cache_sign(self, data_str):
+        """对缓存数据生成 HMAC-SHA256 签名，防篡改"""
+        import hmac
+        secret = self.__update_server + self.__license_file
+        return hmac.new(secret.encode(), data_str.encode(), hashlib.sha256).hexdigest()
+
     def _verify_license(self, key):
         try:
-            import urllib.request
+            import urllib.request, hmac as _hmac
             domain = self._get_domain()
             mid = ''
             if os.path.isfile('/etc/machine-id'):
                 mid = open('/etc/machine-id').read().strip()
-            url = self.__update_server + '/update/verify.php'
-            body = json.dumps({'key': key, 'domain': domain or '', 'machine_id': mid}).encode()
+            ts = int(time.time())
+            sign_str = 'domain=%s&license_key=%s&machine_id=%s&timestamp=%d&version=' % (domain or '', key, mid, ts)
+            sign = _hmac.new(self._get_client_secret().encode(), sign_str.encode(), hashlib.sha256).hexdigest()
+            url = self.__update_server + '/api/v1/license/verify'
+            body = json.dumps({
+                'license_key': key, 'domain': domain or '', 'machine_id': mid,
+                'version': '', 'timestamp': ts, 'sign': sign
+            }).encode()
             req = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json', 'User-Agent': 'QingkaPlugin/1.0'})
             resp = urllib.request.urlopen(req, timeout=10)
             result = json.loads(resp.read().decode())
-            if result.get('valid'):
-                # 缓存授权结果
-                cache = os.path.join(self.__site_dir, '.license_cache')
+            if result.get('code') == 0 and result.get('data', {}).get('valid'):
+                # 缓存授权结果（带 HMAC 签名防篡改）
+                cache_path = os.path.join(self.__site_dir, '.license_cache')
                 os.makedirs(self.__site_dir, exist_ok=True)
-                public.writeFile(cache, json.dumps({'key': key, 'ts': int(time.time())}))
+                cache_data = json.dumps({'key': key, 'ts': ts}, separators=(',', ':'))
+                cache_sign = self._cache_sign(cache_data)
+                public.writeFile(cache_path, json.dumps({'d': cache_data, 's': cache_sign}))
                 return True, '授权有效'
-            return False, result.get('msg', '授权码无效')
+            return False, result.get('message', result.get('msg', '授权码无效'))
         except Exception as e:
-            cache = os.path.join(self.__site_dir, '.license_cache')
-            if os.path.isfile(cache):
+            cache_path = os.path.join(self.__site_dir, '.license_cache')
+            if os.path.isfile(cache_path):
                 try:
-                    c = json.loads(public.readFile(cache))
-                    if c.get('key') == key and time.time() - c.get('ts', 0) < 86400 * 7:
-                        return True, '授权有效（离线缓存）'
+                    raw = json.loads(public.readFile(cache_path))
+                    cache_data = raw.get('d', '')
+                    cache_sign = raw.get('s', '')
+                    # 验证 HMAC 签名
+                    if cache_data and cache_sign == self._cache_sign(cache_data):
+                        c = json.loads(cache_data)
+                        if c.get('key') == key and time.time() - c.get('ts', 0) < 86400 * 7:
+                            return True, '授权有效（离线缓存）'
                 except Exception:
                     pass
             return False, '授权验证失败: %s' % str(e)
+
+    def _get_client_secret(self):
+        """读取客户端签名密钥（与授权站 config.toml 中 client_secret 一致）"""
+        secret_file = os.path.join(self.__site_dir, '.client_secret')
+        if os.path.isfile(secret_file):
+            return open(secret_file).read().strip()
+        return 'default-client-secret'
     # ==================== 状态 ====================
 
     def get_status(self, args):
@@ -531,7 +557,7 @@ class qingka_manager_main:
         if os.path.isdir(mig_dir):
             sqls = sorted([f for f in os.listdir(mig_dir) if f.endswith('.sql')])
             for sql in sqls:
-                result = public.ExecShell('mysql -u%s -p"%s" %s < %s 2>&1' % (db_user, db_pass, db_name, os.path.join(mig_dir, sql)))
+                result = public.ExecShell('mysql --force -u%s -p"%s" %s < %s 2>&1' % (db_user, db_pass, db_name, os.path.join(mig_dir, sql)))
                 if result[1] and result[1].strip():
                     logs.append('%s: %s' % (sql, result[1].strip()[:100]))
         # 3. 补管理员账号
@@ -930,7 +956,7 @@ smtp:
         for sql in sqls:
             sql_path = os.path.join(mig_dir, sql)
             try:
-                result = public.ExecShell('mysql -u%s -p"%s" %s < %s 2>&1' % (db_info['user'], db_info['pass'], db_info['name'], sql_path))
+                result = public.ExecShell('mysql --force -u%s -p"%s" %s < %s 2>&1' % (db_info['user'], db_info['pass'], db_info['name'], sql_path))
                 if result[1] and result[1].strip():
                     public.WriteLog('qingka_manager', '迁移 %s 警告: %s' % (sql, result[1].strip()[:200]))
             except Exception as e:

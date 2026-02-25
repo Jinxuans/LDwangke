@@ -187,7 +187,7 @@ onMounted(() => {
                   <Statistic title="本地商品" :value="sup.local_count" :value-style="{ fontSize: '18px' }" />
                   <Statistic title="在架" :value="sup.active_count" :value-style="{ fontSize: '18px', color: '#52c41a' }" />
                   <div>
-                    <div class="text-xs text-gray-400">余额</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500">余额</div>
                     <div class="font-semibold" style="font-size: 18px; color: #1890ff">{{ sup.money || '0' }}</div>
                   </div>
                 </div>
@@ -239,7 +239,7 @@ onMounted(() => {
                       :min="0.01" :max="100" :step="0.1" :precision="2"
                       style="width: 100px"
                     />
-                    <span class="text-gray-400 text-xs">= 本地售价</span>
+                    <span class="text-gray-400 dark:text-gray-500 text-xs">= 本地售价</span>
                   </div>
                 </div>
               </Card>

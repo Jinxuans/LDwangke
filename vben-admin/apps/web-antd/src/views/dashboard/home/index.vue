@@ -295,29 +295,29 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); });
           <Card>
             <template #extra><WalletOutlined style="color:#6366f1;font-size:20px" /></template>
             <Statistic title="账户余额" :value="(profile?.money || 0).toFixed(2)" prefix="¥" />
-            <div class="mt-1 text-xs text-gray-400">总充值 ¥{{ (profile?.zcz || 0).toFixed(2) }}</div>
+            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">总充值 ¥{{ (profile?.zcz || 0).toFixed(2) }}</div>
           </Card>
         </Col>
         <Col :xs="12" :lg="6">
           <Card>
             <template #extra><ShoppingCartOutlined style="color:#10b981;font-size:20px" /></template>
             <Statistic title="今日订单" :value="profile?.today_orders || dashStats?.today_orders || 0" />
-            <div class="mt-1 text-xs text-gray-400">总订单 {{ profile?.order_total || dashStats?.total_orders || 0 }}</div>
+            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">总订单 {{ profile?.order_total || dashStats?.total_orders || 0 }}</div>
           </Card>
         </Col>
         <Col :xs="12" :lg="6">
           <Card>
             <template #extra><DollarOutlined style="color:#f59e0b;font-size:20px" /></template>
             <Statistic :title="hasAdminRole ? '今日收入' : '今日消费'" :value="(hasAdminRole ? (dashStats?.today_income || 0) : (profile?.today_spend || 0)).toFixed(2)" prefix="¥" />
-            <div class="mt-1 text-xs text-gray-400" v-if="hasAdminRole"><SyncOutlined /> 进行中 {{ dashStats?.processing_orders || 0 }} 单</div>
+            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500" v-if="hasAdminRole"><SyncOutlined /> 进行中 {{ dashStats?.processing_orders || 0 }} 单</div>
           </Card>
         </Col>
         <Col :xs="12" :lg="6">
           <Card>
             <template #extra><TeamOutlined style="color:#8b5cf6;font-size:20px" /></template>
             <Statistic :title="hasAdminRole ? '注册用户' : '我的代理'" :value="hasAdminRole ? (dashStats?.user_count || 0) : (profile?.dailitongji?.dlzs || 0)" />
-            <div class="mt-1 text-xs text-gray-400" v-if="hasAdminRole">平台余额 ¥{{ (dashStats?.total_balance || 0).toFixed(2) }}</div>
-            <div class="mt-1 text-xs text-gray-400" v-else-if="profile?.dailitongji">今日交单 {{ profile.dailitongji.jrjd || 0 }}</div>
+            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500" v-if="hasAdminRole">平台余额 ¥{{ (dashStats?.total_balance || 0).toFixed(2) }}</div>
+            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500" v-else-if="profile?.dailitongji">今日交单 {{ profile.dailitongji.jrjd || 0 }}</div>
           </Card>
         </Col>
       </Row>
@@ -345,7 +345,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); });
         </template>
         <template #extra>
           <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-500 hidden sm:inline">并发:</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">并发:</span>
             <template v-if="editingConcurrency">
               <input type="number" v-model.number="newConcurrency" min="1" max="100" class="w-14 rounded border px-2 py-0.5 text-sm" />
               <Button size="small" type="primary" @click="handleSetConcurrency">确定</Button>
@@ -358,12 +358,12 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); });
           </div>
         </template>
         <Row :gutter="16">
-          <Col :span="4" class="text-center"><Statistic :value="queueStats.active" :value-style="{color:'#3b82f6'}" /><div class="text-xs text-gray-400">活跃</div></Col>
-          <Col :span="4" class="text-center"><Statistic :value="queueStats.pending" :value-style="{color:'#f59e0b'}" /><div class="text-xs text-gray-400">排队</div></Col>
-          <Col :span="4" class="text-center"><Statistic :value="queueStats.processing" :value-style="{color:'#06b6d4'}" /><div class="text-xs text-gray-400">处理</div></Col>
-          <Col :span="4" class="text-center"><Statistic :value="queueStats.completed" :value-style="{color:'#10b981'}" /><div class="text-xs text-gray-400">完成</div></Col>
-          <Col :span="4" class="text-center"><Statistic :value="queueStats.failed" :value-style="{color:'#ef4444'}" /><div class="text-xs text-gray-400">失败</div></Col>
-          <Col :span="4" class="text-center"><Statistic :value="`${queueStats.queue_size}/${queueStats.queue_cap}`" :value-style="{color:'#6b7280'}" /><div class="text-xs text-gray-400">容量</div></Col>
+          <Col :span="4" class="text-center"><Statistic :value="queueStats.active" :value-style="{color:'#3b82f6'}" /><div class="text-xs text-gray-400 dark:text-gray-500">活跃</div></Col>
+          <Col :span="4" class="text-center"><Statistic :value="queueStats.pending" :value-style="{color:'#f59e0b'}" /><div class="text-xs text-gray-400 dark:text-gray-500">排队</div></Col>
+          <Col :span="4" class="text-center"><Statistic :value="queueStats.processing" :value-style="{color:'#06b6d4'}" /><div class="text-xs text-gray-400 dark:text-gray-500">处理</div></Col>
+          <Col :span="4" class="text-center"><Statistic :value="queueStats.completed" :value-style="{color:'#10b981'}" /><div class="text-xs text-gray-400 dark:text-gray-500">完成</div></Col>
+          <Col :span="4" class="text-center"><Statistic :value="queueStats.failed" :value-style="{color:'#ef4444'}" /><div class="text-xs text-gray-400 dark:text-gray-500">失败</div></Col>
+          <Col :span="4" class="text-center"><Statistic :value="`${queueStats.queue_size}/${queueStats.queue_cap}`" :value-style="{color:'#6b7280'}" /><div class="text-xs text-gray-400 dark:text-gray-500">容量</div></Col>
         </Row>
       </Card>
 
@@ -421,7 +421,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); });
                 </template>
               </template>
             </Table>
-            <div v-if="!hasAdminRole || (dashStats?.recent_orders || []).length === 0" class="flex flex-col items-center py-8 text-gray-400">
+            <div v-if="!hasAdminRole || (dashStats?.recent_orders || []).length === 0" class="flex flex-col items-center py-8 text-gray-400 dark:text-gray-500">
               <UnorderedListOutlined class="mb-2 text-2xl" />
               <span>暂无订单数据</span>
             </div>
@@ -439,7 +439,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); });
             </template>
             <div class="flex items-center justify-between">
               <div v-if="checkedIn" class="text-sm text-green-600">✓ 已签到，奖励 ¥{{ checkinReward }}</div>
-              <div v-else class="text-sm text-gray-500">签到领取随机奖励</div>
+              <div v-else class="text-sm text-gray-500 dark:text-gray-400">签到领取随机奖励</div>
               <Button v-if="!checkedIn" type="primary" size="small" :loading="checkinLoading" @click="doCheckin">
                 <GiftOutlined /> 签到
               </Button>
@@ -472,7 +472,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); });
                     class="mt-1"
                   />
                 </div>
-                <span class="text-xs text-gray-400 whitespace-nowrap">{{ u.orders }}单</span>
+                <span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{{ u.orders }}单</span>
               </div>
             </div>
           </Card>
@@ -495,13 +495,13 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); });
                       </div>
                     </template>
                     <template #description>
-                      <div class="text-xs text-gray-400">{{ item.time }}</div>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">{{ item.time }}</div>
                     </template>
                   </ListItemMeta>
                 </ListItem>
               </template>
             </List>
-            <div v-else class="flex flex-col items-center py-8 text-gray-400">
+            <div v-else class="flex flex-col items-center py-8 text-gray-400 dark:text-gray-500">
               <NotificationOutlined class="mb-2 text-2xl" />
               <span>暂无公告</span>
             </div>

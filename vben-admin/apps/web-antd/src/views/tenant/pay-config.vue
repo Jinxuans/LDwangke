@@ -123,7 +123,7 @@ onMounted(load);
                 placeholder="https://your-epay.com/"
                 allow-clear
               />
-              <div class="mt-1 text-xs text-gray-400">
+              <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">
                 易支付站点地址，末尾带斜杠
               </div>
             </div>
@@ -158,7 +158,7 @@ onMounted(load);
           <div class="mb-3 text-base font-semibold">开启支付方式</div>
           <div class="space-y-3">
             <div
-              class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
+              class="flex items-center justify-between rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2"
             >
               <div class="flex items-center gap-2">
                 <AlipayCircleOutlined style="font-size:24px;color:#1677ff" />
@@ -173,7 +173,7 @@ onMounted(load);
             </div>
 
             <div
-              class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
+              class="flex items-center justify-between rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2"
             >
               <div class="flex items-center gap-2">
                 <WechatOutlined style="font-size:24px;color:#07c160" />
@@ -188,7 +188,7 @@ onMounted(load);
             </div>
 
             <div
-              class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2"
+              class="flex items-center justify-between rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2"
             >
               <div class="flex items-center gap-2">
                 <QqOutlined style="font-size:24px;color:#12b7f5" />

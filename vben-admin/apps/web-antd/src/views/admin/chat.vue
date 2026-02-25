@@ -282,28 +282,28 @@ onUnmounted(() => {
         <Col :xs="24" :sm="12" :md="12">
           <Row :gutter="16">
             <Col :span="8">
-              <Card :bordered="false" class="!bg-gray-50 shadow-sm" :body-style="{ padding: '12px 16px' }">
+              <Card :bordered="false" class="!bg-gray-50 dark:!bg-gray-800 shadow-sm" :body-style="{ padding: '12px 16px' }">
                 <Statistic title="消息总数" :value="chatStats.msg_count" />
               </Card>
             </Col>
             <Col :span="8">
-              <Card :bordered="false" class="!bg-gray-50 shadow-sm" :body-style="{ padding: '12px 16px' }">
+              <Card :bordered="false" class="!bg-gray-50 dark:!bg-gray-800 shadow-sm" :body-style="{ padding: '12px 16px' }">
                 <Statistic title="已归档" :value="chatStats.archive_count" :value-style="{ color: '#9ca3af' }" />
               </Card>
             </Col>
             <Col :span="8">
-              <Card :bordered="false" class="!bg-gray-50 shadow-sm" :body-style="{ padding: '12px 16px' }">
+              <Card :bordered="false" class="!bg-gray-50 dark:!bg-gray-800 shadow-sm" :body-style="{ padding: '12px 16px' }">
                 <Statistic title="当前会话" :value="chatStats.session_count" />
               </Card>
             </Col>
           </Row>
         </Col>
         <Col :xs="24" :sm="12" :md="12" class="text-right">
-          <div class="inline-flex items-center gap-2 bg-gray-50 px-4 py-2 rounded-lg border border-gray-100 w-full sm:w-auto justify-between sm:justify-end">
+          <div class="inline-flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-4 py-2 rounded-lg border border-gray-100 dark:border-gray-700 w-full sm:w-auto justify-between sm:justify-end">
             <div class="flex items-center gap-2">
-              <span class="text-gray-500">清理</span>
+              <span class="text-gray-500 dark:text-gray-400">清理</span>
               <InputNumber v-model:value="cleanupDays" :min="1" :max="365" size="small" class="w-16" />
-              <span class="text-gray-500">天前消息</span>
+              <span class="text-gray-500 dark:text-gray-400">天前消息</span>
             </div>
             <Popconfirm :title="`确定归档 ${cleanupDays} 天前的已读消息？`" @confirm="handleCleanup">
               <Button type="primary" danger size="small" :loading="cleanupLoading">
@@ -318,12 +318,12 @@ onUnmounted(() => {
 
     <!-- 聊天主区域 -->
     <div
-      class="flex-1 min-h-0 border rounded-lg overflow-hidden bg-white flex shadow-sm transition-all duration-300"
+      class="flex-1 min-h-0 border rounded-lg overflow-hidden bg-white dark:bg-[#141414] flex shadow-sm transition-all duration-300 dark:border-gray-700"
       :class="isMobile ? 'mx-0 mb-0 border-0 rounded-none' : 'mx-4 mb-4'"
     >
       <!-- 左侧会话列表 -->
       <div
-        class="border-r flex flex-col bg-gray-50/30 transition-all duration-300"
+        class="border-r flex flex-col bg-gray-50/30 dark:bg-[#1a1a1a] transition-all duration-300 dark:border-gray-700"
         :class="[isMobile ? (showChat ? 'w-0 hidden' : 'w-full') : 'w-80']"
       >
         <div class="border-b">
@@ -346,8 +346,8 @@ onUnmounted(() => {
             <div
               v-for="s in filteredSessions"
               :key="s.list_id"
-              class="flex items-center px-3 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
-              :class="{ 'bg-blue-50': s.list_id === activeListId }"
+              class="flex items-center px-3 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              :class="{ 'bg-blue-50 dark:bg-blue-900/30': s.list_id === activeListId }"
               @click="selectSession(s)"
             >
               <Badge :count="s.unread_count" :offset="[-4, 4]" size="small">
@@ -356,8 +356,8 @@ onUnmounted(() => {
                     <template #icon><UserOutlined /></template>
                   </Avatar>
                   <span
-                    class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white"
-                    :class="getPeerOnline(s) ? 'bg-green-500' : 'bg-gray-300'"
+                    class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-gray-800"
+                    :class="getPeerOnline(s) ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'"
                   ></span>
                 </div>
               </Badge>
@@ -371,7 +371,7 @@ onUnmounted(() => {
             </div>
           </Spin>
         </div>
-        <div class="px-3 py-2 border-t text-xs text-gray-400 text-center">
+        <div class="px-3 py-2 border-t dark:border-gray-700 text-xs text-gray-400 dark:text-gray-500 text-center">
           共 {{ sessions.length }} 个会话，{{ unrepliedSessions.length }} 个待回复
         </div>
       </div>
@@ -383,7 +383,7 @@ onUnmounted(() => {
       >
         <template v-if="activeListId && activeSession">
           <!-- 聊天头部 -->
-          <div class="px-4 py-3 border-b flex items-center justify-between">
+          <div class="px-4 py-3 border-b dark:border-gray-700 flex items-center justify-between">
             <div class="flex items-center">
               <Button v-if="isMobile" type="text" size="small" class="mr-2" @click="showChat = false">
                 <template #icon><ArrowLeftOutlined /></template>
@@ -393,13 +393,13 @@ onUnmounted(() => {
                   <template #icon><UserOutlined /></template>
                 </Avatar>
                 <span
-                  class="absolute bottom-0 right-0 w-2 h-2 rounded-full border-2 border-white"
-                  :class="getPeerOnline(activeSession) ? 'bg-green-500' : 'bg-gray-300'"
+                  class="absolute bottom-0 right-0 w-2 h-2 rounded-full border-2 border-white dark:border-gray-800"
+                  :class="getPeerOnline(activeSession) ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'"
                 ></span>
               </div>
               <div class="ml-3">
                 <span class="font-medium">{{ getSessionDisplayName(activeSession) }}</span>
-                <div class="text-xs" :class="getPeerOnline(activeSession) ? 'text-green-500' : 'text-gray-400'">
+                <div class="text-xs" :class="getPeerOnline(activeSession) ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'">
                   {{ getPeerOnline(activeSession) ? '在线' : '离线' }}
                 </div>
               </div>
@@ -411,7 +411,7 @@ onUnmounted(() => {
           </div>
 
           <!-- 消息区域 -->
-          <div ref="msgContainerRef" class="flex-1 overflow-y-auto p-4 bg-gray-50" style="min-height: 0;">
+          <div ref="msgContainerRef" class="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-[#1a1a1a]" style="min-height: 0;">
             <Spin :spinning="messagesLoading">
               <div v-if="messages.length === 0" class="text-center text-gray-400 py-8">
                 暂无消息
@@ -436,14 +436,14 @@ onUnmounted(() => {
                   <!-- 订单卡片消息 -->
                   <div
                     v-else-if="isOrderCard(msg)"
-                    class="px-3 py-2 rounded-lg text-sm bg-white shadow-sm border border-blue-200 cursor-pointer hover:shadow-md transition-shadow"
+                    class="px-3 py-2 rounded-lg text-sm bg-white dark:bg-gray-800 shadow-sm border border-blue-200 dark:border-blue-800 cursor-pointer hover:shadow-md transition-shadow"
                     @click="showOrderDetail(msg)"
                   >
-                    <div class="flex items-center gap-1 text-blue-600 font-semibold mb-1">
+                    <div class="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-semibold mb-1">
                       <LinkOutlined class="text-xs" />
                       {{ getOrderCardLines(msg.content)[0] }}
                     </div>
-                    <div class="text-xs text-gray-600 space-y-0.5">
+                    <div class="text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
                       <div v-for="(line, li) in getOrderCardLines(msg.content).slice(1)" :key="li">{{ line }}</div>
                     </div>
                     <div class="text-xs text-blue-400 mt-1">点击查看详情 →</div>
@@ -453,7 +453,7 @@ onUnmounted(() => {
                     class="px-3 py-2 rounded-lg text-sm whitespace-pre-wrap break-words"
                     :class="isMyMsg(msg)
                       ? 'bg-blue-500 text-white rounded-br-none'
-                      : 'bg-white text-gray-800 rounded-bl-none shadow-sm'"
+                      : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-bl-none shadow-sm'"
                   >
                     {{ msg.content }}
                   </div>
@@ -463,7 +463,7 @@ onUnmounted(() => {
           </div>
 
           <!-- 快捷回复 -->
-          <div class="px-3 pt-2 border-t bg-white flex flex-wrap gap-1">
+          <div class="px-3 pt-2 border-t dark:border-gray-700 bg-white dark:bg-[#141414] flex flex-wrap gap-1">
             <Button
               v-for="(q, idx) in quickReplies"
               :key="idx"
@@ -476,7 +476,7 @@ onUnmounted(() => {
           </div>
 
           <!-- 输入区域 -->
-          <div class="px-3 pb-3 pt-2 bg-white">
+          <div class="px-3 pb-3 pt-2 bg-white dark:bg-[#141414]">
             <div class="flex items-end gap-2">
               <Input.TextArea
                 v-model:value="inputMsg"
