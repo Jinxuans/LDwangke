@@ -1098,6 +1098,12 @@ WantedBy=multi-user.target
             site_root = '/www/wwwroot/' + domain
             for d in [self.__go_dir + '/config', site_root, site_root + '/mall']:
                 os.makedirs(d, exist_ok=True)
+            # 写入 client_secret（与授权站一致）
+            secret_file = os.path.join(self.__site_dir, '.client_secret')
+            if not os.path.isfile(secret_file):
+                os.makedirs(self.__site_dir, exist_ok=True)
+                public.writeFile(secret_file, '3f48cd7beb7c6a492b0119c40f3caf114e23a3acb3d43365939c1325b8d6a72d')
+                os.chmod(secret_file, 0o600)
 
             # 2. 从更新源下载文件
             import urllib.request
