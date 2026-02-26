@@ -136,10 +136,12 @@ class qingka_manager_main:
                 content = public.readFile(config_path)
                 # 更新 license_key
                 if 'license_key:' in content:
-                    content = re.sub(r'(license_key:\s*)(".*?"|\'.*?\'|[^\s#]*)', r'\1"%s"' % key, content)
+                    content = re.sub(r'(license_key:\s*)(".*?"|\x27.*?\x27|[^\s#]*)', r'\1"%s"' % key, content)
+                else:
+                    content += '\nlicense:\n  license_key: "%s"\n  domain: "%s"\n  cache_file: ".sys_state"\n  secrets_file: ".secrets"\n' % (key, domain)
                 # 更新 domain
                 if 'domain:' in content and domain:
-                    content = re.sub(r'(  domain:\s*)(".*?"|\'.*?\'|[^\s#]*)', r'\1"%s"' % domain, content)
+                    content = re.sub(r'(  domain:\s*)(".*?"|\x27.*?\x27|[^\s#]*)', r'\1"%s"' % domain, content)
                 public.writeFile(config_path, content)
             public.WriteLog('qingka_manager', '已同步授权配置到 Go 端（密钥文件 + config.yaml）')
         except Exception as e:
