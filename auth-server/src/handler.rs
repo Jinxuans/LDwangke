@@ -145,14 +145,25 @@ pub async fn verify(
 
         let verify_resp = VerifyResponse {
             valid: true,
-            plan: license.plan,
+            plan: license.plan.clone(),
             expire_at: license.expire_at,
             max_users: license.max_users,
             max_agents: license.max_agents,
+            is_trial: license.is_trial == 1,
             message: None,
         };
 
-        (ApiResponse::success(verify_resp.clone()), Some(verify_resp))
+        let notices = db::get_active_notices(&db, &license.plan);
+
+        (ApiResponse::success(serde_json::json!({
+            "valid": verify_resp.valid,
+            "plan": verify_resp.plan,
+            "expire_at": verify_resp.expire_at,
+            "max_users": verify_resp.max_users,
+            "max_agents": verify_resp.max_agents,
+            "is_trial": verify_resp.is_trial,
+            "notices": notices,
+        })), Some(verify_resp))
     })
     .await
     .unwrap();
@@ -230,7 +241,11 @@ pub async fn heartbeat(
             }
         }
 
-        ApiResponse::success_msg("ok")
+        let notices = db::get_active_notices(&db, &license.plan);
+        ApiResponse::success(serde_json::json!({
+            "status": "ok",
+            "notices": notices,
+        }))
     })
     .await
     .unwrap();
@@ -291,6 +306,100 @@ pub async fn login(
         Ok(data) => Json(ApiResponse::success(data)),
         Err(e) => Json(ApiResponse::error(401, e)),
     }
+}
+
+// ===== 注册接口 =====
+
+/// POST /api/v1/auth/register
+pub async fn register(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(req): Json<RegisterRequest>,
+) -> Json<ApiResponse> {
+    let ip = get_client_ip(&headers, &addr);
+    if !state.rate_limiter.check(&ip) {
+        return Json(ApiResponse::error(429, "请求过于频繁，请稍后重试"));
+    }
+
+    if req.username.len() < 3 || req.username.len() > 32 {
+        return Json(ApiResponse::error(400, "用户名长度应为3-32位"));
+    }
+    if req.password.len() < 6 {
+        return Json(ApiResponse::error(400, "密码长度不能少于6位"));
+    }
+
+    let db = state.db.clone();
+    let display = if req.display_name.is_empty() { req.username.clone() } else { req.display_name.clone() };
+
+    let result = tokio::task::spawn_blocking(move || {
+        let hash = auth::hash_password(&req.password)?;
+        // 注册为普通用户(role=2)
+        let id = db::create_user(&db, &req.username, &hash, 2, &display, 0, None)?;
+        Ok::<_, String>(serde_json::json!({ "id": id }))
+    }).await.unwrap();
+
+    match result {
+        Ok(data) => Json(ApiResponse::success(data)),
+        Err(e) => Json(ApiResponse::error(400, &e)),
+    }
+}
+
+// ===== 修改密码接口 =====
+
+/// POST /api/v1/admin/change_password
+pub async fn change_password(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(req): Json<ChangePasswordRequest>,
+) -> Json<ApiResponse> {
+    if req.new_password.len() < 6 {
+        return Json(ApiResponse::error(400, "新密码长度不能少于6位"));
+    }
+
+    let db = state.db.clone();
+    let uid = claims.sub;
+
+    let result = tokio::task::spawn_blocking(move || {
+        let user = db::get_user_by_id(&db, uid).ok_or("用户不存在")?;
+        if !auth::verify_password(&req.old_password, &user.password_hash) {
+            return Err("原密码错误");
+        }
+        let new_hash = auth::hash_password(&req.new_password).map_err(|_| "密码加密失败")?;
+        db::update_user(&db, &UpdateUserRequest {
+            id: uid,
+            display_name: None,
+            password: None,
+            role: None,
+            status: None,
+            max_licenses: None,
+        }, Some(&new_hash)).map_err(|_| "更新失败")?;
+        Ok(())
+    }).await.unwrap();
+
+    match result {
+        Ok(()) => Json(ApiResponse::success_msg("密码修改成功")),
+        Err(e) => Json(ApiResponse::error(400, e)),
+    }
+}
+
+// ===== 日志清理接口 =====
+
+/// POST /api/v1/admin/license/cleanup_logs
+pub async fn admin_cleanup_logs(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+) -> Json<ApiResponse> {
+    if claims.role != 0 { return Json(ApiResponse::error(403, "仅超管可操作")); }
+    let db = state.db.clone();
+
+    let deleted = tokio::task::spawn_blocking(move || db::cleanup_old_logs(&db, 30))
+        .await.unwrap();
+
+    Json(ApiResponse::success(serde_json::json!({
+        "deleted": deleted,
+        "message": format!("已清理 {} 条30天前的日志", deleted),
+    })))
 }
 
 // ===== JWT认证中间件 =====
@@ -753,4 +862,299 @@ pub async fn admin_me(
         }))),
         None => Json(ApiResponse::error(404, "用户不存在")),
     }
+}
+
+// ===== 批量操作接口 =====
+
+/// POST /api/v1/admin/license/batch_create
+pub async fn admin_batch_create(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(mut req): Json<BatchCreateRequest>,
+) -> Json<ApiResponse> {
+    if claims.role == 2 { return Json(ApiResponse::error(403, "无权操作")); }
+    if req.count < 1 || req.count > 100 {
+        return Json(ApiResponse::error(400, "批量数量应在 1-100 之间"));
+    }
+    if claims.role == 1 {
+        req.dealer_id = claims.sub;
+        let db = state.db.clone();
+        let uid = claims.sub;
+        let count_needed = req.count as i64;
+        let (existing, max) = tokio::task::spawn_blocking(move || {
+            let c = db::count_dealer_licenses(&db, uid);
+            let u = db::get_user_by_id(&db, uid).map(|u| u.max_licenses).unwrap_or(0);
+            (c, u)
+        }).await.unwrap();
+        if existing + count_needed > max as i64 {
+            return Json(ApiResponse::error(403, &format!("配额不足 {}/{}", existing, max)));
+        }
+    }
+
+    let keys: Vec<String> = (0..req.count).map(|_| auth::generate_license_key()).collect();
+    let db = state.db.clone();
+    let who = claims.username.clone();
+    let keys_clone = keys.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        let results = db::batch_create(&db, &keys_clone, &req)?;
+        for (id, key) in &results {
+            db::add_log(&db, *id, "create", &who, &format!("批量创建授权码: {}", key));
+        }
+        Ok::<_, String>(results)
+    }).await.unwrap();
+
+    match result {
+        Ok(results) => {
+            let keys: Vec<&str> = results.iter().map(|(_, k)| k.as_str()).collect();
+            Json(ApiResponse::success(serde_json::json!({
+                "count": results.len(),
+                "keys": keys,
+            })))
+        }
+        Err(e) => Json(ApiResponse::error(500, &e)),
+    }
+}
+
+/// POST /api/v1/admin/license/batch_revoke
+pub async fn admin_batch_revoke(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(req): Json<IdsRequest>,
+) -> Json<ApiResponse> {
+    if claims.role == 2 { return Json(ApiResponse::error(403, "无权操作")); }
+    let db = state.db.clone();
+    let who = claims.username.clone();
+
+    let keys = tokio::task::spawn_blocking(move || {
+        let keys = db::batch_set_status(&db, &req.ids, 0);
+        for &id in &req.ids {
+            db::add_log(&db, id, "revoke", &who, "批量吊销");
+        }
+        keys
+    }).await.unwrap();
+
+    for k in &keys { state.cache.invalidate(k); }
+    Json(ApiResponse::success(serde_json::json!({ "count": keys.len() })))
+}
+
+/// POST /api/v1/admin/license/batch_renew
+pub async fn admin_batch_renew(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(req): Json<BatchRenewRequest>,
+) -> Json<ApiResponse> {
+    if claims.role == 2 { return Json(ApiResponse::error(403, "无权操作")); }
+    let db = state.db.clone();
+    let who = claims.username.clone();
+    let days = req.expire_days;
+
+    let result = tokio::task::spawn_blocking(move || {
+        let results = db::batch_renew(&db, &req.ids, days)?;
+        for (id, new_expire) in &results {
+            db::add_log(&db, *id, "renew", &who, &format!("批量续期 {} 天，新到期: {}", days, new_expire));
+        }
+        Ok::<_, String>(results)
+    }).await.unwrap();
+
+    match result {
+        Ok(results) => Json(ApiResponse::success(serde_json::json!({ "count": results.len() }))),
+        Err(e) => Json(ApiResponse::error(400, &e)),
+    }
+}
+
+// ===== 试用授权（公开接口） =====
+
+/// POST /api/v1/license/trial
+pub async fn request_trial(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(req): Json<TrialRequest>,
+) -> Json<ApiResponse> {
+    let ip = get_client_ip(&headers, &addr);
+    if !state.rate_limiter.check(&ip) {
+        return Json(ApiResponse::error(429, "请求过于频繁，请稍后重试"));
+    }
+
+    // 验证签名（复用heartbeat签名格式: machine_id+timestamp+secret）
+    let expected = auth::hmac_sign(
+        &state.config.security.client_secret,
+        &format!("{}{}", req.machine_id, req.timestamp),
+    );
+    if !auth::constant_time_eq(req.sign.as_bytes(), expected.as_bytes()) {
+        return Json(ApiResponse::error(403, "签名无效"));
+    }
+
+    let db = state.db.clone();
+    let machine_id = req.machine_id.clone();
+    let domain = if req.domain.is_empty() { "*".to_string() } else { req.domain.clone() };
+    let ip_clone = ip.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        if db::check_trial_exists(&db, &machine_id) {
+            return Err("该设备已申请过试用");
+        }
+        let key = auth::generate_license_key();
+        let id = db::create_trial_license(&db, &key, &machine_id, &domain, 7)
+            .map_err(|_| "创建试用授权失败")?;
+        db::add_log(&db, id, "trial", &ip_clone, &format!("试用申请: {}", machine_id));
+        Ok(serde_json::json!({
+            "license_key": key,
+            "expire_days": 7,
+            "plan": "trial",
+        }))
+    }).await.unwrap();
+
+    match result {
+        Ok(data) => Json(ApiResponse::success(data)),
+        Err(e) => Json(ApiResponse::error(400, e)),
+    }
+}
+
+// ===== 公告管理接口 =====
+
+/// GET /api/v1/admin/notices
+pub async fn admin_notice_list(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Query(query): Query<PageQuery>,
+) -> Json<ApiResponse> {
+    if claims.role != 0 { return Json(ApiResponse::error(403, "仅超管可操作")); }
+    let db = state.db.clone();
+    let page = query.page;
+    let limit = query.limit;
+
+    let (list, total) = tokio::task::spawn_blocking(move || db::list_notices(&db, page, limit))
+        .await.unwrap();
+
+    Json(ApiResponse::success(serde_json::json!({ "list": list, "total": total })))
+}
+
+/// POST /api/v1/admin/notice/create
+pub async fn admin_notice_create(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(req): Json<CreateNoticeRequest>,
+) -> Json<ApiResponse> {
+    if claims.role != 0 { return Json(ApiResponse::error(403, "仅超管可操作")); }
+    let db = state.db.clone();
+    let uid = claims.sub;
+
+    let result = tokio::task::spawn_blocking(move || db::create_notice(&db, &req, uid))
+        .await.unwrap();
+
+    match result {
+        Ok(id) => Json(ApiResponse::success(serde_json::json!({ "id": id }))),
+        Err(e) => Json(ApiResponse::error(500, &e)),
+    }
+}
+
+/// POST /api/v1/admin/notice/update
+pub async fn admin_notice_update(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(req): Json<UpdateNoticeRequest>,
+) -> Json<ApiResponse> {
+    if claims.role != 0 { return Json(ApiResponse::error(403, "仅超管可操作")); }
+    let db = state.db.clone();
+
+    let result = tokio::task::spawn_blocking(move || db::update_notice(&db, &req))
+        .await.unwrap();
+
+    match result {
+        Ok(()) => Json(ApiResponse::success_msg("更新成功")),
+        Err(e) => Json(ApiResponse::error(400, &e)),
+    }
+}
+
+/// DELETE /api/v1/admin/notice/delete/{id}
+pub async fn admin_notice_delete(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Path(id): Path<i64>,
+) -> Json<ApiResponse> {
+    if claims.role != 0 { return Json(ApiResponse::error(403, "仅超管可操作")); }
+    let db = state.db.clone();
+
+    let result = tokio::task::spawn_blocking(move || db::delete_notice(&db, id))
+        .await.unwrap();
+
+    match result {
+        Ok(()) => Json(ApiResponse::success_msg("已删除")),
+        Err(e) => Json(ApiResponse::error(400, &e)),
+    }
+}
+
+// ===== 统计报表接口 =====
+
+/// GET /api/v1/admin/stats/trend
+pub async fn admin_stats_trend(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Query(query): Query<TrendQuery>,
+) -> Json<ApiResponse> {
+    let db = state.db.clone();
+    let days = query.days.min(90).max(7);
+    let threshold = state.config.security.offline_threshold_secs;
+    let did = dealer_filter(&claims);
+
+    let trend = tokio::task::spawn_blocking(move || db::trend_stats(&db, days, threshold, did))
+        .await.unwrap();
+
+    Json(ApiResponse::success(trend))
+}
+
+/// GET /api/v1/admin/stats/distribution
+pub async fn admin_stats_distribution(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+) -> Json<ApiResponse> {
+    let db = state.db.clone();
+    let did = dealer_filter(&claims);
+
+    let dist = tokio::task::spawn_blocking(move || db::plan_distribution(&db, did))
+        .await.unwrap();
+
+    Json(ApiResponse::success(dist))
+}
+
+// ===== 导出接口 =====
+
+/// GET /api/v1/admin/licenses/export
+pub async fn admin_export(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Query(query): Query<ExportQuery>,
+) -> impl IntoResponse {
+    let db = state.db.clone();
+    let did = dealer_filter(&claims);
+    let status = query.status;
+
+    let licenses = tokio::task::spawn_blocking(move || db::export_licenses(&db, status, did))
+        .await.unwrap();
+
+    // 生成 CSV
+    let mut csv = String::from("ID,授权码,域名,备注,套餐,状态,试用,到期时间,最后心跳,最后IP,版本,创建时间\n");
+    for l in &licenses {
+        let status_text = match l.status { 1 => "活跃", 0 => "吊销", 2 => "过期", _ => "未知" };
+        let trial_text = if l.is_trial == 1 { "是" } else { "否" };
+        csv.push_str(&format!(
+            "{},{},{},{},{},{},{},{},{},{},{},{}\n",
+            l.id, l.license_key, l.domain,
+            l.note.replace(',', "，"),
+            l.plan, status_text, trial_text,
+            l.expire_at.as_deref().unwrap_or("永久"),
+            l.last_heartbeat.as_deref().unwrap_or("-"),
+            l.last_ip, l.version, l.created_at,
+        ));
+    }
+
+    (
+        [
+            (axum::http::header::CONTENT_TYPE, "text/csv; charset=utf-8"),
+            (axum::http::header::CONTENT_DISPOSITION, "attachment; filename=licenses.csv"),
+        ],
+        csv,
+    )
 }

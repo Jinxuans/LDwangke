@@ -204,7 +204,7 @@ class qingka_manager_main:
         secret_file = os.path.join(self.__site_dir, '.client_secret')
         if os.path.isfile(secret_file):
             return open(secret_file).read().strip()
-        return 'default-client-secret'
+        return 'change-me-client-secret'
     # ==================== 状态 ====================
 
     def get_status(self, args):
@@ -1047,10 +1047,10 @@ WantedBy=multi-user.target
                 logs.append('建表: %s' % result[1].strip()[:200])
         else:
             logs.append('init_db.sql 不存在，跳过建表')
-        # 2. 执行增量迁移
+        # 2. 执行增量迁移（仅运行编号格式的迁移文件）
         mig_dir = os.path.join(self.__go_dir, 'migrations')
         if os.path.isdir(mig_dir):
-            sqls = sorted([f for f in os.listdir(mig_dir) if f.endswith('.sql')])
+            sqls = sorted([f for f in os.listdir(mig_dir) if f.endswith('.sql') and f[:1].isdigit()])
             for sql in sqls:
                 result = self._safe_mysql_cmd(db_user, db_pass, db_name, sql_file=os.path.join(mig_dir, sql))
                 if result[1] and result[1].strip():
@@ -1132,28 +1132,21 @@ WantedBy=multi-user.target
             result = self._safe_mysql_cmd(db_user, db_pass, '', sql_cmd='CREATE DATABASE IF NOT EXISTS `%s` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;' % db_name)
             if result[1] and result[1].strip():
                 public.WriteLog('qingka_manager', '创建数据库失败: %s' % result[1].strip()[:200])
-            # 5. 建表（init_db.sql）
+            # 5. 建表（init_db.sql）—— 安全模式：注释 DROP TABLE、加 IF NOT EXISTS
             deploy_dir = os.path.join(self.__go_dir, 'deploy')
             init_sql = os.path.join(deploy_dir, 'init_db.sql')
             if os.path.isfile(init_sql):
-                # 过滤掉硬编码的 CREATE DATABASE / USE 语句
                 import tempfile
                 fd_tmp, filtered_sql = tempfile.mkstemp(suffix='.sql')
                 os.close(fd_tmp)
-                public.ExecShell('tr -d "\r" < %s | sed -e "/^CREATE DATABASE/d" -e "/^USE /d" > %s' % (init_sql, filtered_sql))
+                public.ExecShell('tr -d "\r" < %s | sed -e "/^CREATE DATABASE/d" -e "/^USE /d" -e "s/^DROP TABLE/-- DROP TABLE/" -e "s/CREATE TABLE /CREATE TABLE IF NOT EXISTS /" > %s' % (init_sql, filtered_sql))
                 result = self._safe_mysql_cmd(db_user, db_pass, db_name, sql_file=filtered_sql)
                 if os.path.isfile(filtered_sql): os.remove(filtered_sql)
                 if result[1] and result[1].strip():
-                    public.WriteLog('qingka_manager', '建表失败: %s' % result[1].strip()[:300])
+                    public.WriteLog('qingka_manager', '建表警告: %s' % result[1].strip()[:300])
 
-            # 6. 执行增量迁移
-            mig_dir = os.path.join(self.__go_dir, 'migrations')
-            if os.path.isdir(mig_dir):
-                sqls = sorted([f for f in os.listdir(mig_dir) if f.endswith('.sql')])
-                for sql in sqls:
-                    result = self._safe_mysql_cmd(db_user, db_pass, db_name, sql_file=os.path.join(mig_dir, sql))
-                    if result[1] and result[1].strip():
-                        public.WriteLog('qingka_manager', '迁移 %s 失败: %s' % (sql, result[1].strip()[:200]))
+            # 6. 执行增量迁移（仅运行编号格式的迁移文件）
+            self._run_migrations()
             # 7. 确保管理员账号和基础配置存在
             seed_sql = (
                 "INSERT IGNORE INTO qingka_wangke_user (uid, uuid, user, pass, name, qq_openid, nickname, faceimg, money, zcz, addprice, `key`, yqm, yqprice, notice, addtime, endtime, ip, grade, active, ck, xd, jd, bs, ck1, xd1, jd1, bs1, fldata, cldata, czAuth) "
@@ -1179,6 +1172,17 @@ WantedBy=multi-user.target
             bin_path = os.path.join(self.__go_dir, self.__bin_name)
             if os.path.isfile(bin_path):
                 os.chmod(bin_path, 0o755)
+
+            # 11.5 验证关键数据表是否存在
+            missing = self._verify_tables(db_user, db_pass, db_name)
+            if missing:
+                public.WriteLog('qingka_manager', '安装后缺少数据表: %s，尝试自动修复...' % ', '.join(missing))
+                # 自动执行 repair_db 补全
+                self.repair_db(type('Args', (), {})())
+                # 再检查一次
+                still_missing = self._verify_tables(db_user, db_pass, db_name)
+                if still_missing:
+                    public.WriteLog('qingka_manager', '自动修复后仍缺少: %s' % ', '.join(still_missing))
 
             # 12. 保存版本
             try:
@@ -1463,6 +1467,32 @@ WantedBy=multi-user.target
                 public.WriteLog('qingka_manager', '读取数据库配置失败(正则): %s' % str(e2))
         return None
 
+    # 关键数据表列表（init_db.sql 中所有表）
+    _REQUIRED_TABLES = [
+        'qingka_wangke_user', 'qingka_wangke_config', 'qingka_wangke_order',
+        'qingka_wangke_class', 'qingka_wangke_fenlei', 'qingka_wangke_dengji',
+        'qingka_wangke_huoyuan', 'qingka_wangke_log', 'qingka_wangke_moneylog',
+        'qingka_wangke_km', 'qingka_wangke_gongdan', 'qingka_wangke_gongdan_msg',
+        'qingka_wangke_gonggao', 'qingka_wangke_huodong', 'qingka_wangke_mijia',
+        'qingka_chat_list', 'qingka_chat_msg', 'qingka_mail',
+        'qingka_platform_config', 'qingka_dynamic_module',
+        'qingka_smtp_config', 'qingka_email_pool', 'qingka_email_template',
+        'qingka_email_log', 'qingka_email_send_log',
+        'mlsx_gslb', 'mlsx_wj_wq',
+    ]
+
+    def _verify_tables(self, db_user, db_pass, db_name):
+        """检查关键数据表是否存在，返回缺失表名列表"""
+        try:
+            result = self._safe_mysql_cmd(db_user, db_pass, db_name,
+                sql_cmd="SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='%s';" % db_name)
+            existing = set(result[0].strip().split('\n')) if result[0] else set()
+            missing = [t for t in self._REQUIRED_TABLES if t not in existing]
+            return missing
+        except Exception as e:
+            public.WriteLog('qingka_manager', '验证数据表失败: %s' % str(e))
+            return []
+
     def _run_migrations(self):
         db_info = self._read_db_config()
         if not db_info:
@@ -1470,7 +1500,7 @@ WantedBy=multi-user.target
         mig_dir = os.path.join(self.__go_dir, 'migrations')
         if not os.path.isdir(mig_dir):
             return
-        sqls = sorted([f for f in os.listdir(mig_dir) if f.endswith('.sql')])
+        sqls = sorted([f for f in os.listdir(mig_dir) if f.endswith('.sql') and f[:1].isdigit()])
         for sql in sqls:
             sql_path = os.path.join(mig_dir, sql)
             try:

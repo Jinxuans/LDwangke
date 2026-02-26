@@ -1,6 +1,6 @@
 # 授权站 (License Server)
 
-基于 Rust 的独立授权管理服务，提供授权码生命周期管理、域名/机器码绑定、心跳监控、HMAC 签名验证。
+基于 Rust 的独立授权管理服务，提供授权码生命周期管理、域名/机器码绑定、心跳监控、HMAC 签名验证、批量操作、试用授权、公告推送、数据导出、趋势统计。
 
 ## 技术栈
 
@@ -161,13 +161,47 @@ sign_str = "license_key={key}&machine_id={mid}&timestamp={ts}&version={ver}"
 sign = HMAC-SHA256(client_secret, sign_str)  → hex 小写
 ```
 
+响应会包含活跃公告：
+```json
+{
+  "code": 0,
+  "data": {
+    "status": "ok",
+    "notices": [{"id": 1, "title": "系统维护", "content": "今晚22点维护2小时", "type": "warning"}]
+  }
+}
+```
+
+#### 试用申请
+
+```
+POST /api/v1/license/trial
+```
+
+请求体：
+```json
+{
+  "machine_id": "硬件指纹",
+  "domain": "example.com",
+  "timestamp": 1740000000,
+  "sign": "HMAC-SHA256签名"
+}
+```
+
+签名算法：`HMAC-SHA256(client_secret, machine_id + timestamp)`
+
+每个机器码只能申请一次试用，默认 7 天、plan=trial、限制功能。
+
 ### 管理接口
 
-所有管理接口需要 `Authorization: Bearer {admin_token}` 请求头。
+所有管理接口需要 JWT 认证：`Authorization: Bearer {jwt_token}`。通过登录接口获取 token。
+
+#### 授权码管理
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/v1/admin/licenses?page=1&limit=20&keyword=&status=` | 授权码列表 |
+| GET | `/api/v1/admin/licenses/export?status=` | 导出 CSV |
 | POST | `/api/v1/admin/license/create` | 创建授权码 |
 | POST | `/api/v1/admin/license/update` | 编辑授权码 |
 | POST | `/api/v1/admin/license/revoke` | 吊销授权码 |
@@ -175,8 +209,37 @@ sign = HMAC-SHA256(client_secret, sign_str)  → hex 小写
 | POST | `/api/v1/admin/license/unbind` | 解绑机器码 |
 | POST | `/api/v1/admin/license/renew` | 续期授权码 |
 | DELETE | `/api/v1/admin/license/delete/{id}` | 删除授权码 |
-| GET | `/api/v1/admin/license/logs?page=1&limit=20&license_id=&action=` | 操作日志 |
+| POST | `/api/v1/admin/license/batch_create` | 批量创建 (1-100) |
+| POST | `/api/v1/admin/license/batch_revoke` | 批量吊销 |
+| POST | `/api/v1/admin/license/batch_renew` | 批量续期 |
+| GET | `/api/v1/admin/license/logs` | 操作日志 |
 | GET | `/api/v1/admin/license/dashboard` | 统计看板 |
+
+#### 公告管理 (仅超管)
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/admin/notices?page=1&limit=20` | 公告列表 |
+| POST | `/api/v1/admin/notice/create` | 创建公告 |
+| POST | `/api/v1/admin/notice/update` | 编辑公告 |
+| DELETE | `/api/v1/admin/notice/delete/{id}` | 删除公告 |
+
+#### 统计报表
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/admin/stats/trend?days=30` | 趋势数据 (7-90天) |
+| GET | `/api/v1/admin/stats/distribution` | 套餐分布 |
+
+#### 用户管理 (仅超管)
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/admin/users?page=1&limit=20` | 用户列表 |
+| POST | `/api/v1/admin/user/create` | 创建用户 |
+| POST | `/api/v1/admin/user/update` | 编辑用户 |
+| DELETE | `/api/v1/admin/user/delete/{id}` | 删除用户 |
+| GET | `/api/v1/admin/me` | 当前用户信息 |
 
 #### 创建授权码
 
@@ -207,9 +270,43 @@ sign = HMAC-SHA256(client_secret, sign_str)  → hex 小写
 - **时间戳防重放** — 请求携带 timestamp，服务端校验 ±5分钟有效窗口
 - **常量时间比较** — 签名比较使用常量时间算法，防时序攻击
 - **机器码绑定** — 首次验证自动绑定，换绑有次数限制
-- **管理接口认证** — Bearer Token 认证
+- **JWT 认证** — 管理接口使用 JWT Token 认证，支持多用户角色
+- **角色权限** — 超管(0)/授权商(1)/普通用户(2) 三级权限控制
 - **操作日志** — 所有关键操作记录 IP 和详情
+- **IP 速率限制** — 每 IP 每分钟 30 次请求
 - **SQLite WAL 模式** — 并发安全，数据完整性保障
+
+## 新增功能
+
+### 批量操作
+- 批量创建授权码 (1-100 个)
+- 批量吊销/续期（前端多选 checkbox）
+- 配额检查（授权商不能超出分配配额）
+
+### 试用授权
+- 客户端可自助申请试用码
+- 每个机器码只能试用一次（7 天）
+- 试用码标记 `is_trial=1`，客户端可据此展示“试用版”
+
+### 公告推送
+- 管理员发布公告，客户端通过 verify/heartbeat 自动收到
+- 支持信息/警告/紧急三种类型
+- 可按套餐定向推送 (`target: plan:standard`)
+- 支持生效/过期时间设置
+
+### 数据导出
+- 授权码列表导出为 CSV 文件
+- 支持按状态筛选导出
+
+### 统计报表
+- 30 天趋势数据（每日新增/过期/在线）
+- 套餐分布统计
+
+### 前端增强
+- 授权码编辑弹窗
+- 点击授权码复制到剪贴板
+- 试用标记展示
+- 公告管理页面（仅超管可见）
 
 ## 数据迁移
 

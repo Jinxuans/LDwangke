@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS license (
     bind_count INTEGER NOT NULL DEFAULT 0,
     max_bind INTEGER NOT NULL DEFAULT 3,
     dealer_id INTEGER NOT NULL DEFAULT 0,
+    is_trial INTEGER NOT NULL DEFAULT 0,
+    month_rebind_count INTEGER NOT NULL DEFAULT 0,
+    last_rebind_month TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
@@ -55,12 +58,28 @@ CREATE TABLE IF NOT EXISTS license_log (
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
+CREATE TABLE IF NOT EXISTS notice (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL DEFAULT '',
+    notice_type TEXT NOT NULL DEFAULT 'info',
+    target TEXT NOT NULL DEFAULT '*',
+    active INTEGER NOT NULL DEFAULT 1,
+    created_by INTEGER,
+    start_at TEXT,
+    end_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_license_key ON license(license_key);
 CREATE INDEX IF NOT EXISTS idx_license_status ON license(status);
 CREATE INDEX IF NOT EXISTS idx_license_dealer ON license(dealer_id);
+CREATE INDEX IF NOT EXISTS idx_license_created ON license(created_at);
 CREATE INDEX IF NOT EXISTS idx_log_license_id ON license_log(license_id);
 CREATE INDEX IF NOT EXISTS idx_log_action ON license_log(action);
 CREATE INDEX IF NOT EXISTS idx_log_created ON license_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_notice_active ON notice(active);
 "#;
 
 /// 初始化数据库连接池，建表
@@ -84,8 +103,11 @@ pub fn init(config: &AppConfig) -> DbPool {
     {
         let c = pool.get().expect("获取初始化连接失败");
         c.execute_batch(SCHEMA).expect("建表失败");
-        // 兼容旧库：给 license 表加 dealer_id 列（如果不存在）
+        // 兼容旧库：给 license 表加新列（如果不存在）
         c.execute_batch("ALTER TABLE license ADD COLUMN dealer_id INTEGER NOT NULL DEFAULT 0;").ok();
+        c.execute_batch("ALTER TABLE license ADD COLUMN is_trial INTEGER NOT NULL DEFAULT 0;").ok();
+        c.execute_batch("ALTER TABLE license ADD COLUMN month_rebind_count INTEGER NOT NULL DEFAULT 0;").ok();
+        c.execute_batch("ALTER TABLE license ADD COLUMN last_rebind_month TEXT NOT NULL DEFAULT '';").ok();
     }
 
     pool
@@ -93,7 +115,7 @@ pub fn init(config: &AppConfig) -> DbPool {
 
 // ===== 查询 =====
 
-const SELECT_COLS: &str = "id,license_key,domain,machine_id,note,plan,max_users,max_agents,status,expire_at,last_heartbeat,last_ip,version,bind_count,max_bind,dealer_id,created_at,updated_at";
+const SELECT_COLS: &str = "id,license_key,domain,machine_id,note,plan,max_users,max_agents,status,expire_at,last_heartbeat,last_ip,version,bind_count,max_bind,dealer_id,is_trial,month_rebind_count,last_rebind_month,created_at,updated_at";
 
 fn map_license(row: &rusqlite::Row) -> rusqlite::Result<License> {
     Ok(License {
@@ -113,8 +135,11 @@ fn map_license(row: &rusqlite::Row) -> rusqlite::Result<License> {
         bind_count: row.get(13)?,
         max_bind: row.get(14)?,
         dealer_id: row.get(15)?,
-        created_at: row.get(16)?,
-        updated_at: row.get(17)?,
+        is_trial: row.get(16)?,
+        month_rebind_count: row.get(17)?,
+        last_rebind_month: row.get(18)?,
+        created_at: row.get(19)?,
+        updated_at: row.get(20)?,
     })
 }
 
@@ -379,20 +404,24 @@ pub fn bind_machine(db: &DbPool, id: i64, machine_id: &str) -> Result<(), String
 
 pub fn unbind_machine(db: &DbPool, id: i64) -> Result<(), String> {
     let c = conn(db);
-    // 检查换绑次数
-    let (bind_count, max_bind): (i32, i32) = c
-        .query_row("SELECT bind_count, max_bind FROM license WHERE id=?1", params![id], |r| {
-            Ok((r.get(0)?, r.get(1)?))
+    // 读取当月换绑信息
+    let (month_rebind_count, last_rebind_month): (i32, String) = c
+        .query_row("SELECT month_rebind_count, last_rebind_month FROM license WHERE id=?1", params![id], |r| {
+            Ok((r.get(0)?, r.get::<_, String>(1)?))
         })
         .map_err(|_| "授权码不存在".to_string())?;
 
-    if bind_count >= max_bind {
-        return Err(format!("已达最大换绑次数 {}/{}", bind_count, max_bind));
+    let current_month = chrono::Local::now().format("%Y-%m").to_string();
+    let used = if last_rebind_month == current_month { month_rebind_count } else { 0 };
+
+    if used >= 2 {
+        return Err(format!("本月换绑次数已用完 ({}/2)", used));
     }
 
+    let new_count = used + 1;
     c.execute(
-        "UPDATE license SET machine_id='', updated_at=datetime('now','localtime') WHERE id=?1",
-        params![id],
+        "UPDATE license SET machine_id='', month_rebind_count=?1, last_rebind_month=?2, bind_count=bind_count+1, updated_at=datetime('now','localtime') WHERE id=?3",
+        params![new_count, &current_month, id],
     )
     .map_err(|e| format!("解绑失败: {}", e))?;
     Ok(())
@@ -419,12 +448,14 @@ pub fn renew_license(db: &DbPool, id: i64, expire_days: i32) -> Result<String, S
         .query_row("SELECT expire_at FROM license WHERE id=?1", params![id], |r| r.get(0))
         .map_err(|_| "授权码不存在".to_string())?;
 
-    // 从当前过期时间或现在开始续期
+    // 从当前过期时间或现在开始续期（已过期则从现在算起）
+    let now = chrono::Local::now().naive_local();
     let base = if let Some(ref exp) = current_expire {
-        chrono::NaiveDateTime::parse_from_str(exp, "%Y-%m-%d %H:%M:%S")
-            .unwrap_or_else(|_| chrono::Local::now().naive_local())
+        let exp_time = chrono::NaiveDateTime::parse_from_str(exp, "%Y-%m-%d %H:%M:%S")
+            .unwrap_or(now);
+        if exp_time < now { now } else { exp_time }
     } else {
-        chrono::Local::now().naive_local()
+        now
     };
 
     let new_expire = (base + duration_days(expire_days as i64))
@@ -560,6 +591,240 @@ pub fn cleanup_old_logs(db: &DbPool, retain_days: i64) -> usize {
         "DELETE FROM license_log WHERE created_at < datetime('now','localtime', ?1)",
         params![format!("-{} days", retain_days)],
     ).unwrap_or(0)
+}
+
+// ===== 批量操作 =====
+
+pub fn batch_create(db: &DbPool, keys: &[String], req: &crate::model::BatchCreateRequest) -> Result<Vec<(i64, String)>, String> {
+    let c = conn(db);
+    let expire_at: Option<String> = if req.expire_days > 0 {
+        Some(
+            (chrono::Local::now() + duration_days(req.expire_days as i64))
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string(),
+        )
+    } else {
+        None
+    };
+
+    let tx = c.unchecked_transaction().map_err(|e| format!("事务开始失败: {}", e))?;
+    let mut results = Vec::new();
+    for key in keys {
+        tx.execute(
+            "INSERT INTO license (license_key, domain, note, plan, max_users, max_agents, max_bind, expire_at, dealer_id, is_trial) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,0)",
+            params![key, req.domain, req.note, req.plan, req.max_users, req.max_agents, req.max_bind, expire_at, req.dealer_id],
+        ).map_err(|e| format!("创建失败: {}", e))?;
+        let id = tx.last_insert_rowid();
+        results.push((id, key.clone()));
+    }
+    tx.commit().map_err(|e| format!("事务提交失败: {}", e))?;
+    Ok(results)
+}
+
+pub fn batch_set_status(db: &DbPool, ids: &[i64], status: i32) -> Vec<String> {
+    let c = conn(db);
+    let mut keys = Vec::new();
+    for &id in ids {
+        if let Ok(key) = c.query_row("SELECT license_key FROM license WHERE id=?1", params![id], |r| r.get::<_, String>(0)) {
+            keys.push(key);
+        }
+        c.execute(
+            "UPDATE license SET status=?1, updated_at=datetime('now','localtime') WHERE id=?2",
+            params![status, id],
+        ).ok();
+    }
+    keys
+}
+
+pub fn batch_renew(db: &DbPool, ids: &[i64], expire_days: i32) -> Result<Vec<(i64, String)>, String> {
+    let c = conn(db);
+    let mut results = Vec::new();
+    let now = chrono::Local::now().naive_local();
+    for &id in ids {
+        let current_expire: Option<String> = c
+            .query_row("SELECT expire_at FROM license WHERE id=?1", params![id], |r| r.get(0))
+            .map_err(|_| format!("授权码 {} 不存在", id))?;
+        let base = if let Some(ref exp) = current_expire {
+            let exp_time = chrono::NaiveDateTime::parse_from_str(exp, "%Y-%m-%d %H:%M:%S").unwrap_or(now);
+            if exp_time < now { now } else { exp_time }
+        } else { now };
+        let new_expire = (base + duration_days(expire_days as i64)).format("%Y-%m-%d %H:%M:%S").to_string();
+        c.execute(
+            "UPDATE license SET expire_at=?1, status=1, updated_at=datetime('now','localtime') WHERE id=?2",
+            params![&new_expire, id],
+        ).map_err(|e| format!("续期失败: {}", e))?;
+        results.push((id, new_expire));
+    }
+    Ok(results)
+}
+
+// ===== 试用授权 =====
+
+pub fn check_trial_exists(db: &DbPool, machine_id: &str) -> bool {
+    let c = conn(db);
+    let count: i64 = c.query_row(
+        "SELECT COUNT(*) FROM license WHERE is_trial=1 AND machine_id=?1",
+        params![machine_id],
+        |r| r.get(0),
+    ).unwrap_or(0);
+    count > 0
+}
+
+pub fn create_trial_license(db: &DbPool, key: &str, machine_id: &str, domain: &str, trial_days: i64) -> Result<i64, String> {
+    let c = conn(db);
+    let expire_at = (chrono::Local::now() + duration_days(trial_days))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    c.execute(
+        "INSERT INTO license (license_key, domain, machine_id, note, plan, max_users, max_agents, max_bind, expire_at, is_trial, bind_count) VALUES (?1,?2,?3,'试用授权','trial',10,5,1,?4,1,1)",
+        params![key, domain, machine_id, &expire_at],
+    ).map_err(|e| format!("创建试用授权失败: {}", e))?;
+    Ok(c.last_insert_rowid())
+}
+
+// ===== 公告管理 =====
+
+const NOTICE_COLS: &str = "id,title,content,notice_type,target,active,created_by,start_at,end_at,created_at,updated_at";
+
+fn map_notice(row: &rusqlite::Row) -> rusqlite::Result<Notice> {
+    Ok(Notice {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        content: row.get(2)?,
+        notice_type: row.get(3)?,
+        target: row.get(4)?,
+        active: row.get(5)?,
+        created_by: row.get(6)?,
+        start_at: row.get(7)?,
+        end_at: row.get(8)?,
+        created_at: row.get(9)?,
+        updated_at: row.get(10)?,
+    })
+}
+
+pub fn create_notice(db: &DbPool, req: &CreateNoticeRequest, created_by: i64) -> Result<i64, String> {
+    let c = conn(db);
+    c.execute(
+        "INSERT INTO notice (title, content, notice_type, target, created_by, start_at, end_at) VALUES (?1,?2,?3,?4,?5,?6,?7)",
+        params![req.title, req.content, req.notice_type, req.target, created_by, req.start_at, req.end_at],
+    ).map_err(|e| format!("创建公告失败: {}", e))?;
+    Ok(c.last_insert_rowid())
+}
+
+pub fn update_notice(db: &DbPool, req: &UpdateNoticeRequest) -> Result<(), String> {
+    let c = conn(db);
+    let mut sets = Vec::new();
+    let mut vals: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+
+    if let Some(ref v) = req.title { sets.push("title=?"); vals.push(Box::new(v.clone())); }
+    if let Some(ref v) = req.content { sets.push("content=?"); vals.push(Box::new(v.clone())); }
+    if let Some(ref v) = req.notice_type { sets.push("notice_type=?"); vals.push(Box::new(v.clone())); }
+    if let Some(ref v) = req.target { sets.push("target=?"); vals.push(Box::new(v.clone())); }
+    if let Some(v) = req.active { sets.push("active=?"); vals.push(Box::new(v)); }
+    if let Some(ref v) = req.start_at { sets.push("start_at=?"); vals.push(Box::new(v.clone())); }
+    if let Some(ref v) = req.end_at { sets.push("end_at=?"); vals.push(Box::new(v.clone())); }
+
+    if sets.is_empty() { return Err("无更新字段".into()); }
+    sets.push("updated_at=datetime('now','localtime')");
+    vals.push(Box::new(req.id));
+
+    let sql = format!("UPDATE notice SET {} WHERE id=?", sets.join(","));
+    let params: Vec<&dyn rusqlite::types::ToSql> = vals.iter().map(|v| v.as_ref()).collect();
+    c.execute(&sql, params.as_slice()).map_err(|e| format!("更新失败: {}", e))?;
+    Ok(())
+}
+
+pub fn delete_notice(db: &DbPool, id: i64) -> Result<(), String> {
+    let c = conn(db);
+    c.execute("DELETE FROM notice WHERE id=?1", params![id])
+        .map_err(|e| format!("删除失败: {}", e))?;
+    Ok(())
+}
+
+pub fn list_notices(db: &DbPool, page: i64, limit: i64) -> (Vec<Notice>, i64) {
+    let c = conn(db);
+    let offset = (page - 1) * limit;
+    let total: i64 = c.query_row("SELECT COUNT(*) FROM notice", [], |r| r.get(0)).unwrap_or(0);
+    let sql = format!("SELECT {} FROM notice ORDER BY id DESC LIMIT ?1 OFFSET ?2", NOTICE_COLS);
+    let mut stmt = c.prepare(&sql).unwrap();
+    let list = stmt.query_map(params![limit, offset], map_notice).unwrap().filter_map(|r| r.ok()).collect();
+    (list, total)
+}
+
+pub fn get_active_notices(db: &DbPool, plan: &str) -> Vec<NoticePublic> {
+    let c = conn(db);
+    let sql = "SELECT id, title, content, notice_type FROM notice WHERE active=1 \
+               AND (start_at IS NULL OR start_at <= datetime('now','localtime')) \
+               AND (end_at IS NULL OR end_at >= datetime('now','localtime')) \
+               AND (target='*' OR target=?1) \
+               ORDER BY id DESC LIMIT 10";
+    let mut stmt = c.prepare(sql).unwrap();
+    let target = format!("plan:{}", plan);
+    stmt.query_map(params![target], |row| {
+        Ok(NoticePublic {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            content: row.get(2)?,
+            notice_type: row.get(3)?,
+        })
+    }).unwrap().filter_map(|r| r.ok()).collect()
+}
+
+// ===== 统计报表 =====
+
+pub fn trend_stats(db: &DbPool, days: i64, offline_threshold_secs: i64, dealer_id: Option<i64>) -> Vec<TrendItem> {
+    let c = conn(db);
+    let did = dealer_id.unwrap_or(-1);
+    let threshold = format!("-{} seconds", offline_threshold_secs);
+    let sql = format!(
+        "WITH RECURSIVE dates(d) AS (
+            SELECT date('now','localtime','-{} days')
+            UNION ALL
+            SELECT date(d, '+1 day') FROM dates WHERE d < date('now','localtime')
+        )
+        SELECT dates.d,
+            (SELECT COUNT(*) FROM license WHERE date(created_at) = dates.d AND (?1 = -1 OR dealer_id = ?1)),
+            (SELECT COUNT(*) FROM license WHERE status=2 AND expire_at IS NOT NULL AND date(expire_at) = dates.d AND (?1 = -1 OR dealer_id = ?1)),
+            (SELECT COUNT(*) FROM license WHERE status=1 AND last_heartbeat IS NOT NULL AND last_heartbeat >= datetime(dates.d || ' 00:00:00', ?2) AND (?1 = -1 OR dealer_id = ?1))
+        FROM dates ORDER BY dates.d",
+        days
+    );
+    let mut stmt = c.prepare(&sql).unwrap();
+    stmt.query_map(params![did, threshold], |row| {
+        Ok(TrendItem {
+            day: row.get(0)?,
+            created: row.get(1)?,
+            expired: row.get(2)?,
+            online: row.get(3)?,
+        })
+    }).unwrap().filter_map(|r| r.ok()).collect()
+}
+
+pub fn plan_distribution(db: &DbPool, dealer_id: Option<i64>) -> Vec<PlanDistribution> {
+    let c = conn(db);
+    let did = dealer_id.unwrap_or(-1);
+    let sql = "SELECT plan, COUNT(*) as cnt FROM license WHERE (?1 = -1 OR dealer_id = ?1) GROUP BY plan ORDER BY cnt DESC";
+    let mut stmt = c.prepare(sql).unwrap();
+    stmt.query_map(params![did], |row| {
+        Ok(PlanDistribution {
+            plan: row.get(0)?,
+            count: row.get(1)?,
+        })
+    }).unwrap().filter_map(|r| r.ok()).collect()
+}
+
+// ===== 导出 =====
+
+pub fn export_licenses(db: &DbPool, status_filter: Option<i32>, dealer_id: Option<i64>) -> Vec<License> {
+    let c = conn(db);
+    let status_val = status_filter.unwrap_or(-1);
+    let did = dealer_id.unwrap_or(-1);
+    let sql = format!(
+        "SELECT {} FROM license WHERE (?1 = -1 OR status = ?1) AND (?2 = -1 OR dealer_id = ?2) ORDER BY id DESC",
+        SELECT_COLS
+    );
+    let mut stmt = c.prepare(&sql).unwrap();
+    stmt.query_map(params![status_val, did], map_license).unwrap().filter_map(|r| r.ok()).collect()
 }
 
 // ===== 从 JSON 迁移 =====

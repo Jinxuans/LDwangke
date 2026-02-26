@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { Page } from '@vben/common-ui';
 import {
   Card, Button, Select, SelectOption, Input, Switch,
-  Table, Checkbox, Tag, Space, Alert, Spin, Tooltip, message,
+  Table, Checkbox, Tag, Space, Alert, Spin, Tooltip, message, Modal, Empty,
 } from 'ant-design-vue';
 import { SearchOutlined, CheckOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons-vue';
 import { useVbenForm } from '#/adapter/form';
@@ -45,6 +45,7 @@ const categoryType = ref(0);
 const xdsmopen = ref(false);
 const queryLoading = ref(false);
 const submitLoading = ref(false);
+const courseModalVisible = ref(false);
 
 // 收藏
 const favoriteCourses = ref<string[]>([]);
@@ -182,11 +183,13 @@ async function handleQuery() {
   courseResults.value = [];
   checkedCourses.value = [];
   queryLoading.value = true;
+  let hasSuccess = false;
 
   // 渐进式加载：每个请求独立处理
   const requests = lines.map((line: string) =>
     queryCourseApi(values.classId, line)
       .then((res: any) => {
+        hasSuccess = true;
         const r = res?.data && !res.userinfo ? res.data : res;
         const resultItem = {
           ...r,
@@ -216,13 +219,15 @@ async function handleQuery() {
       }),
   );
 
-  // 第一个完成后取消加载动画
-  Promise.race(requests).finally(() => {
-    queryLoading.value = false;
-  });
+  courseModalVisible.value = true;
 
   // 等待全部完成
   await Promise.allSettled(requests);
+  queryLoading.value = false;
+  
+  if (hasSuccess) {
+    message.success('查课成功');
+  }
 }
 
 // 选中/取消选中单个课程
@@ -282,6 +287,7 @@ async function handleSubmit() {
       data: checkedCourses.value,
     });
     message.success('下单成功');
+    courseModalVisible.value = false;
     courseResults.value = [];
     checkedCourses.value = [];
     userInfo.value = '';
@@ -436,78 +442,140 @@ onMounted(loadClassData);
             <template #icon><SearchOutlined /></template>
             立即查询
           </Button>
-          <Button
-            type="primary"
-            :loading="submitLoading"
-            :disabled="checkedCourses.length === 0"
-            @click="handleSubmit"
-            class="bg-green-600 border-green-600 hover:bg-green-500"
-          >
-            <template #icon><CheckOutlined /></template>
-            确认下单（{{ checkedCourses.length }}）
-          </Button>
           <Tag v-if="xdsmopen" color="blue">扫码下单已开启</Tag>
         </Space>
       </Card>
     </Spin>
 
-    <!-- 查课结果 -->
-    <Card
-      v-for="(result, index) in courseResults"
-      :key="index"
-      class="mb-4"
-      size="small"
+    <!-- 选课弹窗 -->
+    <Modal
+      v-model:open="courseModalVisible"
+      title="📦 选择代刷课程"
+      width="900px"
+      @ok="handleSubmit"
+      :confirmLoading="submitLoading"
+      okText="立即提交订单"
+      cancelText="取消"
+      :okButtonProps="{ disabled: checkedCourses.length === 0, size: 'large', style: { backgroundColor: '#16a34a', borderColor: '#16a34a' } }"
+      :cancelButtonProps="{ size: 'large' }"
+      :bodyStyle="{ maxHeight: '65vh', overflowY: 'auto', backgroundColor: '#f3f4f6', padding: '20px' }"
     >
-      <template #title>
-        <Space>
-          <span class="font-bold">{{ result.userName || '用户' }}</span>
-          <span class="text-gray-500 text-sm">{{ result.userinfo }}</span>
-          <Tag v-if="result.msg === '查询成功'" color="green">{{ result.msg }}</Tag>
-          <Tag v-else color="red">{{ result.msg }}</Tag>
-        </Space>
+      <div v-if="queryLoading" class="flex flex-col items-center justify-center py-16 bg-white rounded-lg shadow-sm">
+        <Spin size="large" />
+        <div class="mt-4 text-gray-500 text-base">正在疯狂查询中，请稍候...</div>
+      </div>
+      
+      <div v-else-if="courseResults.length === 0" class="bg-white rounded-lg py-12 shadow-sm">
+        <Empty description="暂无查课结果" />
+      </div>
+      
+      <template v-else>
+        <!-- 悬浮提示条 -->
+        <div class="sticky top-0 z-10 bg-[#f3f4f6] pb-4">
+          <Alert
+            :message="`已选择 ${checkedCourses.length} 个课程准备下单`"
+            type="info"
+            show-icon
+            class="border-blue-200 bg-blue-50"
+          >
+            <template #action v-if="checkedCourses.length > 0">
+              <span class="text-blue-600 font-medium text-sm">点击底部按钮确认提交</span>
+            </template>
+          </Alert>
+        </div>
+        
+        <div class="space-y-4">
+          <Card
+            v-for="(result, index) in courseResults"
+            :key="index"
+            :bordered="false"
+            class="shadow-sm rounded-lg overflow-hidden"
+            :bodyStyle="{ padding: 0 }"
+          >
+            <!-- 账号头部 -->
+            <div class="bg-gray-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg shadow-inner">
+                  {{ result.userName ? result.userName.charAt(0).toUpperCase() : 'U' }}
+                </div>
+                <div class="flex flex-col leading-tight">
+                  <span class="font-bold text-gray-800 text-sm">{{ result.userName || '未知账号' }}</span>
+                  <span class="text-xs text-gray-400 mt-0.5">{{ result.userinfo }}</span>
+                </div>
+              </div>
+              <Tag :color="result.msg === '查询成功' || result.msg === '此课程无需查课，直接下单即可' ? 'success' : 'error'" class="m-0 border-0 shadow-sm px-2 py-0.5 rounded-md">
+                {{ result.msg }}
+              </Tag>
+            </div>
+
+            <!-- 课程列表内容 -->
+            <div class="p-4">
+              <Table
+                v-if="result.data && result.data.length > 0"
+                :data-source="result.data"
+                :pagination="false"
+                row-key="idx"
+                size="middle"
+                :row-class-name="(record: CourseItem) => record.select ? 'bg-blue-50' : ''"
+                :custom-row="(record: CourseItem) => ({
+                  onClick: () => toggleCourse(result, record),
+                  style: { cursor: 'pointer', transition: 'all 0.3s ease' },
+                })"
+                class="border border-gray-100 rounded-md overflow-hidden"
+              >
+                <Table.Column title="" :width="60" align="center">
+                  <template #default="{ record }">
+                    <Checkbox :checked="record.select" />
+                  </template>
+                  <template #title>
+                    <Checkbox
+                      :checked="result.data.length > 0 && result.data.every((c: CourseItem) => c.select)"
+                      :indeterminate="result.data.some((c: CourseItem) => c.select) && !result.data.every((c: CourseItem) => c.select)"
+                      @change="toggleAll(result)"
+                    />
+                  </template>
+                </Table.Column>
+                
+                <Table.Column title="课程信息" data-index="name" key="name">
+                  <template #default="{ record }">
+                    <div class="flex flex-col gap-1.5 py-1">
+                      <span class="font-medium text-gray-800 text-sm">{{ record.name }}</span>
+                      <div class="flex flex-wrap gap-1 mt-1">
+                        <Tag v-if="record.learnStatusName" color="processing" :bordered="false" class="text-xs m-0">
+                          状态: {{ record.learnStatusName }}
+                        </Tag>
+                        <Tag v-if="record.complete" color="success" :bordered="false" class="text-xs m-0">
+                          进度: {{ record.complete }}
+                        </Tag>
+                        <Tag v-if="record.studyStartTime || record.studyEndTime" color="blue" :bordered="false" class="text-xs m-0">
+                          学习: {{ record.studyStartTime || '-' }} 至 {{ record.studyEndTime || '-' }}
+                        </Tag>
+                        <Tag v-if="record.examStartTime || record.examEndTime" color="warning" :bordered="false" class="text-xs m-0">
+                          考试: {{ record.examStartTime || '-' }} 至 {{ record.examEndTime || '-' }}
+                        </Tag>
+                      </div>
+                    </div>
+                  </template>
+                </Table.Column>
+                
+                <Table.Column title="课程ID" data-index="id" key="id" :width="120" align="center">
+                  <template #default="{ record }">
+                    <span class="text-gray-400 text-xs font-mono">{{ record.id }}</span>
+                  </template>
+                </Table.Column>
+              </Table>
+
+              <div v-else-if="result.msg === '查询成功' || result.msg === '此课程无需查课，直接下单即可'" class="flex flex-col items-center justify-center py-6 text-green-600 bg-green-50 rounded-md border border-green-100">
+                <span class="text-lg mb-1">✅</span>
+                <span class="font-medium">无需选课，此账号已自动添加并可直接下单</span>
+              </div>
+              <div v-else class="py-6">
+                <Empty description="暂无课程数据" />
+              </div>
+            </div>
+          </Card>
+        </div>
       </template>
-
-      <Table
-        v-if="result.data && result.data.length > 0"
-        :data-source="result.data"
-        :pagination="false"
-        row-key="idx"
-        size="small"
-        bordered
-        :row-class-name="(record: CourseItem) => record.select ? 'bg-blue-50' : ''"
-        :custom-row="(record: CourseItem) => ({
-          onClick: () => toggleCourse(result, record),
-          style: { cursor: 'pointer' },
-        })"
-      >
-        <Table.Column title="" :width="50" align="center">
-          <template #default="{ record }">
-            <Checkbox :checked="record.select" />
-          </template>
-          <template #title>
-            <Checkbox
-              :checked="result.data.every((c: CourseItem) => c.select)"
-              :indeterminate="result.data.some((c: CourseItem) => c.select) && !result.data.every((c: CourseItem) => c.select)"
-              @change="toggleAll(result)"
-            />
-          </template>
-        </Table.Column>
-        <Table.Column title="课程名" data-index="name" key="name">
-          <template #default="{ record }">
-            <span>{{ record.name }}</span>
-            <span v-if="record.studyStartTime" class="text-xs text-gray-400 ml-2">[开始：{{ record.studyStartTime }}]</span>
-            <span v-if="record.studyEndTime" class="text-xs text-gray-400 ml-2">[结束：{{ record.studyEndTime }}]</span>
-            <span v-if="record.examStartTime" class="text-xs text-orange-400 ml-2">[考试开始：{{ record.examStartTime }}]</span>
-            <span v-if="record.examEndTime" class="text-xs text-orange-400 ml-2">[考试结束：{{ record.examEndTime }}]</span>
-            <span v-if="record.learnStatusName" class="text-xs text-blue-400 ml-2">[学习状态：{{ record.learnStatusName }}]</span>
-            <span v-if="record.complete" class="text-xs text-green-500 ml-2">[{{ record.complete }}]</span>
-          </template>
-        </Table.Column>
-        <Table.Column title="课程ID" data-index="id" key="id" :width="120" align="center" />
-      </Table>
-
-      <div v-else-if="result.msg === '查询成功' || result.msg === '此课程无需查课，直接下单即可'" class="text-green-600 text-center py-4 font-medium">✅ 无需选课，可直接下单</div>
-      <div v-else class="text-gray-400 text-center py-4">暂无课程数据</div>
-    </Card>
+    </Modal>
   </Page>
 </template>

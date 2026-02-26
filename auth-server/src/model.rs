@@ -23,6 +23,20 @@ pub struct LoginRequest {
     pub password: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RegisterRequest {
+    pub username: String,
+    pub password: String,
+    #[serde(default)]
+    pub display_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ChangePasswordRequest {
+    pub old_password: String,
+    pub new_password: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: i64,      // user id
@@ -76,6 +90,9 @@ pub struct License {
     pub bind_count: i32,
     pub max_bind: i32,
     pub dealer_id: i64,
+    pub is_trial: i32,
+    pub month_rebind_count: i32,
+    pub last_rebind_month: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -132,6 +149,7 @@ pub struct VerifyResponse {
     pub expire_at: Option<String>,
     pub max_users: i32,
     pub max_agents: i32,
+    pub is_trial: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
@@ -184,6 +202,50 @@ pub struct IdRequest {
     pub id: i64,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct IdsRequest {
+    pub ids: Vec<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BatchCreateRequest {
+    #[serde(default = "default_batch_count")]
+    pub count: i32,
+    #[serde(default = "default_domain")]
+    pub domain: String,
+    #[serde(default)]
+    pub note: String,
+    #[serde(default = "default_plan")]
+    pub plan: String,
+    #[serde(default)]
+    pub max_users: i32,
+    #[serde(default)]
+    pub max_agents: i32,
+    #[serde(default = "default_max_bind")]
+    pub max_bind: i32,
+    #[serde(default)]
+    pub expire_days: i32,
+    #[serde(default)]
+    pub dealer_id: i64,
+}
+
+fn default_batch_count() -> i32 { 1 }
+
+#[derive(Debug, Deserialize)]
+pub struct BatchRenewRequest {
+    pub ids: Vec<i64>,
+    pub expire_days: i32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TrialRequest {
+    pub machine_id: String,
+    #[serde(default)]
+    pub domain: String,
+    pub timestamp: i64,
+    pub sign: String,
+}
+
 // ===== 统计看板 =====
 
 #[derive(Debug, Serialize)]
@@ -193,6 +255,74 @@ pub struct Dashboard {
     pub expired: i64,
     pub revoked: i64,
     pub online_now: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TrendItem {
+    pub day: String,
+    pub created: i64,
+    pub expired: i64,
+    pub online: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PlanDistribution {
+    pub plan: String,
+    pub count: i64,
+}
+
+// ===== 公告 =====
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Notice {
+    pub id: i64,
+    pub title: String,
+    pub content: String,
+    pub notice_type: String,
+    pub target: String,
+    pub active: i32,
+    pub created_by: Option<i64>,
+    pub start_at: Option<String>,
+    pub end_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NoticePublic {
+    pub id: i64,
+    pub title: String,
+    pub content: String,
+    #[serde(rename = "type")]
+    pub notice_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateNoticeRequest {
+    pub title: String,
+    #[serde(default)]
+    pub content: String,
+    #[serde(default = "default_notice_type")]
+    pub notice_type: String,
+    #[serde(default = "default_target")]
+    pub target: String,
+    pub start_at: Option<String>,
+    pub end_at: Option<String>,
+}
+
+fn default_notice_type() -> String { "info".into() }
+fn default_target() -> String { "*".into() }
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateNoticeRequest {
+    pub id: i64,
+    pub title: Option<String>,
+    pub content: Option<String>,
+    pub notice_type: Option<String>,
+    pub target: Option<String>,
+    pub active: Option<i32>,
+    pub start_at: Option<String>,
+    pub end_at: Option<String>,
 }
 
 // ===== 分页查询参数 =====
@@ -218,6 +348,19 @@ pub struct LogQuery {
     pub limit: i64,
     pub license_id: Option<i64>,
     pub action: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TrendQuery {
+    #[serde(default = "default_trend_days")]
+    pub days: i64,
+}
+
+fn default_trend_days() -> i64 { 30 }
+
+#[derive(Debug, Deserialize)]
+pub struct ExportQuery {
+    pub status: Option<i32>,
 }
 
 // ===== 通用 API 响应 =====

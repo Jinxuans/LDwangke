@@ -326,6 +326,11 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
       <span class="nav-label">操作日志</span>
       <span class="tip">操作日志</span>
     </div>
+    <div class="nav-item" onclick="switchPage('notices')" id="nav-notices" style="display:none">
+      <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      <span class="nav-label">公告管理</span>
+      <span class="tip">公告管理</span>
+    </div>
     <div class="nav-item" onclick="switchPage('users')" id="nav-users" style="display:none">
       <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
       <span class="nav-label">用户管理</span>
@@ -354,6 +359,7 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
       </div>
       <div class="topbar-right" id="topbarRight">
         <span style="font-size:12px;color:var(--text-4);display:flex;align-items:center" id="connStatus"><span class="conn-dot" id="connDot"></span>未连接</span>
+        <button class="btn btn-sm" id="btnChangePwd" onclick="showModal('changePwdModal')" style="display:none">改密</button>
         <button class="theme-toggle" onclick="toggleTheme()" title="切换主题">
           <svg id="themeIcon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         </button>
@@ -371,19 +377,36 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
     <!-- 内容区 -->
     <div class="content">
 
-      <!-- 登录 -->
+      <!-- 登录/注册 -->
       <div id="loginScreen">
         <div class="login-box">
           <div style="text-align:center;margin-bottom:32px">
             <div style="width:52px;height:52px;background:var(--text-title);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;color:var(--bg);margin-bottom:20px">LC</div>
-            <h2>License Console</h2>
-            <p class="login-sub">输入账号密码登录授权管理系统</p>
+            <h2 id="authTitle">License Console</h2>
+            <p class="login-sub" id="authSub">输入账号密码登录授权管理系统</p>
           </div>
-          <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;font-weight:500">用户名</label>
-          <input id="loginUser" type="text" placeholder="输入用户名" style="margin-bottom:16px" />
-          <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;font-weight:500">密码</label>
-          <input id="loginPass" type="password" placeholder="输入密码" style="margin-bottom:24px" onkeyup="if(event.key==='Enter')login()" />
-          <button class="btn btn-primary" onclick="login()" style="width:100%;height:44px;font-size:14px;border-radius:12px;font-weight:600">登录</button>
+          <!-- 登录表单 -->
+          <div id="loginForm">
+            <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;font-weight:500">用户名</label>
+            <input id="loginUser" type="text" placeholder="输入用户名" style="margin-bottom:16px" />
+            <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;font-weight:500">密码</label>
+            <input id="loginPass" type="password" placeholder="输入密码" style="margin-bottom:24px" onkeyup="if(event.key==='Enter')login()" />
+            <button class="btn btn-primary" onclick="login()" style="width:100%;height:44px;font-size:14px;border-radius:12px;font-weight:600">登录</button>
+            <p style="text-align:center;margin-top:16px;font-size:12px;color:var(--text-3)">还没有账号？<a href="javascript:void(0)" onclick="toggleAuthForm(true)" style="color:var(--accent);cursor:pointer;text-decoration:none;font-weight:500">注册</a></p>
+          </div>
+          <!-- 注册表单 -->
+          <div id="registerForm" style="display:none">
+            <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;font-weight:500">用户名</label>
+            <input id="regUser" type="text" placeholder="3-32位用户名" style="margin-bottom:16px" />
+            <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;font-weight:500">密码</label>
+            <input id="regPass" type="password" placeholder="至少6位密码" style="margin-bottom:16px" />
+            <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;font-weight:500">确认密码</label>
+            <input id="regPass2" type="password" placeholder="再次输入密码" style="margin-bottom:16px" />
+            <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;font-weight:500">显示名称 (可选)</label>
+            <input id="regDisplay" type="text" placeholder="昵称" style="margin-bottom:24px" />
+            <button class="btn btn-primary" onclick="doRegister()" style="width:100%;height:44px;font-size:14px;border-radius:12px;font-weight:600">注册</button>
+            <p style="text-align:center;margin-top:16px;font-size:12px;color:var(--text-3)">已有账号？<a href="javascript:void(0)" onclick="toggleAuthForm(false)" style="color:var(--accent);cursor:pointer;text-decoration:none;font-weight:500">登录</a></p>
+          </div>
         </div>
       </div>
 
@@ -412,11 +435,19 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
           <div class="filter-bar">
             <input id="searchInput" placeholder="搜索授权码 / 域名 / 备注" onkeyup="if(event.key==='Enter')loadList()" />
             <button class="btn btn-sm" onclick="loadList()">搜索</button>
-            <button class="btn btn-sm btn-primary" onclick="showModal('createModal')">新建授权码</button>
+            <button class="btn btn-sm btn-primary dealer-hide" onclick="showModal('createModal')">新建授权码</button>
+            <button class="btn btn-sm dealer-hide" onclick="showModal('batchCreateModal')">批量创建</button>
+            <button class="btn btn-sm" onclick="exportCSV()">导出 CSV</button>
+          </div>
+          <div id="batchBar" style="display:none;padding:10px 20px;background:var(--accent-soft);border-bottom:1px solid var(--border-light);display:none;align-items:center;gap:10px;font-size:12px">
+            <span id="batchCount">已选0</span>
+            <button class="btn btn-sm btn-danger" onclick="batchRevoke()">批量吐销</button>
+            <button class="btn btn-sm" onclick="showBatchRenew()">批量续期</button>
+            <button class="btn btn-sm" onclick="clearSelection()">取消选择</button>
           </div>
           <div class="panel-body" style="overflow-x:auto">
             <table>
-              <thead><tr><th style="width:44px">ID</th><th>授权码</th><th>域名</th><th>套餐</th><th>状态</th><th>机器码</th><th>到期时间</th><th>最后心跳</th><th>操作</th></tr></thead>
+              <thead><tr><th style="width:32px"><input type="checkbox" onchange="toggleSelectAll(this)" id="selectAllCb" /></th><th style="width:44px">ID</th><th>授权码</th><th>域名</th><th>套餐</th><th>状态</th><th>机器码</th><th>到期时间</th><th>最后心跳</th><th>操作</th></tr></thead>
               <tbody id="licenseBody"></tbody>
             </table>
           </div>
@@ -443,6 +474,8 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
               <option value="renew">续期</option><option value="heartbeat">心跳</option>
             </select>
             <button class="btn btn-sm" onclick="loadLogs()">查询</button>
+            <div style="flex:1"></div>
+            <button class="btn btn-sm btn-danger" id="btnCleanupLogs" onclick="cleanupLogs()" style="display:none">清理日志 (30天前)</button>
           </div>
           <div class="panel-body" style="overflow-x:auto">
             <table>
@@ -455,6 +488,30 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
             <div class="pg-btns">
               <button class="btn btn-sm" onclick="prevLogPage()">上一页</button>
               <button class="btn btn-sm" onclick="nextLogPage()">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ━━ 公告管理页 ━━ -->
+      <div id="page-notices" class="page">
+        <div class="panel">
+          <div class="filter-bar">
+            <span style="font-size:14px;font-weight:600;color:var(--text-title)">公告列表</span>
+            <div style="flex:1"></div>
+            <button class="btn btn-sm btn-primary" onclick="showCreateNotice()">新建公告</button>
+          </div>
+          <div class="panel-body" style="overflow-x:auto">
+            <table>
+              <thead><tr><th style="width:44px">ID</th><th>标题</th><th>类型</th><th>目标</th><th>状态</th><th>生效时间</th><th>过期时间</th><th>创建时间</th><th>操作</th></tr></thead>
+              <tbody id="noticeBody"></tbody>
+            </table>
+          </div>
+          <div class="panel-foot">
+            <span id="noticePageInfo">0 条</span>
+            <div class="pg-btns">
+              <button class="btn btn-sm" onclick="prevNoticePage()">上一页</button>
+              <button class="btn btn-sm" onclick="nextNoticePage()">下一页</button>
             </div>
           </div>
         </div>
@@ -554,13 +611,119 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
   </div>
 </div>
 
+<!-- 弹窗：批量创建 -->
+<div id="batchCreateModal" class="modal-mask">
+  <div class="modal-box">
+    <h3>批量创建授权码</h3>
+    <label>数量 (1-100)</label><input id="bcCount" type="number" value="10" min="1" max="100" />
+    <label>域名</label><input id="bcDomain" placeholder="example.com 或 *" value="*" />
+    <label>备注</label><input id="bcNote" placeholder="客户名称 / 说明" />
+    <div class="row r2">
+      <div><label>套餐</label><select id="bcPlan"><option value="basic">基础版</option><option value="standard" selected>标准版</option><option value="enterprise">企业版</option></select></div>
+      <div><label>有效天数</label><input id="bcExpireDays" type="number" value="365" /></div>
+    </div>
+    <div class="row r3">
+      <div><label>最大用户</label><input id="bcMaxUsers" type="number" value="100" /></div>
+      <div><label>最大坐席</label><input id="bcMaxAgents" type="number" value="50" /></div>
+      <div><label>换绑次数</label><input id="bcMaxBind" type="number" value="3" /></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('batchCreateModal')">取消</button>
+      <button class="btn btn-primary" onclick="batchCreate()">批量创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：批量续期 -->
+<div id="batchRenewModal" class="modal-mask">
+  <div class="modal-box" style="max-width:360px">
+    <h3>批量续期</h3>
+    <label>续期天数</label><input id="brDays" type="number" value="365" />
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('batchRenewModal')">取消</button>
+      <button class="btn btn-primary" onclick="batchRenewConfirm()">确认续期</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：批量创建结果 -->
+<div id="batchKeyModal" class="modal-mask">
+  <div class="modal-box" style="max-width:520px">
+    <h3>批量创建结果</h3>
+    <div id="batchKeyDisplay" class="key-out" style="max-height:300px;overflow-y:auto;font-size:12px;text-align:left;line-height:1.8"></div>
+    <p style="font-size:12px;color:var(--text-3);text-align:center;margin-top:10px">点击上方区域可全选复制</p>
+    <div class="modal-foot" style="margin-top:14px">
+      <button class="btn btn-primary" onclick="closeModal('batchKeyModal')">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：编辑授权码 -->
+<div id="editModal" class="modal-mask">
+  <div class="modal-box">
+    <h3>编辑授权码</h3>
+    <input id="eId" type="hidden" />
+    <label>域名</label><input id="eDomain" placeholder="example.com 或 *" />
+    <label>备注</label><input id="eNote" placeholder="客户名称 / 说明" />
+    <div class="row r2">
+      <div><label>套餐</label><select id="ePlan"><option value="basic">基础版</option><option value="standard">标准版</option><option value="enterprise">企业版</option></select></div>
+      <div><label>换绑次数</label><input id="eMaxBind" type="number" /></div>
+    </div>
+    <div class="row r2">
+      <div><label>最大用户</label><input id="eMaxUsers" type="number" /></div>
+      <div><label>最大坐席</label><input id="eMaxAgents" type="number" /></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('editModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveLicense()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：修改密码 -->
+<div id="changePwdModal" class="modal-mask">
+  <div class="modal-box" style="max-width:380px">
+    <h3>修改密码</h3>
+    <label>原密码</label><input id="cpOldPass" type="password" placeholder="输入当前密码" />
+    <label>新密码</label><input id="cpNewPass" type="password" placeholder="至少6位" />
+    <label>确认新密码</label><input id="cpNewPass2" type="password" placeholder="再次输入新密码" />
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('changePwdModal')">取消</button>
+      <button class="btn btn-primary" onclick="doChangePwd()">确认修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：公告编辑 -->
+<div id="noticeModal" class="modal-mask">
+  <div class="modal-box">
+    <h3 id="noticeModalTitle">新建公告</h3>
+    <input id="nId" type="hidden" />
+    <label>标题</label><input id="nTitle" placeholder="公告标题" />
+    <label>内容</label><input id="nContent" placeholder="公告内容" />
+    <div class="row r2">
+      <div><label>类型</label><select id="nType"><option value="info">信息</option><option value="warning">警告</option><option value="urgent">紧急</option></select></div>
+      <div><label>目标</label><input id="nTarget" value="*" placeholder="* 或 plan:standard" /></div>
+    </div>
+    <div class="row r2">
+      <div><label>生效时间</label><input id="nStartAt" type="datetime-local" /></div>
+      <div><label>过期时间</label><input id="nEndAt" type="datetime-local" /></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('noticeModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveNotice()">保存</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API=window.location.origin+'/api/v1';
 let TOKEN=localStorage.getItem('jwt_token')||'';
 let currentUser=JSON.parse(localStorage.getItem('current_user')||'null');
-let page=1,total=0,limit=15,logPage=1,logTotal=0,userPage=1,userTotal=0;
+let page=1,total=0,limit=15,logPage=1,logTotal=0,userPage=1,userTotal=0,noticePage=1,noticeTotal=0;
 let currentStatus='';
 let currentPage='dashboard';
+let selectedIds=new Set();
 const ROLE_NAMES={0:'超级管理员',1:'授权商',2:'普通用户'};
 
 /* ── 主题切换 ── */
@@ -591,12 +754,13 @@ function switchPage(name){
   const nav=document.getElementById('nav-'+name);
   if(el)el.classList.add('active');
   if(nav)nav.classList.add('active');
-  const titles={dashboard:'概览',licenses:'授权管理',logs:'操作日志',users:'用户管理'};
+  const titles={dashboard:'概览',licenses:'授权管理',logs:'操作日志',notices:'公告管理',users:'用户管理'};
   document.getElementById('pageTitle').textContent=titles[name]||'';
   document.getElementById('tabBar').style.display=name==='licenses'?'flex':'none';
   if(name==='dashboard'){loadDashboard();loadRecent();}
-  if(name==='licenses')loadList();
+  if(name==='licenses'){selectedIds.clear();updateBatchBar();loadList();}
   if(name==='logs')loadLogs();
+  if(name==='notices')loadNotices();
   if(name==='users')loadUsers();
 }
 
@@ -623,7 +787,33 @@ async function api(method,path,body){
   return d.data;
 }
 
-/* ── 登录 ── */
+/* ── 登录/注册切换 ── */
+function toggleAuthForm(showRegister){
+  document.getElementById('loginForm').style.display=showRegister?'none':'block';
+  document.getElementById('registerForm').style.display=showRegister?'block':'none';
+  document.getElementById('authTitle').textContent=showRegister?'注册账号':'License Console';
+  document.getElementById('authSub').textContent=showRegister?'创建新账号加入授权管理系统':'输入账号密码登录授权管理系统';
+}
+
+async function doRegister(){
+  const username=document.getElementById('regUser').value.trim();
+  const password=document.getElementById('regPass').value;
+  const password2=document.getElementById('regPass2').value;
+  const display_name=document.getElementById('regDisplay').value.trim();
+  if(!username||!password)return toast('请输入用户名和密码',false);
+  if(username.length<3||username.length>32)return toast('用户名长度3-32位',false);
+  if(password.length<6)return toast('密码至少6位',false);
+  if(password!==password2)return toast('两次密码不一致',false);
+  try{
+    const o={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,display_name})};
+    const r=await fetch(API+'/auth/register',o),d=await r.json();
+    if(d.code!==0){toast(d.message||'注册失败',false);return;}
+    toast('注册成功，请登录');
+    toggleAuthForm(false);
+    document.getElementById('loginUser').value=username;
+  }catch(e){toast('注册失败',false);}
+}
+
 window.onload=()=>{
   if(TOKEN && currentUser){
     onLoginSuccess(currentUser, true);
@@ -653,6 +843,9 @@ function onLoginSuccess(user, silent){
   document.getElementById('connStatus').style.color='#22c55e';
   // 角色适配
   document.getElementById('nav-users').style.display=user.role===0?'flex':'none';
+  document.getElementById('nav-notices').style.display=user.role===0?'flex':'none';
+  document.getElementById('btnChangePwd').style.display='inline-flex';
+  document.getElementById('btnCleanupLogs').style.display=user.role===0?'inline-flex':'none';
   // 普通用户隐藏创建按钮
   document.querySelectorAll('.dealer-hide').forEach(el=>el.style.display=user.role===2?'none':'');
   switchPage('dashboard');
@@ -670,6 +863,10 @@ function logout(){
   document.getElementById('loginUser').value='';
   document.getElementById('loginPass').value='';
   document.getElementById('nav-users').style.display='none';
+  document.getElementById('nav-notices').style.display='none';
+  document.getElementById('btnChangePwd').style.display='none';
+  document.getElementById('btnCleanupLogs').style.display='none';
+  toggleAuthForm(false);
 }
 
 /* ── 概览 ── */
@@ -711,28 +908,79 @@ async function loadList(){
   const d=await api('GET',u);total=d.total||0;
   document.getElementById('pageInfo').textContent=`共 ${total} 条 · ${page} / ${Math.max(1,Math.ceil(total/limit))} 页`;
   const tb=document.getElementById('licenseBody');tb.innerHTML='';
+  document.getElementById('selectAllCb').checked=false;
   (d.list||[]).forEach(l=>{
     const st=l.status===1?'<span class="tag tag-on">活跃</span>':l.status===0?'<span class="tag tag-off">吊销</span>':'<span class="tag tag-exp">过期</span>';
+    const trial=l.is_trial?'<span class="tag tag-exp" style="margin-left:4px;font-size:10px">试用</span>':'';
     const mid=l.machine_id?`<span class="mono" style="font-size:11px" title="${l.machine_id}">${l.machine_id.substring(0,16)}</span>`:'<span style="color:var(--text-5)">-</span>';
+    const chk=selectedIds.has(l.id)?'checked':'';
     const act=`<div class="acts">
+      <button class="btn btn-sm" onclick="editLicense(${l.id})">编辑</button>
       ${l.status===1?`<button class="btn btn-sm btn-danger" onclick="revokeLicense(${l.id})">吊销</button>`:''}
       ${l.status===0?`<button class="btn btn-sm" onclick="enableLicense(${l.id})">启用</button>`:''}
-      ${l.machine_id?`<button class="btn btn-sm" onclick="unbindLicense(${l.id})">解绑</button>`:''}
+      ${l.machine_id?`<button class="btn btn-sm" onclick="unbindLicense(${l.id})" title="本月已换绑${l.last_rebind_month===new Date().toISOString().slice(0,7)?l.month_rebind_count:0}/2次">解绑</button>`:''}
       <button class="btn btn-sm" onclick="showRenew(${l.id})">续期</button>
       <button class="btn btn-sm btn-danger" onclick="deleteLicense(${l.id})">删除</button>
     </div>`;
     tb.innerHTML+=`<tr>
+      <td><input type="checkbox" ${chk} onchange="toggleSelect(${l.id},this.checked)" /></td>
       <td style="color:var(--text-3)">${l.id}</td>
-      <td><span class="mono">${l.license_key.substring(0,24)}</span><div class="sub">${l.note||''}</div></td>
+      <td><span class="mono" style="cursor:pointer" onclick="copyKey('${l.license_key}')" title="点击复制完整授权码">${l.license_key.substring(0,24)}</span>${trial}<div class="sub">${l.note||''}</div></td>
       <td>${l.domain}</td><td>${l.plan||'-'}</td><td>${st}</td><td>${mid}</td>
       <td style="font-size:12px;color:var(--text-3)">${l.expire_at||'永久'}</td>
       <td style="font-size:11px;color:var(--text-4)">${l.last_heartbeat||'-'}</td>
       <td>${act}</td></tr>`;
   });
-  if(!(d.list||[]).length)tb.innerHTML='<tr class="empty-row"><td colspan="9">暂无数据</td></tr>';
+  if(!(d.list||[]).length)tb.innerHTML='<tr class="empty-row"><td colspan="10">暂无数据</td></tr>';
 }
 function prevPage(){if(page>1){page--;loadList();}}
 function nextPage(){if(page*limit<total){page++;loadList();}}
+function copyKey(key){navigator.clipboard.writeText(key).then(()=>toast('已复制授权码')).catch(()=>{});}
+
+/* ── 选择与批量操作 ── */
+function toggleSelect(id,checked){if(checked)selectedIds.add(id);else selectedIds.delete(id);updateBatchBar();}
+function toggleSelectAll(cb){document.querySelectorAll('#licenseBody input[type=checkbox]').forEach(c=>{c.checked=cb.checked;const id=parseInt(c.closest('tr').querySelector('td:nth-child(2)').textContent);if(cb.checked)selectedIds.add(id);else selectedIds.delete(id);});updateBatchBar();}
+function updateBatchBar(){const bar=document.getElementById('batchBar');if(selectedIds.size>0){bar.style.display='flex';document.getElementById('batchCount').textContent=`已选 ${selectedIds.size} 条`;}else{bar.style.display='none';}}
+function clearSelection(){selectedIds.clear();document.querySelectorAll('#licenseBody input[type=checkbox]').forEach(c=>c.checked=false);document.getElementById('selectAllCb').checked=false;updateBatchBar();}
+
+async function batchRevoke(){if(!confirm(`确定批量吊销 ${selectedIds.size} 条授权码？`))return;await api('POST','/admin/license/batch_revoke',{ids:[...selectedIds]});toast(`已吊销 ${selectedIds.size} 条`);selectedIds.clear();updateBatchBar();loadList();loadDashboard();}
+function showBatchRenew(){showModal('batchRenewModal');}
+async function batchRenewConfirm(){const days=+document.getElementById('brDays').value||365;await api('POST','/admin/license/batch_renew',{ids:[...selectedIds],expire_days:days});closeModal('batchRenewModal');toast(`已续期 ${selectedIds.size} 条`);selectedIds.clear();updateBatchBar();loadList();}
+
+async function batchCreate(){
+  const b={count:parseInt(document.getElementById('bcCount').value)||10,domain:document.getElementById('bcDomain').value||'*',note:document.getElementById('bcNote').value,plan:document.getElementById('bcPlan').value,expire_days:parseInt(document.getElementById('bcExpireDays').value)||365,max_users:parseInt(document.getElementById('bcMaxUsers').value)||100,max_agents:parseInt(document.getElementById('bcMaxAgents').value)||50,max_bind:parseInt(document.getElementById('bcMaxBind').value)||3};
+  const d=await api('POST','/admin/license/batch_create',b);closeModal('batchCreateModal');
+  document.getElementById('batchKeyDisplay').textContent=(d.keys||[]).join('\n');showModal('batchKeyModal');
+  if(currentPage==='dashboard'){loadDashboard();loadRecent();}else{loadList();}
+}
+
+/* ── 导出 ── */
+function exportCSV(){
+  let u=API+'/admin/licenses/export?';
+  if(currentStatus!=='')u+=`status=${currentStatus}&`;
+  const a=document.createElement('a');a.href=u;a.setAttribute('download','licenses.csv');
+  a.style.display='none';document.body.appendChild(a);
+  fetch(u,{headers:{'Authorization':'Bearer '+TOKEN}}).then(r=>r.blob()).then(b=>{const url=URL.createObjectURL(b);a.href=url;a.click();URL.revokeObjectURL(url);a.remove();toast('导出成功');}).catch(()=>toast('导出失败',false));
+}
+
+/* ── 编辑授权码 ── */
+async function editLicense(id){
+  const allData=await api('GET',`/admin/licenses?page=1&limit=100`);
+  const l=(allData.list||[]).find(x=>x.id===id);
+  if(!l)return toast('授权码不存在',false);
+  document.getElementById('eId').value=l.id;
+  document.getElementById('eDomain').value=l.domain;
+  document.getElementById('eNote').value=l.note;
+  document.getElementById('ePlan').value=l.plan;
+  document.getElementById('eMaxBind').value=l.max_bind;
+  document.getElementById('eMaxUsers').value=l.max_users;
+  document.getElementById('eMaxAgents').value=l.max_agents;
+  showModal('editModal');
+}
+async function saveLicense(){
+  const b={id:+document.getElementById('eId').value,domain:document.getElementById('eDomain').value,note:document.getElementById('eNote').value,plan:document.getElementById('ePlan').value,max_bind:+document.getElementById('eMaxBind').value,max_users:+document.getElementById('eMaxUsers').value,max_agents:+document.getElementById('eMaxAgents').value};
+  await api('POST','/admin/license/update',b);closeModal('editModal');toast('更新成功');loadList();
+}
 
 /* ── 创建 ── */
 async function createLicense(){
@@ -745,7 +993,7 @@ async function createLicense(){
 /* ── 操作 ── */
 async function revokeLicense(id){if(!confirm('确定吊销此授权码？'))return;await api('POST','/admin/license/revoke',{id});toast('已吊销');loadList();loadDashboard();}
 async function enableLicense(id){await api('POST','/admin/license/enable',{id});toast('已启用');loadList();loadDashboard();}
-async function unbindLicense(id){if(!confirm('确定解绑机器码？'))return;await api('POST','/admin/license/unbind',{id});toast('已解绑');loadList();}
+async function unbindLicense(id){if(!confirm('确定解绑机器码？（每月限解绑2次）'))return;await api('POST','/admin/license/unbind',{id});toast('已解绑');loadList();}
 async function deleteLicense(id){if(!confirm('永久删除此授权码？'))return;await api('DELETE',`/admin/license/delete/${id}`);toast('已删除');loadList();loadDashboard();}
 
 function showRenew(id){document.getElementById('renewId').value=id;showModal('renewModal');}
@@ -765,6 +1013,28 @@ async function loadLogs(){
 }
 function prevLogPage(){if(logPage>1){logPage--;loadLogs();}}
 function nextLogPage(){if(logPage*20<logTotal){logPage++;loadLogs();}}
+
+async function cleanupLogs(){
+  if(!confirm('确定清理 30 天前的日志？此操作不可撤销！'))return;
+  const d=await api('POST','/admin/license/cleanup_logs');
+  toast(d.message||'清理完成');loadLogs();
+}
+
+/* ── 修改密码 ── */
+async function doChangePwd(){
+  const oldPwd=document.getElementById('cpOldPass').value;
+  const newPwd=document.getElementById('cpNewPass').value;
+  const newPwd2=document.getElementById('cpNewPass2').value;
+  if(!oldPwd||!newPwd)return toast('请填写密码',false);
+  if(newPwd.length<6)return toast('新密码至少6位',false);
+  if(newPwd!==newPwd2)return toast('两次新密码不一致',false);
+  await api('POST','/admin/change_password',{old_password:oldPwd,new_password:newPwd});
+  closeModal('changePwdModal');
+  document.getElementById('cpOldPass').value='';
+  document.getElementById('cpNewPass').value='';
+  document.getElementById('cpNewPass2').value='';
+  toast('密码修改成功');
+}
 
 /* ── 用户管理 ── */
 async function loadUsers(){
@@ -845,6 +1115,85 @@ async function deleteUser(id){
   if(!confirm('确定删除此用户？'))return;
   await api('DELETE',`/admin/user/delete/${id}`);
   toast('已删除');loadUsers();
+}
+
+/* ── 公告管理 ── */
+async function loadNotices(){
+  const d=await api('GET',`/admin/notices?page=${noticePage}&limit=20`);
+  noticeTotal=d.total||0;
+  document.getElementById('noticePageInfo').textContent=`共 ${noticeTotal} 条 · ${noticePage} / ${Math.max(1,Math.ceil(noticeTotal/20))} 页`;
+  const tb=document.getElementById('noticeBody');tb.innerHTML='';
+  (d.list||[]).forEach(n=>{
+    const typeCls=n.notice_type==='urgent'?'tag-off':n.notice_type==='warning'?'tag-exp':'tag-log';
+    const st=n.active===1?'<span class="tag tag-on">启用</span>':'<span class="tag tag-off">禁用</span>';
+    tb.innerHTML+=`<tr>
+      <td style="color:var(--text-3)">${n.id}</td>
+      <td>${n.title}</td>
+      <td><span class="tag ${typeCls}">${n.notice_type}</span></td>
+      <td style="color:var(--text-3)">${n.target}</td>
+      <td>${st}</td>
+      <td style="font-size:12px;color:var(--text-3)">${n.start_at||'-'}</td>
+      <td style="font-size:12px;color:var(--text-3)">${n.end_at||'-'}</td>
+      <td style="font-size:12px;color:var(--text-3)">${n.created_at}</td>
+      <td><div class="acts">
+        <button class="btn btn-sm" onclick="editNotice(${n.id})">编辑</button>
+        ${n.active===1?`<button class="btn btn-sm btn-danger" onclick="toggleNotice(${n.id},0)">禁用</button>`:`<button class="btn btn-sm" onclick="toggleNotice(${n.id},1)">启用</button>`}
+        <button class="btn btn-sm btn-danger" onclick="deleteNotice(${n.id})">删除</button>
+      </div></td></tr>`;
+  });
+  if(!(d.list||[]).length)tb.innerHTML='<tr class="empty-row"><td colspan="9">暂无公告</td></tr>';
+}
+function prevNoticePage(){if(noticePage>1){noticePage--;loadNotices();}}
+function nextNoticePage(){if(noticePage*20<noticeTotal){noticePage++;loadNotices();}}
+
+function showCreateNotice(){
+  document.getElementById('noticeModalTitle').textContent='新建公告';
+  document.getElementById('nId').value='';
+  document.getElementById('nTitle').value='';
+  document.getElementById('nContent').value='';
+  document.getElementById('nType').value='info';
+  document.getElementById('nTarget').value='*';
+  document.getElementById('nStartAt').value='';
+  document.getElementById('nEndAt').value='';
+  showModal('noticeModal');
+}
+
+async function editNotice(id){
+  const d=await api('GET',`/admin/notices?page=1&limit=100`);
+  const n=(d.list||[]).find(x=>x.id===id);
+  if(!n)return toast('公告不存在',false);
+  document.getElementById('noticeModalTitle').textContent='编辑公告';
+  document.getElementById('nId').value=n.id;
+  document.getElementById('nTitle').value=n.title;
+  document.getElementById('nContent').value=n.content;
+  document.getElementById('nType').value=n.notice_type;
+  document.getElementById('nTarget').value=n.target;
+  document.getElementById('nStartAt').value=n.start_at?n.start_at.replace(' ','T'):'';
+  document.getElementById('nEndAt').value=n.end_at?n.end_at.replace(' ','T'):'';
+  showModal('noticeModal');
+}
+
+async function saveNotice(){
+  const id=document.getElementById('nId').value;
+  const title=document.getElementById('nTitle').value;
+  if(!title)return toast('标题必填',false);
+  if(id){
+    await api('POST','/admin/notice/update',{id:+id,title,content:document.getElementById('nContent').value,notice_type:document.getElementById('nType').value,target:document.getElementById('nTarget').value,start_at:document.getElementById('nStartAt').value.replace('T',' ')||null,end_at:document.getElementById('nEndAt').value.replace('T',' ')||null});
+  }else{
+    await api('POST','/admin/notice/create',{title,content:document.getElementById('nContent').value,notice_type:document.getElementById('nType').value,target:document.getElementById('nTarget').value,start_at:document.getElementById('nStartAt').value.replace('T',' ')||null,end_at:document.getElementById('nEndAt').value.replace('T',' ')||null});
+  }
+  closeModal('noticeModal');toast('保存成功');loadNotices();
+}
+
+async function toggleNotice(id,active){
+  await api('POST','/admin/notice/update',{id,active});
+  toast(active===1?'已启用':'已禁用');loadNotices();
+}
+
+async function deleteNotice(id){
+  if(!confirm('确定删除此公告？'))return;
+  await api('DELETE',`/admin/notice/delete/${id}`);
+  toast('已删除');loadNotices();
 }
 </script>
 </body>

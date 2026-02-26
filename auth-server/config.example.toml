@@ -7,7 +7,7 @@ jwt_secret = "change-me-to-a-strong-jwt-secret"
 jwt_expire_hours = 72
 
 [security]
-# 客户端签名密钥，编译进客户端二进制，部署时务必修改
+# 客户端签名密钥，必须与插件端 .client_secret 文件一致，部署时务必修改
 client_secret = "change-me-client-secret"
 # 签名时间窗口（秒），防重放攻击
 sign_window_secs = 300

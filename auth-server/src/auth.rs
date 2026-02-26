@@ -100,8 +100,15 @@ fn verify_hmac(secret: &str, data: &str, sign: &str) -> Result<(), &'static str>
     }
 }
 
+/// 生成 HMAC-SHA256 签名
+pub fn hmac_sign(secret: &str, data: &str) -> String {
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC init");
+    mac.update(data.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
+
 /// 常量时间比较，防止时序攻击
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }
