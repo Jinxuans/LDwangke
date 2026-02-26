@@ -23,6 +23,33 @@ pub struct AppState {
 
 // ===== 工具函数 =====
 
+/// 域名匹配：支持 * (通配所有)、精确匹配、泛域名 *.example.com、逗号分隔多规则
+fn domain_matches(pattern: &str, domain: &str) -> bool {
+    let pattern = pattern.trim();
+    let domain = domain.trim().to_lowercase();
+    if pattern == "*" || domain.is_empty() {
+        return true;
+    }
+    for p in pattern.split(',') {
+        let p = p.trim().to_lowercase();
+        if p.is_empty() {
+            continue;
+        }
+        if p == "*" {
+            return true;
+        }
+        if let Some(suffix) = p.strip_prefix("*.") {
+            // 泛域名：*.example.com 匹配 example.com 及其所有子域
+            if domain == suffix || domain.ends_with(&format!(".{}", suffix)) {
+                return true;
+            }
+        } else if p == domain {
+            return true;
+        }
+    }
+    false
+}
+
 fn get_client_ip(headers: &HeaderMap, addr: &SocketAddr) -> String {
     headers
         .get("x-forwarded-for")
@@ -70,6 +97,9 @@ pub async fn verify(
     let version = req.version.clone();
     let ip = ip.clone();
 
+    let risk_window = state.config.security.risk_window_secs;
+    let max_ips = state.config.security.max_ips_per_license;
+
     let (resp, cache_resp) = tokio::task::spawn_blocking(move || {
         let license = match db::get_by_key(&db, &key) {
             Some(l) => l,
@@ -77,6 +107,11 @@ pub async fn verify(
                 return (ApiResponse::error(404, "授权码不存在"), None);
             }
         };
+
+        // IP 风控检查
+        if let Err(e) = db::check_ip_risk(&db, license.id, risk_window, max_ips) {
+            return (ApiResponse::error(403, &e), None);
+        }
 
         // 状态检查
         if license.status == 0 {
@@ -100,14 +135,14 @@ pub async fn verify(
             }
         }
 
-        // 域名检查
-        if license.domain != "*" && license.domain != domain {
+        // 域名检查（支持泛域名 *.example.com）
+        if !domain_matches(&license.domain, &domain) {
             db::add_log(
                 &db,
                 license.id,
                 "verify_fail",
                 &ip,
-                &format!("域名不匹配: {} != {}", domain, license.domain),
+                &format!("域名不匹配: {} 不符合规则 {}", domain, license.domain),
             );
             return (ApiResponse::error(403, "域名不匹配"), None);
         }
@@ -150,6 +185,11 @@ pub async fn verify(
             max_users: license.max_users,
             max_agents: license.max_agents,
             is_trial: license.is_trial == 1,
+            config: if license.config.is_empty() {
+                None
+            } else {
+                serde_json::from_str(&license.config).ok()
+            },
             message: None,
         };
 
@@ -162,6 +202,7 @@ pub async fn verify(
             "max_users": verify_resp.max_users,
             "max_agents": verify_resp.max_agents,
             "is_trial": verify_resp.is_trial,
+            "config": verify_resp.config,
             "notices": notices,
         })), Some(verify_resp))
     })
@@ -214,15 +255,25 @@ pub async fn heartbeat(
         };
 
         if license.status != 1 {
-            return ApiResponse::error(403, "授权码无效");
+            return ApiResponse {
+                code: 403,
+                message: "授权码无效或已被吊销".into(),
+                data: Some(serde_json::json!({ "action": "kick" })),
+                timestamp: chrono::Utc::now().timestamp(),
+            };
         }
 
         if !license.machine_id.is_empty() && license.machine_id != machine_id {
-            return ApiResponse::error(403, "机器码不匹配");
+            return ApiResponse {
+                code: 403,
+                message: "机器码不匹配，请联系管理员解绑".into(),
+                data: Some(serde_json::json!({ "action": "kick" })),
+                timestamp: chrono::Utc::now().timestamp(),
+            };
         }
 
-        // 域名校验（非通配符时检查）
-        if !domain.is_empty() && license.domain != "*" && license.domain != domain {
+        // 域名校验（支持泛域名 *.example.com）
+        if !domain.is_empty() && !domain_matches(&license.domain, &domain) {
             return ApiResponse::error(403, "域名不匹配");
         }
 

@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS license (
     is_trial INTEGER NOT NULL DEFAULT 0,
     month_rebind_count INTEGER NOT NULL DEFAULT 0,
     last_rebind_month TEXT NOT NULL DEFAULT '',
+    config TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
@@ -108,6 +109,7 @@ pub fn init(config: &AppConfig) -> DbPool {
         c.execute_batch("ALTER TABLE license ADD COLUMN is_trial INTEGER NOT NULL DEFAULT 0;").ok();
         c.execute_batch("ALTER TABLE license ADD COLUMN month_rebind_count INTEGER NOT NULL DEFAULT 0;").ok();
         c.execute_batch("ALTER TABLE license ADD COLUMN last_rebind_month TEXT NOT NULL DEFAULT '';").ok();
+        c.execute_batch("ALTER TABLE license ADD COLUMN config TEXT NOT NULL DEFAULT '';").ok();
     }
 
     pool
@@ -115,7 +117,7 @@ pub fn init(config: &AppConfig) -> DbPool {
 
 // ===== 查询 =====
 
-const SELECT_COLS: &str = "id,license_key,domain,machine_id,note,plan,max_users,max_agents,status,expire_at,last_heartbeat,last_ip,version,bind_count,max_bind,dealer_id,is_trial,month_rebind_count,last_rebind_month,created_at,updated_at";
+const SELECT_COLS: &str = "id,license_key,domain,machine_id,note,plan,max_users,max_agents,status,expire_at,last_heartbeat,last_ip,version,bind_count,max_bind,dealer_id,is_trial,month_rebind_count,last_rebind_month,config,created_at,updated_at";
 
 fn map_license(row: &rusqlite::Row) -> rusqlite::Result<License> {
     Ok(License {
@@ -138,8 +140,9 @@ fn map_license(row: &rusqlite::Row) -> rusqlite::Result<License> {
         is_trial: row.get(16)?,
         month_rebind_count: row.get(17)?,
         last_rebind_month: row.get(18)?,
-        created_at: row.get(19)?,
-        updated_at: row.get(20)?,
+        config: row.get(19)?,
+        created_at: row.get(20)?,
+        updated_at: row.get(21)?,
     })
 }
 
@@ -309,12 +312,12 @@ pub fn list_licenses(db: &DbPool, page: i64, limit: i64, keyword: &str, status_f
 // ===== 创建 =====
 
 fn duration_days(days: i64) -> chrono::TimeDelta {
-    chrono::TimeDelta::try_days(days).expect("invalid days")
+    chrono::Duration::try_days(days).unwrap_or_else(|| chrono::Duration::days(days))
 }
 
 pub fn create_license(db: &DbPool, key: &str, req: &CreateLicenseRequest) -> Result<i64, String> {
     let c = conn(db);
-    let expire_at: Option<String> = if req.expire_days > 0 {
+    let expire_at = if req.expire_days > 0 {
         Some(
             (chrono::Local::now() + duration_days(req.expire_days as i64))
                 .format("%Y-%m-%d %H:%M:%S")
@@ -324,12 +327,26 @@ pub fn create_license(db: &DbPool, key: &str, req: &CreateLicenseRequest) -> Res
         None
     };
 
+    let sql = format!(
+        "INSERT INTO license (license_key, domain, note, plan, max_users, max_agents, max_bind, expire_at, dealer_id, is_trial, config)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10)"
+    );
     c.execute(
-        "INSERT INTO license (license_key, domain, note, plan, max_users, max_agents, max_bind, expire_at, dealer_id) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
-        params![key, req.domain, req.note, req.plan, req.max_users, req.max_agents, req.max_bind, expire_at, req.dealer_id],
+        &sql,
+        params![
+            key,
+            req.domain,
+            req.note,
+            req.plan,
+            req.max_users,
+            req.max_agents,
+            req.max_bind,
+            expire_at,
+            req.dealer_id,
+            req.config,
+        ],
     )
     .map_err(|e| format!("创建失败: {}", e))?;
-
     Ok(c.last_insert_rowid())
 }
 
@@ -360,9 +377,13 @@ pub fn update_license(db: &DbPool, req: &UpdateLicenseRequest) -> Result<(), Str
         sets.push("max_agents=?");
         vals.push(Box::new(v));
     }
-    if let Some(v) = req.max_bind {
+    if let Some(ref v) = req.max_bind {
         sets.push("max_bind=?");
         vals.push(Box::new(v));
+    }
+    if let Some(ref v) = req.config {
+        sets.push("config=?");
+        vals.push(Box::new(v.clone()));
     }
 
     if sets.is_empty() {
@@ -556,6 +577,35 @@ pub fn dashboard(db: &DbPool, offline_threshold_secs: i64, dealer_id: Option<i64
     Dashboard { total, active, expired, revoked, online_now }
 }
 
+// ===== 风险控制 =====
+
+pub fn check_ip_risk(db: &DbPool, license_id: i64, window_secs: i64, max_ips: i64) -> Result<(), String> {
+    let c = conn(db);
+    let mut stmt = c
+        .prepare(
+            "SELECT COUNT(DISTINCT ip) FROM license_log
+             WHERE license_id = ?1 AND action IN ('verify', 'verify_fail', 'bind')
+             AND created_at >= datetime('now', 'localtime', ?2)",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let window_mod = format!("-{} seconds", window_secs);
+    let count: i64 = stmt
+        .query_row(params![license_id, window_mod], |row| row.get(0))
+        .unwrap_or(0);
+
+    if count > max_ips {
+        // 触发熔断
+        c.execute(
+            "UPDATE license SET status = 0, updated_at = datetime('now','localtime') WHERE id = ?1",
+            params![license_id],
+        ).ok();
+        add_log(db, license_id, "risk_ban", "system", &format!("{}秒内IP数({})超过限制({})，自动熔断", window_secs, count, max_ips));
+        return Err("授权码异常，已被系统自动冻结".into());
+    }
+    Ok(())
+}
+
 // ===== 过期扫描 =====
 
 pub fn expire_scan(db: &DbPool) -> Vec<String> {
@@ -610,9 +660,24 @@ pub fn batch_create(db: &DbPool, keys: &[String], req: &crate::model::BatchCreat
     let tx = c.unchecked_transaction().map_err(|e| format!("事务开始失败: {}", e))?;
     let mut results = Vec::new();
     for key in keys {
+        let sql = format!(
+            "INSERT INTO license (license_key, domain, note, plan, max_users, max_agents, max_bind, expire_at, dealer_id, is_trial, config)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10)"
+        );
         tx.execute(
-            "INSERT INTO license (license_key, domain, note, plan, max_users, max_agents, max_bind, expire_at, dealer_id, is_trial) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,0)",
-            params![key, req.domain, req.note, req.plan, req.max_users, req.max_agents, req.max_bind, expire_at, req.dealer_id],
+            &sql,
+            params![
+                key,
+                req.domain,
+                req.note,
+                req.plan,
+                req.max_users,
+                req.max_agents,
+                req.max_bind,
+                expire_at,
+                req.dealer_id,
+                req.config,
+            ],
         ).map_err(|e| format!("创建失败: {}", e))?;
         let id = tx.last_insert_rowid();
         results.push((id, key.clone()));

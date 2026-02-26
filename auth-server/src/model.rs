@@ -93,6 +93,7 @@ pub struct License {
     pub is_trial: i32,
     pub month_rebind_count: i32,
     pub last_rebind_month: String,
+    pub config: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -151,6 +152,8 @@ pub struct VerifyResponse {
     pub max_agents: i32,
     pub is_trial: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
 
@@ -173,6 +176,8 @@ pub struct CreateLicenseRequest {
     #[serde(default)]
     pub expire_days: i32, // 0=永久
     #[serde(default)]
+    pub config: String,
+    #[serde(default)]
     pub dealer_id: i64,   // 由中间件注入
 }
 
@@ -189,6 +194,7 @@ pub struct UpdateLicenseRequest {
     pub max_users: Option<i32>,
     pub max_agents: Option<i32>,
     pub max_bind: Option<i32>,
+    pub config: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -225,6 +231,8 @@ pub struct BatchCreateRequest {
     pub max_bind: i32,
     #[serde(default)]
     pub expire_days: i32,
+    #[serde(default)]
+    pub config: String,
     #[serde(default)]
     pub dealer_id: i64,
 }

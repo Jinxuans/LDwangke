@@ -419,6 +419,14 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
           <div class="stat-card"><div class="label">Expired</div><div class="value" id="statExpired">0</div></div>
           <div class="stat-card"><div class="label">Online</div><div class="value" id="statOnline">0</div></div>
         </div>
+
+        <div class="panel">
+          <div class="panel-head"><span class="title">近30天趋势</span></div>
+          <div class="panel-body" style="padding:20px;">
+            <div id="trendChart" style="width:100%;height:300px;"></div>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel-head"><span class="title">最近授权</span><button class="btn btn-sm" onclick="switchPage('licenses')">查看全部</button></div>
           <div class="panel-body"><table><thead><tr><th>授权码</th><th>域名</th><th>状态</th><th>到期</th></tr></thead><tbody id="recentBody"></tbody></table></div>
@@ -568,7 +576,7 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
 <div id="createModal" class="modal-mask">
   <div class="modal-box">
     <h3>新建授权码</h3>
-    <label>域名</label><input id="cDomain" placeholder="example.com 或 * 不限" value="*" />
+    <label>域名</label><input id="cDomain" placeholder="* 不限 / example.com / *.example.com" value="*" />
     <label>备注</label><input id="cNote" placeholder="客户名称 / 说明" />
     <div class="row r2">
       <div><label>套餐</label><select id="cPlan"><option value="basic">基础版</option><option value="standard" selected>标准版</option><option value="enterprise">企业版</option></select></div>
@@ -579,6 +587,7 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
       <div><label>最大坐席</label><input id="cMaxAgents" type="number" value="50" /></div>
       <div><label>换绑次数</label><input id="cMaxBind" type="number" value="3" /></div>
     </div>
+    <label>附加配置 (JSON)</label><textarea id="cConfig" placeholder='{"feature":"pro"}' style="width:100%;height:60px;margin-bottom:16px;background:var(--input-bg);border:1px solid var(--input-border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:monospace;font-size:12px;outline:none;resize:vertical;"></textarea>
     <div class="modal-foot">
       <button class="btn" onclick="closeModal('createModal')">取消</button>
       <button class="btn btn-primary" onclick="createLicense()">创建</button>
@@ -616,7 +625,7 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
   <div class="modal-box">
     <h3>批量创建授权码</h3>
     <label>数量 (1-100)</label><input id="bcCount" type="number" value="10" min="1" max="100" />
-    <label>域名</label><input id="bcDomain" placeholder="example.com 或 *" value="*" />
+    <label>域名</label><input id="bcDomain" placeholder="* 不限 / example.com / *.example.com" value="*" />
     <label>备注</label><input id="bcNote" placeholder="客户名称 / 说明" />
     <div class="row r2">
       <div><label>套餐</label><select id="bcPlan"><option value="basic">基础版</option><option value="standard" selected>标准版</option><option value="enterprise">企业版</option></select></div>
@@ -627,6 +636,7 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
       <div><label>最大坐席</label><input id="bcMaxAgents" type="number" value="50" /></div>
       <div><label>换绑次数</label><input id="bcMaxBind" type="number" value="3" /></div>
     </div>
+    <label>附加配置 (JSON)</label><textarea id="bcConfig" placeholder='{"feature":"pro"}' style="width:100%;height:60px;margin-bottom:16px;background:var(--input-bg);border:1px solid var(--input-border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:monospace;font-size:12px;outline:none;resize:vertical;"></textarea>
     <div class="modal-foot">
       <button class="btn" onclick="closeModal('batchCreateModal')">取消</button>
       <button class="btn btn-primary" onclick="batchCreate()">批量创建</button>
@@ -663,7 +673,7 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
   <div class="modal-box">
     <h3>编辑授权码</h3>
     <input id="eId" type="hidden" />
-    <label>域名</label><input id="eDomain" placeholder="example.com 或 *" />
+    <label>域名</label><input id="eDomain" placeholder="* 不限 / example.com / *.example.com" />
     <label>备注</label><input id="eNote" placeholder="客户名称 / 说明" />
     <div class="row r2">
       <div><label>套餐</label><select id="ePlan"><option value="basic">基础版</option><option value="standard">标准版</option><option value="enterprise">企业版</option></select></div>
@@ -673,6 +683,7 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
       <div><label>最大用户</label><input id="eMaxUsers" type="number" /></div>
       <div><label>最大坐席</label><input id="eMaxAgents" type="number" /></div>
     </div>
+    <label>附加配置 (JSON)</label><textarea id="eConfig" placeholder='{"feature":"pro"}' style="width:100%;height:60px;margin-bottom:16px;background:var(--input-bg);border:1px solid var(--input-border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:monospace;font-size:12px;outline:none;resize:vertical;"></textarea>
     <div class="modal-foot">
       <button class="btn" onclick="closeModal('editModal')">取消</button>
       <button class="btn btn-primary" onclick="saveLicense()">保存</button>
@@ -716,6 +727,7 @@ body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script>
 const API=window.location.origin+'/api/v1';
 let TOKEN=localStorage.getItem('jwt_token')||'';
@@ -726,6 +738,8 @@ let currentPage='dashboard';
 let selectedIds=new Set();
 const ROLE_NAMES={0:'超级管理员',1:'授权商',2:'普通用户'};
 
+let trendChartInstance=null;
+
 /* ── 主题切换 ── */
 const sunSVG='<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
 const moonSVG='<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>';
@@ -733,6 +747,11 @@ function applyTheme(dark){
   document.body.classList.toggle('dark',dark);
   document.getElementById('themeIcon').innerHTML=dark?moonSVG:sunSVG;
   localStorage.setItem('theme',dark?'dark':'light');
+  if(trendChartInstance) {
+    trendChartInstance.dispose();
+    trendChartInstance=null;
+    if(currentPage==='dashboard') renderChart(window.lastChartData);
+  }
 }
 function toggleTheme(){applyTheme(!document.body.classList.contains('dark'));}
 (function(){const t=localStorage.getItem('theme');applyTheme(t!=='light');})();
@@ -877,7 +896,74 @@ async function loadDashboard(){
   document.getElementById('statRevoked').textContent=d.revoked||0;
   document.getElementById('statExpired').textContent=d.expired||0;
   document.getElementById('statOnline').textContent=d.online_now||0;
+  
+  // Load chart data
+  const trend=await api('GET','/admin/stats/trend?days=30');
+  window.lastChartData = trend;
+  renderChart(trend);
 }
+
+function renderChart(data) {
+  if(!data) return;
+  const chartDom = document.getElementById('trendChart');
+  if(!chartDom) return;
+  if(!trendChartInstance) {
+    trendChartInstance = echarts.init(chartDom, document.body.classList.contains('dark') ? 'dark' : null);
+  }
+  const isDark = document.body.classList.contains('dark');
+  
+  const days = data.map(item => item.day.substring(5)); // MM-DD
+  const created = data.map(item => item.created);
+  const online = data.map(item => item.online);
+  
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['新增授权', '在线设备'], textStyle: { color: isDark ? '#f4eedc' : '#4a3f35' } },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { 
+      type: 'category', 
+      boundaryGap: false, 
+      data: days,
+      axisLabel: { color: isDark ? '#a89d91' : '#8c7d6c' },
+      axisLine: { lineStyle: { color: isDark ? 'rgba(244,238,220,0.1)' : 'rgba(139,115,85,0.2)' } }
+    },
+    yAxis: { 
+      type: 'value',
+      axisLabel: { color: isDark ? '#a89d91' : '#8c7d6c' },
+      splitLine: { lineStyle: { color: isDark ? 'rgba(244,238,220,0.05)' : 'rgba(139,115,85,0.08)' } }
+    },
+    series: [
+      {
+        name: '新增授权', type: 'line', smooth: true,
+        itemStyle: { color: '#9c6644' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(156,102,68,0.5)' },
+            { offset: 1, color: 'rgba(156,102,68,0)' }
+          ])
+        },
+        data: created
+      },
+      {
+        name: '在线设备', type: 'line', smooth: true,
+        itemStyle: { color: '#4f6f52' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(79,111,82,0.5)' },
+            { offset: 1, color: 'rgba(79,111,82,0)' }
+          ])
+        },
+        data: online
+      }
+    ]
+  };
+  trendChartInstance.setOption(option);
+}
+
+window.addEventListener('resize', () => {
+  if(trendChartInstance) trendChartInstance.resize();
+});
 
 async function loadRecent(){
   try{
@@ -948,7 +1034,7 @@ function showBatchRenew(){showModal('batchRenewModal');}
 async function batchRenewConfirm(){const days=+document.getElementById('brDays').value||365;await api('POST','/admin/license/batch_renew',{ids:[...selectedIds],expire_days:days});closeModal('batchRenewModal');toast(`已续期 ${selectedIds.size} 条`);selectedIds.clear();updateBatchBar();loadList();}
 
 async function batchCreate(){
-  const b={count:parseInt(document.getElementById('bcCount').value)||10,domain:document.getElementById('bcDomain').value||'*',note:document.getElementById('bcNote').value,plan:document.getElementById('bcPlan').value,expire_days:parseInt(document.getElementById('bcExpireDays').value)||365,max_users:parseInt(document.getElementById('bcMaxUsers').value)||100,max_agents:parseInt(document.getElementById('bcMaxAgents').value)||50,max_bind:parseInt(document.getElementById('bcMaxBind').value)||3};
+  const b={count:parseInt(document.getElementById('bcCount').value)||10,domain:document.getElementById('bcDomain').value||'*',note:document.getElementById('bcNote').value,plan:document.getElementById('bcPlan').value,expire_days:parseInt(document.getElementById('bcExpireDays').value)||365,max_users:parseInt(document.getElementById('bcMaxUsers').value)||100,max_agents:parseInt(document.getElementById('bcMaxAgents').value)||50,max_bind:parseInt(document.getElementById('bcMaxBind').value)||3,config:document.getElementById('bcConfig').value};
   const d=await api('POST','/admin/license/batch_create',b);closeModal('batchCreateModal');
   document.getElementById('batchKeyDisplay').textContent=(d.keys||[]).join('\n');showModal('batchKeyModal');
   if(currentPage==='dashboard'){loadDashboard();loadRecent();}else{loadList();}
@@ -975,16 +1061,17 @@ async function editLicense(id){
   document.getElementById('eMaxBind').value=l.max_bind;
   document.getElementById('eMaxUsers').value=l.max_users;
   document.getElementById('eMaxAgents').value=l.max_agents;
+  document.getElementById('eConfig').value=l.config||'';
   showModal('editModal');
 }
 async function saveLicense(){
-  const b={id:+document.getElementById('eId').value,domain:document.getElementById('eDomain').value,note:document.getElementById('eNote').value,plan:document.getElementById('ePlan').value,max_bind:+document.getElementById('eMaxBind').value,max_users:+document.getElementById('eMaxUsers').value,max_agents:+document.getElementById('eMaxAgents').value};
+  const b={id:+document.getElementById('eId').value,domain:document.getElementById('eDomain').value,note:document.getElementById('eNote').value,plan:document.getElementById('ePlan').value,max_bind:+document.getElementById('eMaxBind').value,max_users:+document.getElementById('eMaxUsers').value,max_agents:+document.getElementById('eMaxAgents').value,config:document.getElementById('eConfig').value};
   await api('POST','/admin/license/update',b);closeModal('editModal');toast('更新成功');loadList();
 }
 
 /* ── 创建 ── */
 async function createLicense(){
-  const b={domain:document.getElementById('cDomain').value||'*',note:document.getElementById('cNote').value,plan:document.getElementById('cPlan').value,expire_days:parseInt(document.getElementById('cExpireDays').value)||365,max_users:parseInt(document.getElementById('cMaxUsers').value)||100,max_agents:parseInt(document.getElementById('cMaxAgents').value)||50,max_bind:parseInt(document.getElementById('cMaxBind').value)||3};
+  const b={domain:document.getElementById('cDomain').value||'*',note:document.getElementById('cNote').value,plan:document.getElementById('cPlan').value,expire_days:parseInt(document.getElementById('cExpireDays').value)||365,max_users:parseInt(document.getElementById('cMaxUsers').value)||100,max_agents:parseInt(document.getElementById('cMaxAgents').value)||50,max_bind:parseInt(document.getElementById('cMaxBind').value)||3,config:document.getElementById('cConfig').value};
   const d=await api('POST','/admin/license/create',b);closeModal('createModal');
   document.getElementById('newKeyDisplay').textContent=d.license_key;showModal('keyModal');
   if(currentPage==='dashboard'){loadDashboard();loadRecent();}else{loadList();}

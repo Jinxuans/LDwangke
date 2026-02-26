@@ -199,12 +199,12 @@ class qingka_manager_main:
                     pass
             return False, '授权验证失败: %s' % str(e)
 
+    # 应用级共享签名密钥（与授权站 config.toml 中 client_secret 保持一致）
+    __client_secret = 'qk@2024!s3cReT#hmac_shared_key'
+
     def _get_client_secret(self):
-        """读取客户端签名密钥（与授权站 config.toml 中 client_secret 一致）"""
-        secret_file = os.path.join(self.__site_dir, '.client_secret')
-        if os.path.isfile(secret_file):
-            return open(secret_file).read().strip()
-        return 'change-me-client-secret'
+        """获取客户端签名密钥"""
+        return self.__client_secret
     # ==================== 状态 ====================
 
     def get_status(self, args):

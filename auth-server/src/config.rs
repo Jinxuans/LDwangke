@@ -48,7 +48,14 @@ pub struct SecurityConfig {
     pub verify_cache_secs: u64,
     pub offline_threshold_secs: i64,
     pub max_default_bind: i32,
+    #[serde(default = "default_risk_window")]
+    pub risk_window_secs: i64,
+    #[serde(default = "default_max_ips")]
+    pub max_ips_per_license: i64,
 }
+
+fn default_risk_window() -> i64 { 3600 } // 1小时
+fn default_max_ips() -> i64 { 10 } // 1小时内超过10个不同IP则熔断
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DatabaseConfig {

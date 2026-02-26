@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <title>青卡管理器</title>
 <style>
-:root{--primary:#2b5aed;--primary-light:#e8eeff;--success:#28a745;--danger:#dc3545;--warning:#fd7e14;--bg:#f5f7fa;--card:#fff;--text:#333;--text-secondary:#666;--border:#e8e8e8;--shadow:0 2px 12px rgba(0,0,0,.08);--radius:8px}
+:root{--primary:#2b5aed;--primary-light:#e8eeff;--success:#28a745;--danger:#dc3545;--warning:#fd7e14;--bg:#f5f7fa;--card:#fff;--text:#333;--text-secondary:#666;--border:#e8e8e8;--shadow:0 1px 6px rgba(0,0,0,.06);--radius:6px}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);font-size:14px;padding:15px}
-.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:15px}
-.status-bar{display:flex;align-items:center;flex-wrap:wrap;gap:20px}
-.status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;background:#999}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);font-size:12px;padding:10px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px;margin-bottom:10px}
+.status-bar{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;background:#999}
 .status-dot.running{background:var(--success);box-shadow:0 0 8px var(--success);animation:pulse 2s infinite}
 .status-dot.stopped{background:var(--danger)}
 @keyframes pulse{0%,100%{box-shadow:0 0 4px var(--success)}50%{box-shadow:0 0 12px var(--success)}}
-.status-item{display:flex;align-items:center;font-size:13px;color:var(--text-secondary)}
+.status-item{display:flex;align-items:center;font-size:12px;color:var(--text-secondary)}
 .status-item span.val{color:var(--text);font-weight:600;margin-left:4px}
-.btn-group{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0}
-.btn{padding:8px 20px;border:none;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:500;transition:all .2s;display:inline-flex;align-items:center;gap:4px}
+.btn-group{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.btn{padding:5px 14px;border:none;border-radius:var(--radius);cursor:pointer;font-size:12px;font-weight:500;transition:all .2s;display:inline-flex;align-items:center;gap:3px}
 .btn:hover{opacity:.85;transform:translateY(-1px)}
 .btn:active{transform:translateY(0)}
 .btn-primary{background:var(--primary);color:#fff}
@@ -27,42 +27,42 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 .btn-outline:hover{border-color:var(--primary);color:var(--primary)}
 .btn[disabled]{opacity:.5;cursor:not-allowed;transform:none}
 .tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:0;gap:0}
-.tab{padding:10px 22px;cursor:pointer;font-size:14px;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s;user-select:none}
+.tab{padding:7px 16px;cursor:pointer;font-size:12px;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s;user-select:none}
 .tab:hover{color:var(--primary)}
 .tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
-.tab-content{display:none;padding:20px 0}
+.tab-content{display:none;padding:12px 0}
 .tab-content.active{display:block}
-.form-group{margin-bottom:15px}
-.form-group label{display:block;margin-bottom:6px;font-weight:500;font-size:13px;color:var(--text-secondary)}
-.form-input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:14px;transition:border-color .2s;outline:none}
+.form-group{margin-bottom:10px}
+.form-group label{display:block;margin-bottom:4px;font-weight:500;font-size:12px;color:var(--text-secondary)}
+.form-input{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:12px;transition:border-color .2s;outline:none}
 .form-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(43,90,237,.1)}
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:15px}
-.log-viewer{background:#1a1a2e;color:#0f0;font-family:"Courier New",monospace;padding:15px;border-radius:var(--radius);height:400px;overflow-y:auto;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all}
-.config-editor{width:100%;min-height:400px;font-family:"Courier New",monospace;font-size:13px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);resize:vertical;outline:none;line-height:1.6}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.log-viewer{background:#1a1a2e;color:#0f0;font-family:"Courier New",monospace;padding:10px;border-radius:var(--radius);height:260px;overflow-y:auto;font-size:11px;line-height:1.6;white-space:pre-wrap;word-break:break-all}
+.config-editor{width:100%;min-height:260px;font-family:"Courier New",monospace;font-size:12px;padding:10px;border:1px solid var(--border);border-radius:var(--radius);resize:vertical;outline:none;line-height:1.5}
 .config-editor:focus{border-color:var(--primary)}
-.wizard{max-width:500px;margin:0 auto;text-align:center}
-.wizard h3{font-size:18px;margin-bottom:8px}
-.wizard p{color:var(--text-secondary);margin-bottom:25px;font-size:13px}
+.wizard{max-width:440px;margin:0 auto;text-align:center}
+.wizard h3{font-size:15px;margin-bottom:6px}
+.wizard p{color:var(--text-secondary);margin-bottom:15px;font-size:12px}
 .wizard .form-group{text-align:left}
-.update-item{display:flex;justify-content:space-between;align-items:center;padding:12px 15px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px}
+.update-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px}
 .update-item .info{flex:1}
-.update-item .info h4{font-size:14px;margin-bottom:3px}
+.update-item .info h4{font-size:12px;margin-bottom:2px}
 .update-item .info p{font-size:12px;color:var(--text-secondary)}
 .version-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
 .version-badge.current{background:#e8eeff;color:var(--primary)}
 .version-badge.latest{background:#d4edda;color:var(--success)}
-.changelog{background:var(--bg);border-radius:var(--radius);padding:15px;margin:15px 0;font-size:13px;line-height:1.8;max-height:200px;overflow-y:auto}
-.uninstall-zone{text-align:center;padding:40px 20px}
+.changelog{background:var(--bg);border-radius:var(--radius);padding:10px;margin:10px 0;font-size:12px;line-height:1.6;max-height:150px;overflow-y:auto}
+.uninstall-zone{text-align:center;padding:25px 15px}
 .uninstall-zone h3{color:var(--danger);margin-bottom:10px}
-.uninstall-zone p{color:var(--text-secondary);margin-bottom:25px}
+.uninstall-zone p{color:var(--text-secondary);margin-bottom:15px}
 .checkbox-label{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:20px;cursor:pointer;font-size:13px}
-.domain-display{display:flex;align-items:center;gap:10px;padding:12px 15px;background:var(--bg);border-radius:var(--radius);margin-bottom:15px}
-.domain-display .domain-text{flex:1;font-weight:600;font-size:15px}
-.empty-tip{text-align:center;padding:40px;color:var(--text-secondary)}
-.overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px}
-.overview-card{background:var(--bg);border-radius:var(--radius);padding:18px;text-align:center}
-.overview-card .ov-val{font-size:22px;font-weight:700;color:var(--primary);margin-bottom:4px}
-.overview-card .ov-label{font-size:12px;color:var(--text-secondary)}
+.domain-display{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:var(--radius);margin-bottom:10px}
+.domain-display .domain-text{flex:1;font-weight:600;font-size:13px}
+.empty-tip{text-align:center;padding:25px;color:var(--text-secondary)}
+.overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.overview-card{background:var(--bg);border-radius:var(--radius);padding:12px;text-align:center}
+.overview-card .ov-val{font-size:16px;font-weight:700;color:var(--primary);margin-bottom:2px}
+.overview-card .ov-label{font-size:11px;color:var(--text-secondary)}
 .progress-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:8px}
 .progress-bar .fill{height:100%;background:var(--primary);border-radius:3px;transition:width .3s;width:0}
 </style>
@@ -86,8 +86,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
       <button class="btn btn-warning" onclick="doAction('restart')">↻ 重启</button>
       <button class="btn btn-outline" onclick="checkUpdate()">检查更新</button>
     </div>
-    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
-      <div style="font-weight:600;font-size:12px;color:var(--text-secondary);margin-bottom:8px">PHP 桥接服务</div>
+    <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+      <div style="font-weight:600;font-size:11px;color:var(--text-secondary);margin-bottom:6px">PHP 桥接服务</div>
       <div class="status-bar" id="phpStatusBar">
         <div class="status-item"><span class="status-dot" id="phpStatusDot"></span><span id="phpStatusText">检测中...</span></div>
         <div class="status-item">PID: <span class="val" id="phpPid">-</span></div>
@@ -146,7 +146,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
               <input class="form-input" id="initRedisPass" type="password" placeholder="没有密码则留空">
             </div>
           </div>
-          <button class="btn btn-primary" onclick="doInstall()" style="width:100%;padding:12px;font-size:15px;margin-top:10px">⚡ 一键安装</button>
+          <button class="btn btn-primary" onclick="doInstall()" style="width:100%;padding:8px;font-size:13px;margin-top:8px">⚡ 一键安装</button>
         </div>
       </div>
       <div id="overviewPanel" style="display:none">
@@ -158,17 +158,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
           <div class="overview-card"><div class="ov-val" id="ovDomain">-</div><div class="ov-label">绑定域名</div></div>
           <div class="overview-card"><div class="ov-val" id="ovPid">-</div><div class="ov-label">进程 PID</div></div>
         </div>
-        <div style="font-weight:600;font-size:13px;margin:18px 0 10px;color:var(--text-secondary)">PHP 桥接服务</div>
+        <div style="font-weight:600;font-size:12px;margin:12px 0 8px;color:var(--text-secondary)">PHP 桥接服务</div>
         <div class="overview-grid">
           <div class="overview-card"><div class="ov-val" id="ovPhpStatus">-</div><div class="ov-label">PHP 状态</div></div>
           <div class="overview-card"><div class="ov-val" id="ovPhpPort">-</div><div class="ov-label">监听端口</div></div>
           <div class="overview-card"><div class="ov-val" id="ovPhpMem">-</div><div class="ov-label">PHP 内存</div></div>
           <div class="overview-card"><div class="ov-val" id="ovPhpPid">-</div><div class="ov-label">PHP PID</div></div>
         </div>
-        <div style="margin-top:20px;padding:15px;background:var(--bg);border-radius:var(--radius)">
+        <div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:var(--radius)">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
             <div>
-              <div style="font-weight:600;margin-bottom:4px">⚙️ 开机自启 / 崩溃自动重启</div>
+              <div style="font-weight:600;margin-bottom:2px;font-size:12px">⚙️ 开机自启 / 崩溃自动重启</div>
               <div style="font-size:12px;color:var(--text-secondary)" id="systemdInfo">检测中...</div>
             </div>
             <div style="display:flex;gap:8px">
@@ -177,21 +177,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
             </div>
           </div>
         </div>
-        <div style="margin-top:10px;padding:15px;background:var(--bg);border-radius:var(--radius)">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div style="margin-top:8px;padding:10px;background:var(--bg);border-radius:var(--radius)">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
             <div>
-              <div style="font-weight:600;margin-bottom:4px">🩺 健康检查</div>
+              <div style="font-weight:600;margin-bottom:2px;font-size:12px">🩺 健康检查</div>
               <div style="font-size:12px;color:var(--text-secondary)">检测 Go / PHP 进程存活状态，挂掉自动拉起</div>
             </div>
             <button class="btn btn-outline" onclick="doHealthCheck()">立即检查</button>
           </div>
         </div>
-        <div style="margin-top:10px;padding:15px;background:var(--bg);border-radius:var(--radius)">
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div style="margin-top:8px;padding:10px;background:var(--bg);border-radius:var(--radius)">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <span style="font-weight:600">🔐 授权状态:</span>
             <span id="licenseStatus" style="color:var(--danger)">检测中...</span>
           </div>
-          <div id="licenseInput" style="margin-top:10px;display:flex;gap:8px">
+          <div id="licenseInput" style="margin-top:8px;display:flex;gap:6px">
             <input class="form-input" id="licenseKey" placeholder="请输入授权码 (QK-XXXX...)" style="flex:1">
             <button class="btn btn-primary" onclick="saveLicense()">激活</button>
           </div>
@@ -241,37 +241,37 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
           <div class="progress-bar" id="updateProgress" style="display:none"><div class="fill" id="updateFill"></div></div>
         </div>
       </div>
-      <div style="margin-top:20px;padding-top:15px;border-top:1px solid var(--border)">
-        <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:center">
-          <div style="flex:1;min-width:200px">
-            <div style="font-weight:600;margin-bottom:4px">⏪ 回滚后端</div>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:160px">
+            <div style="font-weight:600;margin-bottom:2px;font-size:12px">⏪ 回滚后端</div>
             <div style="font-size:12px;color:var(--text-secondary)" id="rollbackInfo">检测中...</div>
           </div>
           <button class="btn btn-warning" id="btnRollback" onclick="doRollback()" disabled>回滚到上一版本</button>
         </div>
       </div>
-      <div style="margin-top:15px;padding-top:15px;border-top:1px solid var(--border)">
-        <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:center">
-          <div style="flex:1;min-width:200px">
-            <div style="font-weight:600;margin-bottom:4px">🗄 数据库迁移</div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:160px">
+            <div style="font-weight:600;margin-bottom:2px;font-size:12px">🗄 数据库迁移</div>
             <div style="font-size:12px;color:var(--text-secondary)">执行 migrations 目录下的增量 SQL</div>
           </div>
           <button class="btn btn-primary" onclick="doDbUpdate()">执行迁移</button>
         </div>
       </div>
-      <div style="margin-top:15px;padding-top:15px;border-top:1px solid var(--border)">
-        <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:center">
-          <div style="flex:1;min-width:200px">
-            <div style="font-weight:600;margin-bottom:4px">🔧 数据库补全</div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:160px">
+            <div style="font-weight:600;margin-bottom:2px;font-size:12px">🔧 数据库补全</div>
             <div style="font-size:12px;color:var(--text-secondary)">自动补全缺失的表、迁移、管理员账号和基础配置</div>
           </div>
           <button class="btn btn-warning" onclick="doRepairDb()">一键补全</button>
         </div>
       </div>
-      <div style="margin-top:15px;padding-top:15px;border-top:1px solid var(--border)">
-        <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:center">
-          <div style="flex:1;min-width:200px">
-            <div style="font-weight:600;margin-bottom:4px">🔌 插件自更新</div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:160px">
+            <div style="font-weight:600;margin-bottom:2px;font-size:12px">🔌 插件自更新</div>
             <div style="font-size:12px;color:var(--text-secondary)">从远程更新插件面板自身</div>
           </div>
           <button class="btn btn-outline" onclick="doPluginUpdate()">更新插件</button>
@@ -313,7 +313,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
         <label class="checkbox-label">
           <input type="checkbox" id="removeData"> 同时删除数据（数据库、配置文件等）
         </label>
-        <button class="btn btn-danger" onclick="doUninstall()" style="padding:10px 40px;font-size:15px">确认卸载</button>
+        <button class="btn btn-danger" onclick="doUninstall()" style="padding:7px 30px;font-size:13px">确认卸载</button>
       </div>
     </div>
   </div>
