@@ -1,3 +1,11 @@
--- 管理员二级密码独立字段
-ALTER TABLE `qingka_wangke_user`
-  ADD COLUMN IF NOT EXISTS `pass2` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '管理员二级密码' AFTER `pass`;
+-- 管理员二级密码独立字段（兼容 MySQL 5.7）
+DELIMITER //
+CREATE PROCEDURE _migrate_030()
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='qingka_wangke_user' AND COLUMN_NAME='pass2') THEN
+    ALTER TABLE `qingka_wangke_user` ADD COLUMN `pass2` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '管理员二级密码' AFTER `pass`;
+  END IF;
+END //
+DELIMITER ;
+CALL _migrate_030();
+DROP PROCEDURE IF EXISTS _migrate_030;
