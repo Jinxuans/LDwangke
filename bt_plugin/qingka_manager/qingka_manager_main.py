@@ -97,7 +97,9 @@ class qingka_manager_main:
         self._sync_license_to_go(key)
         # 自动注册心跳 cron
         self.setup_heartbeat_cron()
-        return public.returnMsg(True, '授权验证成功')
+        # 重启 Go 服务使授权码生效
+        self._restart_go_service()
+        return public.returnMsg(True, '授权验证成功，Go 服务已重启')
 
     def _sync_license_to_go(self, key):
         """授权码写入后，同步生成 Go 端所需的密钥文件和配置"""
@@ -323,6 +325,15 @@ class qingka_manager_main:
         pid = self._safe_pid(result)
         if pid:
             self._save_pid(pid)
+
+    def _restart_go_service(self):
+        """内部重启 Go 服务（跳过授权检查），用于 save_license 后自动重启"""
+        pid = self._get_pid()
+        if pid:
+            self._kill_process(pid)
+            self._del_pid()
+            time.sleep(1)
+        self._start_no_auth()
 
     def _php_start_no_auth(self):
         """内部启动 PHP（跳过授权检查），仅供 init_install 等内部流程使用"""
