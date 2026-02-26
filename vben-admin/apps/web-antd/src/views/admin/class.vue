@@ -65,7 +65,7 @@ const classList = ref<ClassItem[]>([]);
 const classPagination = reactive({ page: 1, limit: 20, total: 0 });
 const classSearch = reactive({ cateId: undefined as number | undefined, keywords: '' });
 const classEditVisible = ref(false);
-const classForm = reactive({ cid: 0, name: '', price: '0', content: '', cateId: '0', status: 1, hid: '0', sort: 10, noun: '', yunsuan: '*' });
+const classForm = reactive({ cid: 0, name: '', price: 0, content: '', cateId: undefined as number | undefined, status: 1, hid: 0, sort: 10, noun: '', yunsuan: '*' });
 
 // 货源列表（供选择）
 const suppliers = ref<SupplierItem[]>([]);
@@ -99,15 +99,17 @@ function openClassEdit(cls?: ClassItem) {
   if (cls) {
     Object.assign(classForm, cls);
   } else {
-    Object.assign(classForm, { cid: 0, name: '', price: '0', content: '', cateId: '0', status: 1, hid: '0', sort: 10, noun: '', yunsuan: '*' });
+    Object.assign(classForm, { cid: 0, name: '', price: 0, content: '', cateId: undefined as number | undefined, status: 1, hid: 0, sort: 10, noun: '', yunsuan: '*' });
   }
   classEditVisible.value = true;
 }
 
 async function handleClassSave() {
   if (!classForm.name.trim()) { message.warning('请填写课程名称'); return; }
+  if (!classForm.cateId) { message.warning('请选择分类'); return; }
+  if (!classForm.price || classForm.price <= 0) { message.warning('请填写价格'); return; }
   try {
-    await saveClassApi({ ...classForm, price: String(classForm.price), hid: String(classForm.hid), cateId: String(classForm.cateId) });
+    await saveClassApi({ ...classForm, price: String(classForm.price), hid: String(classForm.hid || 0), cateId: String(classForm.cateId) });
     message.success('保存成功');
     classEditVisible.value = false;
     loadClasses(classPagination.page);

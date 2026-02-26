@@ -302,13 +302,13 @@ func (s *AdminService) ClassSave(req model.ClassEditRequest) error {
 	}
 	if req.CID > 0 {
 		_, err := database.DB.Exec(
-			"UPDATE qingka_wangke_class SET name=?, price=?, content=?, fenlei=?, status=?, docking=?, sort=?, noun=?, yunsuan=? WHERE cid=?",
-			req.Name, req.Price, req.Content, req.CateID, req.Status, req.HID, req.Sort, req.Noun, req.Yunsuan, req.CID)
+			"UPDATE qingka_wangke_class SET name=?, price=?, content=?, fenlei=?, status=?, docking=?, queryplat=?, sort=?, noun=?, yunsuan=? WHERE cid=?",
+			req.Name, req.Price, req.Content, req.CateID, req.Status, req.HID, req.HID, req.Sort, req.Noun, req.Yunsuan, req.CID)
 		return err
 	}
 	_, err := database.DB.Exec(
-		"INSERT INTO qingka_wangke_class (name, price, content, fenlei, status, docking, noun, getnoun, sort, yunsuan, addtime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		req.Name, req.Price, req.Content, req.CateID, req.Status, req.HID, req.Noun, req.Noun, req.Sort, req.Yunsuan, time.Now().Format("2006-01-02 15:04:05"))
+		"INSERT INTO qingka_wangke_class (name, price, content, fenlei, status, docking, queryplat, noun, getnoun, sort, yunsuan, addtime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		req.Name, req.Price, req.Content, req.CateID, req.Status, req.HID, req.HID, req.Noun, req.Noun, req.Sort, req.Yunsuan, time.Now().Format("2006-01-02 15:04:05"))
 	return err
 }
 

@@ -183,64 +183,96 @@ onUnmounted(() => {
       <!-- 核心指标卡片 -->
       <Row :gutter="[16, 16]">
         <Col :xs="12" :sm="12" :lg="6">
-          <div class="stat-card stat-card--blue">
-            <div class="stat-card__header">
-              <div class="stat-card__icon stat-card__icon--blue">
+          <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
+            <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-blue-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-blue-500/10"></div>
+            <div class="relative z-10 flex items-center justify-between mb-4">
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-xl text-blue-600 transition-colors group-hover:bg-blue-100 dark:bg-blue-500/20 dark:text-blue-400 dark:group-hover:bg-blue-500/30">
                 <ShoppingCartOutlined />
               </div>
-              <div class="stat-card__trend" :class="ordersDiff >= 0 ? 'trend--up' : 'trend--down'" v-if="stats.yesterday_orders > 0 || stats.today_orders > 0">
+              <div class="flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium"
+                   :class="ordersDiff >= 0 ? 'bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400' : 'bg-red-50 text-red-600 dark:bg-red-500/20 dark:text-red-400'"
+                   v-if="stats.yesterday_orders > 0 || stats.today_orders > 0">
                 <ArrowUpOutlined v-if="ordersDiff >= 0" />
                 <ArrowDownOutlined v-else />
                 {{ Math.abs(ordersDiff) }}%
               </div>
             </div>
-            <div class="stat-card__value">{{ stats.today_orders }}</div>
-            <div class="stat-card__label">今日订单</div>
-            <div class="stat-card__footer">昨日 {{ stats.yesterday_orders || 0 }}</div>
+            <div class="relative z-10">
+              <div class="text-3xl font-bold text-gray-800 dark:text-gray-100">{{ stats.today_orders }}</div>
+              <div class="mt-1 text-sm font-medium text-gray-500">今日订单</div>
+              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
+                <span>昨日 <span class="font-medium text-gray-500 dark:text-gray-400">{{ stats.yesterday_orders || 0 }}</span></span>
+              </div>
+            </div>
           </div>
         </Col>
+        
         <Col :xs="12" :sm="12" :lg="6">
-          <div class="stat-card stat-card--green">
-            <div class="stat-card__header">
-              <div class="stat-card__icon stat-card__icon--green">
+          <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
+            <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-green-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-green-500/10"></div>
+            <div class="relative z-10 flex items-center justify-between mb-4">
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-xl text-green-600 transition-colors group-hover:bg-green-100 dark:bg-green-500/20 dark:text-green-400 dark:group-hover:bg-green-500/30">
                 <DollarOutlined />
               </div>
-              <div class="stat-card__trend" :class="incomeDiff >= 0 ? 'trend--up' : 'trend--down'" v-if="stats.yesterday_income > 0 || stats.today_income > 0">
+              <div class="flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium"
+                   :class="incomeDiff >= 0 ? 'bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400' : 'bg-red-50 text-red-600 dark:bg-red-500/20 dark:text-red-400'"
+                   v-if="stats.yesterday_income > 0 || stats.today_income > 0">
                 <ArrowUpOutlined v-if="incomeDiff >= 0" />
                 <ArrowDownOutlined v-else />
                 {{ Math.abs(incomeDiff) }}%
               </div>
             </div>
-            <div class="stat-card__value">¥{{ (stats.today_income || 0).toFixed(2) }}</div>
-            <div class="stat-card__label">今日收入</div>
-            <div class="stat-card__footer">昨日 ¥{{ (stats.yesterday_income || 0).toFixed(2) }}</div>
+            <div class="relative z-10">
+              <div class="text-3xl font-bold text-gray-800 dark:text-gray-100">
+                <span class="text-xl mr-1">¥</span>{{ (stats.today_income || 0).toFixed(2) }}
+              </div>
+              <div class="mt-1 text-sm font-medium text-gray-500">今日收入</div>
+              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
+                <span>昨日 <span class="font-medium text-gray-500 dark:text-gray-400">¥{{ (stats.yesterday_income || 0).toFixed(2) }}</span></span>
+              </div>
+            </div>
           </div>
         </Col>
+        
         <Col :xs="12" :sm="12" :lg="6">
-          <div class="stat-card stat-card--purple">
-            <div class="stat-card__header">
-              <div class="stat-card__icon stat-card__icon--purple">
+          <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
+            <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-purple-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-purple-500/10"></div>
+            <div class="relative z-10 flex items-center justify-between mb-4">
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-xl text-purple-600 transition-colors group-hover:bg-purple-100 dark:bg-purple-500/20 dark:text-purple-400 dark:group-hover:bg-purple-500/30">
                 <UserOutlined />
               </div>
-              <div class="stat-card__sub" v-if="stats.today_new_users > 0">
+              <div class="flex items-center gap-1 rounded-full bg-purple-50 text-purple-600 px-2 py-1 text-xs font-medium dark:bg-purple-500/20 dark:text-purple-400"
+                   v-if="stats.today_new_users > 0">
                 <UserAddOutlined /> +{{ stats.today_new_users }}
               </div>
             </div>
-            <div class="stat-card__value">{{ formatNumber(stats.user_count) }}</div>
-            <div class="stat-card__label">用户总数</div>
-            <div class="stat-card__footer">今日注册 {{ stats.today_new_users || 0 }}</div>
+            <div class="relative z-10">
+              <div class="text-3xl font-bold text-gray-800 dark:text-gray-100">{{ formatNumber(stats.user_count) }}</div>
+              <div class="mt-1 text-sm font-medium text-gray-500">用户总数</div>
+              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
+                <span>今日注册 <span class="font-medium text-gray-500 dark:text-gray-400">{{ stats.today_new_users || 0 }}</span></span>
+              </div>
+            </div>
           </div>
         </Col>
+        
         <Col :xs="12" :sm="12" :lg="6">
-          <div class="stat-card stat-card--orange">
-            <div class="stat-card__header">
-              <div class="stat-card__icon stat-card__icon--orange">
+          <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
+            <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-orange-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-orange-500/10"></div>
+            <div class="relative z-10 flex items-center justify-between mb-4">
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-50 text-xl text-orange-600 transition-colors group-hover:bg-orange-100 dark:bg-orange-500/20 dark:text-orange-400 dark:group-hover:bg-orange-500/30">
                 <WalletOutlined />
               </div>
             </div>
-            <div class="stat-card__value">¥{{ (stats.total_balance || 0).toFixed(2) }}</div>
-            <div class="stat-card__label">用户总余额</div>
-            <div class="stat-card__footer">总订单 {{ formatNumber(stats.total_orders) }}</div>
+            <div class="relative z-10">
+              <div class="text-3xl font-bold text-gray-800 dark:text-gray-100">
+                <span class="text-xl mr-1">¥</span>{{ (stats.total_balance || 0).toFixed(2) }}
+              </div>
+              <div class="mt-1 text-sm font-medium text-gray-500">用户总余额</div>
+              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
+                <span>总订单 <span class="font-medium text-gray-500 dark:text-gray-400">{{ formatNumber(stats.total_orders) }}</span></span>
+              </div>
+            </div>
           </div>
         </Col>
       </Row>
@@ -248,49 +280,56 @@ onUnmounted(() => {
       <!-- 订单状态概览 -->
       <Row :gutter="[16, 16]" class="mt-4">
         <Col :xs="12" :sm="6" :lg="6">
-          <Card class="status-mini-card" :body-style="{ padding: '16px' }">
+          <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-gray-800 dark:bg-[#141414]">
             <div class="flex items-center gap-3">
-              <div class="status-dot status-dot--blue"><SyncOutlined spin /></div>
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-lg text-blue-500 dark:bg-blue-500/10 dark:text-blue-400">
+                <SyncOutlined spin />
+              </div>
               <div>
-                <div class="text-xl font-semibold">{{ stats.processing_orders }}</div>
-                <div class="text-xs text-gray-400 dark:text-gray-500">进行中</div>
+                <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ stats.processing_orders }}</div>
+                <div class="text-xs font-medium text-gray-500">进行中</div>
               </div>
             </div>
-          </Card>
+          </div>
         </Col>
         <Col :xs="12" :sm="6" :lg="6">
-          <Card class="status-mini-card" :body-style="{ padding: '16px' }">
+          <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-gray-800 dark:bg-[#141414]">
             <div class="flex items-center gap-3">
-              <div class="status-dot status-dot--green"><CheckCircleOutlined /></div>
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50 text-lg text-green-500 dark:bg-green-500/10 dark:text-green-400">
+                <CheckCircleOutlined />
+              </div>
               <div>
-                <div class="text-xl font-semibold">{{ stats.completed_orders }}</div>
-                <div class="text-xs text-gray-400 dark:text-gray-500">已完成</div>
+                <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ stats.completed_orders }}</div>
+                <div class="text-xs font-medium text-gray-500">已完成</div>
               </div>
             </div>
-          </Card>
+          </div>
         </Col>
         <Col :xs="12" :sm="6" :lg="6">
-          <Card class="status-mini-card" :body-style="{ padding: '16px' }">
+          <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-gray-800 dark:bg-[#141414]">
             <div class="flex items-center gap-3">
-              <div class="status-dot status-dot--red"><WarningOutlined /></div>
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-lg text-red-500 dark:bg-red-500/10 dark:text-red-400">
+                <WarningOutlined />
+              </div>
               <div>
-                <div class="text-xl font-semibold">{{ stats.failed_orders }}</div>
-                <div class="text-xs text-gray-400 dark:text-gray-500">异常</div>
+                <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ stats.failed_orders }}</div>
+                <div class="text-xs font-medium text-gray-500">异常</div>
               </div>
             </div>
-          </Card>
+          </div>
         </Col>
         <Col :xs="12" :sm="6" :lg="6">
-          <Card class="status-mini-card" :body-style="{ padding: '16px' }">
+          <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-gray-800 dark:bg-[#141414]">
             <div class="flex items-center gap-3">
-              <div class="completion-ring">
-                <Progress type="circle" :percent="completionRate" :width="42" :stroke-width="8" :format="() => `${completionRate}%`" />
+              <div class="completion-ring shrink-0">
+                <Progress type="circle" :percent="completionRate" :width="40" :stroke-width="8" :format="() => `${completionRate}%`" />
               </div>
               <div>
-                <div class="text-xs text-gray-400 dark:text-gray-500">完成率</div>
+                <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ completionRate }}%</div>
+                <div class="text-xs font-medium text-gray-500">完成率</div>
               </div>
             </div>
-          </Card>
+          </div>
         </Col>
       </Row>
 
@@ -477,106 +516,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* 统计卡片 */
-.stat-card {
-  border-radius: 12px;
-  padding: 20px;
-  color: #fff;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-}
-html.dark .stat-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-.stat-card--blue { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-.stat-card--green { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
-.stat-card--purple { background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); }
-.stat-card--orange { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
-
-.stat-card__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.stat-card__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  background: rgba(255, 255, 255, 0.2);
-}
-.stat-card__trend {
-  font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 8px;
-  border-radius: 12px;
-}
-.trend--up { background: rgba(255,255,255,0.2); color: #fff; }
-.trend--down { background: rgba(255,255,255,0.2); color: #ffd6d6; }
-.stat-card__sub {
-  font-size: 13px;
-  font-weight: 500;
-  opacity: 0.9;
-}
-.stat-card__value {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.2;
-  margin-bottom: 4px;
-}
-.stat-card__label {
-  font-size: 14px;
-  opacity: 0.85;
-  margin-bottom: 8px;
-}
-.stat-card__footer {
-  font-size: 12px;
-  opacity: 0.65;
-  border-top: 1px solid rgba(255,255,255,0.15);
-  padding-top: 8px;
-}
-
-/* 状态小卡片 */
-.status-mini-card {
-  border-radius: 8px;
-  transition: box-shadow 0.2s;
-}
-.status-mini-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-html.dark .status-mini-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-.status-dot {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
-}
-.status-dot--blue { background: #e6f7ff; color: #1890ff; }
-.status-dot--green { background: #f6ffed; color: #52c41a; }
-.status-dot--red { background: #fff1f0; color: #ff4d4f; }
-html.dark .status-dot--blue { background: rgba(24,144,255,0.15); }
-html.dark .status-dot--green { background: rgba(82,196,26,0.15); }
-html.dark .status-dot--red { background: rgba(255,77,79,0.15); }
-.completion-ring { flex-shrink: 0; }
-
 /* 柱状图 */
 .chart-container {
   display: flex;

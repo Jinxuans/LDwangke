@@ -258,30 +258,30 @@ onUnmounted(() => {
               </div>
             </Col>
             <Col :xs="24" :lg="14">
-              <div class="turbo-params">
-                <div class="turbo-param">
-                  <span class="turbo-param-label">DB连接池</span>
-                  <span class="turbo-param-value">{{ turbo.profile.db_max_open }} / {{ turbo.profile.db_max_idle }}</span>
+              <div class="grid grid-cols-2 gap-2 lg:grid-cols-3">
+                <div class="flex flex-col rounded-md bg-gray-50 p-2 dark:bg-[#1f1f1f]">
+                  <span class="mb-0.5 text-[11px] text-gray-500">DB连接池</span>
+                  <span class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">{{ turbo.profile.db_max_open }} / {{ turbo.profile.db_max_idle }}</span>
                 </div>
-                <div class="turbo-param">
-                  <span class="turbo-param-label">Redis池</span>
-                  <span class="turbo-param-value">{{ turbo.profile.redis_pool_size }}</span>
+                <div class="flex flex-col rounded-md bg-gray-50 p-2 dark:bg-[#1f1f1f]">
+                  <span class="mb-0.5 text-[11px] text-gray-500">Redis池</span>
+                  <span class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">{{ turbo.profile.redis_pool_size }}</span>
                 </div>
-                <div class="turbo-param">
-                  <span class="turbo-param-label">对接并发</span>
-                  <span class="turbo-param-value">{{ turbo.profile.dock_workers }}</span>
+                <div class="flex flex-col rounded-md bg-gray-50 p-2 dark:bg-[#1f1f1f]">
+                  <span class="mb-0.5 text-[11px] text-gray-500">对接并发</span>
+                  <span class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">{{ turbo.profile.dock_workers }}</span>
                 </div>
-                <div class="turbo-param">
-                  <span class="turbo-param-label">同步间隔</span>
-                  <span class="turbo-param-value">{{ turbo.profile.sync_interval_sec }}s</span>
+                <div class="flex flex-col rounded-md bg-gray-50 p-2 dark:bg-[#1f1f1f]">
+                  <span class="mb-0.5 text-[11px] text-gray-500">同步间隔</span>
+                  <span class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">{{ turbo.profile.sync_interval_sec }}s</span>
                 </div>
-                <div class="turbo-param">
-                  <span class="turbo-param-label">GOMAXPROCS</span>
-                  <span class="turbo-param-value">{{ turbo.profile.gomaxprocs }}</span>
+                <div class="flex flex-col rounded-md bg-gray-50 p-2 dark:bg-[#1f1f1f]">
+                  <span class="mb-0.5 text-[11px] text-gray-500">GOMAXPROCS</span>
+                  <span class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">{{ turbo.profile.gomaxprocs }}</span>
                 </div>
-                <div class="turbo-param">
-                  <span class="turbo-param-label">GOGC</span>
-                  <span class="turbo-param-value">{{ turbo.profile.gc_percent }}%</span>
+                <div class="flex flex-col rounded-md bg-gray-50 p-2 dark:bg-[#1f1f1f]">
+                  <span class="mb-0.5 text-[11px] text-gray-500">GOGC</span>
+                  <span class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">{{ turbo.profile.gc_percent }}%</span>
                 </div>
               </div>
             </Col>
@@ -289,53 +289,100 @@ onUnmounted(() => {
         </Card>
 
         <!-- 顶部健康概览 4卡片 -->
-        <Row :gutter="[16, 16]">
+        <Row :gutter="[16, 16]" class="mb-4">
           <Col :xs="12" :sm="12" :lg="6">
-            <div class="health-card" :class="dash.db.status === 'healthy' ? 'health-card--ok' : 'health-card--err'">
-              <div class="health-card__icon"><DatabaseOutlined /></div>
-              <div class="health-card__body">
-                <div class="health-card__title">MySQL</div>
-                <div class="health-card__status">
+            <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
+              <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-50 transition-transform duration-500 group-hover:scale-150"
+                   :class="dash.db.status === 'healthy' ? 'bg-green-50 dark:bg-green-500/10' : 'bg-red-50 dark:bg-red-500/10'"></div>
+              <div class="relative z-10 flex items-center justify-between mb-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl text-xl transition-colors"
+                     :class="dash.db.status === 'healthy' ? 'bg-green-50 text-green-600 group-hover:bg-green-100 dark:bg-green-500/20 dark:text-green-400' : 'bg-red-50 text-red-600 group-hover:bg-red-100 dark:bg-red-500/20 dark:text-red-400'">
+                  <DatabaseOutlined />
+                </div>
+                <div class="flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium"
+                     :class="dash.db.status === 'healthy' ? 'bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400' : 'bg-red-50 text-red-600 dark:bg-red-500/20 dark:text-red-400'">
                   <Badge :status="dash.db.status === 'healthy' ? 'success' : 'error'" />
                   {{ healthText(dash.db.status) }}
-                  <span class="health-card__latency">{{ dash.db.ping_latency_ms }}ms</span>
+                </div>
+              </div>
+              <div class="relative z-10">
+                <div class="text-2xl font-bold text-gray-800 dark:text-gray-100">MySQL</div>
+                <div class="mt-1 text-sm font-medium text-gray-500">连接状态</div>
+                <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
+                  <span>延迟 <span class="font-medium text-gray-500 dark:text-gray-400">{{ dash.db.ping_latency_ms }} ms</span></span>
                 </div>
               </div>
             </div>
           </Col>
+          
           <Col :xs="12" :sm="12" :lg="6">
-            <div class="health-card" :class="dash.redis.status === 'healthy' ? 'health-card--ok' : 'health-card--err'">
-              <div class="health-card__icon"><ThunderboltOutlined /></div>
-              <div class="health-card__body">
-                <div class="health-card__title">Redis</div>
-                <div class="health-card__status">
+            <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
+              <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-50 transition-transform duration-500 group-hover:scale-150"
+                   :class="dash.redis.status === 'healthy' ? 'bg-green-50 dark:bg-green-500/10' : 'bg-red-50 dark:bg-red-500/10'"></div>
+              <div class="relative z-10 flex items-center justify-between mb-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl text-xl transition-colors"
+                     :class="dash.redis.status === 'healthy' ? 'bg-green-50 text-green-600 group-hover:bg-green-100 dark:bg-green-500/20 dark:text-green-400' : 'bg-red-50 text-red-600 group-hover:bg-red-100 dark:bg-red-500/20 dark:text-red-400'">
+                  <ThunderboltOutlined />
+                </div>
+                <div class="flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium"
+                     :class="dash.redis.status === 'healthy' ? 'bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400' : 'bg-red-50 text-red-600 dark:bg-red-500/20 dark:text-red-400'">
                   <Badge :status="dash.redis.status === 'healthy' ? 'success' : 'error'" />
                   {{ healthText(dash.redis.status) }}
-                  <span class="health-card__latency">{{ dash.redis.ping_latency_ms }}ms</span>
+                </div>
+              </div>
+              <div class="relative z-10">
+                <div class="text-2xl font-bold text-gray-800 dark:text-gray-100">Redis</div>
+                <div class="mt-1 text-sm font-medium text-gray-500">缓存服务</div>
+                <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
+                  <span>延迟 <span class="font-medium text-gray-500 dark:text-gray-400">{{ dash.redis.ping_latency_ms }} ms</span></span>
                 </div>
               </div>
             </div>
           </Col>
+          
           <Col :xs="12" :sm="12" :lg="6">
-            <div class="health-card health-card--ok">
-              <div class="health-card__icon"><WifiOutlined /></div>
-              <div class="health-card__body">
-                <div class="health-card__title">WebSocket</div>
-                <div class="health-card__status">
+            <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
+              <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-blue-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-blue-500/10"></div>
+              <div class="relative z-10 flex items-center justify-between mb-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-xl text-blue-600 transition-colors group-hover:bg-blue-100 dark:bg-blue-500/20 dark:text-blue-400">
+                  <WifiOutlined />
+                </div>
+                <div class="flex items-center gap-1.5 rounded-full bg-blue-50 text-blue-600 px-2 py-1 text-xs font-medium dark:bg-blue-500/20 dark:text-blue-400">
                   <Badge status="processing" />
-                  在线 {{ dash.ws.online_count }} 人
+                  正常运行
+                </div>
+              </div>
+              <div class="relative z-10">
+                <div class="text-2xl font-bold text-gray-800 dark:text-gray-100">WebSocket</div>
+                <div class="mt-1 text-sm font-medium text-gray-500">双向通信</div>
+                <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
+                  <span>实时在线 <span class="font-medium text-gray-500 dark:text-gray-400">{{ dash.ws.online_count }} 人</span></span>
                 </div>
               </div>
             </div>
           </Col>
+          
           <Col :xs="12" :sm="12" :lg="6">
-            <div class="health-card" :class="(dash.errors.today_failed + dash.errors.today_exception) === 0 ? 'health-card--ok' : 'health-card--warn'">
-              <div class="health-card__icon"><AlertOutlined /></div>
-              <div class="health-card__body">
-                <div class="health-card__title">今日异常</div>
-                <div class="health-card__status">
+            <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
+              <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-50 transition-transform duration-500 group-hover:scale-150"
+                   :class="(dash.errors.today_failed + dash.errors.today_exception) === 0 ? 'bg-green-50 dark:bg-green-500/10' : 'bg-orange-50 dark:bg-orange-500/10'"></div>
+              <div class="relative z-10 flex items-center justify-between mb-4">
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl text-xl transition-colors"
+                     :class="(dash.errors.today_failed + dash.errors.today_exception) === 0 ? 'bg-green-50 text-green-600 group-hover:bg-green-100 dark:bg-green-500/20 dark:text-green-400' : 'bg-orange-50 text-orange-600 group-hover:bg-orange-100 dark:bg-orange-500/20 dark:text-orange-400'">
+                  <AlertOutlined />
+                </div>
+                <div class="flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium"
+                     :class="(dash.errors.today_failed + dash.errors.today_exception) === 0 ? 'bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400' : 'bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400'">
                   <Badge :status="(dash.errors.today_failed + dash.errors.today_exception) === 0 ? 'success' : 'warning'" />
-                  失败 {{ dash.errors.today_failed }} / 异常 {{ dash.errors.today_exception }}
+                  异常监控
+                </div>
+              </div>
+              <div class="relative z-10">
+                <div class="text-2xl font-bold text-gray-800 dark:text-gray-100">今日告警</div>
+                <div class="mt-1 text-sm font-medium text-gray-500">错误概览</div>
+                <div class="mt-3 flex items-center gap-4 text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
+                  <span>失败 <span class="font-medium text-gray-500 dark:text-gray-400">{{ dash.errors.today_failed }}</span></span>
+                  <span>异常 <span class="font-medium text-gray-500 dark:text-gray-400">{{ dash.errors.today_exception }}</span></span>
                 </div>
               </div>
             </div>
@@ -353,54 +400,54 @@ onUnmounted(() => {
                   <Tag size="small" color="blue">{{ dash.system.goos }}/{{ dash.system.goarch }}</Tag>
                 </div>
               </template>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">Go 版本</span>
-                  <span class="info-value">{{ dash.system.go_version }}</span>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-2 xl:grid-cols-3">
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">Go 版本</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.system.go_version }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">CPU 核数</span>
-                  <span class="info-value">{{ dash.system.num_cpu }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">CPU 核数</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.system.num_cpu }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">Goroutine</span>
-                  <span class="info-value" :class="dash.system.num_goroutine > 500 ? 'text-orange-500' : ''">{{ dash.system.num_goroutine }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">Goroutine</span>
+                  <span class="text-sm font-medium" :class="dash.system.num_goroutine > 500 ? 'text-orange-500 font-bold' : 'text-gray-800 dark:text-gray-200'">{{ dash.system.num_goroutine }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">堆内存</span>
-                  <span class="info-value">{{ formatBytes(dash.system.heap_inuse) }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">堆内存</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ formatBytes(dash.system.heap_inuse) }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">分配内存</span>
-                  <span class="info-value">{{ formatBytes(dash.system.mem_alloc) }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">分配内存</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ formatBytes(dash.system.mem_alloc) }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">系统内存</span>
-                  <span class="info-value">{{ formatBytes(dash.system.mem_sys) }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">系统内存</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ formatBytes(dash.system.mem_sys) }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">栈内存</span>
-                  <span class="info-value">{{ formatBytes(dash.system.stack_inuse) }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">栈内存</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ formatBytes(dash.system.stack_inuse) }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">堆对象</span>
-                  <span class="info-value">{{ dash.system.heap_objects?.toLocaleString() }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">堆对象</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.system.heap_objects?.toLocaleString() }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">GC 次数</span>
-                  <span class="info-value">{{ dash.system.num_gc }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">GC 次数</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.system.num_gc }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">上次GC耗时</span>
-                  <span class="info-value">{{ (dash.system.last_gc_pause_ns / 1e6).toFixed(2) }}ms</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">上次GC耗时</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ (dash.system.last_gc_pause_ns / 1e6).toFixed(2) }}ms</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">服务器时间</span>
-                  <span class="info-value">{{ dash.system.server_time }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">服务器时间</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.system.server_time }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">上传存储</span>
-                  <span class="info-value">{{ dash.storage.uploads_size }} ({{ dash.storage.uploads_files }} 文件)</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">上传存储</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.storage.uploads_size }} ({{ dash.storage.uploads_files }} 文件)</span>
                 </div>
               </div>
             </Card>
@@ -416,27 +463,31 @@ onUnmounted(() => {
               </template>
               <Row :gutter="[12, 12]">
                 <Col :span="12">
-                  <div class="err-stat-card">
-                    <div class="err-stat-value" :class="dash.errors.today_failed > 0 ? 'text-red-500' : 'text-green-500'">{{ dash.errors.today_failed }}</div>
-                    <div class="err-stat-label">今日失败</div>
+                  <div class="relative overflow-hidden flex flex-col items-center justify-center rounded-xl bg-gray-50 p-4 transition-all hover:-translate-y-0.5 hover:shadow-sm dark:bg-[#1f1f1f] group">
+                    <div class="absolute inset-0 bg-red-50 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:bg-red-500/5"></div>
+                    <div class="relative z-10 text-3xl font-bold" :class="dash.errors.today_failed > 0 ? 'text-red-500' : 'text-green-500'">{{ dash.errors.today_failed }}</div>
+                    <div class="relative z-10 mt-1 text-xs text-gray-500">今日失败</div>
                   </div>
                 </Col>
                 <Col :span="12">
-                  <div class="err-stat-card">
-                    <div class="err-stat-value" :class="dash.errors.today_exception > 0 ? 'text-orange-500' : 'text-green-500'">{{ dash.errors.today_exception }}</div>
-                    <div class="err-stat-label">今日异常</div>
+                  <div class="relative overflow-hidden flex flex-col items-center justify-center rounded-xl bg-gray-50 p-4 transition-all hover:-translate-y-0.5 hover:shadow-sm dark:bg-[#1f1f1f] group">
+                    <div class="absolute inset-0 bg-orange-50 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:bg-orange-500/5"></div>
+                    <div class="relative z-10 text-3xl font-bold" :class="dash.errors.today_exception > 0 ? 'text-orange-500' : 'text-green-500'">{{ dash.errors.today_exception }}</div>
+                    <div class="relative z-10 mt-1 text-xs text-gray-500">今日异常</div>
                   </div>
                 </Col>
                 <Col :span="12">
-                  <div class="err-stat-card">
-                    <div class="err-stat-value" :class="dash.errors.pending_dock > 0 ? 'text-blue-500' : ''">{{ dash.errors.pending_dock }}</div>
-                    <div class="err-stat-label">待对接</div>
+                  <div class="relative overflow-hidden flex flex-col items-center justify-center rounded-xl bg-gray-50 p-4 transition-all hover:-translate-y-0.5 hover:shadow-sm dark:bg-[#1f1f1f] group">
+                    <div class="absolute inset-0 bg-blue-50 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:bg-blue-500/5"></div>
+                    <div class="relative z-10 text-3xl font-bold" :class="dash.errors.pending_dock > 0 ? 'text-blue-500' : 'text-gray-700 dark:text-gray-300'">{{ dash.errors.pending_dock }}</div>
+                    <div class="relative z-10 mt-1 text-xs text-gray-500">待对接</div>
                   </div>
                 </Col>
                 <Col :span="12">
-                  <div class="err-stat-card">
-                    <div class="err-stat-value" :class="dash.errors.stuck_orders > 0 ? 'text-red-500' : 'text-green-500'">{{ dash.errors.stuck_orders }}</div>
-                    <div class="err-stat-label">卡单(>24h)</div>
+                  <div class="relative overflow-hidden flex flex-col items-center justify-center rounded-xl bg-gray-50 p-4 transition-all hover:-translate-y-0.5 hover:shadow-sm dark:bg-[#1f1f1f] group">
+                    <div class="absolute inset-0 bg-red-50 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:bg-red-500/5"></div>
+                    <div class="relative z-10 text-3xl font-bold" :class="dash.errors.stuck_orders > 0 ? 'text-red-500' : 'text-green-500'">{{ dash.errors.stuck_orders }}</div>
+                    <div class="relative z-10 mt-1 text-xs text-gray-500">卡单(>24h)</div>
                   </div>
                 </Col>
               </Row>
@@ -472,34 +523,34 @@ onUnmounted(() => {
                   <Tag size="small">{{ dash.db.version }}</Tag>
                 </div>
               </template>
-              <div class="info-grid info-grid--3">
-                <div class="info-item">
-                  <span class="info-label">延迟</span>
-                  <span class="info-value">{{ dash.db.ping_latency_ms }}ms</span>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-3">
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">延迟</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.db.ping_latency_ms }}ms</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">运行时间</span>
-                  <span class="info-value">{{ formatUptime(dash.db.uptime_seconds) }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">运行时间</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ formatUptime(dash.db.uptime_seconds) }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">查询总数</span>
-                  <span class="info-value">{{ dash.db.questions?.toLocaleString() }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">查询总数</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.db.questions?.toLocaleString() }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">慢查询</span>
-                  <span class="info-value" :class="dash.db.slow_queries > 0 ? 'text-orange-500 font-bold' : ''">{{ dash.db.slow_queries }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">慢查询</span>
+                  <span class="text-sm font-medium" :class="dash.db.slow_queries > 0 ? 'text-orange-500 font-bold' : 'text-gray-800 dark:text-gray-200'">{{ dash.db.slow_queries }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">线程数</span>
-                  <span class="info-value">{{ dash.db.threads }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">线程数</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.db.threads }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">表数量</span>
-                  <span class="info-value">{{ dash.db.table_count }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">表数量</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.db.table_count }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">数据库大小</span>
-                  <span class="info-value">{{ dash.db.db_size_mb }} MB</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">数据库大小</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.db.db_size_mb }} MB</span>
                 </div>
               </div>
               <div class="mt-3">
@@ -522,30 +573,30 @@ onUnmounted(() => {
                   <Tag size="small">{{ dash.redis.version }}</Tag>
                 </div>
               </template>
-              <div class="info-grid info-grid--3">
-                <div class="info-item">
-                  <span class="info-label">延迟</span>
-                  <span class="info-value">{{ dash.redis.ping_latency_ms }}ms</span>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-3">
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">延迟</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.redis.ping_latency_ms }}ms</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">运行时间</span>
-                  <span class="info-value">{{ formatUptime(dash.redis.uptime_seconds) }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">运行时间</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ formatUptime(dash.redis.uptime_seconds) }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">内存使用</span>
-                  <span class="info-value">{{ dash.redis.used_memory_human }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">内存使用</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.redis.used_memory_human }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">客户端数</span>
-                  <span class="info-value">{{ dash.redis.connected_clients }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">客户端数</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.redis.connected_clients }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">Key 总数</span>
-                  <span class="info-value">{{ dash.redis.total_keys?.toLocaleString() }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">Key 总数</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.redis.total_keys?.toLocaleString() }}</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">命中率</span>
-                  <span class="info-value">{{ dash.redis.hit_rate }}</span>
+                <div class="flex flex-col rounded-lg bg-gray-50/50 p-2.5 dark:bg-[#1f1f1f]/50">
+                  <span class="mb-1 text-xs text-gray-500">命中率</span>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ dash.redis.hit_rate }}</span>
                 </div>
               </div>
             </Card>
@@ -564,39 +615,39 @@ onUnmounted(() => {
               </template>
               <Row :gutter="[8, 8]">
                 <Col :span="8">
-                  <div class="q-stat">
-                    <div class="q-stat-val" style="color:#1677ff;">{{ dash.queue?.active || 0 }}</div>
-                    <div class="q-stat-lbl">活跃</div>
+                  <div class="flex flex-col items-center justify-center py-2">
+                    <div class="text-2xl font-bold leading-tight" style="color:#1677ff;">{{ dash.queue?.active || 0 }}</div>
+                    <div class="mt-0.5 text-[11px] text-gray-500">活跃</div>
                   </div>
                 </Col>
                 <Col :span="8">
-                  <div class="q-stat">
-                    <div class="q-stat-val" style="color:#fa8c16;">{{ dash.queue?.pending || 0 }}</div>
-                    <div class="q-stat-lbl">排队</div>
+                  <div class="flex flex-col items-center justify-center py-2">
+                    <div class="text-2xl font-bold leading-tight" style="color:#fa8c16;">{{ dash.queue?.pending || 0 }}</div>
+                    <div class="mt-0.5 text-[11px] text-gray-500">排队</div>
                   </div>
                 </Col>
                 <Col :span="8">
-                  <div class="q-stat">
-                    <div class="q-stat-val" style="color:#52c41a;">{{ dash.queue?.completed || 0 }}</div>
-                    <div class="q-stat-lbl">完成</div>
+                  <div class="flex flex-col items-center justify-center py-2">
+                    <div class="text-2xl font-bold leading-tight" style="color:#52c41a;">{{ dash.queue?.completed || 0 }}</div>
+                    <div class="mt-0.5 text-[11px] text-gray-500">完成</div>
                   </div>
                 </Col>
                 <Col :span="8">
-                  <div class="q-stat">
-                    <div class="q-stat-val" style="color:#13c2c2;">{{ dash.queue?.processing || 0 }}</div>
-                    <div class="q-stat-lbl">处理中</div>
+                  <div class="flex flex-col items-center justify-center py-2">
+                    <div class="text-2xl font-bold leading-tight" style="color:#13c2c2;">{{ dash.queue?.processing || 0 }}</div>
+                    <div class="mt-0.5 text-[11px] text-gray-500">处理中</div>
                   </div>
                 </Col>
                 <Col :span="8">
-                  <div class="q-stat">
-                    <div class="q-stat-val" style="color:#ff4d4f;">{{ dash.queue?.failed || 0 }}</div>
-                    <div class="q-stat-lbl">失败</div>
+                  <div class="flex flex-col items-center justify-center py-2">
+                    <div class="text-2xl font-bold leading-tight" style="color:#ff4d4f;">{{ dash.queue?.failed || 0 }}</div>
+                    <div class="mt-0.5 text-[11px] text-gray-500">失败</div>
                   </div>
                 </Col>
                 <Col :span="8">
-                  <div class="q-stat">
-                    <div class="q-stat-val" style="color:#8c8c8c;">{{ dash.queue?.queue_size || 0 }}/{{ dash.queue?.queue_cap || 0 }}</div>
-                    <div class="q-stat-lbl">容量</div>
+                  <div class="flex flex-col items-center justify-center py-2">
+                    <div class="text-2xl font-bold leading-tight text-gray-500">{{ dash.queue?.queue_size || 0 }}/{{ dash.queue?.queue_cap || 0 }}</div>
+                    <div class="mt-0.5 text-[11px] text-gray-500">容量</div>
                   </div>
                 </Col>
               </Row>
@@ -618,22 +669,22 @@ onUnmounted(() => {
                   <span>今日时段订单分布</span>
                 </div>
               </template>
-              <div class="hourly-chart" v-if="dash.hourly_orders?.length">
+              <div class="flex items-end gap-[3px] h-40 pt-2.5" v-if="dash.hourly_orders?.length">
                 <div
                   v-for="item in dash.hourly_orders"
                   :key="item.hour"
-                  class="hourly-bar-group"
+                  class="group flex h-100% flex-1 flex-col items-center justify-end cursor-pointer"
                 >
                   <Tooltip :title="`${item.hour}:00 — ${item.count} 单`">
-                    <div class="hourly-bar-wrapper">
-                      <span class="hourly-bar-val" v-if="item.count > 0">{{ item.count }}</span>
+                    <div class="flex w-full flex-1 flex-col items-center justify-end">
+                      <span class="mb-0.5 whitespace-nowrap text-[10px] text-gray-400 dark:text-gray-500" v-if="item.count > 0">{{ item.count }}</span>
                       <div
-                        class="hourly-bar"
+                        class="w-full max-w-[28px] rounded-t bg-gradient-to-b from-purple-600 to-purple-400 min-h-[2px] transition-all duration-300 group-hover:scale-x-125 group-hover:opacity-80 dark:from-purple-500 dark:to-purple-300"
                         :style="{ height: `${Math.max((item.count / maxHourlyCount) * 120, 2)}px` }"
                       />
                     </div>
                   </Tooltip>
-                  <span class="hourly-bar-label">{{ item.hour }}</span>
+                  <span class="mt-1 text-[10px] text-gray-400 dark:text-gray-500">{{ item.hour }}</span>
                 </div>
               </div>
               <div v-else class="text-center text-gray-400 dark:text-gray-500 py-8">暂无数据</div>
@@ -756,211 +807,4 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* 健康卡片 */
-.health-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 20px;
-  border-radius: 10px;
-  border: 1px solid #f0f0f0;
-  background: #fff;
-  transition: all 0.2s;
-}
-html.dark .health-card {
-  background: #141414;
-  border-color: #333;
-}
-.health-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-}
-html.dark .health-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-.health-card--ok {
-  border-left: 4px solid #52c41a;
-}
-.health-card--err {
-  border-left: 4px solid #ff4d4f;
-}
-.health-card--warn {
-  border-left: 4px solid #faad14;
-}
-.health-card__icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  background: #f5f5f5;
-  color: #595959;
-  flex-shrink: 0;
-}
-html.dark .health-card__icon { background: #333; color: #999; }
-.health-card--ok .health-card__icon { background: #f6ffed; color: #52c41a; }
-.health-card--err .health-card__icon { background: #fff1f0; color: #ff4d4f; }
-.health-card--warn .health-card__icon { background: #fffbe6; color: #faad14; }
-html.dark .health-card--ok .health-card__icon { background: rgba(82,196,26,0.15); }
-html.dark .health-card--err .health-card__icon { background: rgba(255,77,79,0.15); }
-html.dark .health-card--warn .health-card__icon { background: rgba(250,173,20,0.15); }
-.health-card__title {
-  font-weight: 600;
-  font-size: 14px;
-  color: #262626;
-  margin-bottom: 2px;
-}
-html.dark .health-card__title { color: #e5e7eb; }
-.health-card__status {
-  font-size: 13px;
-  color: #8c8c8c;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.health-card__latency {
-  margin-left: 6px;
-  font-size: 12px;
-  color: #bfbfbf;
-}
-
-/* 信息网格 */
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px 16px;
-}
-.info-grid--3 {
-  grid-template-columns: repeat(3, 1fr);
-}
-.info-item {
-  display: flex;
-  flex-direction: column;
-  padding: 6px 0;
-}
-.info-label {
-  font-size: 12px;
-  color: #8c8c8c;
-  margin-bottom: 2px;
-}
-.info-value {
-  font-size: 14px;
-  font-weight: 500;
-  color: #262626;
-}
-html.dark .info-value { color: #e5e7eb; }
-
-/* 异常统计卡 */
-.err-stat-card {
-  text-align: center;
-  padding: 12px 8px;
-  border-radius: 8px;
-  background: #fafafa;
-}
-html.dark .err-stat-card { background: #1f1f1f; }
-.err-stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-.err-stat-label {
-  font-size: 12px;
-  color: #8c8c8c;
-  margin-top: 4px;
-}
-
-/* 队列统计 */
-.q-stat {
-  text-align: center;
-  padding: 8px 0;
-}
-.q-stat-val {
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-.q-stat-lbl {
-  font-size: 11px;
-  color: #999;
-  margin-top: 2px;
-}
-html.dark .q-stat-lbl { color: #666; }
-
-/* 小时柱状图 */
-.hourly-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 160px;
-  padding-top: 10px;
-}
-.hourly-bar-group {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  height: 100%;
-  cursor: pointer;
-}
-.hourly-bar-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  flex: 1;
-  width: 100%;
-}
-.hourly-bar-val {
-  font-size: 10px;
-  color: #999;
-  margin-bottom: 2px;
-  white-space: nowrap;
-}
-html.dark .hourly-bar-val { color: #666; }
-.hourly-bar {
-  width: 100%;
-  max-width: 28px;
-  border-radius: 4px 4px 1px 1px;
-  background: linear-gradient(180deg, #722ed1 0%, #b37feb 100%);
-  min-height: 2px;
-  transition: all 0.3s;
-}
-.hourly-bar-group:hover .hourly-bar {
-  opacity: 0.8;
-  transform: scaleX(1.2);
-}
-.hourly-bar-label {
-  font-size: 10px;
-  color: #aaa;
-  margin-top: 4px;
-}
-html.dark .hourly-bar-label { color: #666; }
-
-/* 狂暴模式参数网格 */
-.turbo-params {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.turbo-param {
-  display: flex;
-  flex-direction: column;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: #fafafa;
-}
-html.dark .turbo-param { background: #1f1f1f; }
-.turbo-param-label {
-  font-size: 11px;
-  color: #8c8c8c;
-  margin-bottom: 2px;
-}
-.turbo-param-value {
-  font-size: 15px;
-  font-weight: 600;
-  color: #262626;
-}
-html.dark .turbo-param-value { color: #e5e7eb; }
 </style>

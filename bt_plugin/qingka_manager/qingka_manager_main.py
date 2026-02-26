@@ -19,7 +19,7 @@ class qingka_manager_main:
     __php_port = '9000'
     __version_file = '/www/wwwroot/qingka/version.json'
     __service_name = 'qingka-api'
-    __update_server = 'https://qingka.top'
+    __update_server = 'https://auth.qingka.top'
     __license_file = '/www/wwwroot/qingka/license.key'
 
 

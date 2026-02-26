@@ -110,7 +110,7 @@ func (s Status) String() string {
 
 // ===== 授权站地址（硬编码，不可通过配置修改） =====
 
-const licenseServerURL = "https://qingka.top"
+const licenseServerURL = "https://auth.qingka.top"
 
 // ===== 缓存数据结构 =====
 

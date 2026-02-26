@@ -319,33 +319,88 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
       <!-- 统计卡片 -->
       <Row :gutter="[16, 16]">
         <Col :xs="12" :lg="6">
-          <Card>
-            <template #extra><WalletOutlined style="color:#6366f1;font-size:20px" /></template>
-            <Statistic title="账户余额" :value="(profile?.money || 0).toFixed(2)" prefix="¥" />
-            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">总充值 ¥{{ (profile?.zcz || 0).toFixed(2) }}</div>
-          </Card>
+          <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
+            <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-blue-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-blue-500/10"></div>
+            <div class="relative z-10 flex items-center justify-between mb-4">
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-xl text-blue-600 transition-colors group-hover:bg-blue-100 dark:bg-blue-500/20 dark:text-blue-400 dark:group-hover:bg-blue-500/30">
+                <WalletOutlined />
+              </div>
+            </div>
+            <div class="relative z-10">
+              <div class="text-3xl font-bold text-gray-800 dark:text-gray-100">
+                <span class="text-xl mr-1">¥</span>{{ (profile?.money || 0).toFixed(2) }}
+              </div>
+              <div class="mt-1 text-sm font-medium text-gray-500">账户余额</div>
+              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
+                <span>总充值 <span class="font-medium text-gray-500 dark:text-gray-400">¥{{ (profile?.zcz || 0).toFixed(2) }}</span></span>
+              </div>
+            </div>
+          </div>
         </Col>
+
         <Col :xs="12" :lg="6">
-          <Card>
-            <template #extra><ShoppingCartOutlined style="color:#10b981;font-size:20px" /></template>
-            <Statistic title="今日订单" :value="profile?.today_orders || dashStats?.today_orders || 0" />
-            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">总订单 {{ profile?.order_total || dashStats?.total_orders || 0 }}</div>
-          </Card>
+          <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
+            <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-green-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-green-500/10"></div>
+            <div class="relative z-10 flex items-center justify-between mb-4">
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-xl text-green-600 transition-colors group-hover:bg-green-100 dark:bg-green-500/20 dark:text-green-400 dark:group-hover:bg-green-500/30">
+                <ShoppingCartOutlined />
+              </div>
+            </div>
+            <div class="relative z-10">
+              <div class="text-3xl font-bold text-gray-800 dark:text-gray-100">{{ profile?.today_orders || dashStats?.today_orders || 0 }}</div>
+              <div class="mt-1 text-sm font-medium text-gray-500">今日订单</div>
+              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
+                <span>总订单 <span class="font-medium text-gray-500 dark:text-gray-400">{{ profile?.order_total || dashStats?.total_orders || 0 }}</span></span>
+              </div>
+            </div>
+          </div>
         </Col>
+
         <Col :xs="12" :lg="6">
-          <Card>
-            <template #extra><DollarOutlined style="color:#f59e0b;font-size:20px" /></template>
-            <Statistic :title="hasAdminRole ? '今日收入' : '今日消费'" :value="(hasAdminRole ? (dashStats?.today_income || 0) : (profile?.today_spend || 0)).toFixed(2)" prefix="¥" />
-            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500" v-if="hasAdminRole"><SyncOutlined /> 进行中 {{ dashStats?.processing_orders || 0 }} 单</div>
-          </Card>
+          <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
+            <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-orange-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-orange-500/10"></div>
+            <div class="relative z-10 flex items-center justify-between mb-4">
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-50 text-xl text-orange-600 transition-colors group-hover:bg-orange-100 dark:bg-orange-500/20 dark:text-orange-400 dark:group-hover:bg-orange-500/30">
+                <DollarOutlined />
+              </div>
+            </div>
+            <div class="relative z-10">
+              <div class="text-3xl font-bold text-gray-800 dark:text-gray-100">
+                <span class="text-xl mr-1">¥</span>{{ (hasAdminRole ? (dashStats?.today_income || 0) : (profile?.today_spend || 0)).toFixed(2) }}
+              </div>
+              <div class="mt-1 text-sm font-medium text-gray-500">{{ hasAdminRole ? '今日收入' : '今日消费' }}</div>
+              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-if="hasAdminRole">
+                <span class="flex items-center gap-1"><SyncOutlined /> 进行中 <span class="font-medium text-gray-500 dark:text-gray-400">{{ dashStats?.processing_orders || 0 }} 单</span></span>
+              </div>
+              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-else>
+                <span>&nbsp;</span>
+              </div>
+            </div>
+          </div>
         </Col>
+
         <Col :xs="12" :lg="6">
-          <Card>
-            <template #extra><TeamOutlined style="color:#8b5cf6;font-size:20px" /></template>
-            <Statistic :title="hasAdminRole ? '注册用户' : '我的代理'" :value="hasAdminRole ? (dashStats?.user_count || 0) : (profile?.dailitongji?.dlzs || 0)" />
-            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500" v-if="hasAdminRole">平台余额 ¥{{ (dashStats?.total_balance || 0).toFixed(2) }}</div>
-            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500" v-else-if="profile?.dailitongji">今日交单 {{ profile.dailitongji.jrjd || 0 }}</div>
-          </Card>
+          <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
+            <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-purple-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-purple-500/10"></div>
+            <div class="relative z-10 flex items-center justify-between mb-4">
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-xl text-purple-600 transition-colors group-hover:bg-purple-100 dark:bg-purple-500/20 dark:text-purple-400 dark:group-hover:bg-purple-500/30">
+                <TeamOutlined />
+              </div>
+            </div>
+            <div class="relative z-10">
+              <div class="text-3xl font-bold text-gray-800 dark:text-gray-100">{{ hasAdminRole ? (dashStats?.user_count || 0) : (profile?.dailitongji?.dlzs || 0) }}</div>
+              <div class="mt-1 text-sm font-medium text-gray-500">{{ hasAdminRole ? '注册用户' : '我的代理' }}</div>
+              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-if="hasAdminRole">
+                <span>平台余额 <span class="font-medium text-gray-500 dark:text-gray-400">¥{{ (dashStats?.total_balance || 0).toFixed(2) }}</span></span>
+              </div>
+              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-else-if="profile?.dailitongji">
+                <span>今日交单 <span class="font-medium text-gray-500 dark:text-gray-400">{{ profile.dailitongji.jrjd || 0 }}</span></span>
+              </div>
+              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-else>
+                <span>&nbsp;</span>
+              </div>
+            </div>
+          </div>
         </Col>
       </Row>
 
