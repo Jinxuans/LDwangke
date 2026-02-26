@@ -1340,6 +1340,7 @@ WantedBy=multi-user.target
                     f.write(chunk)
             # 后端特殊处理：备份旧二进制 + 保护配置文件
             config_backup = None
+            php_config_backup = None
             if '/backend' in url:
                 bin_path = os.path.join(self.__go_dir, self.__bin_name)
                 if os.path.isfile(bin_path):
@@ -1349,11 +1350,18 @@ WantedBy=multi-user.target
                 # 保护用户配置文件
                 if os.path.isfile(self.__config_file):
                     config_backup = public.readFile(self.__config_file)
+            # PHP API 特殊处理：保护 config.php
+            if '/php-api' in url:
+                php_config_file = os.path.join(self.__php_dir, 'config.php')
+                if os.path.isfile(php_config_file):
+                    php_config_backup = public.readFile(php_config_file)
             public.ExecShell('tar -xzf %s -C %s' % (tmp, target_dir))
             public.ExecShell('chown -R www:www %s' % target_dir)
             # 恢复用户配置文件
             if config_backup is not None:
                 public.writeFile(self.__config_file, config_backup)
+            if php_config_backup is not None:
+                public.writeFile(os.path.join(self.__php_dir, 'config.php'), php_config_backup)
         finally:
             if os.path.isfile(tmp): os.remove(tmp)
 
