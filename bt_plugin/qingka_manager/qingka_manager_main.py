@@ -37,6 +37,28 @@ class qingka_manager_main:
 
     # ==================== 输入校验 ====================
 
+    def _kill_process(self, pid):
+        """安全杀掉指定 PID 进程"""
+        if not pid or not os.path.exists('/proc/%s' % pid):
+            return
+        public.ExecShell('kill %s' % pid)
+        time.sleep(1)
+        if os.path.exists('/proc/%s' % pid):
+            public.ExecShell('kill -9 %s' % pid)
+            time.sleep(0.5)
+
+    def _kill_process_by_port(self, port):
+        """根据端口杀掉相关进程"""
+        if not port: return
+        old_pids = public.ExecShell("lsof -i :%s -t 2>/dev/null" % port)[0].strip()
+        if old_pids:
+            for p in old_pids.split('\n'):
+                p = p.strip()
+                if p and p.isdigit():
+                    public.ExecShell('kill -9 %s' % p)
+                    public.WriteLog('qingka_manager', '已杀掉占用端口 %s 的旧进程 PID: %s' % (port, p))
+            time.sleep(1)
+
     def _safe_pid(self, pid):
         if pid and str(pid).strip().isdigit():
             return str(pid).strip()
@@ -241,14 +263,7 @@ class qingka_manager_main:
         # 自动杀掉占用端口的旧进程
         port = self._get_port()
         if port:
-            old_pids = public.ExecShell("lsof -i :%s -t 2>/dev/null" % port)[0].strip()
-            if old_pids:
-                for p in old_pids.split('\n'):
-                    p = p.strip()
-                    if p and p.isdigit():
-                        public.ExecShell('kill -9 %s' % p)
-                        public.WriteLog('qingka_manager', '已杀掉占用端口 %s 的旧进程 PID: %s' % (port, p))
-                time.sleep(1)
+            self._kill_process_by_port(port)
         os.chmod(bin_path, 0o755)
         # 优先使用 systemd
         if self._is_systemd_registered('qingka-api'):
@@ -272,17 +287,14 @@ class qingka_manager_main:
         pid = self._get_pid()
         if not pid:
             return public.returnMsg(False, '服务未运行')
+        
         # 优先使用 systemd
         if self._is_systemd_registered('qingka-api'):
             public.ExecShell('systemctl stop qingka-api.service')
-            time.sleep(1)
-        else:
-            public.ExecShell('kill %s' % pid)
-            time.sleep(1)
-            if os.path.exists('/proc/%s' % pid):
-                public.ExecShell('kill -9 %s' % pid)
-                time.sleep(0.5)
+        
+        self._kill_process(pid)
         self._del_pid()
+        
         if os.path.exists('/proc/%s' % pid):
             return public.returnMsg(False, '停止失败，进程仍在运行，PID: %s' % pid)
         return public.returnMsg(True, '已停止')
@@ -302,13 +314,7 @@ class qingka_manager_main:
             return
         port = self._get_port()
         if port:
-            old_pids = public.ExecShell("lsof -i :%s -t 2>/dev/null" % port)[0].strip()
-            if old_pids:
-                for p in old_pids.split('\n'):
-                    p = p.strip()
-                    if p and p.isdigit():
-                        public.ExecShell('kill -9 %s' % p)
-                time.sleep(1)
+            self._kill_process_by_port(port)
         os.chmod(bin_path, 0o755)
         cmd = 'cd %s && nohup ./%s > %s 2>&1 & echo $!' % (self.__go_dir, self.__bin_name, self.__log_file)
         result = public.ExecShell(cmd)[0].strip()
@@ -326,13 +332,7 @@ class qingka_manager_main:
         pid = self._get_php_pid()
         if pid and os.path.exists('/proc/%s' % pid):
             return
-        old_pids = public.ExecShell('lsof -i :%s -t 2>/dev/null' % self.__php_port)[0].strip()
-        if old_pids:
-            for p in old_pids.split('\n'):
-                p = p.strip()
-                if p and p.isdigit():
-                    public.ExecShell('kill -9 %s' % p)
-            time.sleep(1)
+        self._kill_process_by_port(self.__php_port)
         cmd = 'cd %s && nohup %s -S 127.0.0.1:%s -t public > %s 2>&1 & echo $!' % (
             self.__php_dir, php_bin, self.__php_port, self.__php_log_file)
         result = public.ExecShell(cmd)[0].strip()
@@ -405,13 +405,7 @@ class qingka_manager_main:
             return public.returnMsg(False, 'PHP 服务已在运行中，PID: %s' % pid)
 
         # 杀掉占用端口的旧进程
-        old_pids = public.ExecShell('lsof -i :%s -t 2>/dev/null' % self.__php_port)[0].strip()
-        if old_pids:
-            for p in old_pids.split('\n'):
-                p = p.strip()
-                if p and p.isdigit():
-                    public.ExecShell('kill -9 %s' % p)
-            time.sleep(1)
+        self._kill_process_by_port(self.__php_port)
 
         # 优先使用 systemd
         if self._is_systemd_registered('qingka-php'):
@@ -436,16 +430,13 @@ class qingka_manager_main:
         pid = self._get_php_pid()
         if not pid:
             return public.returnMsg(False, 'PHP 服务未运行')
+        
         # 优先使用 systemd
         if self._is_systemd_registered('qingka-php'):
             public.ExecShell('systemctl stop qingka-php.service')
-            time.sleep(1)
-        else:
-            public.ExecShell('kill %s' % pid)
-            time.sleep(1)
-            if os.path.exists('/proc/%s' % pid):
-                public.ExecShell('kill -9 %s' % pid)
-                time.sleep(0.5)
+        
+        self._kill_process(pid)
+        
         try:
             if os.path.isfile(self.__php_pid_file):
                 os.remove(self.__php_pid_file)
@@ -526,9 +517,11 @@ class qingka_manager_main:
                 if key:
                     ok, _ = self._verify_license(key)
                     if ok:
-                        self.start(args)
-                        results.append('Go 服务已自动拉起')
-                        public.WriteLog('qingka_manager', '健康检查：Go 服务异常退出，已自动重启')
+                        # 仅在非 systemd 模式下自动拉起，systemd 会自动重启
+                        if not self._is_systemd_registered('qingka-api'):
+                            self.start(args)
+                            results.append('Go 服务已自动拉起')
+                            public.WriteLog('qingka_manager', '健康检查：Go 服务异常退出，已自动重启')
                     else:
                         results.append('Go 服务已停止（授权失效，未拉起）')
                 else:
@@ -543,9 +536,11 @@ class qingka_manager_main:
         php_running = php_pid and os.path.exists('/proc/%s' % php_pid)
         if not php_running:
             if os.path.isdir(self.__php_dir) and os.path.isfile(os.path.join(self.__php_dir, 'public', 'index.php')):
-                self.php_start(args)
-                results.append('PHP 服务已自动拉起')
-                public.WriteLog('qingka_manager', '健康检查：PHP 服务异常退出，已自动重启')
+                # 仅在非 systemd 模式下自动拉起，systemd 会自动重启
+                if not self._is_systemd_registered('qingka-php'):
+                    self.php_start(args)
+                    results.append('PHP 服务已自动拉起')
+                    public.WriteLog('qingka_manager', '健康检查：PHP 服务异常退出，已自动重启')
             else:
                 results.append('PHP API 未部署，跳过')
         else:
