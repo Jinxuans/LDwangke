@@ -35,7 +35,13 @@ func (s *AuthService) Login(req model.LoginRequest) (*model.VbenLoginResponse, s
 		"SELECT uid, uuid, user, pass, IFNULL(pass2,''), name, money, grade, active FROM qingka_wangke_user WHERE user = ?",
 		req.Username,
 	).Scan(&user.UID, &user.UUID, &user.User, &user.Pass, &user.Pass2, &user.Name, &user.Money, &user.Grade, &user.Active)
-
+	if err != nil && strings.Contains(err.Error(), "pass2") {
+		// pass2 列不存在，fallback 不查 pass2
+		err = database.DB.QueryRow(
+			"SELECT uid, uuid, user, pass, name, money, grade, active FROM qingka_wangke_user WHERE user = ?",
+			req.Username,
+		).Scan(&user.UID, &user.UUID, &user.User, &user.Pass, &user.Name, &user.Money, &user.Grade, &user.Active)
+	}
 	if err == sql.ErrNoRows {
 		return nil, "", errors.New("用户不存在")
 	}
@@ -64,14 +70,21 @@ func (s *AuthService) Login(req model.LoginRequest) (*model.VbenLoginResponse, s
 		}
 	}
 
-	// 旧系统逻辑：如果是管理员且未提供二级密码，返回特殊错误码触发前端弹窗
-	if user.Grade == "3" && req.Pass2 == "" {
-		// 这里借用 error 返回一个特定标识，Handler 层处理
-		return nil, "", errors.New("NEED_ADMIN_AUTH")
+	// 二级密码开关：查询系统配置 pass2_kg，默认开启("1")
+	pass2Enabled := true
+	var pass2Kg string
+	if err := database.DB.QueryRow("SELECT `k` FROM qingka_wangke_config WHERE `v`='pass2_kg'").Scan(&pass2Kg); err == nil {
+		if pass2Kg == "0" {
+			pass2Enabled = false
+		}
 	}
 
-	// 如果提供了二级密码，校验是否正确（使用独立的 pass2 字段）
-	if user.Grade == "3" && req.Pass2 != "" {
+	if pass2Enabled && user.Grade == "3" {
+		// 如果是管理员且未提供二级密码，返回特殊错误码触发前端弹窗
+		if req.Pass2 == "" {
+			return nil, "", errors.New("NEED_ADMIN_AUTH")
+		}
+		// 如果提供了二级密码，校验是否正确（使用独立的 pass2 字段）
 		if user.Pass2 == "" {
 			// 尚未设置二级密码，跳过校验（首次登录自动通过）
 		} else if strings.HasPrefix(user.Pass2, "$2a$") || strings.HasPrefix(user.Pass2, "$2b$") {

@@ -1028,12 +1028,19 @@ WantedBy=multi-user.target
             return public.returnMsg(False, '数据库迁移失败: %s' % str(e))
 
     def repair_db(self, args):
+        """兼容旧调用，转发到 verify_db"""
+        return self.verify_db(args)
+
+    def verify_db(self, args):
+        """模式1: 检验标准数据库并补全 —— 不删除任何已有数据，只补缺失的部分"""
         db_info = self._read_db_config()
         if not db_info:
             return public.returnMsg(False, '无法读取数据库配置，请检查 config.yaml')
         db_user, db_pass, db_name = db_info['user'], db_info['pass'], db_info['name']
-        logs = []
-        # 1. 建表（注释掉 DROP TABLE，只创建不存在的表）
+        report = []  # 检验报告
+        warnings = []
+        # ---- 1. 检验表结构 ----
+        missing_before = self._verify_tables(db_user, db_pass, db_name)
         deploy_dir = os.path.join(self.__go_dir, 'deploy')
         init_sql = os.path.join(deploy_dir, 'init_db.sql')
         if os.path.isfile(init_sql):
@@ -1044,38 +1051,152 @@ WantedBy=multi-user.target
             result = self._safe_mysql_cmd(db_user, db_pass, db_name, sql_file=filtered_sql)
             if os.path.isfile(filtered_sql): os.remove(filtered_sql)
             if result[1] and result[1].strip():
-                logs.append('建表: %s' % result[1].strip()[:200])
+                warnings.append('建表: %s' % result[1].strip()[:200])
         else:
-            logs.append('init_db.sql 不存在，跳过建表')
-        # 2. 执行增量迁移（仅运行编号格式的迁移文件）
+            warnings.append('init_db.sql 不存在，跳过建表')
+        missing_after = self._verify_tables(db_user, db_pass, db_name)
+        if missing_before:
+            fixed = [t for t in missing_before if t not in missing_after]
+            if fixed:
+                report.append('✅ 已补全 %d 张缺失表: %s' % (len(fixed), ', '.join(fixed)))
+            if missing_after:
+                report.append('⚠️ 仍有 %d 张表缺失: %s' % (len(missing_after), ', '.join(missing_after)))
+        else:
+            report.append('✅ 表结构完整 (%d 张表全部存在)' % len(self._REQUIRED_TABLES))
+        # ---- 2. 增量迁移 ----
         mig_dir = os.path.join(self.__go_dir, 'migrations')
+        mig_count = 0
         if os.path.isdir(mig_dir):
             sqls = sorted([f for f in os.listdir(mig_dir) if f.endswith('.sql') and f[:1].isdigit()])
+            mig_count = len(sqls)
             for sql in sqls:
                 result = self._safe_mysql_cmd(db_user, db_pass, db_name, sql_file=os.path.join(mig_dir, sql))
                 if result[1] and result[1].strip():
-                    logs.append('%s: %s' % (sql, result[1].strip()[:100]))
-        # 3. 补管理员账号
-        seed_sql = (
-            "INSERT IGNORE INTO qingka_wangke_user (uid, uuid, user, pass, name, qq_openid, nickname, faceimg, money, zcz, addprice, `key`, yqm, yqprice, notice, addtime, endtime, ip, grade, active, ck, xd, jd, bs, ck1, xd1, jd1, bs1, fldata, cldata, czAuth) "
-            "VALUES (1, 1, 'admin', 'admin123', 'Admin', '', '', '', 0, '0', 1, '', '', '', '', NOW(), '', '', '3', '1', 0, 0, 0, 0, 0, 0, 0, 0, '', '', '0');"
-        )
-        result = self._exec_sql(db_user, db_pass, db_name, seed_sql)
-        if result[1] and result[1].strip():
-            logs.append('管理员: %s' % result[1].strip()[:200])
-        # 4. 补基础配置
+                    warnings.append('%s: %s' % (sql, result[1].strip()[:100]))
+        report.append('✅ 增量迁移已执行 (%d 个文件)' % mig_count)
+        # ---- 3. 检验管理员账号 ----
+        check_admin = self._exec_sql(db_user, db_pass, db_name, "SELECT COUNT(*) FROM qingka_wangke_user WHERE grade='3';")
+        admin_exists = check_admin[0] and check_admin[0].strip() not in ('0', '')
+        if admin_exists:
+            report.append('✅ 管理员账号已存在')
+        else:
+            seed_sql = (
+                "INSERT INTO qingka_wangke_user (uuid, user, pass, name, qq_openid, nickname, faceimg, money, zcz, addprice, `key`, yqm, yqprice, notice, addtime, endtime, ip, grade, active, ck, xd, jd, bs, ck1, xd1, jd1, bs1, fldata, cldata, czAuth) "
+                "VALUES (1, 'admin', 'admin123', 'Admin', '', '', '', 0, '0', 1, '', '', '', '', NOW(), '', '', '3', '1', 0, 0, 0, 0, 0, 0, 0, 0, '', '', '0');"
+            )
+            result = self._exec_sql(db_user, db_pass, db_name, seed_sql)
+            if result[1] and result[1].strip():
+                warnings.append('管理员: %s' % result[1].strip()[:200])
+                report.append('⚠️ 管理员账号创建失败')
+            else:
+                report.append('✅ 已创建默认管理员 admin/admin123')
+        # ---- 4. 检验基础配置 ----
+        check_cfg = self._exec_sql(db_user, db_pass, db_name, "SELECT COUNT(*) FROM qingka_wangke_config;")
+        cfg_count = int(check_cfg[0].strip()) if check_cfg[0] and check_cfg[0].strip().isdigit() else 0
         config_sql = (
             "INSERT IGNORE INTO qingka_wangke_config (v, k) VALUES "
             "('sitename',''),('sykg','1'),('version','1.0.0'),('user_yqzc','0'),"
             "('sjqykg','0'),('user_htkh','0'),('dl_pkkg','0'),('zdpay','0'),"
             "('flkg','1'),('fllx','0'),('djfl','0'),('notice',''),"
-            "('bz',''),('logo',''),('hlogo',''),('tcgonggao','');"
+            "('bz',''),('logo',''),('hlogo',''),('tcgonggao',''),('pass2_kg','1');"
         )
         self._exec_sql(db_user, db_pass, db_name, config_sql)
-        if logs:
-            public.WriteLog('qingka_manager', '数据库修复警告: %s' % '; '.join(logs))
-            return public.returnMsg(True, '数据库补全完成（有警告）:\n' + '\n'.join(logs))
-        return public.returnMsg(True, '数据库补全完成，表结构/迁移/管理员/配置均已检查')
+        check_cfg2 = self._exec_sql(db_user, db_pass, db_name, "SELECT COUNT(*) FROM qingka_wangke_config;")
+        cfg_count2 = int(check_cfg2[0].strip()) if check_cfg2[0] and check_cfg2[0].strip().isdigit() else 0
+        if cfg_count2 > cfg_count:
+            report.append('✅ 已补全 %d 条基础配置' % (cfg_count2 - cfg_count))
+        else:
+            report.append('✅ 基础配置完整 (%d 条)' % cfg_count2)
+        # ---- 5. 检验 pass2 列 ----
+        check_pass2 = self._exec_sql(db_user, db_pass, db_name,
+            "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='qingka_wangke_user' AND COLUMN_NAME='pass2';" % db_name)
+        has_pass2 = check_pass2[0] and check_pass2[0].strip() not in ('0', '')
+        if has_pass2:
+            report.append('✅ pass2 列已存在')
+        else:
+            self._exec_sql(db_user, db_pass, db_name,
+                "ALTER TABLE `qingka_wangke_user` ADD COLUMN `pass2` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '管理员二级密码' AFTER `pass`;")
+            report.append('✅ 已自动添加 pass2 列')
+        # ---- 汇总 ----
+        summary = '\n'.join(report)
+        if warnings:
+            public.WriteLog('qingka_manager', '数据库检验警告: %s' % '; '.join(warnings))
+            summary += '\n\n⚠️ 警告信息:\n' + '\n'.join(warnings)
+        return public.returnMsg(True, summary)
+
+    def reset_db(self, args):
+        """模式2: 重置一套全新的标准数据库 —— 删除所有表后重新创建"""
+        confirm = getattr(args, 'confirm', '')
+        if confirm != 'YES':
+            return public.returnMsg(False, '危险操作！请传入 confirm=YES 确认重置。此操作将删除所有数据！')
+        db_info = self._read_db_config()
+        if not db_info:
+            return public.returnMsg(False, '无法读取数据库配置，请检查 config.yaml')
+        db_user, db_pass, db_name = db_info['user'], db_info['pass'], db_info['name']
+        logs = []
+        # 1. 获取所有现有表并逐一 DROP
+        result = self._safe_mysql_cmd(db_user, db_pass, db_name,
+            sql_cmd="SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='%s';" % db_name)
+        if result[0] and result[0].strip():
+            tables = [t.strip() for t in result[0].strip().split('\n') if t.strip() and t.strip() != 'TABLE_NAME']
+            if tables:
+                # 先关闭外键检查，再逐一 DROP
+                drop_sql = 'SET FOREIGN_KEY_CHECKS=0;\n'
+                for t in tables:
+                    drop_sql += 'DROP TABLE IF EXISTS `%s`;\n' % t
+                drop_sql += 'SET FOREIGN_KEY_CHECKS=1;\n'
+                self._exec_sql(db_user, db_pass, db_name, drop_sql)
+                logs.append('已删除 %d 张旧表' % len(tables))
+        # 2. 重新建表（直接执行 init_db.sql，不过滤 DROP 语句）
+        deploy_dir = os.path.join(self.__go_dir, 'deploy')
+        init_sql = os.path.join(deploy_dir, 'init_db.sql')
+        if os.path.isfile(init_sql):
+            import tempfile
+            fd_tmp, clean_sql = tempfile.mkstemp(suffix='.sql')
+            os.close(fd_tmp)
+            public.ExecShell('tr -d "\r" < %s | sed -e "/^CREATE DATABASE/d" -e "/^USE /d" > %s' % (init_sql, clean_sql))
+            result = self._safe_mysql_cmd(db_user, db_pass, db_name, sql_file=clean_sql)
+            if os.path.isfile(clean_sql): os.remove(clean_sql)
+            if result[1] and result[1].strip():
+                logs.append('建表警告: %s' % result[1].strip()[:200])
+            logs.append('已重新创建标准表结构')
+        else:
+            return public.returnMsg(False, 'init_db.sql 不存在，无法重置数据库')
+        # 3. 执行增量迁移
+        mig_dir = os.path.join(self.__go_dir, 'migrations')
+        if os.path.isdir(mig_dir):
+            sqls = sorted([f for f in os.listdir(mig_dir) if f.endswith('.sql') and f[:1].isdigit()])
+            for sql in sqls:
+                self._safe_mysql_cmd(db_user, db_pass, db_name, sql_file=os.path.join(mig_dir, sql))
+            logs.append('已执行 %d 个增量迁移' % len(sqls))
+        # 4. 插入默认管理员
+        seed_sql = (
+            "INSERT INTO qingka_wangke_user (uuid, user, pass, name, qq_openid, nickname, faceimg, money, zcz, addprice, `key`, yqm, yqprice, notice, addtime, endtime, ip, grade, active, ck, xd, jd, bs, ck1, xd1, jd1, bs1, fldata, cldata, czAuth) "
+            "VALUES (1, 'admin', 'admin123', 'Admin', '', '', '', 0, '0', 1, '', '', '', '', NOW(), '', '', '3', '1', 0, 0, 0, 0, 0, 0, 0, 0, '', '', '0');"
+        )
+        result = self._exec_sql(db_user, db_pass, db_name, seed_sql)
+        if result[1] and result[1].strip():
+            logs.append('管理员创建警告: %s' % result[1].strip()[:200])
+        else:
+            logs.append('已创建默认管理员 admin/admin123')
+        # 5. 插入默认配置
+        config_sql = (
+            "INSERT IGNORE INTO qingka_wangke_config (v, k) VALUES "
+            "('sitename',''),('sykg','1'),('version','1.0.0'),('user_yqzc','0'),"
+            "('sjqykg','0'),('user_htkh','0'),('dl_pkkg','0'),('zdpay','0'),"
+            "('flkg','1'),('fllx','0'),('djfl','0'),('notice',''),"
+            "('bz',''),('logo',''),('hlogo',''),('tcgonggao',''),('pass2_kg','1');"
+        )
+        self._exec_sql(db_user, db_pass, db_name, config_sql)
+        logs.append('已写入默认系统配置')
+        # 6. 验证
+        missing = self._verify_tables(db_user, db_pass, db_name)
+        if missing:
+            logs.append('⚠️ 重置后仍缺少 %d 张表: %s' % (len(missing), ', '.join(missing)))
+        else:
+            logs.append('✅ 所有 %d 张标准表已就绪' % len(self._REQUIRED_TABLES))
+        public.WriteLog('qingka_manager', '数据库已重置: %s' % '; '.join(logs))
+        return public.returnMsg(True, '数据库重置完成:\n' + '\n'.join(logs))
 
     # ==================== 一键安装 ====================
 
@@ -1147,14 +1268,17 @@ WantedBy=multi-user.target
 
             # 6. 执行增量迁移（仅运行编号格式的迁移文件）
             self._run_migrations()
-            # 7. 确保管理员账号和基础配置存在
-            seed_sql = (
-                "INSERT IGNORE INTO qingka_wangke_user (uid, uuid, user, pass, name, qq_openid, nickname, faceimg, money, zcz, addprice, `key`, yqm, yqprice, notice, addtime, endtime, ip, grade, active, ck, xd, jd, bs, ck1, xd1, jd1, bs1, fldata, cldata, czAuth) "
-                "VALUES (1, 1, 'admin', 'admin123', 'Admin', '', '', '', 0, '0', 1, '', '', '', '', NOW(), '', '', '3', '1', 0, 0, 0, 0, 0, 0, 0, 0, '', '', '0');"
-            )
-            result = self._exec_sql(db_user, db_pass, db_name, seed_sql)
-            if result[1] and result[1].strip():
-                public.WriteLog('qingka_manager', '插入管理员账号失败: %s' % result[1].strip()[:200])
+            # 7. 确保管理员账号和基础配置存在（仅在无管理员时插入，不硬编码uid）
+            check_admin = self._exec_sql(db_user, db_pass, db_name, "SELECT COUNT(*) FROM qingka_wangke_user WHERE grade='3';")
+            admin_exists = check_admin[0] and check_admin[0].strip() not in ('0', '')
+            if not admin_exists:
+                seed_sql = (
+                    "INSERT INTO qingka_wangke_user (uuid, user, pass, name, qq_openid, nickname, faceimg, money, zcz, addprice, `key`, yqm, yqprice, notice, addtime, endtime, ip, grade, active, ck, xd, jd, bs, ck1, xd1, jd1, bs1, fldata, cldata, czAuth) "
+                    "VALUES (1, 'admin', 'admin123', 'Admin', '', '', '', 0, '0', 1, '', '', '', '', NOW(), '', '', '3', '1', 0, 0, 0, 0, 0, 0, 0, 0, '', '', '0');"
+                )
+                result = self._exec_sql(db_user, db_pass, db_name, seed_sql)
+                if result[1] and result[1].strip():
+                    public.WriteLog('qingka_manager', '插入管理员账号失败: %s' % result[1].strip()[:200])
 
             # 8. 下载 PHP API（如果更新源有）
             try:

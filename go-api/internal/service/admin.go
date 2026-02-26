@@ -438,6 +438,7 @@ var publicConfigKeys = map[string]bool{
 	"keywords": true, "description": true,
 	"checkin_enabled":      true,
 	"recharge_bonus_rules": true,
+	"pass2_kg":             true,
 }
 
 func (s *AdminService) GetPublicConfig() (map[string]string, error) {

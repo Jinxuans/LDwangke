@@ -55,7 +55,7 @@ export const useAuthStore = defineStore('auth', () => {
       loginLoading.value = true;
       const res = await loginApi(params);
 
-      // 如果返回 code 为 5，表示需要管理员二次验证
+      // 如果返回 code 为 5，表示需要管理员二次验证（后端已根据 pass2_kg 开关判断）
       if ((res as any).code === 5) {
         const pass2 = window.prompt('检测到管理员账号，请输入管理员二级密码：');
         if (!pass2) {

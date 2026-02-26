@@ -108,10 +108,6 @@ func (s Status) String() string {
 	}
 }
 
-// ===== 授权站地址（硬编码，不可通过配置修改） =====
-
-const licenseServerURL = "https://auth.qingka.top"
-
 // ===== 缓存数据结构 =====
 
 type cacheData struct {
@@ -151,6 +147,7 @@ type Manager struct {
 	licenseKey     string
 	machineID      string
 	domain         string
+	serverURL      string
 	plan           string
 	expireAt       string
 	maxUsers       int
@@ -158,6 +155,7 @@ type Manager struct {
 	cacheFile      string
 	failCount      int
 	lastError      string
+	disabled       bool
 	stopCh         chan struct{}
 }
 
@@ -165,9 +163,14 @@ var Global *Manager
 
 // NewManager 创建授权管理器
 func NewManager(cfg config.LicenseConfig) *Manager {
+	serverURL := cfg.ServerURL
+	if serverURL == "" {
+		serverURL = "https://auth.qingka.top"
+	}
 	m := &Manager{
 		status:    StatusDegraded,
 		domain:    cfg.Domain,
+		serverURL: serverURL,
 		cacheFile: cfg.CacheFile,
 		stopCh:    make(chan struct{}),
 	}
@@ -181,9 +184,11 @@ func NewManager(cfg config.LicenseConfig) *Manager {
 	if secretsFile == "" {
 		secretsFile = ".secrets"
 	}
+	secretsLoaded := true
 	if err := loadSecrets(secretsFile); err != nil {
 		log.Printf("[License] 加载密钥文件失败: %v（授权功能不可用）", err)
 		m.lastError = fmt.Sprintf("密钥文件加载失败: %v", err)
+		secretsLoaded = false
 	}
 
 	// 读取授权码：优先配置文件中的 license_key，其次从 key_file 读
@@ -197,11 +202,21 @@ func NewManager(cfg config.LicenseConfig) *Manager {
 	// 读取机器码
 	m.machineID = readMachineID()
 
+	// 如果密钥文件和授权码都没配置，禁用授权检查（开发模式）
+	if !secretsLoaded && m.licenseKey == "" {
+		log.Println("[License] 未配置密钥文件和授权码，授权检查已禁用（开发模式）")
+		m.disabled = true
+		m.status = StatusOK
+	}
+
 	return m
 }
 
 // Start 启动授权验证（启动验证 + 后台心跳）
 func (m *Manager) Start() {
+	if m.disabled {
+		return
+	}
 	if m.licenseKey == "" {
 		log.Println("[License] 未配置授权码，系统将以降级模式运行")
 		m.mu.Lock()
@@ -275,6 +290,9 @@ func (m *Manager) GetStatusInfo() map[string]interface{} {
 
 // IsAllowed 检查当前授权是否允许正常使用
 func (m *Manager) IsAllowed() bool {
+	if m.disabled {
+		return true
+	}
 	s := m.GetStatus()
 	return s == StatusOK || s == StatusOffline || s == StatusWarning
 }
@@ -419,7 +437,7 @@ func (m *Manager) updateOfflineStatus() {
 
 func (m *Manager) callAPI(path string, body map[string]interface{}) (json.RawMessage, error) {
 	jsonBody, _ := json.Marshal(body)
-	url := licenseServerURL + path
+	url := m.serverURL + path
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("POST", url, strings.NewReader(string(jsonBody)))

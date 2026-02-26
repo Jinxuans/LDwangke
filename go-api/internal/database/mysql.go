@@ -45,5 +45,30 @@ func Connect(cfg config.DatabaseConfig) *sql.DB {
 
 	DB = db
 	log.Println("MySQL 连接成功")
+	autoMigrate(db)
 	return db
+}
+
+func autoMigrate(db *sql.DB) {
+	var count int
+	db.QueryRow("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='qingka_wangke_user' AND COLUMN_NAME='pass2'").Scan(&count)
+	if count == 0 {
+		_, err := db.Exec("ALTER TABLE `qingka_wangke_user` ADD COLUMN `pass2` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '管理员二级密码' AFTER `pass`")
+		if err != nil {
+			log.Printf("[AutoMigrate] 添加 pass2 列失败: %v", err)
+		} else {
+			log.Println("[AutoMigrate] 已自动添加 pass2 列")
+		}
+	}
+	// 确保管理员账号存在
+	var adminCount int
+	db.QueryRow("SELECT COUNT(*) FROM qingka_wangke_user WHERE grade='3'").Scan(&adminCount)
+	if adminCount == 0 {
+		_, err := db.Exec("INSERT INTO qingka_wangke_user (uuid, user, pass, name, grade, active, addprice, addtime) VALUES (1, 'admin', 'admin123', 'Admin', '3', '1', 1, NOW())")
+		if err != nil {
+			log.Printf("[AutoMigrate] 插入管理员失败: %v", err)
+		} else {
+			log.Println("[AutoMigrate] 已自动创建管理员账号 admin/admin123")
+		}
+	}
 }

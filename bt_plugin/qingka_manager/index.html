@@ -79,27 +79,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
       <div class="status-item">运行时间: <span class="val" id="sUptime">-</span></div>
       <div class="status-item">版本: <span class="val" id="sVersion">-</span></div>
       <div class="status-item">域名: <span class="val" id="sDomain">-</span></div>
+      <div style="width:1px;height:14px;background:var(--border);margin:0 4px"></div>
+      <div class="status-item"><span class="status-dot" id="phpStatusDot"></span><span id="phpStatusText">PHP检测中...</span></div>
+      <div class="status-item">PHP端口: <span class="val" id="phpPort">-</span></div>
+      <div class="status-item">PHP内存: <span class="val" id="phpMem">-</span></div>
     </div>
-    <div class="btn-group">
-      <button class="btn btn-success" onclick="doAction('start')">▶ 启动</button>
-      <button class="btn btn-danger" onclick="doAction('stop')">■ 停止</button>
-      <button class="btn btn-warning" onclick="doAction('restart')">↻ 重启</button>
-      <button class="btn btn-outline" onclick="checkUpdate()">检查更新</button>
-    </div>
-    <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
-      <div style="font-weight:600;font-size:11px;color:var(--text-secondary);margin-bottom:6px">PHP 桥接服务</div>
-      <div class="status-bar" id="phpStatusBar">
-        <div class="status-item"><span class="status-dot" id="phpStatusDot"></span><span id="phpStatusText">检测中...</span></div>
-        <div class="status-item">PID: <span class="val" id="phpPid">-</span></div>
-        <div class="status-item">端口: <span class="val" id="phpPort">-</span></div>
-        <div class="status-item">内存: <span class="val" id="phpMem">-</span></div>
-      </div>
-      <div class="btn-group">
-        <button class="btn btn-success" onclick="doPhpAction('php_start')">▶ 启动 PHP</button>
-        <button class="btn btn-danger" onclick="doPhpAction('php_stop')">■ 停止 PHP</button>
-        <button class="btn btn-warning" onclick="doPhpAction('php_restart')">↻ 重启 PHP</button>
-        <button class="btn btn-outline" onclick="doRestartAll()">↻ 全部重启</button>
-      </div>
+    <div class="btn-group" style="margin-top:10px">
+      <button class="btn btn-success" onclick="doAction('start')">▶ 启动 Go</button>
+      <button class="btn btn-danger" onclick="doAction('stop')">■ 停止 Go</button>
+      <button class="btn btn-warning" onclick="doAction('restart')">↻ 重启 Go</button>
+      <button class="btn btn-success" style="margin-left:8px" onclick="doPhpAction('php_start')">▶ 启动 PHP</button>
+      <button class="btn btn-danger" onclick="doPhpAction('php_stop')">■ 停止 PHP</button>
+      <button class="btn btn-warning" onclick="doPhpAction('php_restart')">↻ 重启 PHP</button>
+      <button class="btn btn-outline" style="margin-left:8px" onclick="doRestartAll()">↻ 全部重启</button>
     </div>
   </div>
 
@@ -150,50 +142,49 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
         </div>
       </div>
       <div id="overviewPanel" style="display:none">
-        <div class="overview-grid">
-          <div class="overview-card"><div class="ov-val" id="ovStatus">-</div><div class="ov-label">运行状态</div></div>
-          <div class="overview-card"><div class="ov-val" id="ovVersion">-</div><div class="ov-label">当前版本</div></div>
-          <div class="overview-card"><div class="ov-val" id="ovMem">-</div><div class="ov-label">内存占用</div></div>
-          <div class="overview-card"><div class="ov-val" id="ovUptime">-</div><div class="ov-label">运行时间</div></div>
-          <div class="overview-card"><div class="ov-val" id="ovDomain">-</div><div class="ov-label">绑定域名</div></div>
-          <div class="overview-card"><div class="ov-val" id="ovPid">-</div><div class="ov-label">进程 PID</div></div>
-        </div>
-        <div style="font-weight:600;font-size:12px;margin:12px 0 8px;color:var(--text-secondary)">PHP 桥接服务</div>
-        <div class="overview-grid">
+        <div class="overview-grid" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));">
+          <div class="overview-card"><div class="ov-val" id="ovStatus">-</div><div class="ov-label">Go 状态</div></div>
+          <div class="overview-card"><div class="ov-val" id="ovMem">-</div><div class="ov-label">Go 内存</div></div>
           <div class="overview-card"><div class="ov-val" id="ovPhpStatus">-</div><div class="ov-label">PHP 状态</div></div>
-          <div class="overview-card"><div class="ov-val" id="ovPhpPort">-</div><div class="ov-label">监听端口</div></div>
           <div class="overview-card"><div class="ov-val" id="ovPhpMem">-</div><div class="ov-label">PHP 内存</div></div>
-          <div class="overview-card"><div class="ov-val" id="ovPhpPid">-</div><div class="ov-label">PHP PID</div></div>
+          <div class="overview-card"><div class="ov-val" id="ovUptime">-</div><div class="ov-label">运行时间</div></div>
+          <div class="overview-card"><div class="ov-val" id="ovVersion">-</div><div class="ov-label">当前版本</div></div>
         </div>
-        <div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:var(--radius)">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-            <div>
-              <div style="font-weight:600;margin-bottom:2px;font-size:12px">⚙️ 开机自启 / 崩溃自动重启</div>
-              <div style="font-size:12px;color:var(--text-secondary)" id="systemdInfo">检测中...</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <!-- Left: Services -->
+          <div style="padding:10px;background:var(--bg);border-radius:var(--radius)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div>
+                <div style="font-weight:600;font-size:12px">⚙️ 进程守护 (开机自启)</div>
+                <div style="font-size:11px;color:var(--text-secondary)" id="systemdInfo">检测中...</div>
+              </div>
+              <div>
+                <button class="btn btn-outline" style="padding:4px 8px" onclick="setupSystemd()" id="btnSystemdSetup">注册</button>
+                <button class="btn btn-danger" style="padding:4px 8px;display:none" onclick="removeSystemd()" id="btnSystemdRemove">移除</button>
+              </div>
             </div>
-            <div style="display:flex;gap:8px">
-              <button class="btn btn-primary" onclick="setupSystemd()" id="btnSystemdSetup">注册 Systemd</button>
-              <button class="btn btn-danger" onclick="removeSystemd()" id="btnSystemdRemove" style="display:none">移除 Systemd</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:8px">
+              <div>
+                <div style="font-weight:600;font-size:12px">🩺 存活监控 (防挂)</div>
+                <div style="font-size:11px;color:var(--text-secondary)">自动拉起挂掉的进程</div>
+              </div>
+              <button class="btn btn-outline" style="padding:4px 8px" onclick="doHealthCheck()">立即检查</button>
             </div>
           </div>
-        </div>
-        <div style="margin-top:8px;padding:10px;background:var(--bg);border-radius:var(--radius)">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-            <div>
-              <div style="font-weight:600;margin-bottom:2px;font-size:12px">🩺 健康检查</div>
-              <div style="font-size:12px;color:var(--text-secondary)">检测 Go / PHP 进程存活状态，挂掉自动拉起</div>
+          <!-- Right: License & Domain -->
+          <div style="padding:10px;background:var(--bg);border-radius:var(--radius);display:flex;flex-direction:column;justify-content:center">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span style="font-weight:600;font-size:12px">🔐 系统授权:</span>
+              <span id="licenseStatus" style="color:var(--danger);font-size:12px">检测中...</span>
             </div>
-            <button class="btn btn-outline" onclick="doHealthCheck()">立即检查</button>
-          </div>
-        </div>
-        <div style="margin-top:8px;padding:10px;background:var(--bg);border-radius:var(--radius)">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <span style="font-weight:600">🔐 授权状态:</span>
-            <span id="licenseStatus" style="color:var(--danger)">检测中...</span>
-          </div>
-          <div id="licenseInput" style="margin-top:8px;display:flex;gap:6px">
-            <input class="form-input" id="licenseKey" placeholder="请输入授权码 (QK-XXXX...)" style="flex:1">
-            <button class="btn btn-primary" onclick="saveLicense()">激活</button>
+            <div id="licenseInput" style="display:flex;gap:6px;margin-bottom:8px">
+              <input class="form-input" id="licenseKey" placeholder="输入授权码" style="padding:4px 8px">
+              <button class="btn btn-primary" style="padding:4px 10px" onclick="saveLicense()">激活</button>
+            </div>
+            <div style="border-top:1px solid var(--border);padding-top:8px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-weight:600;font-size:12px">🌐 绑定域名:</span>
+              <span id="ovDomain" style="font-size:12px;font-family:monospace">-</span>
+            </div>
           </div>
         </div>
       </div>
@@ -223,7 +214,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
       <div id="updateInfo">
         <div class="empty-tip" id="noUpdate">点击上方「检查更新」按钮获取最新版本信息</div>
         <div id="updateDetail" style="display:none">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
             <span class="version-badge current" id="upCurrent">-</span>
             <span>→</span>
             <span class="version-badge latest" id="upLatest">-</span>
@@ -241,40 +232,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
           <div class="progress-bar" id="updateProgress" style="display:none"><div class="fill" id="updateFill"></div></div>
         </div>
       </div>
-      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <div style="flex:1;min-width:160px">
-            <div style="font-weight:600;margin-bottom:2px;font-size:12px">⏪ 回滚后端</div>
-            <div style="font-size:12px;color:var(--text-secondary)" id="rollbackInfo">检测中...</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+        <!-- DB Tools -->
+        <div style="padding:10px;background:var(--bg);border-radius:var(--radius)">
+          <div style="font-weight:600;margin-bottom:6px;font-size:12px">🔧 数据库工具</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px">自动检查缺失项、增量迁移或重建</div>
+          <div class="btn-group" style="margin:0">
+            <button class="btn btn-primary" onclick="doDbUpdate()">执行迁移</button>
+            <button class="btn btn-warning" onclick="doVerifyDb()">检验补全</button>
+            <button class="btn btn-danger" onclick="doResetDb()">重置数据库</button>
           </div>
-          <button class="btn btn-warning" id="btnRollback" onclick="doRollback()" disabled>回滚到上一版本</button>
         </div>
-      </div>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <div style="flex:1;min-width:160px">
-            <div style="font-weight:600;margin-bottom:2px;font-size:12px">🗄 数据库迁移</div>
-            <div style="font-size:12px;color:var(--text-secondary)">执行 migrations 目录下的增量 SQL</div>
+        <!-- Other Tools -->
+        <div style="padding:10px;background:var(--bg);border-radius:var(--radius)">
+          <div style="font-weight:600;margin-bottom:6px;font-size:12px">🛠️ 系统维护</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:11px;color:var(--text-secondary)" id="rollbackInfo">检测中...</span>
+              <button class="btn btn-warning" style="padding:4px 8px" id="btnRollback" onclick="doRollback()" disabled>回滚上一版</button>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:8px">
+              <span style="font-size:11px;color:var(--text-secondary)">从远程更新插件面板自身</span>
+              <button class="btn btn-outline" style="padding:4px 8px" onclick="doPluginUpdate()">更新插件</button>
+            </div>
           </div>
-          <button class="btn btn-primary" onclick="doDbUpdate()">执行迁移</button>
-        </div>
-      </div>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <div style="flex:1;min-width:160px">
-            <div style="font-weight:600;margin-bottom:2px;font-size:12px">🔧 数据库补全</div>
-            <div style="font-size:12px;color:var(--text-secondary)">自动补全缺失的表、迁移、管理员账号和基础配置</div>
-          </div>
-          <button class="btn btn-warning" onclick="doRepairDb()">一键补全</button>
-        </div>
-      </div>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <div style="flex:1;min-width:160px">
-            <div style="font-weight:600;margin-bottom:2px;font-size:12px">🔌 插件自更新</div>
-            <div style="font-size:12px;color:var(--text-secondary)">从远程更新插件面板自身</div>
-          </div>
-          <button class="btn btn-outline" onclick="doPluginUpdate()">更新插件</button>
         </div>
       </div>
     </div>
@@ -563,16 +545,35 @@ function doDbUpdate() {
     });
   });
 }
-function doRepairDb() {
+function doVerifyDb() {
   if (QK._busy) return;
-  layer.confirm('确定要执行数据库补全？将自动补全缺失的表、迁移、管理员账号和基础配置。', {icon: 3}, function(i) {
+  layer.confirm('将检验数据库表结构、迁移、管理员账号和基础配置，自动补全缺失项。<br><b>不会删除任何已有数据。</b>', {icon: 3, title: '检验补全'}, function(i) {
     layer.close(i);
     QK._busy = true;
-    var idx = layer.msg('数据库补全中...', {icon: 16, shade: 0.3, time: 0});
-    req('repair_db', null, function(res) {
+    var idx = layer.msg('数据库检验中...', {icon: 16, shade: 0.3, time: 0});
+    req('verify_db', null, function(res) {
       layer.close(idx);
       QK._busy = false;
-      layer.msg(res.msg || (res.status ? '补全完成' : '补全失败'), {icon: res.status ? 1 : 2, time: 5000});
+      var msg = res.msg || (res.status ? '检验完成' : '检验失败');
+      layer.open({type: 0, title: '数据库检验报告', content: '<pre style="white-space:pre-wrap;font-size:12px;max-height:400px;overflow-y:auto">' + msg.replace(/</g,'&lt;') + '</pre>', area: ['500px'], btn: ['确定']});
+    });
+  });
+}
+function doResetDb() {
+  if (QK._busy) return;
+  layer.confirm('<b style="color:#dc3545">⚠️ 危险操作！</b><br><br>此操作将 <b>删除所有数据表和数据</b>，重建一套全新的标准数据库。<br><br>所有用户、订单、配置等数据将 <b>永久丢失且不可恢复</b>！<br><br>确定要继续吗？', {icon: 0, title: '重置数据库', btn: ['确认重置', '取消']}, function(i) {
+    layer.close(i);
+    layer.prompt({title: '请输入 YES 确认重置', formType: 0}, function(val, pi) {
+      layer.close(pi);
+      if (val !== 'YES') return layer.msg('输入不正确，已取消', {icon: 2});
+      QK._busy = true;
+      var idx = layer.msg('数据库重置中，请勿关闭页面...', {icon: 16, shade: 0.3, time: 0});
+      req('reset_db', {confirm: 'YES'}, function(res) {
+        layer.close(idx);
+        QK._busy = false;
+        var msg = res.msg || (res.status ? '重置完成' : '重置失败');
+        layer.open({type: 0, title: '数据库重置报告', content: '<pre style="white-space:pre-wrap;font-size:12px;max-height:400px;overflow-y:auto">' + msg.replace(/</g,'&lt;') + '</pre>', area: ['500px'], btn: ['确定']});
+      });
     });
   });
 }

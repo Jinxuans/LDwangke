@@ -101,7 +101,7 @@ func main() {
 	// 初始化授权管理器
 	lm := license.NewManager(cfg.License)
 	license.Global = lm
-	go lm.Start()
+	lm.Start()
 
 	// 设置 Gin 模式
 	if cfg.Server.Mode == "release" {

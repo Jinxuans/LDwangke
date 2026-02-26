@@ -555,6 +555,9 @@ func (s *UserCenterService) ChangePassword(uid int, oldPass, newPass string) err
 func (s *UserCenterService) ChangePass2(uid int, oldPass2, newPass2 string) error {
 	var grade, dbPass2 string
 	err := database.DB.QueryRow("SELECT grade, IFNULL(pass2,'') FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&grade, &dbPass2)
+	if err != nil && strings.Contains(err.Error(), "pass2") {
+		err = database.DB.QueryRow("SELECT grade FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&grade)
+	}
 	if err != nil {
 		return errors.New("用户不存在")
 	}

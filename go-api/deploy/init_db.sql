@@ -265,3 +265,11 @@ CREATE TABLE IF NOT EXISTS `qingka_wangke_user_favorite` (
   KEY `idx_uid_addtime` (`uid`,`addtime`),
   KEY `idx_uid_cid` (`uid`,`cid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='用户收藏表';
+
+-- 默认管理员账号（不硬编码uid，由AUTO_INCREMENT分配；Go启动时autoMigrate会再检查一次）
+INSERT INTO `qingka_wangke_user` (uuid, user, pass, name, qq_openid, nickname, faceimg, money, zcz, addprice, `key`, yqm, yqprice, notice, addtime, endtime, ip, grade, active, ck, xd, jd, bs, ck1, xd1, jd1, bs1, fldata, cldata, czAuth)
+SELECT 1, 'admin', 'admin123', 'Admin', '', '', '', 0, '0', 1, '', '', '', '', NOW(), '', '', '3', '1', 0, 0, 0, 0, 0, 0, 0, 0, '', '', '0'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `qingka_wangke_user` WHERE grade='3');
+
+-- 默认系统配置
+INSERT IGNORE INTO `qingka_wangke_config` (v, k) VALUES ('sitename',''),('sykg','1'),('version','1.0.0'),('user_yqzc','0'),('sjqykg','0'),('user_htkh','0'),('dl_pkkg','0'),('zdpay','0'),('flkg','1'),('fllx','0'),('djfl','0'),('notice',''),('bz',''),('logo',''),('hlogo',''),('tcgonggao',''),('pass2_kg','1');

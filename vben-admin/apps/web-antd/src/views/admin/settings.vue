@@ -569,7 +569,7 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
             <div class="tab-body">
               <Row :gutter="[24, 24]">
                 <Col :span="24"><Divider orientation="left" class="!my-0">安全验证</Divider></Col>
-                <Col :xs="24" :lg="12">
+                <Col :xs="24" :lg="8">
                   <div class="switch-row">
                     <div>
                       <label class="field-label !mb-0">滑块验证</label>
@@ -578,13 +578,22 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                     <Switch :checked="getVal('login_slider_verify', '1') === '1'" @change="(v: any) => setVal('login_slider_verify', v ? '1' : '0')" />
                   </div>
                 </Col>
-                <Col :xs="24" :lg="12">
+                <Col :xs="24" :lg="8">
                   <div class="switch-row">
                     <div>
                       <label class="field-label !mb-0">邮箱验证</label>
                       <div class="text-xs text-gray-400 dark:text-gray-500">开启后注册时需要填写邮箱并验证邮箱验证码</div>
                     </div>
                     <Switch :checked="getVal('login_email_verify', '0') === '1'" @change="(v: any) => setVal('login_email_verify', v ? '1' : '0')" />
+                  </div>
+                </Col>
+                <Col :xs="24" :lg="8">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">管理员二级密码</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后管理员登录需要额外输入二级密码验证</div>
+                    </div>
+                    <Switch :checked="getVal('pass2_kg', '1') === '1'" @change="(v: any) => setVal('pass2_kg', v ? '1' : '0')" />
                   </div>
                 </Col>
               </Row>
