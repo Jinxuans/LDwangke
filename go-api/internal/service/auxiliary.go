@@ -529,7 +529,11 @@ func (s *AuxiliaryService) CheckOrder(req model.CheckOrderRequest) ([]model.Chec
 	}
 
 	rows, err := database.DB.Query(`
-		SELECT o.oid, COALESCE(c.name, o.ptname, ''), o.kcname, o.status, COALESCE(o.process,''), COALESCE(o.remarks,''), o.addtime
+		SELECT o.oid, COALESCE(c.name, o.ptname, ''), 
+		CONCAT(COALESCE(NULLIF(o.school,''),'自动识别'),' ',o.user,' ',o.pass),
+		COALESCE(o.school,''), o.kcname, o.status, COALESCE(o.process,''), COALESCE(o.remarks,''), o.addtime,
+		COALESCE(o.pushUid,''), COALESCE(o.pushStatus,''), COALESCE(o.pushEmail,''),
+		COALESCE(o.pushEmailStatus,'0'), COALESCE(o.showdoc_push_url,''), COALESCE(o.pushShowdocStatus,'0')
 		FROM qingka_wangke_order o
 		LEFT JOIN qingka_wangke_class c ON o.cid = c.cid
 		WHERE `+where+`
@@ -542,7 +546,8 @@ func (s *AuxiliaryService) CheckOrder(req model.CheckOrderRequest) ([]model.Chec
 	var list []model.CheckOrderResult
 	for rows.Next() {
 		var r model.CheckOrderResult
-		rows.Scan(&r.OID, &r.PtName, &r.KCName, &r.Status, &r.Process, &r.Remarks, &r.AddTime)
+		rows.Scan(&r.OID, &r.PtName, &r.Account, &r.School, &r.KCName, &r.Status, &r.Process, &r.Remarks, &r.AddTime,
+			&r.PushUid, &r.PushStatus, &r.PushEmail, &r.PushEmailStatus, &r.ShowdocPushURL, &r.PushShowdocStatus)
 		list = append(list, r)
 	}
 	if list == nil {

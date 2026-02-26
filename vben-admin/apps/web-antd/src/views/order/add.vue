@@ -188,14 +188,23 @@ async function handleQuery() {
     queryCourseApi(values.classId, line)
       .then((res: any) => {
         const r = res?.data && !res.userinfo ? res.data : res;
-        courseResults.value.push({
+        const resultItem = {
           ...r,
           data: (r.data || []).map((item: CourseItem, idx: number) => ({
             ...item,
             idx,
             select: false,
           })),
-        });
+        };
+        courseResults.value.push(resultItem);
+        // 无需选课时（data 为空且查询成功），自动加入待下单列表
+        if (resultItem.data.length === 0 && (r.msg === '查询成功' || r.msg === '此课程无需查课，直接下单即可')) {
+          checkedCourses.value.push({
+            userinfo: r.userinfo || line,
+            userName: r.userName || '',
+            data: { id: '', name: '', idx: 0, select: true } as any,
+          });
+        }
       })
       .catch((err: any) => {
         courseResults.value.push({
@@ -497,6 +506,7 @@ onMounted(loadClassData);
         <Table.Column title="课程ID" data-index="id" key="id" :width="120" align="center" />
       </Table>
 
+      <div v-else-if="result.msg === '查询成功' || result.msg === '此课程无需查课，直接下单即可'" class="text-green-600 text-center py-4 font-medium">✅ 无需选课，可直接下单</div>
       <div v-else class="text-gray-400 text-center py-4">暂无课程数据</div>
     </Card>
   </Page>

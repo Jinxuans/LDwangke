@@ -86,6 +86,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
       <button class="btn btn-warning" onclick="doAction('restart')">↻ 重启</button>
       <button class="btn btn-outline" onclick="checkUpdate()">检查更新</button>
     </div>
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+      <div style="font-weight:600;font-size:12px;color:var(--text-secondary);margin-bottom:8px">PHP 桥接服务</div>
+      <div class="status-bar" id="phpStatusBar">
+        <div class="status-item"><span class="status-dot" id="phpStatusDot"></span><span id="phpStatusText">检测中...</span></div>
+        <div class="status-item">PID: <span class="val" id="phpPid">-</span></div>
+        <div class="status-item">端口: <span class="val" id="phpPort">-</span></div>
+        <div class="status-item">内存: <span class="val" id="phpMem">-</span></div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-success" onclick="doPhpAction('php_start')">▶ 启动 PHP</button>
+        <button class="btn btn-danger" onclick="doPhpAction('php_stop')">■ 停止 PHP</button>
+        <button class="btn btn-warning" onclick="doPhpAction('php_restart')">↻ 重启 PHP</button>
+        <button class="btn btn-outline" onclick="doRestartAll()">↻ 全部重启</button>
+      </div>
+    </div>
   </div>
 
   <!-- Tabs -->
@@ -143,7 +158,35 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
           <div class="overview-card"><div class="ov-val" id="ovDomain">-</div><div class="ov-label">绑定域名</div></div>
           <div class="overview-card"><div class="ov-val" id="ovPid">-</div><div class="ov-label">进程 PID</div></div>
         </div>
+        <div style="font-weight:600;font-size:13px;margin:18px 0 10px;color:var(--text-secondary)">PHP 桥接服务</div>
+        <div class="overview-grid">
+          <div class="overview-card"><div class="ov-val" id="ovPhpStatus">-</div><div class="ov-label">PHP 状态</div></div>
+          <div class="overview-card"><div class="ov-val" id="ovPhpPort">-</div><div class="ov-label">监听端口</div></div>
+          <div class="overview-card"><div class="ov-val" id="ovPhpMem">-</div><div class="ov-label">PHP 内存</div></div>
+          <div class="overview-card"><div class="ov-val" id="ovPhpPid">-</div><div class="ov-label">PHP PID</div></div>
+        </div>
         <div style="margin-top:20px;padding:15px;background:var(--bg);border-radius:var(--radius)">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <div>
+              <div style="font-weight:600;margin-bottom:4px">⚙️ 开机自启 / 崩溃自动重启</div>
+              <div style="font-size:12px;color:var(--text-secondary)" id="systemdInfo">检测中...</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary" onclick="setupSystemd()" id="btnSystemdSetup">注册 Systemd</button>
+              <button class="btn btn-danger" onclick="removeSystemd()" id="btnSystemdRemove" style="display:none">移除 Systemd</button>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:10px;padding:15px;background:var(--bg);border-radius:var(--radius)">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+            <div>
+              <div style="font-weight:600;margin-bottom:4px">🩺 健康检查</div>
+              <div style="font-size:12px;color:var(--text-secondary)">检测 Go / PHP 进程存活状态，挂掉自动拉起</div>
+            </div>
+            <button class="btn btn-outline" onclick="doHealthCheck()">立即检查</button>
+          </div>
+        </div>
+        <div style="margin-top:10px;padding:15px;background:var(--bg);border-radius:var(--radius)">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <span style="font-weight:600">🔐 授权状态:</span>
             <span id="licenseStatus" style="color:var(--danger)">检测中...</span>
@@ -192,6 +235,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
             <button class="btn btn-primary" onclick="doUpdate('backend')">更新后端</button>
             <button class="btn btn-primary" onclick="doUpdate('frontend')">更新前端</button>
             <button class="btn btn-primary" onclick="doUpdate('mall')">更新商城</button>
+            <button class="btn btn-primary" onclick="doUpdate('php-api')">更新PHP桥接</button>
             <button class="btn btn-success" onclick="doUpdate('full')">全部更新</button>
           </div>
           <div class="progress-bar" id="updateProgress" style="display:none"><div class="fill" id="updateFill"></div></div>
@@ -238,7 +282,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
     <!-- 运行日志 -->
     <div class="tab-content" id="tab-log">
       <div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:600">运行日志</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-weight:600">运行日志</span>
+          <button class="btn btn-outline" style="padding:4px 12px;font-size:12px" onclick="toggleLogSource('go')" id="btnLogGo">Go 日志</button>
+          <button class="btn btn-outline" style="padding:4px 12px;font-size:12px" onclick="toggleLogSource('php')" id="btnLogPhp">PHP 日志</button>
+        </div>
         <button class="btn btn-outline" onclick="loadLog()">刷新日志</button>
       </div>
       <div class="log-viewer" id="logViewer">等待加载...</div>
@@ -274,9 +322,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
 <script>
 var QK = {
   status: {},
+  phpStatus: {},
   initStatus: {},
   updateInfo: null,
   timer: null,
+  logSource: 'go',
   _busy: false
 };
 
@@ -310,14 +360,12 @@ function refreshStatus() {
     $('#sUptime').text(d.uptime || '-');
     $('#sVersion').text(d.version || '-');
     $('#sDomain').text(d.domain || '未绑定');
-    // overview
     $('#ovStatus').text(running ? '运行中' : '已停止').css('color', running ? 'var(--success)' : 'var(--danger)');
     $('#ovVersion').text(d.version || '-');
     $('#ovMem').text(d.mem || '-');
     $('#ovUptime').text(d.uptime || '-');
     $('#ovDomain').text(d.domain || '未绑定');
     $('#ovPid').text(d.pid || '-');
-    // domain tab
     if (d.domain) {
       $('#currentDomain').text(d.domain);
       $('#domainBound').show();
@@ -326,6 +374,23 @@ function refreshStatus() {
       $('#domainBound').hide();
       $('#domainEmpty').show();
     }
+  });
+  refreshPhpStatus();
+}
+function refreshPhpStatus() {
+  req('get_php_status', null, function(res) {
+    var d = parseMsg(res);
+    QK.phpStatus = d;
+    var running = d.status === true;
+    $('#phpStatusDot').attr('class', 'status-dot ' + (running ? 'running' : 'stopped'));
+    $('#phpStatusText').text(running ? '运行中' : '已停止');
+    $('#phpPid').text(d.pid || '-');
+    $('#phpPort').text(d.port || '-');
+    $('#phpMem').text(d.mem || '-');
+    $('#ovPhpStatus').text(running ? '运行中' : '已停止').css('color', running ? 'var(--success)' : 'var(--danger)');
+    $('#ovPhpPort').text(d.port || '-');
+    $('#ovPhpMem').text(d.mem || '-');
+    $('#ovPhpPid').text(d.pid || '-');
   });
 }
 
@@ -537,9 +602,44 @@ function loadRollbackInfo() {
     }
   });
 }
+// PHP Actions
+function doPhpAction(act) {
+  if (QK._busy) return;
+  QK._busy = true;
+  $('.btn-group .btn').prop('disabled', true);
+  var idx = layer.msg('执行中...', {icon: 16, shade: 0.1, time: 0});
+  req(act, null, function(res) {
+    layer.close(idx);
+    QK._busy = false;
+    $('.btn-group .btn').prop('disabled', false);
+    layer.msg(res.msg || (res.status ? '操作成功' : '操作失败'), {icon: res.status ? 1 : 2});
+    setTimeout(refreshStatus, 1000);
+  });
+}
+function doRestartAll() {
+  if (QK._busy) return;
+  layer.confirm('确定要重启 Go + PHP 两个服务吗？', {icon: 3}, function(i) {
+    layer.close(i);
+    QK._busy = true;
+    var idx = layer.msg('全部重启中...', {icon: 16, shade: 0.3, time: 0});
+    req('restart_all', null, function(res) {
+      layer.close(idx);
+      QK._busy = false;
+      layer.msg(res.msg || (res.status ? '全部重启成功' : '重启失败'), {icon: res.status ? 1 : 2});
+      setTimeout(refreshStatus, 1500);
+    });
+  });
+}
 // Log
+function toggleLogSource(source) {
+  QK.logSource = source;
+  $('#btnLogGo').css({'background': source === 'go' ? 'var(--primary)' : '', 'color': source === 'go' ? '#fff' : '', 'border-color': source === 'go' ? 'var(--primary)' : ''});
+  $('#btnLogPhp').css({'background': source === 'php' ? 'var(--primary)' : '', 'color': source === 'php' ? '#fff' : '', 'border-color': source === 'php' ? 'var(--primary)' : ''});
+  loadLog();
+}
 function loadLog() {
-  req('get_log', {line_count: 200}, function(res) {
+  var method = QK.logSource === 'php' ? 'get_php_log' : 'get_log';
+  req(method, {line_count: 200}, function(res) {
     var text = res.msg || res || '暂无日志';
     $('#logViewer').text(text);
     var el = document.getElementById('logViewer');
@@ -568,6 +668,63 @@ function testDb() {
   req('test_db', null, function(res) {
     layer.close(idx);
     layer.msg(res.msg || (res.status ? '连接成功' : '连接失败'), {icon: res.status ? 1 : 2, time: 5000});
+  });
+}
+
+// Systemd
+function loadSystemdStatus() {
+  req('get_systemd_status', null, function(res) {
+    var d = parseMsg(res);
+    var registered = d.go_registered || d.php_registered;
+    if (registered) {
+      var parts = [];
+      if (d.go_registered) parts.push('Go: ' + (d.go_active ? '运行中' : '已注册'));
+      if (d.php_registered) parts.push('PHP: ' + (d.php_active ? '运行中' : '已注册'));
+      $('#systemdInfo').text('已注册 (' + parts.join(', ') + ')');
+      $('#btnSystemdSetup').hide();
+      $('#btnSystemdRemove').show();
+    } else {
+      $('#systemdInfo').text('未注册（服务器重启后需手动启动）');
+      $('#btnSystemdSetup').show();
+      $('#btnSystemdRemove').hide();
+    }
+  });
+}
+function setupSystemd() {
+  if (QK._busy) return;
+  QK._busy = true;
+  var idx = layer.msg('注册中...', {icon: 16, shade: 0.1, time: 0});
+  req('setup_systemd', null, function(res) {
+    layer.close(idx);
+    QK._busy = false;
+    layer.msg(res.msg || (res.status ? '注册成功' : '注册失败'), {icon: res.status ? 1 : 2});
+    if (res.status) loadSystemdStatus();
+  });
+}
+function removeSystemd() {
+  if (QK._busy) return;
+  layer.confirm('确定要移除 Systemd 自启服务吗？移除后服务器重启不会自动拉起。', {icon: 3}, function(i) {
+    layer.close(i);
+    QK._busy = true;
+    var idx = layer.msg('移除中...', {icon: 16, shade: 0.1, time: 0});
+    req('remove_systemd', null, function(res) {
+      layer.close(idx);
+      QK._busy = false;
+      layer.msg(res.msg || (res.status ? '已移除' : '移除失败'), {icon: res.status ? 1 : 2});
+      if (res.status) loadSystemdStatus();
+    });
+  });
+}
+// Health Check
+function doHealthCheck() {
+  if (QK._busy) return;
+  QK._busy = true;
+  var idx = layer.msg('健康检查中...', {icon: 16, shade: 0.1, time: 0});
+  req('health_check', null, function(res) {
+    layer.close(idx);
+    QK._busy = false;
+    layer.msg(res.msg || (res.status ? '检查完成' : '检查失败'), {icon: res.status ? 1 : 2, time: 5000});
+    setTimeout(refreshStatus, 1000);
   });
 }
 
@@ -638,7 +795,9 @@ $(function() {
   checkInitStatus();
   loadRollbackInfo();
   checkLicense();
-  // Auto refresh
+  loadSystemdStatus();
+  toggleLogSource('go');
+  // Auto refresh (Go + PHP status every 10s)
   QK.timer = setInterval(refreshStatus, 10000);
 });
 </script>

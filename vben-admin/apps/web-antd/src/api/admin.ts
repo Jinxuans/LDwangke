@@ -286,7 +286,29 @@ export async function getSiteConfigApi(): Promise<Record<string, string>> {
   return requestClient.get<Record<string, string>>('/site/config');
 }
 
-// ===== 系统设置 =====
+// ===== 插件/克隆管理 =====
+export interface CloneConfig {
+  hid: number;
+  price_rate?: number;
+  clone_category?: boolean;
+  skip_categories?: string[];
+  name_replace?: Record<string, string>;
+  secret_price_rate?: number;
+}
+
+export async function cloneFromUpstreamApi(data: CloneConfig) {
+  return requestClient.post('/admin/clone/execute', data);
+}
+
+export async function updatePricesApi(data: CloneConfig) {
+  return requestClient.post('/admin/clone/update-prices', data);
+}
+
+export async function autoSyncApi(data: CloneConfig) {
+  return requestClient.post('/admin/clone/auto-sync', data);
+}
+
+// ===== 站点配置 =====
 export async function getConfigApi() {
   return requestClient.get<Record<string, string>>('/admin/config');
 }

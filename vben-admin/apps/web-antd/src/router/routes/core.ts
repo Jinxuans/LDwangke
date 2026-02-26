@@ -88,7 +88,7 @@ const coreRoutes: RouteRecordRaw[] = [
 /** 外部查单（公开页面，无需登录） */
 const checkOrderRoute: RouteRecordRaw = {
   name: 'CheckOrder',
-  path: '/checkorder',
+  path: '/query',
   component: () => import('#/views/user/checkorder.vue'),
   meta: {
     hideInMenu: true,

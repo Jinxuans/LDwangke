@@ -34,6 +34,7 @@ type PlatformConfigDB struct {
 	AlwaysUsername    bool      `json:"always_username" db:"always_username"`
 	PauseAct          string    `json:"pause_act" db:"pause_act"`
 	PausePath         string    `json:"pause_path" db:"pause_path"`
+	PauseIDParam      string    `json:"pause_id_param" db:"pause_id_param"`
 	ResumeAct         string    `json:"resume_act" db:"resume_act"`
 	ResumePath        string    `json:"resume_path" db:"resume_path"`
 	ChangePassAct     string    `json:"change_pass_act" db:"change_pass_act"`
@@ -41,6 +42,7 @@ type PlatformConfigDB struct {
 	ChangePassParam   string    `json:"change_pass_param" db:"change_pass_param"`
 	ChangePassIDParam string    `json:"change_pass_id_param" db:"change_pass_id_param"`
 	ResubmitPath      string    `json:"resubmit_path" db:"resubmit_path"`
+	ResubmitIDParam   string    `json:"resubmit_id_param" db:"resubmit_id_param"`
 	LogAct            string    `json:"log_act" db:"log_act"`
 	LogPath           string    `json:"log_path" db:"log_path"`
 	LogMethod         string    `json:"log_method" db:"log_method"`
@@ -49,12 +51,12 @@ type PlatformConfigDB struct {
 	BalancePath       string    `json:"balance_path" db:"balance_path"`
 	BalanceMoneyField string    `json:"balance_money_field" db:"balance_money_field"`
 	BalanceMethod     string    `json:"balance_method" db:"balance_method"`
-	BalanceAuthType    string    `json:"balance_auth_type" db:"balance_auth_type"`
-	ReportParamStyle   string    `json:"report_param_style" db:"report_param_style"`
-	ReportAuthType     string    `json:"report_auth_type" db:"report_auth_type"`
-	ReportPath         string    `json:"report_path" db:"report_path"`
-	GetReportPath      string    `json:"get_report_path" db:"get_report_path"`
-	RefreshPath        string    `json:"refresh_path" db:"refresh_path"`
+	BalanceAuthType   string    `json:"balance_auth_type" db:"balance_auth_type"`
+	ReportParamStyle  string    `json:"report_param_style" db:"report_param_style"`
+	ReportAuthType    string    `json:"report_auth_type" db:"report_auth_type"`
+	ReportPath        string    `json:"report_path" db:"report_path"`
+	GetReportPath     string    `json:"get_report_path" db:"get_report_path"`
+	RefreshPath       string    `json:"refresh_path" db:"refresh_path"`
 	SourceCode        string    `json:"source_code" db:"source_code"`
 	CreatedAt         time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at" db:"updated_at"`
@@ -92,6 +94,7 @@ type PlatformConfigSaveRequest struct {
 	AlwaysUsername    bool   `json:"always_username"`
 	PauseAct          string `json:"pause_act"`
 	PausePath         string `json:"pause_path"`
+	PauseIDParam      string `json:"pause_id_param"`
 	ResumeAct         string `json:"resume_act"`
 	ResumePath        string `json:"resume_path"`
 	ChangePassAct     string `json:"change_pass_act"`
@@ -99,6 +102,7 @@ type PlatformConfigSaveRequest struct {
 	ChangePassParam   string `json:"change_pass_param"`
 	ChangePassIDParam string `json:"change_pass_id_param"`
 	ResubmitPath      string `json:"resubmit_path"`
+	ResubmitIDParam   string `json:"resubmit_id_param"`
 	LogAct            string `json:"log_act"`
 	LogPath           string `json:"log_path"`
 	LogMethod         string `json:"log_method"`
@@ -107,11 +111,11 @@ type PlatformConfigSaveRequest struct {
 	BalancePath       string `json:"balance_path"`
 	BalanceMoneyField string `json:"balance_money_field"`
 	BalanceMethod     string `json:"balance_method"`
-	BalanceAuthType    string `json:"balance_auth_type"`
-	ReportParamStyle   string `json:"report_param_style"`
-	ReportAuthType     string `json:"report_auth_type"`
-	ReportPath         string `json:"report_path"`
-	GetReportPath      string `json:"get_report_path"`
-	RefreshPath        string `json:"refresh_path"`
+	BalanceAuthType   string `json:"balance_auth_type"`
+	ReportParamStyle  string `json:"report_param_style"`
+	ReportAuthType    string `json:"report_auth_type"`
+	ReportPath        string `json:"report_path"`
+	GetReportPath     string `json:"get_report_path"`
+	RefreshPath       string `json:"refresh_path"`
 	SourceCode        string `json:"source_code"`
 }

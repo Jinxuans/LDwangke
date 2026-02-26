@@ -232,7 +232,7 @@ func AdminClassBatchDelete(c *gin.Context) {
 
 func AdminClassBatchCategory(c *gin.Context) {
 	var body struct {
-		CIDs   []int `json:"cids" binding:"required"`
+		CIDs   []int  `json:"cids" binding:"required"`
 		CateID string `json:"cateId" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil || len(body.CIDs) == 0 {
@@ -249,9 +249,9 @@ func AdminClassBatchCategory(c *gin.Context) {
 
 func AdminClassBatchPrice(c *gin.Context) {
 	var body struct {
-		CIDs   []int   `json:"cids" binding:"required"`
-		Rate   float64 `json:"rate" binding:"required"`
-		Yunsuan string `json:"yunsuan"`
+		CIDs    []int   `json:"cids" binding:"required"`
+		Rate    float64 `json:"rate" binding:"required"`
+		Yunsuan string  `json:"yunsuan"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil || len(body.CIDs) == 0 {
 		response.BadRequest(c, "参数错误")
@@ -959,6 +959,68 @@ func OrderResubmit(c *gin.Context) {
 	}
 	if code == 1 || code == 0 {
 		database.DB.Exec("UPDATE qingka_wangke_order SET status='补刷中', dockstatus=1, bsnum=bsnum+1 WHERE oid=?", oid)
+		response.SuccessMsg(c, msg)
+	} else {
+		response.BadRequest(c, msg)
+	}
+}
+
+// ===== PUP 扩展操作：重置分数/时长/周期 =====
+
+func OrderPupReset(c *gin.Context) {
+	var body struct {
+		OID   int    `json:"oid" binding:"required"`
+		Type  string `json:"type" binding:"required"` // score, duration, period
+		Value int    `json:"value" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误：需要 oid, type 和 value")
+		return
+	}
+
+	if body.Type != "score" && body.Type != "duration" && body.Type != "period" {
+		response.BadRequest(c, "不支持的重置类型")
+		return
+	}
+
+	var order struct {
+		HID    int
+		YID    string
+		Status string
+	}
+	err := database.DB.QueryRow("SELECT hid, COALESCE(yid,''), COALESCE(status,'') FROM qingka_wangke_order WHERE oid=?", body.OID).Scan(&order.HID, &order.YID, &order.Status)
+	if err != nil {
+		response.BadRequest(c, "订单不存在")
+		return
+	}
+	if order.YID == "" || order.YID == "0" {
+		response.BadRequest(c, "订单未对接，无法操作")
+		return
+	}
+
+	sup, err := supService.GetSupplierByHID(order.HID)
+	if err != nil {
+		response.BadRequest(c, "未找到货源信息")
+		return
+	}
+
+	var code int
+	var msg string
+
+	switch body.Type {
+	case "score":
+		code, msg, err = supService.ResetOrderScore(sup, order.YID, body.Value)
+	case "duration":
+		code, msg, err = supService.ResetOrderDuration(sup, order.YID, body.Value)
+	case "period":
+		code, msg, err = supService.ResetOrderPeriod(sup, order.YID, body.Value)
+	}
+
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+	if code == 1 || code == 0 {
 		response.SuccessMsg(c, msg)
 	} else {
 		response.BadRequest(c, msg)

@@ -147,11 +147,19 @@ type CheckOrderRequest struct {
 }
 
 type CheckOrderResult struct {
-	OID     int    `json:"oid"`
-	PtName  string `json:"ptname"`
-	KCName  string `json:"kcname"`
-	Status  string `json:"status"`
-	Process string `json:"process"`
-	Remarks string `json:"remarks"`
-	AddTime string `json:"addtime"`
+	OID               int    `json:"oid"`
+	PtName            string `json:"ptname"`
+	Account           string `json:"account"`
+	School            string `json:"school"`
+	KCName            string `json:"kcname"`
+	Status            string `json:"status"`
+	Process           string `json:"process"`
+	Remarks           string `json:"remarks"`
+	AddTime           string `json:"addtime"`
+	PushUid           string `json:"pushUid"`
+	PushStatus        string `json:"pushStatus"`
+	PushEmail         string `json:"pushEmail"`
+	PushEmailStatus   string `json:"pushEmailStatus"`
+	ShowdocPushURL    string `json:"showdoc_push_url"`
+	PushShowdocStatus string `json:"pushShowdocStatus"`
 }

@@ -38,6 +38,7 @@ export interface PlatformConfig {
   change_pass_param: string;
   change_pass_id_param: string;
   resubmit_path: string;
+  resubmit_id_param: string;
   log_act: string;
   log_path: string;
   log_method: string;

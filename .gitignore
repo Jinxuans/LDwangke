@@ -5,10 +5,27 @@ vendor/
 # Build outputs
 */dist/
 go-api/server
+go-api/server.exe
 go-api/go-api
 go-api/go-api-bin
 go-api/bin/
+*.exe
 *.log
+
+# npm cache
+mall-h5/.npm-cache/
+
+# Deploy artifacts
+deploy/release/
+deploy/release.tar.gz
+
+# Sensitive configs (use .example as template)
+go-api/config/config.yaml
+php-api/core/config.php
+licenses_db.json
+*.key
+.sys_state
+.secrets
 
 # IDE & OS
 .vscode/
@@ -20,12 +37,19 @@ Thumbs.db
 .env
 .env.*
 
-# Sisyphus / AI tools
+# AI tool configs
+AGENTS.md
+CLAUDE.md
 .sisyphus/
 .clinerules/
 .opencode/
 Cline/
+.windsurf/
+
+# SSL challenge
+.well-known/
 
 # Temp
 *.bak
 *.bak2
+bug.md

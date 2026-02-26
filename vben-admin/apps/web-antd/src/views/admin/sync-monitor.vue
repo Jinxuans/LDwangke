@@ -24,6 +24,8 @@ const config = ref<Partial<SyncConfig>>({
   supplier_ids: '', price_rates: {}, category_rates: {},
   sync_price: true, sync_status: true, sync_content: true, sync_name: false,
   clone_enabled: false, force_price_up: false,
+  clone_category: false, skip_categories: [], name_replace: {},
+  secret_price_rate: 0, auto_sync_enabled: false, auto_sync_interval: 30,
 });
 const configLoading = ref(false);
 const allSuppliers = ref<SupplierItem[]>([]);
@@ -59,6 +61,39 @@ async function saveConfig() {
     message.success('配置已保存');
     loadDashboard();
   } catch (e: any) { message.error(e?.message || '保存失败'); }
+}
+
+// ===== 名称替换管理 =====
+const newReplaceOld = ref('');
+const newReplaceNew = ref('');
+function addNameReplace() {
+  if (!newReplaceOld.value) return;
+  if (!config.value.name_replace) config.value.name_replace = {};
+  config.value.name_replace[newReplaceOld.value] = newReplaceNew.value;
+  newReplaceOld.value = '';
+  newReplaceNew.value = '';
+}
+function removeNameReplace(key: string) {
+  if (config.value.name_replace) {
+    delete config.value.name_replace[key];
+    config.value.name_replace = { ...config.value.name_replace };
+  }
+}
+
+// ===== 跳过分类管理 =====
+const newSkipCat = ref('');
+function addSkipCategory() {
+  if (!newSkipCat.value) return;
+  if (!config.value.skip_categories) config.value.skip_categories = [];
+  if (!config.value.skip_categories.includes(newSkipCat.value)) {
+    config.value.skip_categories.push(newSkipCat.value);
+  }
+  newSkipCat.value = '';
+}
+function removeSkipCategory(id: string) {
+  if (config.value.skip_categories) {
+    config.value.skip_categories = config.value.skip_categories.filter(s => s !== id);
+  }
 }
 
 // ===== 仪表盘 =====
@@ -118,7 +153,7 @@ const diffColumns = [
 
 const actionColors: Record<string, string> = {
   '更新价格': 'blue', '更新说明': 'cyan', '更新名称': 'purple',
-  '上架': 'green', '下架': 'red', '克隆上架': 'orange',
+  '上架': 'green', '下架': 'red', '克隆上架': 'orange', '新增分类': 'geekblue',
 };
 
 // ===== 日志 =====
@@ -251,7 +286,7 @@ onMounted(() => {
                     <Switch v-model:checked="config.sync_price" />
                   </div>
                   <div class="flex items-center justify-between">
-                    <span>同步上下架 <Tooltip title="上游下架→本地也下架；上游恢复→本地也恢复"><QuestionCircleOutlined class="text-gray-400" /></Tooltip></span>
+                    <span>同步上下架 <Tooltip title="上游下架→本地也下架（status=0）；上游恢复→本地也恢复"><QuestionCircleOutlined class="text-gray-400" /></Tooltip></span>
                     <Switch v-model:checked="config.sync_status" />
                   </div>
                   <div class="flex items-center justify-between">
@@ -267,9 +302,88 @@ onMounted(() => {
                     <Switch v-model:checked="config.clone_enabled" />
                   </div>
                   <div class="flex items-center justify-between">
+                    <span>克隆分类 <Tooltip title="克隆新商品时，同步创建上游的分类到本地"><QuestionCircleOutlined class="text-gray-400" /></Tooltip></span>
+                    <Switch v-model:checked="config.clone_category" />
+                  </div>
+                  <div class="flex items-center justify-between">
                     <span>只涨不降 <Tooltip title="价格只会上调不会下调。上游涨价你跟涨，上游降价你不降"><QuestionCircleOutlined class="text-gray-400" /></Tooltip></span>
                     <Switch v-model:checked="config.force_price_up" />
                   </div>
+                </div>
+              </Card>
+
+              <Card size="small" class="mb-4">
+                <template #title>
+                  密价倍率
+                  <Tooltip title="密价 = 本地售价 × 密价倍率。设为 0 表示不设密价"><QuestionCircleOutlined class="ml-1 text-gray-400" /></Tooltip>
+                </template>
+                <div class="flex items-center gap-3">
+                  <span class="text-gray-500 text-xs">本地售价 ×</span>
+                  <InputNumber
+                    v-model:value="config.secret_price_rate"
+                    :min="0" :max="10" :step="0.1" :precision="2"
+                    placeholder="0 = 不设密价"
+                    style="width: 140px"
+                  />
+                  <span class="text-gray-400 dark:text-gray-500 text-xs">= 密价（0 为不设置）</span>
+                </div>
+              </Card>
+
+              <Card size="small" class="mb-4" v-if="config.skip_categories || true">
+                <template #title>
+                  跳过分类
+                  <Tooltip title="填入上游分类ID，这些分类的商品不参与同步"><QuestionCircleOutlined class="ml-1 text-gray-400" /></Tooltip>
+                </template>
+                <div class="flex flex-wrap gap-2 mb-2" v-if="config.skip_categories?.length">
+                  <Tag v-for="id in config.skip_categories" :key="id" closable @close="removeSkipCategory(id)" color="red">
+                    分类ID: {{ id }}
+                  </Tag>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input v-model="newSkipCat" placeholder="上游分类ID" class="ant-input" style="width: 160px" @keyup.enter="addSkipCategory" />
+                  <Button size="small" @click="addSkipCategory">添加</Button>
+                </div>
+              </Card>
+
+              <Card size="small" class="mb-4">
+                <template #title>
+                  名称替换
+                  <Tooltip title="克隆/同步名称时，自动将商品名中的指定文字替换为新文字"><QuestionCircleOutlined class="ml-1 text-gray-400" /></Tooltip>
+                </template>
+                <div class="space-y-2 mb-2" v-if="config.name_replace && Object.keys(config.name_replace).length">
+                  <div v-for="(newVal, oldVal) in config.name_replace" :key="oldVal" class="flex items-center gap-2">
+                    <Tag color="red">{{ oldVal }}</Tag>
+                    <span class="text-gray-400">→</span>
+                    <Tag color="green">{{ newVal || '(删除)' }}</Tag>
+                    <Button size="small" danger type="text" @click="removeNameReplace(String(oldVal))">删除</Button>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input v-model="newReplaceOld" placeholder="原文字" class="ant-input" style="width: 140px" />
+                  <span class="text-gray-400">→</span>
+                  <input v-model="newReplaceNew" placeholder="替换为（留空=删除）" class="ant-input" style="width: 160px" @keyup.enter="addNameReplace" />
+                  <Button size="small" @click="addNameReplace">添加</Button>
+                </div>
+              </Card>
+
+              <Card size="small" class="mb-4">
+                <template #title>
+                  自动定时同步
+                  <Tooltip title="开启后，系统将按设定的间隔自动执行同步（无需手动预览确认）"><QuestionCircleOutlined class="ml-1 text-gray-400" /></Tooltip>
+                </template>
+                <div class="flex items-center gap-4">
+                  <div class="flex items-center gap-2">
+                    <span>启用</span>
+                    <Switch v-model:checked="config.auto_sync_enabled" />
+                  </div>
+                  <div class="flex items-center gap-2" v-if="config.auto_sync_enabled">
+                    <span class="text-sm">间隔</span>
+                    <InputNumber v-model:value="config.auto_sync_interval" :min="5" :max="1440" style="width: 90px" />
+                    <span class="text-xs text-gray-500">分钟</span>
+                  </div>
+                </div>
+                <div v-if="config.auto_sync_enabled" class="text-xs text-orange-500 mt-2 bg-orange-50 p-2 rounded">
+                  自动同步将直接应用所有差异（等同于手动执行同步），请确保配置正确后再开启
                 </div>
               </Card>
 
@@ -290,6 +404,7 @@ onMounted(() => {
               <SelectOption value="上架">上架</SelectOption>
               <SelectOption value="下架">下架</SelectOption>
               <SelectOption value="克隆上架">克隆上架</SelectOption>
+              <SelectOption value="新增分类">新增分类</SelectOption>
             </Select>
             <Button @click="loadLogs"><template #icon><SyncOutlined /></template></Button>
           </div>

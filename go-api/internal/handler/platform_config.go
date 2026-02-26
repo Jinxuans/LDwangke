@@ -17,9 +17,9 @@ func AdminPlatformConfigList(c *gin.Context) {
 		order_act, order_path, yid_in_data_array,
 		progress_act, progress_no_yid, progress_path, progress_method, progress_needs_auth,
 		use_id_param, use_uuid_param, always_username,
-		pause_act, pause_path, resume_act, resume_path,
+		pause_act, pause_path, COALESCE(pause_id_param,'id'), resume_act, resume_path,
 		change_pass_act, change_pass_path, change_pass_param, change_pass_id_param,
-		resubmit_path,
+		resubmit_path, COALESCE(resubmit_id_param,'id'),
 		log_act, log_path, log_method, log_id_param,
 		COALESCE(balance_act,'getmoney'), COALESCE(balance_path,''), COALESCE(balance_money_field,'money'),
 		COALESCE(balance_method,'POST'), COALESCE(balance_auth_type,''),
@@ -42,9 +42,9 @@ func AdminPlatformConfigList(c *gin.Context) {
 			&cfg.OrderAct, &cfg.OrderPath, &cfg.YIDInDataArray,
 			&cfg.ProgressAct, &cfg.ProgressNoYID, &cfg.ProgressPath, &cfg.ProgressMethod, &cfg.ProgressNeedsAuth,
 			&cfg.UseIDParam, &cfg.UseUUIDParam, &cfg.AlwaysUsername,
-			&cfg.PauseAct, &cfg.PausePath, &cfg.ResumeAct, &cfg.ResumePath,
+			&cfg.PauseAct, &cfg.PausePath, &cfg.PauseIDParam, &cfg.ResumeAct, &cfg.ResumePath,
 			&cfg.ChangePassAct, &cfg.ChangePassPath, &cfg.ChangePassParam, &cfg.ChangePassIDParam,
-			&cfg.ResubmitPath,
+			&cfg.ResubmitPath, &cfg.ResubmitIDParam,
 			&cfg.LogAct, &cfg.LogPath, &cfg.LogMethod, &cfg.LogIDParam,
 			&cfg.BalanceAct, &cfg.BalancePath, &cfg.BalanceMoneyField, &cfg.BalanceMethod, &cfg.BalanceAuthType,
 			&cfg.ReportParamStyle, &cfg.ReportAuthType, &cfg.ReportPath, &cfg.GetReportPath, &cfg.RefreshPath,
@@ -98,6 +98,9 @@ func AdminPlatformConfigSave(c *gin.Context) {
 	if req.PauseAct == "" {
 		req.PauseAct = "zt"
 	}
+	if req.PauseIDParam == "" {
+		req.PauseIDParam = "id"
+	}
 	if req.ChangePassAct == "" {
 		req.ChangePassAct = "gaimi"
 	}
@@ -106,6 +109,9 @@ func AdminPlatformConfigSave(c *gin.Context) {
 	}
 	if req.ChangePassIDParam == "" {
 		req.ChangePassIDParam = "id"
+	}
+	if req.ResubmitIDParam == "" {
+		req.ResubmitIDParam = "id"
 	}
 	if req.LogAct == "" {
 		req.LogAct = "xq"
@@ -133,14 +139,14 @@ func AdminPlatformConfigSave(c *gin.Context) {
 		order_act, order_path, yid_in_data_array,
 		progress_act, progress_no_yid, progress_path, progress_method, progress_needs_auth,
 		use_id_param, use_uuid_param, always_username,
-		pause_act, pause_path, resume_act, resume_path,
+		pause_act, pause_path, pause_id_param, resume_act, resume_path,
 		change_pass_act, change_pass_path, change_pass_param, change_pass_id_param,
-		resubmit_path,
+		resubmit_path, resubmit_id_param,
 		log_act, log_path, log_method, log_id_param,
 		balance_act, balance_path, balance_money_field, balance_method, balance_auth_type,
 		report_param_style, report_auth_type, report_path, get_report_path, refresh_path,
 		source_code
-	) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+	) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 	ON DUPLICATE KEY UPDATE
 		name=VALUES(name), auth_type=VALUES(auth_type), api_path_style=VALUES(api_path_style),
 		success_codes=VALUES(success_codes), use_json=VALUES(use_json), need_proxy=VALUES(need_proxy),
@@ -154,11 +160,11 @@ func AdminPlatformConfigSave(c *gin.Context) {
 		progress_needs_auth=VALUES(progress_needs_auth),
 		use_id_param=VALUES(use_id_param), use_uuid_param=VALUES(use_uuid_param),
 		always_username=VALUES(always_username),
-		pause_act=VALUES(pause_act), pause_path=VALUES(pause_path),
+		pause_act=VALUES(pause_act), pause_path=VALUES(pause_path), pause_id_param=VALUES(pause_id_param),
 		resume_act=VALUES(resume_act), resume_path=VALUES(resume_path),
 		change_pass_act=VALUES(change_pass_act), change_pass_path=VALUES(change_pass_path),
 		change_pass_param=VALUES(change_pass_param), change_pass_id_param=VALUES(change_pass_id_param),
-		resubmit_path=VALUES(resubmit_path),
+		resubmit_path=VALUES(resubmit_path), resubmit_id_param=VALUES(resubmit_id_param),
 		log_act=VALUES(log_act), log_path=VALUES(log_path), log_method=VALUES(log_method),
 		log_id_param=VALUES(log_id_param),
 		balance_act=VALUES(balance_act), balance_path=VALUES(balance_path),
@@ -174,9 +180,9 @@ func AdminPlatformConfigSave(c *gin.Context) {
 		req.OrderAct, req.OrderPath, req.YIDInDataArray,
 		req.ProgressAct, req.ProgressNoYID, req.ProgressPath, req.ProgressMethod, req.ProgressNeedsAuth,
 		req.UseIDParam, req.UseUUIDParam, req.AlwaysUsername,
-		req.PauseAct, req.PausePath, req.ResumeAct, req.ResumePath,
+		req.PauseAct, req.PausePath, req.PauseIDParam, req.ResumeAct, req.ResumePath,
 		req.ChangePassAct, req.ChangePassPath, req.ChangePassParam, req.ChangePassIDParam,
-		req.ResubmitPath,
+		req.ResubmitPath, req.ResubmitIDParam,
 		req.LogAct, req.LogPath, req.LogMethod, req.LogIDParam,
 		req.BalanceAct, req.BalancePath, req.BalanceMoneyField, req.BalanceMethod, req.BalanceAuthType,
 		req.ReportParamStyle, req.ReportAuthType, req.ReportPath, req.GetReportPath, req.RefreshPath,

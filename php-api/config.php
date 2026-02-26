@@ -24,7 +24,7 @@ return [
 
     // JWT 配置（与 Go API 共用同一密钥）
     'jwt' => [
-        'secret'      => 'your-secret-key-change-in-production',
+        'secret'      => 'x9Kf2mPqR7vL4wNj8sTbYc5hAeUdGi3o',
         'access_ttl'  => 7200,
         'refresh_ttl' => 604800,
     ],
@@ -34,6 +34,12 @@ return [
         'epay_api' => '',
         'epay_pid' => '',
         'epay_key' => '',
+    ],
+
+    // Go API 桥接配置
+    'bridge' => [
+        'go_api_url'    => 'http://127.0.0.1:8080',  // Go API 内网地址
+        'bridge_secret' => 'qingka_bridge_secret_2024', // 与 Go config.yaml bridge_secret 一致
     ],
 
     // 应用配置

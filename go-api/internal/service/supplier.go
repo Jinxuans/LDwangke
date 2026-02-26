@@ -89,6 +89,7 @@ type PlatformConfig struct {
 	YIDInDataArray    bool   // 下单响应 yid 在 data 数组里（龙龙：data:["yid"]）
 	UseUUIDParam      bool   // 进度查询用 "uuid" 参数代替 "yid"（龙龙平台）
 	PauseAct          string // 暂停/恢复 act，默认 "zt"；龙龙用 "zanting"；hzw 用 "stop"
+	PauseIDParam      string // 暂停订单 ID 参数名，默认 "id"；Benz 用 "oid"
 	ChangePassAct     string // 改密 act，默认 "gaimi"
 	PausePath         string // 非标准暂停路径（覆盖 act 拼接），如 "/api/stop" (2xx)
 	ChangePassPath    string // 非标准改密路径，如 "/api/update" (2xx)
@@ -100,6 +101,7 @@ type PlatformConfig struct {
 	ChangePassParam   string // 改密密码参数名，默认 "newPwd"；29/spi 用 "xgmm"；pup 用 "newpwd"
 	ChangePassIDParam string // 改密订单 ID 参数名，默认 "id"；pup 用 "oid"
 	ResubmitPath      string // 非标准补单路径，如 "/api/reset" (2xx)
+	ResubmitIDParam   string // 补单订单 ID 参数名，默认 "id"；pup 用 "oid"
 	BalanceAct        string // 余额查询 act，默认 "getmoney"；longlong 用 "money"
 	BalancePath       string // 余额 REST 路径（覆盖 act），如 "/api/getinfo" (2xx)、"/api/getuserinfo/" (nx)
 	BalanceMoneyField string // 余额字段路径："money"(根级) / "data.money" / "data" / "data.remainscore"
@@ -113,6 +115,7 @@ type PlatformConfig struct {
 	ReportParamStyle  string // 反馈参数风格："standard"(uid/key/id/question) / "token"(token/type/id/content)
 	ReportAuthType    string // 反馈认证方式：空=跟随全局(uid_key) / "token_only"
 	RefreshPath       string // 非标准刷新路径，如 "/api/refresh" (2xx)
+	CategoryAct       string // 获取分类 act，默认 "getcate"；天河(skyriver) 用 "getfl"
 }
 
 // platformRegistry 所有已知平台配置（按 PHP Checkorder/ckjk.php + xdjk.php + jdjk.php 提取）
@@ -125,10 +128,10 @@ var platformRegistry = map[string]PlatformConfig{
 	"haha": {SuccessCode: "0", ReturnsYID: true, ExtraParams: true, ProgressPath: "/api/search", ProgressMethod: "GET"},
 	// hzw - 成功码"1"，返回 yid，进度用 chadan+id 参数 +username，暂停用 stop，日志用 cha_logwk
 	"hzw": {SuccessCode: "1", ReturnsYID: true, ProgressAct: "chadan", ProgressNoYID: "chadan", UseIDParam: true, AlwaysUsername: true, PauseAct: "stop", LogAct: "cha_logwk", BalanceMoneyField: "money"},
-	// 龙龙 - 下单 code=1, yid 在 data 数组，查单用 uuid 参数
-	"longlong": {SuccessCode: "1", ReturnsYID: true, YIDInDataArray: true, UseUUIDParam: true, ProgressAct: "chadan", ProgressNoYID: "chadan", PauseAct: "zanting", BalanceAct: "money", BalanceMoneyField: "data"},
-	// 流年 - 进度用 /api/chadan1
-	"liunian": {SuccessCode: "0", ReturnsYID: true, ProgressPath: "/api/chadan1"},
+	// 龙龙 - 下单 code=0, yid 在 data 数组，查单用 uuid 参数
+	"longlong": {SuccessCode: "0", ReturnsYID: true, YIDInDataArray: true, UseUUIDParam: true, ProgressAct: "chadan", ProgressNoYID: "chadan", PauseAct: "zanting", BalanceAct: "money", BalanceMoneyField: "data"},
+	// 流年 - 进度用 /api/chadan1，改密用 xgmm
+	"liunian": {SuccessCode: "0", ReturnsYID: true, ProgressPath: "/api/chadan1", ChangePassAct: "xgmm", ChangePassParam: "xgmm"},
 	// 学习通官方 - 本地脚本，新系统暂不支持
 	"xxtgf": {QueryAct: "local_script"},
 	// 毛豆 mooc - 本地脚本，新系统暂不支持
@@ -137,10 +140,12 @@ var platformRegistry = map[string]PlatformConfig{
 	"yyy": {QueryAct: "yyy_custom", SuccessCode: "200", ReturnsYID: true, BalanceMoneyField: "money"},
 	// 爱学习 (2xx) - JSON API，暂停用/api/stop，改密用/api/update，补单用/api/reset
 	"2xx": {SuccessCode: "0", ReturnsYID: true, PausePath: "/api/stop", ChangePassPath: "/api/update", ResubmitPath: "/api/reset", UseJSON: true, BalancePath: "/api/getinfo", BalanceMoneyField: "data.money", ReportPath: "/api/submitWork", GetReportPath: "/api/queryWork", ReportParamStyle: "token", ReportAuthType: "token_only"},
-	// KUN - 标准接口，日志用 /log/ GET
-	"KUN": {SuccessCode: "0", LogPath: "/log/", LogMethod: "GET"},
+	// KUN - 自定义接口：GET /query/ 查课、GET /getorder/ 下单、GET /upPwd/ 改密，日志用 /log/ GET
+	"KUN": {QueryAct: "KUN_custom", SuccessCode: "0", LogPath: "/log/", LogMethod: "GET"},
 	// kunba - 同 KUN
-	"kunba": {SuccessCode: "0", LogPath: "/log/", LogMethod: "GET"},
+	"kunba": {QueryAct: "KUN_custom", SuccessCode: "0", LogPath: "/log/", LogMethod: "GET"},
+	// Benz(奔驰) - 标准接口，改密用 xgmm(oid/pwd)，日志用 getOrderLogs(oid)，暂停用 ztdd(oid)
+	"Benz": {SuccessCode: "0", ReturnsYID: true, ProgressAct: "chadan", ProgressNoYID: "chadan", ChangePassAct: "xgmm", ChangePassIDParam: "oid", ChangePassParam: "pwd", LogAct: "getOrderLogs", LogIDParam: "oid", PauseAct: "ztdd", PauseIDParam: "oid"},
 	// 土拨鼠 - 完全自定义（论文/AI 服务，JSON+satoken），独立适配
 	"tuboshu": {QueryAct: "tuboshu_custom", SuccessCode: "0", BalanceMoneyField: "data.money"},
 	// 29 - 标准接口，改密用 xgmm
@@ -151,12 +156,14 @@ var platformRegistry = map[string]PlatformConfig{
 	"lg": {SuccessCode: "0", ReturnsYID: true, BalanceMoneyField: "data.money"},
 	// nx(奶昔) - 完全自定义 REST API（token+proxy），独立适配
 	"nx": {QueryAct: "nx_custom", SuccessCode: "0", ReturnsYID: true, BalancePath: "/api/getuserinfo/", BalanceMoneyField: "data.remainscore", BalanceAuthType: "bearer_token"},
-	// pup - 标准接口，改密用 updateorderpwd(oid/newpwd)，日志用 orderlog(oid)
-	"pup": {SuccessCode: "0", ReturnsYID: true, ChangePassAct: "updateorderpwd", ChangePassIDParam: "oid", ChangePassParam: "newpwd", LogAct: "orderlog", LogIDParam: "oid"},
-	// wanzi(丸子) - 进度查询用 chadan（不支持 chadan2），日志用 REST API /business/order/{id}/logs
-	"wanzi": {SuccessCode: "0", ReturnsYID: true, ProgressAct: "chadan", ProgressNoYID: "chadan", LogPath: "/business/order/", LogMethod: "GET"},
+	// pup - 标准接口，支持 score/duration/period 额外参数，进度只有 chadan（无 chadan2），改密用 updateorderpwd(oid/newpwd)，日志用 orderlog(oid)，补单用 budan(oid)
+	"pup": {SuccessCode: "0", ReturnsYID: true, ExtraParams: true, ProgressAct: "chadan", ProgressNoYID: "chadan", ChangePassAct: "updateorderpwd", ChangePassIDParam: "oid", ChangePassParam: "newpwd", LogAct: "orderlog", LogIDParam: "oid", ResubmitIDParam: "oid"},
+	// wanzi(丸子) - 成功码"1"，进度用chadan，日志用getOrderLogs，改密用xgmm(oid/pwd)，暂停用pause
+	"wanzi": {SuccessCode: "1", ReturnsYID: true, ProgressAct: "chadan", ProgressNoYID: "chadan", LogAct: "getOrderLogs", ChangePassAct: "xgmm", ChangePassIDParam: "oid", ChangePassParam: "pwd", PauseAct: "pause"},
 	// lgwk - 查课用/login 端点，自定义查课
 	"lgwk": {QueryAct: "lgwk_custom", SuccessCode: "0"},
+	// 天河(skyriver) - 成功码"1"，返回yid，进度用/api/chadan1，改密用xgmm(oid/newpass)，分类用getfl，工单用submitWorkOrder/queryWorkOrder
+	"skyriver": {SuccessCode: "1", ReturnsYID: true, ProgressPath: "/api/chadan1", ProgressNoYID: "chadan", ChangePassAct: "xgmm", ChangePassParam: "newpass", ChangePassIDParam: "oid", CategoryAct: "getfl", ReportAct: "submitWorkOrder", GetReportAct: "queryWorkOrder", BalanceMoneyField: "money"},
 }
 
 // dbConfigCache 数据库平台配置缓存
@@ -176,8 +183,9 @@ func loadDBPlatformConfigs() {
 		query_act, order_act, extra_params, returns_yid,
 		progress_act, progress_no_yid, progress_path, progress_method,
 		use_id_param, use_uuid_param, always_username, yid_in_data_array,
-		pause_act, pause_path, change_pass_act, change_pass_param, change_pass_id_param,
-		change_pass_path, resubmit_path, log_act, log_path, log_method, log_id_param, use_json,
+		pause_act, pause_path, COALESCE(pause_id_param,'id'),
+		change_pass_act, change_pass_param, change_pass_id_param,
+		change_pass_path, resubmit_path, COALESCE(resubmit_id_param,'id'), log_act, log_path, log_method, log_id_param, use_json,
 		COALESCE(balance_act,'getmoney'), COALESCE(balance_path,''), COALESCE(balance_money_field,'money'),
 		COALESCE(balance_method,'POST'), COALESCE(balance_auth_type,''),
 		COALESCE(report_param_style,''), COALESCE(report_auth_type,''),
@@ -201,8 +209,9 @@ func loadDBPlatformConfigs() {
 			&cfg.QueryAct, &cfg.OrderAct, &cfg.ExtraParams, &cfg.ReturnsYID,
 			&cfg.ProgressAct, &cfg.ProgressNoYID, &cfg.ProgressPath, &cfg.ProgressMethod,
 			&cfg.UseIDParam, &cfg.UseUUIDParam, &cfg.AlwaysUsername, &cfg.YIDInDataArray,
-			&cfg.PauseAct, &cfg.PausePath, &cfg.ChangePassAct, &cfg.ChangePassParam, &cfg.ChangePassIDParam,
-			&cfg.ChangePassPath, &cfg.ResubmitPath, &cfg.LogAct, &cfg.LogPath, &cfg.LogMethod, &cfg.LogIDParam, &cfg.UseJSON,
+			&cfg.PauseAct, &cfg.PausePath, &cfg.PauseIDParam,
+			&cfg.ChangePassAct, &cfg.ChangePassParam, &cfg.ChangePassIDParam,
+			&cfg.ChangePassPath, &cfg.ResubmitPath, &cfg.ResubmitIDParam, &cfg.LogAct, &cfg.LogPath, &cfg.LogMethod, &cfg.LogIDParam, &cfg.UseJSON,
 			&cfg.BalanceAct, &cfg.BalancePath, &cfg.BalanceMoneyField, &cfg.BalanceMethod, &cfg.BalanceAuthType,
 			&cfg.ReportParamStyle, &cfg.ReportAuthType,
 			&cfg.ReportPath, &cfg.GetReportPath, &cfg.RefreshPath,
@@ -304,8 +313,14 @@ func fillDefaults(cfg PlatformConfig) PlatformConfig {
 	if cfg.ReportSuccessCode == "" {
 		cfg.ReportSuccessCode = "1"
 	}
+	if cfg.ResubmitIDParam == "" {
+		cfg.ResubmitIDParam = "id"
+	}
 	if cfg.ReportParamStyle == "" {
 		cfg.ReportParamStyle = "standard"
+	}
+	if cfg.CategoryAct == "" {
+		cfg.CategoryAct = "getcate"
 	}
 	return cfg
 }
@@ -342,6 +357,8 @@ func GetPlatformNames() map[string]string {
 		"pup":      "pup",
 		"wanzi":    "丸子",
 		"lgwk":     "lgwk",
+		"Benz":     "奔驰",
+		"skyriver": "天河",
 	}
 
 	dbConfigMu.RLock()
@@ -436,12 +453,80 @@ func (s *SupplierService) QueryCourse(cid int, userinfo string) (*model.CourseQu
 		}, nil
 
 	case "local_script":
-		// xxtgf/moocmd 等本地脚本平台，新系统暂不支持
+		// moocmd 等本地脚本平台，新系统暂不支持
 		return &model.CourseQueryResponse{
 			UserInfo: userinfo,
 			UserName: user,
 			Msg:      fmt.Sprintf("平台 %s 暂不支持自动查课，请直接下单", sup.PT),
 			Data:     []model.CourseItem{},
+		}, nil
+
+	case "xxt_query":
+		// 学习通直接查课（登录超星API获取课程列表）
+		result, err := xxtCallQuery(user, pass, school)
+		if err != nil {
+			return &model.CourseQueryResponse{
+				UserInfo: userinfo,
+				UserName: user,
+				Msg:      fmt.Sprintf("学习通查课失败：%s", err.Error()),
+				Data:     []model.CourseItem{},
+			}, nil
+		}
+		codeVal, _ := result["code"].(int)
+		if codeVal == -1 {
+			msg, _ := result["msg"].(string)
+			return &model.CourseQueryResponse{
+				UserInfo: userinfo,
+				UserName: user,
+				Msg:      msg,
+				Data:     []model.CourseItem{},
+			}, nil
+		}
+		// 转换课程数据
+		var items []model.CourseItem
+		if data, ok := result["data"].([]map[string]interface{}); ok {
+			for _, d := range data {
+				items = append(items, model.CourseItem{
+					ID:   toString(d["id"]),
+					Name: toString(d["name"]),
+				})
+			}
+		}
+		if userInfoStr, ok := result["userinfo"].(string); ok {
+			userinfo = userInfoStr
+		}
+		return &model.CourseQueryResponse{
+			UserInfo: userinfo,
+			UserName: user,
+			Msg:      "查询成功",
+			Data:     items,
+		}, nil
+
+	case "yyy_custom":
+		// yyy 平台：部分商品无需查课，响应成功即可直接下单
+		return &model.CourseQueryResponse{
+			UserInfo: userinfo,
+			UserName: user,
+			Msg:      "查询成功",
+			Data:     []model.CourseItem{},
+		}, nil
+
+	case "KUN_custom":
+		// KUN/kunba 平台：GET /query/?platform=&school=&account=&password=&dtoken=
+		result, err := kunCallQuery(sup, cls.Noun, school, user, pass)
+		if err != nil {
+			return &model.CourseQueryResponse{
+				UserInfo: userinfo,
+				UserName: user,
+				Msg:      fmt.Sprintf("查课失败：%s", err.Error()),
+				Data:     []model.CourseItem{},
+			}, nil
+		}
+		return &model.CourseQueryResponse{
+			UserInfo: userinfo,
+			UserName: user,
+			Msg:      result.Msg,
+			Data:     result.Data,
 		}, nil
 
 	default:
@@ -529,6 +614,11 @@ func (s *SupplierService) CallSupplierOrder(sup *model.SupplierFull, cls *model.
 	// yyy 平台走独立适配器
 	if sup.PT == "yyy" {
 		return yyyCallOrder(sup, user, pass, kcname, cls.Noun)
+	}
+
+	// KUN/kunba 平台走独立适配器
+	if sup.PT == "KUN" || sup.PT == "kunba" {
+		return kunCallOrder(sup, cls.Noun, school, user, pass, kcname, kcid)
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
@@ -703,13 +793,13 @@ func (s *SupplierService) GetSupplierCategories(sup *model.SupplierFull) map[str
 
 	if cfg.ReportAuthType == "token_only" && cfg.UseJSON {
 		// 2xx 等 token_only 平台：JSON POST 到 /api/getcate
-		apiURL := baseURL + "/api/getcate"
+		apiURL := baseURL + "/api/" + cfg.CategoryAct
 		jsonData, _ := json.Marshal(map[string]string{"token": sup.Pass})
 		req, _ := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonData)))
 		req.Header.Set("Content-Type", "application/json")
 		resp, err = client.Do(req)
 	} else {
-		cateURL := s.buildSupplierURL(sup.URL, "getcate")
+		cateURL := s.buildSupplierURL(sup.URL, cfg.CategoryAct)
 		formData := url.Values{}
 		formData.Set("uid", sup.User)
 		formData.Set("key", sup.Pass)
@@ -1166,6 +1256,11 @@ func (s *SupplierService) PauseOrder(sup *model.SupplierFull, yid string) (int, 
 		return -1, "当前平台暂不支持暂停操作", nil
 	}
 
+	// KUN/kunba 平台走独立适配器
+	if sup.PT == "KUN" || sup.PT == "kunba" {
+		return kunPauseOrder(sup, yid)
+	}
+
 	cfg := GetPlatformConfig(sup.PT)
 
 	if host := extractHost(sup.URL); host != "" {
@@ -1193,7 +1288,11 @@ func (s *SupplierService) PauseOrder(sup *model.SupplierFull, yid string) (int, 
 		formData := url.Values{}
 		formData.Set("uid", sup.User)
 		formData.Set("key", sup.Pass)
-		formData.Set("id", yid)
+		idParam := cfg.PauseIDParam
+		if idParam == "" {
+			idParam = "id"
+		}
+		formData.Set(idParam, yid)
 		resp, err = s.client.PostForm(apiURL, formData)
 	}
 
@@ -1217,6 +1316,11 @@ func (s *SupplierService) PauseOrder(sup *model.SupplierFull, yid string) (int, 
 func (s *SupplierService) ChangePassword(sup *model.SupplierFull, yid, newPwd string) (int, string, error) {
 	if sup.PT == "yyy" || sup.PT == "tuboshu" {
 		return -1, "当前平台暂不支持改密操作", nil
+	}
+
+	// KUN/kunba 平台走独立适配器
+	if sup.PT == "KUN" || sup.PT == "kunba" {
+		return kunChangePassword(sup, yid, newPwd)
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
@@ -1305,10 +1409,121 @@ func (s *SupplierService) ResubmitOrder(sup *model.SupplierFull, yid string) (in
 		formData := url.Values{}
 		formData.Set("uid", sup.User)
 		formData.Set("key", sup.Pass)
-		formData.Set("id", yid)
+		formData.Set(cfg.ResubmitIDParam, yid)
 		resp, err = s.client.PostForm(apiURL, formData)
 	}
 
+	if err != nil {
+		return -1, "", fmt.Errorf("请求上游失败：%v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	var result struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return -1, string(body), nil
+	}
+	return result.Code, result.Msg, nil
+}
+
+// ResetOrderScore 重置订单目标分数（PUP 平台：act=resetscore，newscore 70-100）
+func (s *SupplierService) ResetOrderScore(sup *model.SupplierFull, yid string, newscore int) (int, string, error) {
+	if sup.PT != "pup" {
+		return -1, "当前平台不支持重置分数", nil
+	}
+	if newscore < 70 || newscore > 100 {
+		return -1, "分数范围 70-100", nil
+	}
+
+	if host := extractHost(sup.URL); host != "" {
+		globalRateLimiter.wait(host, 500*time.Millisecond)
+	}
+
+	apiURL := s.buildSupplierURL(sup.URL, "resetscore")
+	formData := url.Values{}
+	formData.Set("uid", sup.User)
+	formData.Set("key", sup.Pass)
+	formData.Set("oid", yid)
+	formData.Set("newscore", fmt.Sprintf("%d", newscore))
+
+	resp, err := s.client.PostForm(apiURL, formData)
+	if err != nil {
+		return -1, "", fmt.Errorf("请求上游失败：%v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	var result struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return -1, string(body), nil
+	}
+	return result.Code, result.Msg, nil
+}
+
+// ResetOrderDuration 重置订单目标时长（PUP 平台：act=resetsc，newsc 0-50 小时）
+func (s *SupplierService) ResetOrderDuration(sup *model.SupplierFull, yid string, newsc int) (int, string, error) {
+	if sup.PT != "pup" {
+		return -1, "当前平台不支持重置时长", nil
+	}
+	if newsc < 0 || newsc > 50 {
+		return -1, "时长范围 0-50 小时", nil
+	}
+
+	if host := extractHost(sup.URL); host != "" {
+		globalRateLimiter.wait(host, 500*time.Millisecond)
+	}
+
+	apiURL := s.buildSupplierURL(sup.URL, "resetsc")
+	formData := url.Values{}
+	formData.Set("uid", sup.User)
+	formData.Set("key", sup.Pass)
+	formData.Set("oid", yid)
+	formData.Set("newsc", fmt.Sprintf("%d", newsc))
+
+	resp, err := s.client.PostForm(apiURL, formData)
+	if err != nil {
+		return -1, "", fmt.Errorf("请求上游失败：%v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	var result struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return -1, string(body), nil
+	}
+	return result.Code, result.Msg, nil
+}
+
+// ResetOrderPeriod 重置订单刷课周期（PUP 平台：act=resetcron，newcron 1-20 天）
+func (s *SupplierService) ResetOrderPeriod(sup *model.SupplierFull, yid string, newcron int) (int, string, error) {
+	if sup.PT != "pup" {
+		return -1, "当前平台不支持重置周期", nil
+	}
+	if newcron < 1 || newcron > 20 {
+		return -1, "周期范围 1-20 天", nil
+	}
+
+	if host := extractHost(sup.URL); host != "" {
+		globalRateLimiter.wait(host, 500*time.Millisecond)
+	}
+
+	apiURL := s.buildSupplierURL(sup.URL, "resetcron")
+	formData := url.Values{}
+	formData.Set("uid", sup.User)
+	formData.Set("key", sup.Pass)
+	formData.Set("oid", yid)
+	formData.Set("newcron", fmt.Sprintf("%d", newcron))
+
+	resp, err := s.client.PostForm(apiURL, formData)
 	if err != nil {
 		return -1, "", fmt.Errorf("请求上游失败：%v", err)
 	}

@@ -11,6 +11,12 @@ export interface SyncConfig {
   sync_name: boolean;
   clone_enabled: boolean;
   force_price_up: boolean;
+  clone_category: boolean;
+  skip_categories: string[];
+  name_replace: Record<string, string>;
+  secret_price_rate: number;
+  auto_sync_enabled: boolean;
+  auto_sync_interval: number;
 }
 
 export interface SyncDiffItem {

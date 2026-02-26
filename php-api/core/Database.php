@@ -44,6 +44,9 @@ class Database
 
     public static function getInstance(): self
     {
+        if (self::$instance === null) {
+            throw new \RuntimeException('Database not initialized. Call Database::init() first.');
+        }
         return self::$instance;
     }
 

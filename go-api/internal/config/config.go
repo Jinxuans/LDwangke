@@ -14,6 +14,16 @@ type Config struct {
 	JWT      JWTConfig      `yaml:"jwt"`
 	Cache    CacheConfig    `yaml:"cache"`
 	SMTP     SMTPConfig     `yaml:"smtp"`
+	License  LicenseConfig  `yaml:"license"`
+}
+
+type LicenseConfig struct {
+	ServerURL   string `yaml:"server_url"`   // 授权站地址，如 https://29.colnt.com
+	LicenseKey  string `yaml:"license_key"`  // 授权码（也可从 key_file 读取）
+	KeyFile     string `yaml:"key_file"`     // 授权码文件路径，优先级低于 license_key
+	Domain      string `yaml:"domain"`       // 当前站点域名
+	CacheFile   string `yaml:"cache_file"`   // 离线缓存文件路径，默认 .sys_state
+	SecretsFile string `yaml:"secrets_file"` // 密钥文件路径，默认 .secrets（宝塔插件生成）
 }
 
 type SMTPConfig struct {

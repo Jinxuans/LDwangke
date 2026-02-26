@@ -146,8 +146,54 @@ export interface CheckOrderResult {
   process: string;
   remarks: string;
   addtime: string;
+  account?: string;
+  school?: string;
+  pushUid?: string;
+  pushStatus?: string;
+  pushEmail?: string;
+  pushEmailStatus?: string;
+  showdoc_push_url?: string;
+  pushShowdocStatus?: string;
 }
 
 export async function checkOrderApi(params: { user?: string; oid?: string }) {
-  return requestClient.get<{ list: CheckOrderResult[]; total: number }>('/checkorder', { params });
+  return requestClient.get<{ list: CheckOrderResult[]; total: number }>('/query', { params });
+}
+
+// ===== 消息推送与自动登录 =====
+
+export async function pushBindWxApi(data: { account: string; pushUid: string; oids: string }) {
+  return requestClient.post('/push/bind-wx', data);
+}
+
+export async function pushUnbindWxApi(data: { account: string }) {
+  return requestClient.post('/push/unbind-wx', data);
+}
+
+export async function pushBindEmailApi(data: { orderid?: number; account?: string; pushEmail: string }) {
+  return requestClient.post('/push/bind-email', data);
+}
+
+export async function pushUnbindEmailApi(data: { orderid?: number; account?: string }) {
+  return requestClient.post('/push/unbind-email', data);
+}
+
+export async function pushBindShowDocApi(data: { orderid?: number; account?: string; showdoc_url: string }) {
+  return requestClient.post('/push/bind-showdoc', data);
+}
+
+export async function pushUnbindShowDocApi(data: { orderid?: number; account?: string }) {
+  return requestClient.post('/push/unbind-showdoc', data);
+}
+
+export async function pushWxQrcodeApi(data: { account: string }) {
+  return requestClient.post<{ code: string; url: string; shortUrl: string }>('/push/wx-qrcode', data);
+}
+
+export async function pushWxScanUidApi(data: { code: string }) {
+  return requestClient.post<{ uid: string }>('/push/wx-scan-uid', data);
+}
+
+export async function pushPupLoginApi(oid: number) {
+  return requestClient.get<{ url: string }>('/push/puplogin', { params: { oid } });
 }

@@ -16,6 +16,10 @@ cp -f "$SRC_DIR/index.html" "$PLUGIN_DIR/"
 cp -f "$SRC_DIR/__init__.py" "$PLUGIN_DIR/"
 cp -f "$SRC_DIR/uninstall.sh" "$PLUGIN_DIR/"
 
+# 复制模板目录
+mkdir -p "$PLUGIN_DIR/templates"
+cp -f "$SRC_DIR/templates/"*.tpl "$PLUGIN_DIR/templates/" 2>/dev/null
+
 # 创建项目目录
 mkdir -p /www/wwwroot/qingka/go-api/config
 mkdir -p /var/www/admin

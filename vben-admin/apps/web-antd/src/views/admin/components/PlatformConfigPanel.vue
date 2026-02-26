@@ -179,7 +179,7 @@ function applyDetectResult() {
     pause_act: cfg.pause_act || '', pause_path: cfg.pause_path || '',
     change_pass_act: cfg.change_pass_act || '', change_pass_path: cfg.change_pass_path || '',
     change_pass_param: 'newPwd', change_pass_id_param: 'id',
-    resubmit_path: cfg.resubmit_path || '', refresh_path: cfg.refresh_path || '',
+    resubmit_path: cfg.resubmit_path || '', resubmit_id_param: cfg.resubmit_id_param || 'id', refresh_path: cfg.refresh_path || '',
     log_act: cfg.log_act || '', log_path: cfg.log_path || '',
     log_method: cfg.log_method || 'POST', log_id_param: 'id',
     balance_act: cfg.balance_act || '', balance_path: cfg.balance_path || '',
@@ -362,7 +362,10 @@ onMounted(loadData);
               <FormItem label="ID参数名"><Input v-model:value="editForm.change_pass_id_param" placeholder="id" /></FormItem>
             </div>
             <Typography.Text type="secondary" class="mb-2 mt-3 block">补单</Typography.Text>
-            <FormItem label="补单路径"><Input v-model:value="editForm.resubmit_path" placeholder="如 /api/reset" /></FormItem>
+            <div class="grid grid-cols-2 gap-x-4">
+              <FormItem label="补单路径"><Input v-model:value="editForm.resubmit_path" placeholder="如 /api/reset" /></FormItem>
+              <FormItem label="补单ID参数"><Input v-model:value="editForm.resubmit_id_param" placeholder="id" /></FormItem>
+            </div>
             <Typography.Text type="secondary" class="mb-2 mt-3 block">日志</Typography.Text>
             <div class="grid grid-cols-2 gap-x-4">
               <FormItem label="日志 act"><Input v-model:value="editForm.log_act" placeholder="xq" /></FormItem>

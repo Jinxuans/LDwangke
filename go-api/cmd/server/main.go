@@ -8,6 +8,7 @@ import (
 	"go-api/internal/config"
 	"go-api/internal/database"
 	"go-api/internal/handler"
+	"go-api/internal/license"
 	"go-api/internal/middleware"
 	"go-api/internal/queue"
 	"go-api/internal/service"
@@ -57,6 +58,22 @@ func main() {
 	// 定时同步"进行中"订单的进度（可被狂暴模式热替换间隔）
 	service.InitSyncTicker(2 * time.Minute)
 
+	// 自动商品同步定时任务（间隔从 sync_config 读取，默认30分钟）
+	go func() {
+		// 启动5分钟后先执行一次
+		time.Sleep(5 * time.Minute)
+		service.AutoShelfCron()
+		for {
+			cfg, _ := service.GetSyncConfig()
+			interval := 30
+			if cfg != nil && cfg.AutoSyncInterval > 0 {
+				interval = cfg.AutoSyncInterval
+			}
+			time.Sleep(time.Duration(interval) * time.Minute)
+			service.AutoShelfCron()
+		}
+	}()
+
 	// 聊天消息定时清理（每天凌晨3点）
 	go func() {
 		chatSvc := service.NewChatService()
@@ -80,6 +97,11 @@ func main() {
 			}
 		}
 	}()
+
+	// 初始化授权管理器
+	lm := license.NewManager(cfg.License)
+	license.Global = lm
+	go lm.Start()
 
 	// 设置 Gin 模式
 	if cfg.Server.Mode == "release" {
@@ -111,8 +133,22 @@ func main() {
 
 	// ===== 公开路由（无需认证） =====
 	r.GET("/api/v1/site/config", handler.SiteConfigGet)
-	r.GET("/api/v1/checkorder", handler.CheckOrderPublic)
-	r.POST("/api/v1/checkorder", handler.CheckOrderPublic)
+	r.GET("/api/v1/query", handler.CheckOrderPublic)
+	r.POST("/api/v1/query", handler.CheckOrderPublic)
+
+	// ===== 推送相关（公开，查单页面调用） =====
+	push := r.Group("/api/v1/push")
+	{
+		push.POST("/bind-wx", handler.PushBindWxUID)
+		push.POST("/unbind-wx", handler.PushUnbindWxUID)
+		push.POST("/bind-email", handler.PushBindEmail)
+		push.POST("/unbind-email", handler.PushUnbindEmail)
+		push.POST("/bind-showdoc", handler.PushBindShowDoc)
+		push.POST("/unbind-showdoc", handler.PushUnbindShowDoc)
+		push.POST("/wx-qrcode", handler.PushWxQRCode)
+		push.POST("/wx-scan-uid", handler.PushWxScanUID)
+		push.GET("/puplogin", handler.PushPupLogin)
+	}
 
 	// ===== 外部API（密钥认证，对应 PHP apisub.php 密钥调用） =====
 	openapi := r.Group("/api/v1/open", middleware.APIKeyAuth())
@@ -126,10 +162,15 @@ func main() {
 		openapi.GET("/orderlist", handler.OpenAPIOrderList)
 		openapi.POST("/orderlist", handler.OpenAPIOrderList)
 		openapi.GET("/balance", handler.OpenAPIBalance)
+		openapi.GET("/chadan", handler.OpenAPIChadan)
+		openapi.POST("/chadan", handler.OpenAPIChadan)
+		openapi.POST("/bindpushuid", handler.OpenAPIBindPushUID)
+		openapi.POST("/bindpushemail", handler.OpenAPIBindPushEmail)
+		openapi.POST("/bindshowdocpush", handler.OpenAPIBindShowDocPush)
 	}
 
 	// ===== 需要认证的路由 =====
-	api := r.Group("/api/v1", middleware.JWTAuth())
+	api := r.Group("/api/v1", middleware.JWTAuth(), middleware.LicenseGuard())
 	{
 		// 认证相关（需 token）
 		api.GET("/user/info", handler.UserInfo)
@@ -150,6 +191,7 @@ func main() {
 			order.GET("/pause", handler.OrderPause)
 			order.POST("/changepass", handler.OrderChangePassword)
 			order.GET("/resubmit", handler.OrderResubmit)
+			order.POST("/pup-reset", handler.OrderPupReset)
 			order.GET("/logs", handler.OrderLogs)
 		}
 
@@ -267,11 +309,15 @@ func main() {
 			admin.POST("/class/batch-price", handler.AdminClassBatchPrice)
 			admin.GET("/suppliers", handler.AdminSupplierList)
 			admin.POST("/supplier/save", handler.AdminSupplierSave)
-			admin.GET("/supplier/products", handler.AdminSupplierProducts)
+			admin.POST("/supplier/delete", handler.AdminSupplierDelete)
 			admin.GET("/supplier/balance", handler.AdminSupplierBalance)
 			admin.POST("/class/add", handler.AdminAddClass)
 			admin.GET("/supplier/import", handler.AdminSupplierImport)
 			admin.GET("/supplier/sync-status", handler.AdminSupplierSyncStatus)
+			admin.GET("/supplier/products", handler.AdminSupplierProducts)
+			admin.POST("/clone/execute", handler.AdminCloneExecute)
+			admin.POST("/clone/update-prices", handler.AdminCloneUpdatePrices)
+			admin.POST("/clone/auto-sync", handler.AdminCloneAutoSync)
 			admin.POST("/category/batch-toggle", handler.AdminCategoryBatchToggle)
 			admin.POST("/order/dock", handler.OrderManualDock)
 			admin.POST("/order/redock-pending", handler.AdminRedockPending)
@@ -301,6 +347,7 @@ func main() {
 			admin.GET("/order/pause", handler.OrderPause)
 			admin.POST("/order/changepass", handler.OrderChangePassword)
 			admin.GET("/order/resubmit", handler.OrderResubmit)
+			admin.POST("/order/pup-reset", handler.OrderPupReset)
 			admin.GET("/order/logs", handler.OrderLogs)
 			admin.GET("/queue/stats", handler.AdminQueueStats)
 			admin.POST("/queue/concurrency", handler.AdminQueueSetConcurrency)
@@ -358,6 +405,9 @@ func main() {
 			admin.POST("/email-templates/save", handler.AdminEmailTemplateSave)
 			admin.GET("/email-templates/preview", handler.AdminEmailTemplatePreview)
 			admin.POST("/email-templates/test", handler.AdminEmailTemplateTest)
+
+			// 授权状态
+			admin.GET("/license/status", handler.AdminLicenseStatus)
 
 			// 运维看板
 			admin.GET("/ops/dashboard", handler.AdminOpsDashboard)
@@ -447,6 +497,19 @@ func main() {
 		tenant.POST("/cuser/save", handler.TenantCUserSave)
 		tenant.DELETE("/cuser/:id", handler.TenantCUserDelete)
 	}
+
+	// ===== PHP 反向代理（/php-api/* → PHP 后端） =====
+	r.Any("/php-api/*path", handler.PhpProxy())
+
+	// ===== PHP 桥接内部 API（bridge_secret 签名认证，供 PHP 调用） =====
+	phpBridge := r.Group("/internal/php-bridge")
+	{
+		phpBridge.POST("/money", handler.BridgeMoneyChange)
+		phpBridge.GET("/user", handler.BridgeGetUser)
+		phpBridge.POST("/order", handler.BridgeCreateOrder)
+	}
+	// 桥接认证 URL 生成（需用户登录）
+	api.GET("/php-bridge/auth-url", handler.BridgeAuthURL)
 
 	// ===== WebSocket 推送 =====
 	r.GET("/ws/push", middleware.WSAuth(), ws.HandlePush(hub))

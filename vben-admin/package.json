@@ -118,5 +118,8 @@
       "canvas",
       "node-gyp"
     ]
+  },
+  "dependencies": {
+    "cssnano": "^7.1.2"
   }
 }

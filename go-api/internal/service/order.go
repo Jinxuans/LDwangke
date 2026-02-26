@@ -22,11 +22,11 @@ func NewOrderService() *OrderService {
 	return &OrderService{}
 }
 
-const orderColumns = "oid, uid, cid, hid, COALESCE(ptname,''), COALESCE(school,''), COALESCE(name,''), COALESCE(user,''), COALESCE(pass,''), COALESCE(kcname,''), COALESCE(kcid,''), COALESCE(status,'待处理'), COALESCE(fees,'0'), COALESCE(process,''), COALESCE(remarks,''), COALESCE(dockstatus,'0'), COALESCE(yid,''), COALESCE(addtime,'')"
+const orderColumns = "oid, uid, cid, hid, COALESCE(ptname,''), COALESCE(school,''), COALESCE(name,''), COALESCE(user,''), COALESCE(pass,''), COALESCE(kcname,''), COALESCE(kcid,''), COALESCE(status,'待处理'), COALESCE(fees,'0'), COALESCE(process,''), COALESCE(remarks,''), COALESCE(dockstatus,'0'), COALESCE(yid,''), COALESCE(addtime,''), COALESCE(pushUid,''), COALESCE(pushStatus,''), COALESCE(pushEmail,''), COALESCE(pushEmailStatus,'0'), COALESCE(showdoc_push_url,''), COALESCE(pushShowdocStatus,'0'), COALESCE((SELECT pt FROM qingka_wangke_huoyuan WHERE hid=qingka_wangke_order.hid LIMIT 1),'')"
 
 func scanOrder(rows *sql.Rows) (model.Order, error) {
 	var o model.Order
-	err := rows.Scan(&o.OID, &o.UID, &o.CID, &o.HID, &o.PTName, &o.School, &o.Name, &o.User, &o.Pass, &o.KCName, &o.KCID, &o.Status, &o.Fees, &o.Process, &o.Remarks, &o.DockStatus, &o.YID, &o.AddTime)
+	err := rows.Scan(&o.OID, &o.UID, &o.CID, &o.HID, &o.PTName, &o.School, &o.Name, &o.User, &o.Pass, &o.KCName, &o.KCID, &o.Status, &o.Fees, &o.Process, &o.Remarks, &o.DockStatus, &o.YID, &o.AddTime, &o.PushUid, &o.PushStatus, &o.PushEmail, &o.PushEmailStatus, &o.ShowdocPushURL, &o.PushShowdocStatus, &o.SupplierPT)
 	return o, err
 }
 
@@ -227,6 +227,12 @@ func (s *OrderService) ChangeStatus(uid int, grade string, req model.OrderStatus
 	}
 
 	_, err := database.DB.Exec(sqlStr, args...)
+	if err == nil && req.Type == 1 {
+		// 手动修改任务状态时，触发推送通知
+		for _, oid := range req.OIDs {
+			NotifyOrderStatusChange(oid, req.Status, "", "")
+		}
+	}
 	return err
 }
 
@@ -491,11 +497,14 @@ func DockSingleOrder(oid int64) {
 		database.DB.Exec("UPDATE qingka_wangke_order SET dockstatus = 1, yid = ?, status = '进行中' WHERE oid = ?",
 			result.YID, oid)
 		fmt.Printf("[DockHandler] oid=%d 对接成功，yid=%s\n", oid, result.YID)
+		NotifyOrderStatusChange(int(oid), "进行中", "", "")
 	} else {
 		// 对接失败：更新 dockstatus=2, status=异常，并记录备注
+		remarkText := fmt.Sprintf("对接失败：%s", result.Msg)
 		database.DB.Exec("UPDATE qingka_wangke_order SET dockstatus = 2, status = '异常', remarks = ? WHERE oid = ?",
-			fmt.Sprintf("对接失败：%s", result.Msg), oid)
+			remarkText, oid)
 		fmt.Printf("[DockHandler] oid=%d 对接失败：%s\n", oid, result.Msg)
+		NotifyOrderStatusChange(int(oid), "异常", "", remarkText)
 	}
 }
 
@@ -646,6 +655,7 @@ func (s *OrderService) SyncOrderProgress(oids []int) (int, error) {
 				item.CourseStartTime, item.CourseEndTime, item.ExamStartTime, item.ExamEndTime,
 				item.User, item.KCName, oid,
 			)
+			NotifyOrderStatusChange(oid, statusText, item.Process, item.Remarks)
 			updated++
 		}
 	}
@@ -737,6 +747,7 @@ func AutoSyncAllProgress() {
 						p.CourseStartTime, p.CourseEndTime, p.ExamStartTime, p.ExamEndTime,
 						it.OID,
 					)
+					NotifyOrderStatusChange(it.OID, statusText, p.Process, p.Remarks)
 					atomic.AddInt64(&updatedCount, 1)
 				}
 			}
@@ -777,7 +788,7 @@ func (s *OrderService) BatchSyncOrders(oids []int) (int, error) {
 	return updated, err
 }
 
-// BatchResendOrders 批量补单 (按 PHP batchResetOrder)
+// BatchResendOrders 批量补单 (按 PHP batchResetOrder → 调用上游 act=budan)
 func (s *OrderService) BatchResendOrders(oids []int) (int, int, error) {
 	if len(oids) == 0 {
 		return 0, 0, errors.New("请选择要补单的订单")
@@ -786,50 +797,48 @@ func (s *OrderService) BatchResendOrders(oids []int) (int, int, error) {
 	success, fail := 0, 0
 
 	for _, oid := range oids {
-		var cid int
-		var school, user, pass, kcid, kcname string
+		var hidStr, yid, status string
 		err := database.DB.QueryRow(
-			"SELECT cid, COALESCE(school,''), COALESCE(user,''), COALESCE(pass,''), COALESCE(kcid,''), COALESCE(kcname,'') FROM qingka_wangke_order WHERE oid = ?",
+			"SELECT COALESCE(hid,'0'), COALESCE(yid,''), COALESCE(status,'') FROM qingka_wangke_order WHERE oid = ?",
 			oid,
-		).Scan(&cid, &school, &user, &pass, &kcid, &kcname)
+		).Scan(&hidStr, &yid, &status)
+		if err != nil {
+			fail++
+			continue
+		}
+		hid, _ := strconv.Atoi(hidStr)
+		if hid == 0 || yid == "" || yid == "0" {
+			fail++
+			continue
+		}
+		if status == "已退款" || status == "已取消" {
+			fail++
+			continue
+		}
+
+		sup, err := supService.GetSupplierByHID(hid)
 		if err != nil {
 			fail++
 			continue
 		}
 
-		cls, err := supService.GetClassFull(cid)
-		if err != nil {
-			fail++
-			continue
-		}
-		docking, _ := strconv.Atoi(cls.Docking)
-		if docking == 0 {
-			fail++
-			continue
-		}
-		sup, err := supService.GetSupplierByHID(docking)
-		if err != nil {
-			fail++
-			continue
-		}
-
-		result, err := supService.CallSupplierOrder(sup, cls, school, user, pass, kcid, kcname, nil)
+		code, msg, err := supService.ResubmitOrder(sup, yid)
 		if err != nil {
 			database.DB.Exec("UPDATE qingka_wangke_order SET remarks = ? WHERE oid = ?",
 				fmt.Sprintf("补单失败: %s", err.Error()), oid)
 			fail++
 			continue
 		}
-		if result.Code == 1 {
+		if code == 1 || code == 0 {
 			now := time.Now().Format("2006-01-02 15:04:05")
 			database.DB.Exec(
-				"UPDATE qingka_wangke_order SET status = '补刷中', dockstatus = '1', yid = ?, remarks = ?, bsnum = bsnum + 1 WHERE oid = ?",
-				result.YID, fmt.Sprintf("补刷成功，等待进度更新。补刷时间：%s", now), oid,
+				"UPDATE qingka_wangke_order SET status = '补刷中', dockstatus = 1, remarks = ?, bsnum = bsnum + 1 WHERE oid = ?",
+				fmt.Sprintf("补刷成功，等待进度更新。补刷时间：%s", now), oid,
 			)
 			success++
 		} else {
 			database.DB.Exec("UPDATE qingka_wangke_order SET remarks = ? WHERE oid = ?",
-				fmt.Sprintf("补单失败: %s", result.Msg), oid)
+				fmt.Sprintf("补单失败: %s", msg), oid)
 			fail++
 		}
 	}

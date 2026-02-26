@@ -293,6 +293,7 @@ function getGradient(name: string): string {
                             已选 {{ selectedCourses.length }} 门课程
                         </div>
                     </div>
+                    <div v-else-if="queryResult.msg === '查询成功' || queryResult.msg === '此课程无需查课，直接下单即可'" class="query-success-direct">无需选课，可直接下单</div>
                     <div v-else class="query-empty">暂无课程数据</div>
                 </div>
 
@@ -597,6 +598,13 @@ function getGradient(name: string): string {
     color: var(--primary-color, #6366f1);
     padding: 6px 12px 2px;
     font-weight: 500;
+}
+.query-success-direct {
+    font-size: 13px;
+    color: #22c55e;
+    text-align: center;
+    padding: 8px 0;
+    font-weight: 600;
 }
 .query-empty {
     font-size: 13px;

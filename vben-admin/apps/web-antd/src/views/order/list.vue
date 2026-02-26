@@ -2,8 +2,8 @@
 import { ref, reactive, onMounted, computed } from 'vue';
 import { Page } from '@vben/common-ui';
 import {
-  Table,
   Input,
+  InputNumber,
   Select,
   SelectOption,
   Button,
@@ -34,6 +34,7 @@ import {
   DownOutlined,
   FilterOutlined,
   MessageOutlined,
+  LoginOutlined,
 } from '@ant-design/icons-vue';
 import { useRouter } from 'vue-router';
 import { createChatApi, sendChatMessageApi } from '#/api/chat';
@@ -52,6 +53,8 @@ import {
   changeOrderPasswordApi,
   resubmitOrderApi,
   getOrderLogsApi,
+  pupLoginApi,
+  pupResetOrderApi,
   type OrderItem,
   type OrderListParams,
   type OrderStats,
@@ -97,13 +100,17 @@ const search = reactive<OrderListParams>({
 const detailVisible = ref(false);
 const detailOrder = ref<OrderItem | null>(null);
 
-// 任务状态列表
+// 任务状态列表（与旧系统 list.php 保持一致）
 const statusOptions = [
   '待处理', '进行中', '已完成', '异常', '已取消',
   '待考试', '待时长', '待重刷', '待上号', '已上号',
   '排队中', '补刷中', '处理中', '考试中', '队列中',
-  '上号中', '重刷中', '刷课中', '暂停中', '已退款',
-  '已退单', '出错啦', '问题单', '失败', '密码错误',
+  '上号中', '重刷中', '刷课中', '时长中', '讨论中',
+  '暂停中', '学习中', '运行中', '完成次数中', '平时分中',
+  '平时分', '已提取', '已提交', '已暂停', '已结课',
+  '已完成待考试', '已退款', '已退单',
+  '异常待处理', '异常已处理', '等待中',
+  '出错啦', '问题单', '失败', '密码错误',
   '登录失败', '未找到课程',
 ];
 
@@ -119,12 +126,14 @@ const dockStatusMap: Record<string, { text: string; color: string }> = {
   '99': { text: '自营', color: 'gold' },
 };
 
-// 任务状态颜色
+// 任务状态颜色（与旧系统保持一致）
 function statusColor(status: string) {
-  if (status === '已完成' || status === '已上号') return 'green';
-  if (status === '进行中' || status === '刷课中') return 'blue';
-  if (status === '异常' || status === '补刷中' || status === '出错啦') return 'red';
-  if (status === '待处理') return 'orange';
+  if (status === '已完成' || status === '已上号' || status === '已结课' || status === '已完成待考试') return 'green';
+  if (status === '进行中' || status === '刷课中' || status === '运行中' || status === '学习中' || status === '时长中' || status === '讨论中' || status === '完成次数中' || status === '平时分中') return 'blue';
+  if (status === '异常' || status === '补刷中' || status === '出错啦' || status === '异常待处理' || status === '失败') return 'red';
+  if (status === '待处理' || status === '等待中') return 'orange';
+  if (status === '已退款' || status === '已退单' || status === '已取消') return 'default';
+  if (status === '暂停中' || status === '已暂停') return 'purple';
   return 'default';
 }
 
@@ -409,6 +418,28 @@ async function handleChangePwd() {
   } catch (e: any) { message.error(e?.message || '修改失败'); }
 }
 
+// PUP 重置弹窗（分数/时长/周期）
+const resetVisible = ref(false);
+const resetOid = ref(0);
+const resetType = ref<'score' | 'duration' | 'period'>('score');
+const resetValue = ref<number>(0);
+const resetLabel = computed(() => ({ score: '分数', duration: '时长（小时）', period: '周期（天）' }[resetType.value]));
+const resetPlaceholder = computed(() => ({ score: '70-100', duration: '0-50', period: '1-20' }[resetType.value]));
+function openReset(oid: number, type: 'score' | 'duration' | 'period') {
+  resetOid.value = oid;
+  resetType.value = type;
+  resetValue.value = type === 'score' ? 85 : type === 'duration' ? 20 : 5;
+  resetVisible.value = true;
+}
+async function handlePupReset() {
+  try {
+    await pupResetOrderApi(resetOid.value, resetType.value, resetValue.value);
+    message.success(`${resetLabel.value}重置成功`);
+    resetVisible.value = false;
+    loadData(pagination.page);
+  } catch (e: any) { message.error(e?.message || '重置失败'); }
+}
+
 // 实时日志
 const logVisible = ref(false);
 const logLoading = ref(false);
@@ -463,6 +494,18 @@ async function handleTicketSubmit() {
   finally { ticketSubmitting.value = false; }
 }
 
+// Pup登录
+async function handlePupLogin(oid: number) {
+  try {
+    const res = await pupLoginApi(oid);
+    if (res?.url) {
+      window.open(res.url, '_blank');
+    } else {
+      message.warning('未获取到登录地址');
+    }
+  } catch (e: any) { message.error(e?.message || 'Pup登录失败'); }
+}
+
 // 表格列
 const columns = computed(() => {
   const cols: any[] = [
@@ -477,6 +520,7 @@ const columns = computed(() => {
       customRender: ({ text }: { text: string }) => text,
     },
     { title: '进度', dataIndex: 'process', key: 'process', width: 120 },
+    { title: '推送', key: 'push', width: 80 },
     { title: '详情', dataIndex: 'remarks', key: 'remarks', width: 160, ellipsis: true },
     { title: '金额', dataIndex: 'fees', key: 'fees', width: 80 },
     { title: '提交时间', dataIndex: 'addtime', key: 'addtime', width: 160 },
@@ -490,7 +534,7 @@ const columns = computed(() => {
   }
 
   cols.push({
-    title: '操作', key: 'action', width: 80, fixed: 'right',
+    title: '操作', key: 'action', width: 130, fixed: 'right',
   });
 
   return cols;
@@ -664,8 +708,22 @@ onMounted(() => {
           <template v-else-if="column.key === 'fees'">
             <span class="font-semibold text-green-600">¥{{ record.fees }}</span>
           </template>
+          <template v-else-if="column.key === 'push'">
+            <Space :size="2" direction="vertical">
+              <Tag v-if="record.pushUid" :color="record.pushStatus === '成功' ? 'green' : record.pushStatus === '失败' ? 'red' : 'blue'" class="text-xs">微信{{ record.pushStatus || '已绑' }}</Tag>
+              <Tag v-if="record.pushEmail" :color="record.pushEmailStatus === '成功' ? 'green' : record.pushEmailStatus === '失败' ? 'red' : 'blue'" class="text-xs">邮箱{{ record.pushEmailStatus || '已绑' }}</Tag>
+              <Tag v-if="record.showdoc_push_url" :color="record.pushShowdocStatus === '成功' ? 'green' : record.pushShowdocStatus === '失败' ? 'red' : 'blue'" class="text-xs">ShowDoc{{ record.pushShowdocStatus || '已绑' }}</Tag>
+              <span v-if="!record.pushUid && !record.pushEmail && !record.showdoc_push_url" class="text-xs text-gray-400">-</span>
+            </Space>
+          </template>
           <template v-else-if="column.key === 'action'">
-            <Button type="link" size="small" @click="showDetail(record)">详情</Button>
+            <Space :size="4">
+              <Button type="link" size="small" @click="showDetail(record)">详情</Button>
+              <Button v-if="record.yid" type="link" size="small" @click="handlePupLogin(record.oid)" class="text-purple-600">
+                <template #icon><LoginOutlined /></template>
+                登录
+              </Button>
+            </Space>
           </template>
         </template>
       </Table>
@@ -715,6 +773,14 @@ onMounted(() => {
         <DescriptionsItem label="详情/备注" v-if="detailOrder.remarks">
           <div class="whitespace-pre-wrap text-sm">{{ detailOrder.remarks }}</div>
         </DescriptionsItem>
+        <DescriptionsItem label="推送状态">
+          <Space>
+            <Tag v-if="detailOrder.pushUid" :color="detailOrder.pushStatus === '成功' ? 'green' : detailOrder.pushStatus === '失败' ? 'red' : 'blue'">微信{{ detailOrder.pushStatus || '已绑' }}</Tag>
+            <Tag v-if="detailOrder.pushEmail" :color="detailOrder.pushEmailStatus === '成功' ? 'green' : detailOrder.pushEmailStatus === '失败' ? 'red' : 'blue'">邮箱{{ detailOrder.pushEmailStatus || '已绑' }}</Tag>
+            <Tag v-if="detailOrder.showdoc_push_url" :color="detailOrder.pushShowdocStatus === '成功' ? 'green' : detailOrder.pushShowdocStatus === '失败' ? 'red' : 'blue'">ShowDoc{{ detailOrder.pushShowdocStatus || '已绑' }}</Tag>
+            <span v-if="!detailOrder.pushUid && !detailOrder.pushEmail && !detailOrder.showdoc_push_url" class="text-gray-400">未绑定</span>
+          </Space>
+        </DescriptionsItem>
       </Descriptions>
 
       <!-- 操作按钮 -->
@@ -732,6 +798,20 @@ onMounted(() => {
           反馈
           <Tag v-if="detailTicketCount > 0" color="orange" class="ml-1" style="margin-right:0">{{ detailTicketCount }}</Tag>
         </Button>
+        <Button v-if="detailOrder!.yid && detailOrder!.supplier_pt === 'pup'" size="small" class="bg-purple-50 border-purple-300 text-purple-600" @click="handlePupLogin(detailOrder!.oid)">
+          <template #icon><LoginOutlined /></template>
+          Pup登录
+        </Button>
+        <Dropdown v-if="detailOrder!.yid && detailOrder!.supplier_pt === 'pup'">
+          <Button size="small" class="bg-indigo-50 border-indigo-300 text-indigo-600">PUP重置 <DownOutlined /></Button>
+          <template #overlay>
+            <Menu>
+              <MenuItem key="score" @click="openReset(detailOrder!.oid, 'score')">重置分数</MenuItem>
+              <MenuItem key="duration" @click="openReset(detailOrder!.oid, 'duration')">重置时长</MenuItem>
+              <MenuItem key="period" @click="openReset(detailOrder!.oid, 'period')">重置周期</MenuItem>
+            </Menu>
+          </template>
+        </Dropdown>
         <Popconfirm title="确定取消此订单？" @confirm="() => { handleCancel(detailOrder!.oid); }">
           <Button size="small">取消订单</Button>
         </Popconfirm>
@@ -784,6 +864,29 @@ onMounted(() => {
         <div class="text-sm text-gray-500 mb-3">订单ID: {{ ticketOid }}</div>
         <Input.TextArea v-model:value="ticketContent" :rows="4" placeholder="请详细描述您遇到的问题..." />
         <div class="text-xs text-gray-400 mt-2">提交后将自动进入在线聊天，客服会尽快处理</div>
+      </div>
+    </Modal>
+
+    <!-- PUP重置弹窗 -->
+    <Modal v-model:open="resetVisible" :title="`重置订单${resetLabel}`" @ok="handlePupReset" ok-text="确定" cancel-text="取消" :width="400" style="max-width: 95vw">
+      <div class="py-4">
+        <div class="text-sm text-gray-500 mb-4">订单ID: {{ resetOid }}</div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium">新{{ resetLabel }}:</span>
+          <InputNumber 
+            v-model:value="resetValue" 
+            :min="resetType === 'score' ? 70 : resetType === 'duration' ? 0 : 1" 
+            :max="resetType === 'score' ? 100 : resetType === 'duration' ? 50 : 20" 
+            :placeholder="resetPlaceholder" 
+            class="w-32"
+          />
+          <span class="text-sm text-gray-500">{{ resetType === 'duration' ? '小时' : resetType === 'period' ? '天' : '分' }}</span>
+        </div>
+        <div class="text-xs text-orange-500 mt-4 bg-orange-50 p-2 rounded">
+          <span v-if="resetType === 'score'">提示：分数范围 70-100</span>
+          <span v-else-if="resetType === 'duration'">提示：时长范围 0-50 小时</span>
+          <span v-else>提示：周期范围 1-20 天，从下单时间开始计算</span>
+        </div>
       </div>
     </Modal>
 

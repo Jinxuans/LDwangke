@@ -1,6 +1,7 @@
 package service
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"math"
@@ -247,4 +248,102 @@ func (s *OpenAPIService) GetClassList(uid int, money float64) ([]map[string]inte
 		list = []map[string]interface{}{}
 	}
 	return list, nil
+}
+
+// Chadan 查单（带推送字段，对应 PHP api.php act=chadan）
+func (s *OpenAPIService) Chadan(username string, orderID string) ([]map[string]interface{}, error) {
+	if username == "" && orderID == "" {
+		return nil, errors.New("账号或订单ID不能为空")
+	}
+
+	var rows *sql.Rows
+	var err error
+	if username != "" {
+		rows, err = database.DB.Query(`SELECT oid, COALESCE(ptname,''), COALESCE(school,''), COALESCE(user,''), COALESCE(pass,''),
+			COALESCE(kcname,''), COALESCE(addtime,''), COALESCE(status,''), COALESCE(process,''), COALESCE(remarks,''),
+			COALESCE(pushUid,''), COALESCE(pushStatus,''), COALESCE(pushEmail,''),
+			COALESCE(pushEmailStatus,'0'), COALESCE(showdoc_push_url,''), COALESCE(pushShowdocStatus,'0')
+			FROM qingka_wangke_order WHERE user=? ORDER BY oid ASC`, username)
+	} else {
+		rows, err = database.DB.Query(`SELECT oid, COALESCE(ptname,''), COALESCE(school,''), COALESCE(user,''), COALESCE(pass,''),
+			COALESCE(kcname,''), COALESCE(addtime,''), COALESCE(status,''), COALESCE(process,''), COALESCE(remarks,''),
+			COALESCE(pushUid,''), COALESCE(pushStatus,''), COALESCE(pushEmail,''),
+			COALESCE(pushEmailStatus,'0'), COALESCE(showdoc_push_url,''), COALESCE(pushShowdocStatus,'0')
+			FROM qingka_wangke_order WHERE oid=?`, orderID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []map[string]interface{}
+	for rows.Next() {
+		var oid int
+		var ptname, school, user, pass, kcname, addtime, status, process, remarks string
+		var pushUid, pushStatus, pushEmail, pushEmailStatus, showdocPushURL, pushShowdocStatus string
+		rows.Scan(&oid, &ptname, &school, &user, &pass, &kcname, &addtime, &status, &process, &remarks,
+			&pushUid, &pushStatus, &pushEmail, &pushEmailStatus, &showdocPushURL, &pushShowdocStatus)
+
+		schoolVal := school
+		if schoolVal == "" {
+			schoolVal = "自动识别"
+		}
+		account := schoolVal + " " + user + " " + pass
+
+		list = append(list, map[string]interface{}{
+			"id":                oid,
+			"ptname":            ptname,
+			"school":            school,
+			"user":              user,
+			"pass":              pass,
+			"account":           account,
+			"kcname":            kcname,
+			"addtime":           addtime,
+			"status":            status,
+			"process":           process,
+			"remarks":           remarks,
+			"pushUid":           pushUid,
+			"pushStatus":        pushStatus,
+			"pushEmail":         pushEmail,
+			"pushEmailStatus":   pushEmailStatus,
+			"showdoc_push_url":  showdocPushURL,
+			"pushShowdocStatus": pushShowdocStatus,
+		})
+	}
+	if list == nil {
+		list = []map[string]interface{}{}
+	}
+	return list, nil
+}
+
+// BindPushUID 绑定微信推送UID（对应 PHP act=bindpushuid）
+func (s *OpenAPIService) BindPushUID(orderID int, pushUID string) error {
+	_, err := database.DB.Exec("UPDATE qingka_wangke_order SET pushUid=?, pushStatus='0' WHERE oid=?", pushUID, orderID)
+	return err
+}
+
+// BindPushEmail 绑定邮箱推送（对应 PHP act=bindpushemail）
+func (s *OpenAPIService) BindPushEmail(orderID int, account string, pushEmail string) error {
+	if orderID > 0 {
+		_, err := database.DB.Exec("UPDATE qingka_wangke_order SET pushEmail=?, pushEmailStatus='0' WHERE oid=?", pushEmail, orderID)
+		return err
+	}
+	if account != "" {
+		_, err := database.DB.Exec("UPDATE qingka_wangke_order SET pushEmail=?, pushEmailStatus='0' WHERE user=?", pushEmail, account)
+		return err
+	}
+	return errors.New("需要订单ID或账号")
+}
+
+// BindShowDocPush 绑定ShowDoc推送（对应 PHP act=bindshowdocpush）
+func (s *OpenAPIService) BindShowDocPush(orderID int, account string, showdocURL string) error {
+	if orderID > 0 {
+		_, err := database.DB.Exec("UPDATE qingka_wangke_order SET showdoc_push_url=?, pushShowdocStatus='0' WHERE oid=?", showdocURL, orderID)
+		return err
+	}
+	if account != "" {
+		_, err := database.DB.Exec("UPDATE qingka_wangke_order SET showdoc_push_url=?, pushShowdocStatus='0' WHERE user=?", showdocURL, account)
+		return err
+	}
+	return errors.New("需要订单ID或账号")
 }

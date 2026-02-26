@@ -35,6 +35,13 @@ export interface OrderItem {
   dockstatus: string;
   yid: string;
   addtime: string;
+  pushUid: string;
+  pushStatus: string;
+  pushEmail: string;
+  pushEmailStatus: string;
+  showdoc_push_url: string;
+  pushShowdocStatus: string;
+  supplier_pt: string;
 }
 
 export interface OrderListResult {
@@ -140,4 +147,14 @@ export interface OrderLogEntry {
 /** 查询订单实时日志 */
 export async function getOrderLogsApi(oid: number) {
   return requestClient.get<OrderLogEntry[]>('/order/logs', { params: { oid } });
+}
+
+/** Pup自动登录 */
+export async function pupLoginApi(oid: number) {
+  return requestClient.get<{ url: string }>('/push/puplogin', { params: { oid } });
+}
+
+/** PUP重置（分数/时长/周期） */
+export async function pupResetOrderApi(oid: number, type: 'score' | 'duration' | 'period', value: number) {
+  return requestClient.post('/order/pup-reset', { oid, type, value });
 }

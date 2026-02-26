@@ -13,30 +13,38 @@ import (
 
 // SyncConfig 同步配置
 type SyncConfig struct {
-	ID            int                           `json:"id"`
-	SupplierIDs   string                        `json:"supplier_ids"`
-	PriceRates    map[string]float64            `json:"price_rates"`
-	CategoryRates map[string]map[string]float64 `json:"category_rates"`
-	SyncPrice     bool                          `json:"sync_price"`
-	SyncStatus    bool                          `json:"sync_status"`
-	SyncContent   bool                          `json:"sync_content"`
-	SyncName      bool                          `json:"sync_name"`
-	CloneEnabled  bool                          `json:"clone_enabled"`
-	ForcePriceUp  bool                          `json:"force_price_up"`
+	ID               int                           `json:"id"`
+	SupplierIDs      string                        `json:"supplier_ids"`
+	PriceRates       map[string]float64            `json:"price_rates"`
+	CategoryRates    map[string]map[string]float64 `json:"category_rates"`
+	SyncPrice        bool                          `json:"sync_price"`
+	SyncStatus       bool                          `json:"sync_status"`
+	SyncContent      bool                          `json:"sync_content"`
+	SyncName         bool                          `json:"sync_name"`
+	CloneEnabled     bool                          `json:"clone_enabled"`
+	ForcePriceUp     bool                          `json:"force_price_up"`
+	CloneCategory    bool                          `json:"clone_category"`
+	SkipCategories   []string                      `json:"skip_categories"`
+	NameReplace      map[string]string             `json:"name_replace"`
+	SecretPriceRate  float64                       `json:"secret_price_rate"`
+	AutoSyncEnabled  bool                          `json:"auto_sync_enabled"`
+	AutoSyncInterval int                           `json:"auto_sync_interval"`
 }
 
 // SyncDiffItem 同步差异项
 type SyncDiffItem struct {
-	Action       string `json:"action"`       // 更新价格/更新说明/更新名称/下架/上架/克隆上架
-	CID          int    `json:"cid"`          // 本地商品CID（克隆时为0）
-	Name         string `json:"name"`         // 商品名
-	Category     string `json:"category"`     // 分类名
-	CategoryID   int    `json:"category_id"`  // 分类ID
-	OldValue     string `json:"old_value"`    // 旧值（显示用，可能截断）
-	NewValue     string `json:"new_value"`    // 新值（显示用，可能截断）
-	FullOldValue string `json:"-"`            // 完整旧值（执行用，不传前端）
-	FullNewValue string `json:"-"`            // 完整新值（执行用，不传前端）
-	UpstreamCID  string `json:"upstream_cid"` // 上游CID(noun)
+	Action         string  `json:"action"`       // 更新价格/更新说明/更新名称/下架/上架/克隆上架/新增分类
+	CID            int     `json:"cid"`          // 本地商品CID（克隆时为0）
+	Name           string  `json:"name"`         // 商品名
+	Category       string  `json:"category"`     // 分类名
+	CategoryID     int     `json:"category_id"`  // 分类ID
+	OldValue       string  `json:"old_value"`    // 旧值（显示用，可能截断）
+	NewValue       string  `json:"new_value"`    // 新值（显示用，可能截断）
+	FullOldValue   string  `json:"-"`            // 完整旧值（执行用，不传前端）
+	FullNewValue   string  `json:"-"`            // 完整新值（执行用，不传前端）
+	UpstreamCID    string  `json:"upstream_cid"` // 上游CID(noun)
+	SecretPrice    float64 `json:"-"`            // 密价（执行用）
+	UpstreamFenlei string  `json:"-"`            // 上游分类ID（执行用，克隆时写入fenlei）
 }
 
 // SyncPreviewResult 同步预览结果
@@ -60,55 +68,89 @@ type SyncExecuteResult struct {
 func GetSyncConfig() (*SyncConfig, error) {
 	row := database.DB.QueryRow(`SELECT id, COALESCE(supplier_ids,''), COALESCE(price_rates,'{}'),
 		COALESCE(category_rates,'{}'), sync_price, sync_status, sync_content, sync_name,
-		clone_enabled, force_price_up
+		clone_enabled, force_price_up,
+		clone_category, COALESCE(skip_categories,'[]'), COALESCE(name_replace,'{}'),
+		secret_price_rate, auto_sync_enabled, auto_sync_interval
 		FROM qingka_wangke_sync_config ORDER BY id DESC LIMIT 1`)
 
 	var cfg SyncConfig
-	var priceRatesJSON, categoryRatesJSON string
+	var priceRatesJSON, categoryRatesJSON, skipCategoriesJSON, nameReplaceJSON string
 	err := row.Scan(&cfg.ID, &cfg.SupplierIDs, &priceRatesJSON, &categoryRatesJSON,
 		&cfg.SyncPrice, &cfg.SyncStatus, &cfg.SyncContent, &cfg.SyncName,
-		&cfg.CloneEnabled, &cfg.ForcePriceUp)
+		&cfg.CloneEnabled, &cfg.ForcePriceUp,
+		&cfg.CloneCategory, &skipCategoriesJSON, &nameReplaceJSON,
+		&cfg.SecretPriceRate, &cfg.AutoSyncEnabled, &cfg.AutoSyncInterval)
 	if err != nil {
 		// 没有配置，返回默认
 		return &SyncConfig{
-			PriceRates:    map[string]float64{},
-			CategoryRates: map[string]map[string]float64{},
-			SyncPrice:     true,
-			SyncStatus:    true,
-			SyncContent:   true,
+			PriceRates:       map[string]float64{},
+			CategoryRates:    map[string]map[string]float64{},
+			SkipCategories:   []string{},
+			NameReplace:      map[string]string{},
+			SyncPrice:        true,
+			SyncStatus:       true,
+			SyncContent:      true,
+			AutoSyncInterval: 30,
 		}, nil
 	}
 
 	json.Unmarshal([]byte(priceRatesJSON), &cfg.PriceRates)
 	json.Unmarshal([]byte(categoryRatesJSON), &cfg.CategoryRates)
+	json.Unmarshal([]byte(skipCategoriesJSON), &cfg.SkipCategories)
+	json.Unmarshal([]byte(nameReplaceJSON), &cfg.NameReplace)
 	if cfg.PriceRates == nil {
 		cfg.PriceRates = map[string]float64{}
 	}
 	if cfg.CategoryRates == nil {
 		cfg.CategoryRates = map[string]map[string]float64{}
 	}
+	if cfg.SkipCategories == nil {
+		cfg.SkipCategories = []string{}
+	}
+	if cfg.NameReplace == nil {
+		cfg.NameReplace = map[string]string{}
+	}
+	if cfg.AutoSyncInterval <= 0 {
+		cfg.AutoSyncInterval = 30
+	}
 	return &cfg, nil
 }
 
-// SaveSyncConfig 保存同步配置
+// SaveSyncConfig 保存同步配置（事务包裹，避免 DELETE 后 INSERT 失败丢配置）
 func SaveSyncConfig(cfg *SyncConfig) error {
 	priceJSON, _ := json.Marshal(cfg.PriceRates)
 	categoryJSON, _ := json.Marshal(cfg.CategoryRates)
+	skipJSON, _ := json.Marshal(cfg.SkipCategories)
+	nameReplaceJSON, _ := json.Marshal(cfg.NameReplace)
+	if cfg.AutoSyncInterval <= 0 {
+		cfg.AutoSyncInterval = 30
+	}
 
-	// 清空旧配置，只保留一行
-	database.DB.Exec("DELETE FROM qingka_wangke_sync_config WHERE 1=1")
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 
-	_, err := database.DB.Exec(`INSERT INTO qingka_wangke_sync_config
-		(supplier_ids, price_rates, category_rates, sync_price, sync_status, sync_content, sync_name, clone_enabled, force_price_up)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	tx.Exec("DELETE FROM qingka_wangke_sync_config WHERE 1=1")
+
+	_, err = tx.Exec(`INSERT INTO qingka_wangke_sync_config
+		(supplier_ids, price_rates, category_rates, sync_price, sync_status, sync_content, sync_name,
+		 clone_enabled, force_price_up, clone_category, skip_categories, name_replace,
+		 secret_price_rate, auto_sync_enabled, auto_sync_interval)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		cfg.SupplierIDs, string(priceJSON), string(categoryJSON),
 		cfg.SyncPrice, cfg.SyncStatus, cfg.SyncContent, cfg.SyncName,
-		cfg.CloneEnabled, cfg.ForcePriceUp)
-	return err
+		cfg.CloneEnabled, cfg.ForcePriceUp, cfg.CloneCategory, string(skipJSON), string(nameReplaceJSON),
+		cfg.SecretPriceRate, cfg.AutoSyncEnabled, cfg.AutoSyncInterval)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // SyncPreview 预览同步差异（不执行任何修改）
-func SyncPreview(hid int) (*SyncPreviewResult, error) {
+func SyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, error) {
 	supService := NewSupplierService()
 
 	// 获取供应商信息
@@ -118,12 +160,23 @@ func SyncPreview(hid int) (*SyncPreviewResult, error) {
 	}
 
 	// 获取同步配置
-	cfg, _ := GetSyncConfig()
+	var cfg *SyncConfig
+	if len(customCfg) > 0 && customCfg[0] != nil {
+		cfg = customCfg[0]
+	} else {
+		cfg, _ = GetSyncConfig()
+	}
 
 	// 拉取上游商品列表
 	upstreamClasses, err := supService.GetSupplierClasses(sup)
 	if err != nil {
 		return nil, fmt.Errorf("拉取上游商品失败: %v", err)
+	}
+
+	// 构建跳过分类集合
+	skipSet := map[string]bool{}
+	for _, id := range cfg.SkipCategories {
+		skipSet[id] = true
 	}
 
 	// 获取本地商品（docking = hid）
@@ -154,8 +207,14 @@ func SyncPreview(hid int) (*SyncPreviewResult, error) {
 		localCount++
 	}
 
-	// 分类名映射
+	// 分类名映射（本地）
 	categoryNames := loadCategoryNames()
+
+	// 本地已有分类ID集合（用于判断是否需要新增分类）
+	localCategoryIDs := map[string]bool{}
+	for id := range categoryNames {
+		localCategoryIDs[strconv.Itoa(id)] = true
+	}
 
 	// 价格倍率
 	hidStr := strconv.Itoa(hid)
@@ -169,23 +228,69 @@ func SyncPreview(hid int) (*SyncPreviewResult, error) {
 	diffs := make([]SyncDiffItem, 0)
 	summary := map[string]int{}
 
+	// 如果开启了分类克隆，先收集需要新增的分类
+	newCategorySet := map[string]string{} // 上游fenlei → 分类名
+	if cfg.CloneCategory {
+		for _, up := range upstreamClasses {
+			if skipSet[up.Fenlei] {
+				continue
+			}
+			if !localCategoryIDs[up.Fenlei] && up.CategoryName != "" {
+				newCategorySet[up.Fenlei] = up.CategoryName
+			}
+		}
+		for fenlei, catName := range newCategorySet {
+			diffs = append(diffs, SyncDiffItem{
+				Action:         "新增分类",
+				Name:           catName,
+				NewValue:       catName,
+				UpstreamFenlei: fenlei,
+			})
+			summary["新增分类"]++
+		}
+	}
+
 	upNounSet := map[string]bool{}
 	for _, up := range upstreamClasses {
+		// 跳过指定分类
+		if skipSet[up.Fenlei] {
+			continue
+		}
+
 		upNounSet[up.CID] = true
+
+		// 应用名称替换规则
+		displayName := up.Name
+		for old, newStr := range cfg.NameReplace {
+			displayName = strings.ReplaceAll(displayName, old, newStr)
+		}
+
 		local, exists := localMap[up.CID]
 
 		if !exists {
 			// 上游有、本地没有 → 克隆上架
 			if cfg.CloneEnabled {
 				calcRate := rate
-				// TODO: category-specific rate for new products
+				// 分类维度倍率（用上游分类ID匹配）
+				if categoryRates != nil {
+					if cr, ok := categoryRates[up.Fenlei]; ok {
+						calcRate = cr
+					}
+				}
 				newPrice := math.Round(up.Price*calcRate*100) / 100
+				secretPrice := 0.0
+				if cfg.SecretPriceRate > 0 {
+					secretPrice = math.Round(newPrice*cfg.SecretPriceRate*100) / 100
+				}
 				diffs = append(diffs, SyncDiffItem{
-					Action:      "克隆上架",
-					Name:        up.Name,
-					NewValue:    fmt.Sprintf("%.2f", newPrice),
-					UpstreamCID: up.CID,
-					Category:    up.CategoryName,
+					Action:         "克隆上架",
+					Name:           displayName,
+					NewValue:       fmt.Sprintf("%.2f", newPrice),
+					UpstreamCID:    up.CID,
+					Category:       up.CategoryName,
+					SecretPrice:    secretPrice,
+					UpstreamFenlei: up.Fenlei,
+					FullNewValue:   up.Content,
 				})
 				summary["克隆上架"]++
 			}
@@ -203,6 +308,12 @@ func SyncPreview(hid int) (*SyncPreviewResult, error) {
 		newPrice := math.Round(up.Price*calcRate*100) / 100
 		catName := categoryNames[local.Fenlei]
 
+		// 计算密价
+		secretPrice := 0.0
+		if cfg.SecretPriceRate > 0 {
+			secretPrice = math.Round(newPrice*cfg.SecretPriceRate*100) / 100
+		}
+
 		// 价格差异
 		if cfg.SyncPrice {
 			if cfg.ForcePriceUp {
@@ -216,6 +327,7 @@ func SyncPreview(hid int) (*SyncPreviewResult, error) {
 						OldValue:    fmt.Sprintf("%.2f", local.Price),
 						NewValue:    fmt.Sprintf("%.2f", newPrice),
 						UpstreamCID: up.CID,
+						SecretPrice: secretPrice,
 					})
 					summary["更新价格"]++
 				}
@@ -229,6 +341,7 @@ func SyncPreview(hid int) (*SyncPreviewResult, error) {
 					OldValue:    fmt.Sprintf("%.2f", local.Price),
 					NewValue:    fmt.Sprintf("%.2f", newPrice),
 					UpstreamCID: up.CID,
+					SecretPrice: secretPrice,
 				})
 				summary["更新价格"]++
 			}
@@ -259,8 +372,8 @@ func SyncPreview(hid int) (*SyncPreviewResult, error) {
 			summary["更新说明"]++
 		}
 
-		// 名称差异
-		if cfg.SyncName && up.Name != local.Name {
+		// 名称差异（应用名称替换后对比）
+		if cfg.SyncName && displayName != local.Name {
 			diffs = append(diffs, SyncDiffItem{
 				Action:      "更新名称",
 				CID:         local.CID,
@@ -268,7 +381,7 @@ func SyncPreview(hid int) (*SyncPreviewResult, error) {
 				Category:    catName,
 				CategoryID:  local.Fenlei,
 				OldValue:    local.Name,
-				NewValue:    up.Name,
+				NewValue:    displayName,
 				UpstreamCID: up.CID,
 			})
 			summary["更新名称"]++
@@ -290,7 +403,7 @@ func SyncPreview(hid int) (*SyncPreviewResult, error) {
 		}
 	}
 
-	// 本地有、上游没有 → 下架
+	// 本地有、上游没有 → 下架（status=0，不删除）
 	if cfg.SyncStatus {
 		for noun, local := range localMap {
 			if !upNounSet[noun] && local.Status == 1 {
@@ -320,8 +433,8 @@ func SyncPreview(hid int) (*SyncPreviewResult, error) {
 }
 
 // SyncExecute 执行同步（应用差异）—— 内部调用 SyncPreview 获取差异后直接执行
-func SyncExecute(hid int) (*SyncExecuteResult, error) {
-	preview, err := SyncPreview(hid)
+func SyncExecute(hid int, customCfg ...*SyncConfig) (*SyncExecuteResult, error) {
+	preview, err := SyncPreview(hid, customCfg...)
 	if err != nil {
 		return nil, err
 	}
@@ -334,12 +447,28 @@ func SyncExecute(hid int) (*SyncExecuteResult, error) {
 	for _, diff := range preview.Diffs {
 		var execErr error
 		switch diff.Action {
+		case "新增分类":
+			fenleiID, _ := strconv.Atoi(diff.UpstreamFenlei)
+			if fenleiID > 0 {
+				var exists int
+				database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_fenlei WHERE id=?", fenleiID).Scan(&exists)
+				if exists == 0 {
+					_, execErr = database.DB.Exec(
+						"INSERT INTO qingka_wangke_fenlei (id, sort, name, status, time) VALUES (?, 0, ?, 1, NOW())",
+						fenleiID, diff.Name)
+				}
+			}
 		case "更新价格":
-			_, execErr = database.DB.Exec(
-				"UPDATE qingka_wangke_class SET price = ? WHERE cid = ?",
-				diff.NewValue, diff.CID)
+			if diff.SecretPrice > 0 {
+				_, execErr = database.DB.Exec(
+					"UPDATE qingka_wangke_class SET price = ?, secret_price = ? WHERE cid = ?",
+					diff.NewValue, fmt.Sprintf("%.2f", diff.SecretPrice), diff.CID)
+			} else {
+				_, execErr = database.DB.Exec(
+					"UPDATE qingka_wangke_class SET price = ? WHERE cid = ?",
+					diff.NewValue, diff.CID)
+			}
 		case "更新说明":
-			// 使用完整值，而非截断的显示值
 			val := diff.FullNewValue
 			if val == "" {
 				val = diff.NewValue
@@ -360,10 +489,23 @@ func SyncExecute(hid int) (*SyncExecuteResult, error) {
 				"UPDATE qingka_wangke_class SET status = 1, addtime = ? WHERE cid = ?",
 				now, diff.CID)
 		case "克隆上架":
-			_, execErr = database.DB.Exec(
-				`INSERT INTO qingka_wangke_class (name, noun, getnoun, docking, queryplat, price, yunsuan, content, fenlei, status, addtime)
-				 VALUES (?, ?, ?, ?, ?, ?, '*', '', 0, 1, ?)`,
-				diff.Name, diff.UpstreamCID, diff.UpstreamCID, hid, hid, diff.NewValue, now)
+			fenlei := 0
+			if diff.UpstreamFenlei != "" {
+				fenlei, _ = strconv.Atoi(diff.UpstreamFenlei)
+			}
+			content := diff.FullNewValue
+			if diff.SecretPrice > 0 {
+				_, execErr = database.DB.Exec(
+					`INSERT INTO qingka_wangke_class (name, noun, getnoun, docking, queryplat, price, secret_price, yunsuan, content, fenlei, status, addtime)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, '*', ?, ?, 1, ?)`,
+					diff.Name, diff.UpstreamCID, diff.UpstreamCID, hid, hid, diff.NewValue,
+					fmt.Sprintf("%.2f", diff.SecretPrice), content, fenlei, now)
+			} else {
+				_, execErr = database.DB.Exec(
+					`INSERT INTO qingka_wangke_class (name, noun, getnoun, docking, queryplat, price, yunsuan, content, fenlei, status, addtime)
+					 VALUES (?, ?, ?, ?, ?, ?, '*', ?, ?, 1, ?)`,
+					diff.Name, diff.UpstreamCID, diff.UpstreamCID, hid, hid, diff.NewValue, content, fenlei, now)
+			}
 		}
 
 		if execErr != nil {

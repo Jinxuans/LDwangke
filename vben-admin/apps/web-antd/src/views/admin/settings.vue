@@ -641,8 +641,50 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
             </div>
           </TabPane>
 
+          <!-- 推送与同步 -->
+          <TabPane key="tspz">
+            <template #tab><SettingOutlined class="mr-1" />推送与同步</template>
+            <div class="tab-body">
+              <Row :gutter="[24, 24]">
+                <Col :span="24"><Divider orientation="left" class="!my-0">WxPusher 微信推送</Divider></Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">WxPusher AppToken</label>
+                  <Input.Password :value="getVal('wxpusher_token')" @update:value="(v: string) => setVal('wxpusher_token', v)" placeholder="AT_xxxxxxx" />
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">在 wxpusher.zjiecode.com 创建应用后获取</div>
+                </Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">WxPusher 应用ID</label>
+                  <Input :value="getVal('wxpusher_appid')" @update:value="(v: string) => setVal('wxpusher_appid', v)" placeholder="应用ID（用于生成关注二维码）" />
+                </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">Pup 自动登录</Divider></Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">Pup 登录地址</label>
+                  <Input :value="getVal('pup_base_url')" @update:value="(v: string) => setVal('pup_base_url', v)" placeholder="https://demo.yehuimei.xyz/autologin/index.php" />
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">Pup 浏览器插件自动登录的目标地址</div>
+                </Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">Pup Plan</label>
+                  <Input :value="getVal('pup_plan')" @update:value="(v: string) => setVal('pup_plan', v)" placeholder="计划名称（留空为默认）" />
+                </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">自动上下架同步</Divider></Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">自动同步货源 HID</label>
+                  <Input :value="getVal('auto_sync_hids')" @update:value="(v: string) => setVal('auto_sync_hids', v)" placeholder="多个用逗号分隔，如 1,2,3" />
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">填写需要自动上下架同步的货源HID，系统每30分钟自动执行一次</div>
+                </Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">同步价格倍率</label>
+                  <Input :value="getVal('auto_sync_rate', '5')" @update:value="(v: string) => setVal('auto_sync_rate', v)" placeholder="5" />
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">上游价格 × 此倍率 = 本站售价</div>
+                </Col>
+              </Row>
+            </div>
+          </TabPane>
+
           <!-- 其他设置 -->
-          <TabPane key="qtpz">
+          <TabPane key="qtpz2">
             <template #tab><SettingOutlined class="mr-1" />其他设置</template>
             <div class="tab-body">
               <Row :gutter="[24, 16]">
