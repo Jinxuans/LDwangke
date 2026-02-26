@@ -224,6 +224,36 @@ func AgentMigrateSuperior(c *gin.Context) {
 	response.SuccessMsg(c, fmt.Sprintf("迁移成功,您已迁移至[UID%d]的名下", body.UID))
 }
 
+// ===== 跨户充值权限检查 =====
+
+func AgentCrossRechargeCheck(c *gin.Context) {
+	uid := c.GetInt("uid")
+	allowed := agentService.CrossRechargeAllowed(uid)
+	response.Success(c, gin.H{"allowed": allowed})
+}
+
+// ===== 跨户充值 =====
+
+func AgentCrossRecharge(c *gin.Context) {
+	uid := c.GetInt("uid")
+
+	var body struct {
+		UID   int     `json:"uid"`
+		Money float64 `json:"money"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+
+	err := agentService.AgentCrossRecharge(uid, body.UID, body.Money)
+	if err != nil {
+		response.BusinessError(c, 1001, err.Error())
+		return
+	}
+	response.SuccessMsg(c, "跨户充值成功")
+}
+
 // ===== 给下级设置邀请码 =====
 
 func AgentSetInviteCode(c *gin.Context) {

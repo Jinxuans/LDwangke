@@ -432,6 +432,15 @@ export async function agentSetInviteCodeApi(data: { uid: number; yqm: string }) 
   return requestClient.post('/agent/set-invite-code', data);
 }
 
+// ===== 跨户充值 =====
+export async function agentCrossRechargeCheckApi() {
+  return requestClient.get<{ allowed: boolean }>('/agent/cross-recharge-check');
+}
+
+export async function agentCrossRechargeApi(data: { uid: number; money: number }) {
+  return requestClient.post('/agent/cross-recharge', data);
+}
+
 // ===== 对接队列 =====
 export interface QueueStats {
   max_workers: number;

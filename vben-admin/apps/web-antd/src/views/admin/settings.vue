@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { Page } from '@vben/common-ui';
 import {
-  Card, Button, Input, Switch, Select, SelectOption,
-  message, Spin, Tabs, TabPane, Row, Col, Divider,
+  Card, Button, Input, InputNumber, Switch, Select, SelectOption,
+  message, Spin, Tabs, TabPane, Row, Col, Divider, Tag, Checkbox,
 } from 'ant-design-vue';
 import {
   SaveOutlined, ReloadOutlined, DesktopOutlined, TeamOutlined,
   CreditCardOutlined, AppstoreOutlined, SearchOutlined, SettingOutlined,
   LayoutOutlined, SafetyCertificateOutlined, GiftOutlined,
+  PlusOutlined, DeleteOutlined,
 } from '@ant-design/icons-vue';
 import { getConfigApi, saveConfigApi, getPayDataApi, savePayDataApi } from '#/api/admin';
 import { updatePreferences } from '@vben/preferences';
@@ -92,7 +93,87 @@ function setPayVal(key: string, val: string) {
   payData.value[key] = val;
 }
 
-onMounted(loadAll);
+// ===== 充值赠送规则 =====
+interface BonusRule { min: number; max: number; bonus_pct: number; }
+interface BonusActivity { enabled: boolean; weekdays: number[]; rules: BonusRule[]; }
+interface BonusConfig { enabled: boolean; rules: BonusRule[]; activity: BonusActivity; }
+
+const emptyActivity = (): BonusActivity => ({ enabled: false, weekdays: [], rules: [] });
+
+const bonusConfig = ref<BonusConfig>({ enabled: false, rules: [], activity: emptyActivity() });
+
+function parseBonusConfig() {
+  const raw = config.value['recharge_bonus_rules'];
+  if (!raw) { bonusConfig.value = { enabled: false, rules: [], activity: emptyActivity() }; return; }
+  try {
+    bonusConfig.value = JSON.parse(raw);
+    if (!bonusConfig.value.rules) bonusConfig.value.rules = [];
+    if (!bonusConfig.value.activity) bonusConfig.value.activity = emptyActivity();
+    if (!bonusConfig.value.activity.weekdays) bonusConfig.value.activity.weekdays = [];
+    if (!bonusConfig.value.activity.rules) bonusConfig.value.activity.rules = [];
+  } catch { bonusConfig.value = { enabled: false, rules: [], activity: emptyActivity() }; }
+}
+
+function syncBonusConfig() {
+  config.value['recharge_bonus_rules'] = JSON.stringify(bonusConfig.value);
+}
+
+function addBonusRule() {
+  const rules = bonusConfig.value.rules;
+  const lastMax = rules.length > 0 ? rules[rules.length - 1]!.max : 0;
+  rules.push({ min: lastMax, max: lastMax + 500, bonus_pct: 5 });
+  syncBonusConfig();
+}
+
+function removeBonusRule(idx: number) {
+  bonusConfig.value.rules.splice(idx, 1);
+  syncBonusConfig();
+}
+
+function updateBonusRule(idx: number, field: keyof BonusRule, val: number) {
+  (bonusConfig.value.rules[idx] as any)[field] = val;
+  syncBonusConfig();
+}
+
+function addActivityRule() {
+  const rules = bonusConfig.value.activity.rules;
+  const lastMax = rules.length > 0 ? rules[rules.length - 1]!.max : 0;
+  rules.push({ min: lastMax, max: lastMax + 500, bonus_pct: 10 });
+  syncBonusConfig();
+}
+
+function removeActivityRule(idx: number) {
+  bonusConfig.value.activity.rules.splice(idx, 1);
+  syncBonusConfig();
+}
+
+function updateActivityRule(idx: number, field: keyof BonusRule, val: number) {
+  (bonusConfig.value.activity.rules[idx] as any)[field] = val;
+  syncBonusConfig();
+}
+
+function toggleBonusEnabled(v: boolean) {
+  bonusConfig.value.enabled = v;
+  syncBonusConfig();
+}
+
+function toggleActivityEnabled(v: boolean) {
+  bonusConfig.value.activity.enabled = v;
+  syncBonusConfig();
+}
+
+const weekdayLabels = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+function toggleWeekday(day: number) {
+  const wds = bonusConfig.value.activity.weekdays;
+  const idx = wds.indexOf(day);
+  if (idx >= 0) wds.splice(idx, 1);
+  else wds.push(day);
+  wds.sort((a, b) => a - b);
+  syncBonusConfig();
+}
+
+onMounted(async () => { await loadAll(); parseBonusConfig(); });
 </script>
 
 <template>
@@ -104,49 +185,61 @@ onMounted(loadAll);
           <TabPane key="wzpz">
             <template #tab><DesktopOutlined class="mr-1" />网站配置</template>
             <div class="tab-body">
-              <Row :gutter="[24, 16]">
+              <Row :gutter="[24, 24]">
+                <Col :span="24"><Divider orientation="left" class="!my-0">基本信息</Divider></Col>
                 <Col :xs="24" :lg="12">
-                  <label class="field-label">站点名字</label>
-                  <Input :value="getVal('sitename')" @update:value="(v: string) => setVal('sitename', v)" placeholder="站点名字" />
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">SEO关键词</label>
-                  <Input :value="getVal('keywords')" @update:value="(v: string) => setVal('keywords', v)" placeholder="SEO关键词" />
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">SEO介绍</label>
-                  <Input :value="getVal('description')" @update:value="(v: string) => setVal('description', v)" placeholder="SEO描述" />
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">登录页面LOGO地址</label>
-                  <Input :value="getVal('logo')" @update:value="(v: string) => setVal('logo', v)" placeholder="https://..." />
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">主页顶部LOGO地址</label>
-                  <Input :value="getVal('hlogo')" @update:value="(v: string) => setVal('hlogo', v)" placeholder="https://..." />
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">是否开启水印</label>
-                  <Select :value="getVal('sykg', '1')" @change="(v: any) => setVal('sykg', String(v))" class="w-full">
-                    <SelectOption value="1">开启</SelectOption>
-                    <SelectOption value="0">关闭</SelectOption>
-                  </Select>
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">维护模式</label>
-                  <Select :value="getVal('bz', '0')" @change="(v: any) => setVal('bz', String(v))" class="w-full">
-                    <SelectOption value="1">开启（仅管理员可访问）</SelectOption>
-                    <SelectOption value="0">关闭</SelectOption>
-                  </Select>
-                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">开启后普通用户将无法访问前台，仅管理员可用</div>
+                  <label class="field-label">站点名称</label>
+                  <Input :value="getVal('sitename')" @update:value="(v: string) => setVal('sitename', v)" placeholder="请输入站点名称" />
                 </Col>
                 <Col :xs="24" :lg="12">
                   <label class="field-label">资源版本号</label>
                   <Input :value="getVal('version')" @update:value="(v: string) => setVal('version', v)" placeholder="如 1.0.1" />
                   <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">显示在页面底部，用于标识当前系统版本</div>
                 </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">SEO 设置</Divider></Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">SEO 关键词</label>
+                  <Input :value="getVal('keywords')" @update:value="(v: string) => setVal('keywords', v)" placeholder="SEO关键词" />
+                </Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">SEO 介绍</label>
+                  <Input :value="getVal('description')" @update:value="(v: string) => setVal('description', v)" placeholder="SEO描述" />
+                </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">品牌与视觉</Divider></Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">登录页面 LOGO 地址</label>
+                  <Input :value="getVal('logo')" @update:value="(v: string) => setVal('logo', v)" placeholder="https://..." />
+                </Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">主页顶部 LOGO 地址</label>
+                  <Input :value="getVal('hlogo')" @update:value="(v: string) => setVal('hlogo', v)" placeholder="https://..." />
+                </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">系统功能开关</Divider></Col>
+                <Col :xs="24" :lg="12">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">全站水印</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后前台页面将显示防截图水印</div>
+                    </div>
+                    <Switch :checked="getVal('sykg', '0') === '1'" @change="(v: any) => setVal('sykg', v ? '1' : '0')" />
+                  </div>
+                </Col>
+                <Col :xs="24" :lg="12">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0 text-red-500">维护模式</label>
+                      <div class="text-xs text-red-400">开启后普通用户将无法访问前台，仅管理员可用</div>
+                    </div>
+                    <Switch :checked="getVal('bz', '0') === '1'" @change="(v: any) => setVal('bz', v ? '1' : '0')" />
+                  </div>
+                </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">站点公告</Divider></Col>
                 <Col :span="24">
-                  <label class="field-label">公告</label>
+                  <label class="field-label">登录页弹窗公告</label>
                   <Input.TextArea :value="getVal('notice')" @update:value="(v: string) => setVal('notice', v)" :rows="6" placeholder="公告内容（支持HTML）" />
                 </Col>
                 <Col :span="24">
@@ -161,51 +254,58 @@ onMounted(loadAll);
           <TabPane key="dlpz">
             <template #tab><TeamOutlined class="mr-1" />代理配置</template>
             <div class="tab-body">
-              <Row :gutter="[24, 16]">
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">是否开启上级迁移功能</label>
-                  <Select :value="getVal('sjqykg', '0')" @change="(v: any) => setVal('sjqykg', String(v))" class="w-full">
-                    <SelectOption value="1">开启</SelectOption>
-                    <SelectOption value="0">关闭</SelectOption>
-                  </Select>
+              <Row :gutter="[24, 24]">
+                <Col :span="24"><Divider orientation="left" class="!my-0">功能开关</Divider></Col>
+                <Col :xs="24" :lg="8">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">邀请注册</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">允许用户通过邀请码注册</div>
+                    </div>
+                    <Switch :checked="getVal('user_yqzc', '0') === '1'" @change="(v: any) => setVal('user_yqzc', v ? '1' : '0')" />
+                  </div>
                 </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">是否允许邀请码注册</label>
-                  <Select :value="getVal('user_yqzc', '0')" @change="(v: any) => setVal('user_yqzc', String(v))" class="w-full">
-                    <SelectOption value="1">允许</SelectOption>
-                    <SelectOption value="0">拒绝</SelectOption>
-                  </Select>
+                <Col :xs="24" :lg="8">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">上级迁移</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">允许下级主动迁移至其他上级名下</div>
+                    </div>
+                    <Switch :checked="getVal('sjqykg', '0') === '1'" @change="(v: any) => setVal('sjqykg', v ? '1' : '0')" />
+                  </div>
                 </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">是否允许后台开户</label>
-                  <Select :value="getVal('user_htkh', '0')" @change="(v: any) => setVal('user_htkh', String(v))" class="w-full">
-                    <SelectOption value="1">允许</SelectOption>
-                    <SelectOption value="0">拒绝</SelectOption>
-                  </Select>
+                <Col :xs="24" :lg="8">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">跨户开号</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">允许代理跨级给他人开通下级账号</div>
+                    </div>
+                    <Switch :checked="getVal('user_htkh', '0') === '1'" @change="(v: any) => setVal('user_htkh', v ? '1' : '0')" />
+                  </div>
                 </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">平开代理限制</Divider></Col>
                 <Col :xs="24" :lg="12">
-                  <label class="field-label">代理开通价格</label>
-                  <Input :value="getVal('user_ktmoney')" @update:value="(v: string) => setVal('user_ktmoney', v)" placeholder="0" prefix="¥" />
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">商城开通价格</label>
-                  <Input :value="getVal('mall_open_price')" @update:value="(v: string) => setVal('mall_open_price', v)" placeholder="99" prefix="¥" />
-                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">代理开通商城所需余额，默认 99 元</div>
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">代理平开控制</label>
+                  <label class="field-label">平开控制</label>
                   <Select :value="getVal('dl_pkkg', '0')" @change="(v: any) => setVal('dl_pkkg', String(v))" class="w-full">
-                    <SelectOption value="0">不限制</SelectOption>
-                    <SelectOption value="1">顶级不允许平开</SelectOption>
+                    <SelectOption value="0">无限制（正常开启）</SelectOption>
+                    <SelectOption value="1">禁止所有等级平开</SelectOption>
                     <SelectOption value="2">顶级平开需双倍余额</SelectOption>
                     <SelectOption value="3">所有等级平开需双倍余额</SelectOption>
                   </Select>
                   <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">控制代理开设同级下级时的限制规则</div>
                 </Col>
                 <Col :xs="24" :lg="12">
-                  <label class="field-label">顶级代理费率</label>
+                  <label class="field-label">顶级代理费率定义</label>
                   <Input :value="getVal('djfl')" @update:value="(v: string) => setVal('djfl', v)" placeholder="如 0.5" />
-                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">用于判断是否为顶级代理（addprice 等于此值即为顶级）</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">用于判断是否为顶级代理（用户addprice等于此值即为顶级）</div>
+                </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">跨户充值设置</Divider></Col>
+                <Col :span="24">
+                  <label class="field-label">授权用户 UID 列表</label>
+                  <Input :value="getVal('cross_recharge_uids')" @update:value="(v: string) => setVal('cross_recharge_uids', v)" placeholder="多个UID用逗号分隔，如 2,5,12" />
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">拥有跨户充值权限的用户UID，多个用英文逗号分隔。管理员(UID=1)默认拥有权限。被授权用户可在代理列表中向任意用户转账充值（从自己余额按费率换算扣除）。</div>
                 </Col>
               </Row>
             </div>
@@ -252,6 +352,85 @@ onMounted(loadAll);
                     <Switch :checked="getPayVal('is_usdt') === '1'" @change="(v: any) => setPayVal('is_usdt', v ? '1' : '0')" />
                   </div>
                 </Col>
+                <Col :span="24"><Divider class="!my-2">充值赠送规则</Divider></Col>
+                <Col :span="24">
+                  <div class="switch-row mb-3">
+                    <div>
+                      <label class="field-label !mb-0">启用充值赠送</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后用户充值达到指定金额区间时自动赠送对应比例余额</div>
+                    </div>
+                    <Switch :checked="bonusConfig.enabled" @change="(v: any) => toggleBonusEnabled(!!v)" />
+                  </div>
+                </Col>
+
+                <template v-if="bonusConfig.enabled">
+                  <!-- 区间规则 -->
+                  <Col :span="24">
+                    <div class="flex items-center justify-between mb-2">
+                      <label class="field-label !mb-0">赠送区间规则</label>
+                      <Button size="small" type="dashed" @click="addBonusRule"><PlusOutlined /> 添加规则</Button>
+                    </div>
+                    <div v-if="bonusConfig.rules.length === 0" class="text-gray-400 text-sm py-2">暂无规则，请点击上方添加。</div>
+                    <div v-for="(rule, idx) in bonusConfig.rules" :key="idx" class="bonus-rule-row">
+                      <span class="text-sm text-gray-500 mr-1">充值</span>
+                      <InputNumber :value="rule.min" :min="0" :step="100" size="small" style="width: 100px" @change="(v: any) => updateBonusRule(idx, 'min', v ?? 0)" />
+                      <span class="text-sm text-gray-500 mx-1">~</span>
+                      <InputNumber :value="rule.max" :min="rule.min + 1" :step="100" size="small" style="width: 100px" @change="(v: any) => updateBonusRule(idx, 'max', v ?? 0)" />
+                      <span class="text-sm text-gray-500 mx-1">元，赠送</span>
+                      <InputNumber :value="rule.bonus_pct" :min="0" :max="100" :step="1" size="small" style="width: 80px" @change="(v: any) => updateBonusRule(idx, 'bonus_pct', v ?? 0)" />
+                      <span class="text-sm text-gray-500 ml-1">%</span>
+                      <Button size="small" type="text" danger class="ml-2" @click="removeBonusRule(idx)"><DeleteOutlined /></Button>
+                    </div>
+                  </Col>
+
+                  <!-- 活动日设置 -->
+                  <Col :span="24" class="mt-2">
+                    <div class="switch-row mb-3">
+                      <div>
+                        <label class="field-label !mb-0">活动日规则</label>
+                        <div class="text-xs text-gray-400 dark:text-gray-500">开启后，在指定星期使用独立赠送规则替换普通规则，用户端只显示"今日爆率很高"</div>
+                      </div>
+                      <Switch :checked="bonusConfig.activity.enabled" @change="(v: any) => toggleActivityEnabled(!!v)" />
+                    </div>
+                  </Col>
+
+                  <template v-if="bonusConfig.activity.enabled">
+                    <Col :span="24">
+                      <label class="field-label">选择活动日（星期几）</label>
+                      <div class="flex flex-wrap gap-2">
+                        <Tag
+                          v-for="(label, idx) in weekdayLabels" :key="idx"
+                          :color="bonusConfig.activity.weekdays.includes(idx) ? 'blue' : ''"
+                          class="cursor-pointer select-none !text-sm !px-3 !py-1"
+                          @click="toggleWeekday(idx)"
+                        >{{ label }}</Tag>
+                      </div>
+                    </Col>
+                    <Col :span="24" class="mt-2">
+                      <label class="field-label">活动日提示文案</label>
+                      <Input :value="bonusConfig.activity.hint || ''" @update:value="(v: string) => { bonusConfig.activity.hint = v; syncBonusConfig(); }" placeholder="今日爆率很高，充值更划算！" />
+                      <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">用户在充值页面看到的活动日提示，留空则显示默认文案</div>
+                    </Col>
+                    <Col :span="24" class="mt-3">
+                      <div class="flex items-center justify-between mb-2">
+                        <label class="field-label !mb-0">活动日赠送规则（替换普通规则）</label>
+                        <Button size="small" type="dashed" @click="addActivityRule"><PlusOutlined /> 添加规则</Button>
+                      </div>
+                      <div v-if="bonusConfig.activity.rules.length === 0" class="text-gray-400 text-sm py-2">暂无活动日规则，请点击上方添加。</div>
+                      <div v-for="(rule, idx) in bonusConfig.activity.rules" :key="idx" class="bonus-rule-row">
+                        <span class="text-sm text-gray-500 mr-1">充值</span>
+                        <InputNumber :value="rule.min" :min="0" :step="100" size="small" style="width: 100px" @change="(v: any) => updateActivityRule(idx, 'min', v ?? 0)" />
+                        <span class="text-sm text-gray-500 mx-1">~</span>
+                        <InputNumber :value="rule.max" :min="rule.min + 1" :step="100" size="small" style="width: 100px" @change="(v: any) => updateActivityRule(idx, 'max', v ?? 0)" />
+                        <span class="text-sm text-gray-500 mx-1">元，赠送</span>
+                        <InputNumber :value="rule.bonus_pct" :min="0" :max="100" :step="1" size="small" style="width: 80px" @change="(v: any) => updateActivityRule(idx, 'bonus_pct', v ?? 0)" />
+                        <span class="text-sm text-gray-500 ml-1">%</span>
+                        <Button size="small" type="text" danger class="ml-2" @click="removeActivityRule(idx)"><DeleteOutlined /></Button>
+                      </div>
+                    </Col>
+                  </template>
+                </template>
+
                 <Col :span="24"><Divider class="!my-2">易支付配置</Divider></Col>
                 <Col :xs="24" :lg="12">
                   <label class="field-label">易支付API</label>
@@ -269,17 +448,108 @@ onMounted(loadAll);
             </div>
           </TabPane>
 
+          <!-- 前台配置 -->
+          <TabPane key="qtpz">
+            <template #tab><LayoutOutlined class="mr-1" />前台配置</template>
+            <div class="tab-body">
+              <Row :gutter="[24, 24]">
+                <Col :span="24"><Divider orientation="left" class="!my-0">前台界面与特效</Divider></Col>
+                <Col :xs="24" :lg="8">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">前台背景特效</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后前台页面将显示动态背景特效</div>
+                    </div>
+                    <Switch :checked="getVal('webVfx_open', '0') === '1'" @change="(v: any) => setVal('webVfx_open', v ? '1' : '0')" />
+                  </div>
+                </Col>
+                <Col :xs="24" :lg="8">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">防调试模式</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后禁用F12和右键等开发者工具</div>
+                    </div>
+                    <Switch :checked="getVal('anti_debug', '0') === '1'" @change="(v: any) => setVal('anti_debug', v ? '1' : '0')" />
+                  </div>
+                </Col>
+                <Col :xs="24" :lg="8">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">前台登录提示</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">未登录时访问需要登录的页面弹出提示</div>
+                    </div>
+                    <Switch :checked="getVal('onlineStore_trdltz', '0') === '1'" @change="(v: any) => setVal('onlineStore_trdltz', v ? '1' : '0')" />
+                  </div>
+                </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">视觉与样式</Divider></Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">特效类型</label>
+                  <Select :value="getVal('webVfx', '0')" @change="(v: any) => setVal('webVfx', String(v))" class="w-full">
+                    <SelectOption value="0">默认特效</SelectOption>
+                    <SelectOption value="1">樱花飘落</SelectOption>
+                    <SelectOption value="2">雪花飘落</SelectOption>
+                    <SelectOption value="3">星星闪烁</SelectOption>
+                    <SelectOption value="4">彩色气泡</SelectOption>
+                    <SelectOption value="5">黑客帝国代码雨</SelectOption>
+                  </Select>
+                </Col>
+                <Col :xs="24" :lg="12">
+                  <div class="switch-row h-full items-start">
+                    <div>
+                      <label class="field-label !mb-0">自定义字体</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后前台将加载并使用自定义字体</div>
+                    </div>
+                    <Switch :checked="getVal('fontsZDY', '0') === '1'" @change="(v: any) => setVal('fontsZDY', v ? '1' : '0')" />
+                  </div>
+                </Col>
+                <Col :span="24">
+                  <label class="field-label">字体CSS代码 (URL)</label>
+                  <Input :value="getVal('fontsFamily')" @update:value="(v: string) => setVal('fontsFamily', v)" placeholder="例如: https://fonts.googleapis.com/css2?family=Noto+Sans+SC&display=swap" />
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">需开启自定义字体功能才能生效。填入包含 @font-face 的 CSS 链接或直接写 CSS 代码。</div>
+                </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">渠道与提示</Divider></Col>
+                <Col :xs="24" :lg="12">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">下单说明展示</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">在商品下单页面显示下单说明模块</div>
+                    </div>
+                    <Switch :checked="getVal('xdsmopen', '0') === '1'" @change="(v: any) => setVal('xdsmopen', v ? '1' : '0')" />
+                  </div>
+                </Col>
+                <Col :xs="24" :lg="12">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">渠道公告</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后，主页将显示公告信息</div>
+                    </div>
+                    <Switch :checked="getVal('qd_notice_open', '0') === '1'" @change="(v: any) => setVal('qd_notice_open', v ? '1' : '0')" />
+                  </div>
+                </Col>
+                <Col :span="24">
+                  <label class="field-label">自定义代码(底部)</label>
+                  <Input.TextArea :value="getVal('bottom_code')" @update:value="(v: string) => setVal('bottom_code', v)" :rows="4" placeholder="此处可以放网站统计代码、客服代码等，将插入在页面底部。" />
+                </Col>
+              </Row>
+            </div>
+          </TabPane>
+
           <!-- 分类配置 -->
           <TabPane key="flpz">
             <template #tab><AppstoreOutlined class="mr-1" />分类配置</template>
             <div class="tab-body">
-              <Row :gutter="[24, 16]">
+              <Row :gutter="[24, 24]">
+                <Col :span="24"><Divider orientation="left" class="!my-0">分类展示</Divider></Col>
                 <Col :xs="24" :lg="12">
-                  <label class="field-label">分类开关</label>
-                  <Select :value="getVal('flkg', '1')" @change="(v: any) => setVal('flkg', String(v))" class="w-full">
-                    <SelectOption value="1">开启</SelectOption>
-                    <SelectOption value="0">关闭</SelectOption>
-                  </Select>
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">分类开关</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后在前台显示商品分类</div>
+                    </div>
+                    <Switch :checked="getVal('flkg', '0') === '1'" @change="(v: any) => setVal('flkg', v ? '1' : '0')" />
+                  </div>
                 </Col>
                 <Col :xs="24" :lg="12">
                   <label class="field-label">分类类型</label>
@@ -293,96 +563,12 @@ onMounted(loadAll);
             </div>
           </TabPane>
 
-          <!-- 查课配置 -->
-          <TabPane key="ckpz">
-            <template #tab><SearchOutlined class="mr-1" />查课配置</template>
-            <div class="tab-body">
-              <Row :gutter="[24, 16]">
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">是否开启API调用功能</label>
-                  <Select :value="getVal('settings', '1')" @change="(v: any) => setVal('settings', String(v))" class="w-full">
-                    <SelectOption value="1">开启API调用</SelectOption>
-                    <SelectOption value="0">关闭API调用</SelectOption>
-                  </Select>
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">API调用扣费限制</label>
-                  <Input :value="getVal('api_proportion')" @update:value="(v: string) => setVal('api_proportion', v)" placeholder="0" suffix="%" />
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">API查课余额限制</label>
-                  <Input :value="getVal('api_ck')" @update:value="(v: string) => setVal('api_ck', v)" placeholder="0" prefix="¥" />
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">API下单余额限制</label>
-                  <Input :value="getVal('api_xd')" @update:value="(v: string) => setVal('api_xd', v)" placeholder="0" prefix="¥" />
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">API同步随机时间最小</label>
-                  <Input :value="getVal('api_tongb')" @update:value="(v: string) => setVal('api_tongb', v)" placeholder="0" suffix="分钟" />
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">API同步随机时间最大</label>
-                  <Input :value="getVal('api_tongbc')" @update:value="(v: string) => setVal('api_tongbc', v)" placeholder="0" suffix="分钟" />
-                </Col>
-              </Row>
-            </div>
-          </TabPane>
-
-          <!-- 前端显示 -->
-          <TabPane key="qdpz">
-            <template #tab><LayoutOutlined class="mr-1" />前端显示</template>
-            <div class="tab-body">
-              <Row :gutter="[24, 16]">
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">自定义字体开关</label>
-                  <Select :value="getVal('fontsZDY', '0')" @change="(v: any) => setVal('fontsZDY', String(v))" class="w-full">
-                    <SelectOption value="1">开启</SelectOption>
-                    <SelectOption value="0">关闭</SelectOption>
-                  </Select>
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">字体族</label>
-                  <Input :value="getVal('fontsFamily')" @update:value="(v: string) => setVal('fontsFamily', v)" placeholder="如: 'Noto Serif SC', serif" />
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <div class="switch-row">
-                    <label class="field-label !mb-0">渠道公告</label>
-                    <Switch :checked="getVal('qd_notice_open') === '1'" @change="(v: any) => setVal('qd_notice_open', v ? '1' : '0')" />
-                  </div>
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <div class="switch-row">
-                    <label class="field-label !mb-0">下单扫码</label>
-                    <Switch :checked="getVal('xdsmopen') === '1'" @change="(v: any) => setVal('xdsmopen', v ? '1' : '0')" />
-                  </div>
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <div class="switch-row">
-                    <label class="field-label !mb-0">代理登入跳转</label>
-                    <Switch :checked="getVal('onlineStore_trdltz') === '1'" @change="(v: any) => setVal('onlineStore_trdltz', v ? '1' : '0')" />
-                  </div>
-                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">开启后管理员可从前台跳转代理登入页</div>
-                </Col>
-                <Col :xs="24" :lg="12">
-                  <div class="switch-row">
-                    <label class="field-label !mb-0">自定义特效</label>
-                    <Switch :checked="getVal('webVfx_open') === '1'" @change="(v: any) => setVal('webVfx_open', v ? '1' : '0')" />
-                  </div>
-                </Col>
-                <Col :span="24" v-if="getVal('webVfx_open') === '1'">
-                  <label class="field-label">特效代码</label>
-                  <Input.TextArea :value="getVal('webVfx')" @update:value="(v: string) => setVal('webVfx', v)" :rows="4" placeholder="自定义 CSS/JS 特效代码" />
-                </Col>
-              </Row>
-            </div>
-          </TabPane>
-
           <!-- 登录设置 -->
           <TabPane key="dlsz">
             <template #tab><SafetyCertificateOutlined class="mr-1" />登录设置</template>
             <div class="tab-body">
-              <Row :gutter="[24, 16]">
+              <Row :gutter="[24, 24]">
+                <Col :span="24"><Divider orientation="left" class="!my-0">安全验证</Divider></Col>
                 <Col :xs="24" :lg="12">
                   <div class="switch-row">
                     <div>
@@ -409,7 +595,8 @@ onMounted(loadAll);
           <TabPane key="qdsz">
             <template #tab><GiftOutlined class="mr-1" />签到设置</template>
             <div class="tab-body">
-              <Row :gutter="[24, 16]">
+              <Row :gutter="[24, 24]">
+                <Col :span="24"><Divider orientation="left" class="!my-0">基础开关</Divider></Col>
                 <Col :xs="24" :lg="12">
                   <div class="switch-row">
                     <div>
@@ -428,6 +615,8 @@ onMounted(loadAll);
                     <Switch :checked="getVal('checkin_order_required', '0') === '1'" @change="(v: any) => setVal('checkin_order_required', v ? '1' : '0')" />
                   </div>
                 </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">条件与限制</Divider></Col>
                 <Col :xs="24" :lg="12">
                   <label class="field-label">最低余额要求</label>
                   <Input :value="getVal('checkin_min_balance', '10')" @update:value="(v: string) => setVal('checkin_min_balance', v)" placeholder="10" prefix="¥" />
@@ -438,6 +627,8 @@ onMounted(loadAll);
                   <Input :value="getVal('checkin_max_users', '10')" @update:value="(v: string) => setVal('checkin_max_users', v)" placeholder="10" suffix="人" />
                   <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">每天最多允许签到的人数</div>
                 </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">奖励设置</Divider></Col>
                 <Col :xs="24" :lg="12">
                   <label class="field-label">最小奖励金额</label>
                   <Input :value="getVal('checkin_min_reward', '0.1')" @update:value="(v: string) => setVal('checkin_min_reward', v)" placeholder="0.1" prefix="¥" />
@@ -508,10 +699,19 @@ html.dark .field-label { color: #aaa; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   padding: 10px 16px;
   border-radius: 8px;
   background: #fafafa;
   border: 1px solid #f0f0f0;
+}
+.switch-row > div:first-child {
+  min-width: 0;
+  flex: 1;
+  padding-right: 12px;
+}
+.switch-row .ant-switch {
+  flex-shrink: 0;
 }
 html.dark .switch-row { background: #1f1f1f; border-color: #333; }
 .save-bar {
@@ -523,4 +723,16 @@ html.dark .switch-row { background: #1f1f1f; border-color: #333; }
   background: #fafafa;
 }
 html.dark .save-bar { background: #1f1f1f; border-top-color: #333; }
+.bonus-rule-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+}
+html.dark .bonus-rule-row { background: #1f1f1f; border-color: #333; }
 </style>

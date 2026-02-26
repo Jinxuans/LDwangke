@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"go-api/internal/database"
@@ -599,5 +600,92 @@ func (s *AgentService) AgentSetInviteCode(operatorUID int, targetUID int, yqm st
 
 	database.DB.Exec("UPDATE qingka_wangke_user SET yqm = ? WHERE uid = ?", yqm, targetUID)
 	wlog(operatorUID, "设置邀请码", fmt.Sprintf("给下级设置邀请码%s成功", yqm), 0)
+	return nil
+}
+
+// ===== 跨户充值权限检查 =====
+
+func (s *AgentService) CrossRechargeAllowed(uid int) bool {
+	if uid == 1 {
+		return true // 管理员始终有权限
+	}
+	conf, _ := NewAdminService().GetConfig()
+	uidList := conf["cross_recharge_uids"]
+	if uidList == "" {
+		return false
+	}
+	uidStr := fmt.Sprintf("%d", uid)
+	for _, s := range splitCSV(uidList) {
+		if s == uidStr {
+			return true
+		}
+	}
+	return false
+}
+
+// splitCSV 按逗号分割并去空白
+func splitCSV(s string) []string {
+	var result []string
+	for _, part := range strings.Split(s, ",") {
+		p := strings.TrimSpace(part)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+// ===== 跨户充值 =====
+
+func (s *AgentService) AgentCrossRecharge(operatorUID int, targetUID int, money float64) error {
+	if money <= 0 {
+		return errors.New("充值金额必须大于0")
+	}
+	if money < 1 {
+		return errors.New("最低充值1元")
+	}
+	if operatorUID == targetUID {
+		return errors.New("不能给自己跨户充值")
+	}
+
+	// 权限检查
+	if !s.CrossRechargeAllowed(operatorUID) {
+		return errors.New("您没有跨户充值权限")
+	}
+
+	// 查操作者信息
+	var operatorMoney, operatorAddPrice float64
+	var operatorName string
+	err := database.DB.QueryRow("SELECT COALESCE(money,0), COALESCE(addprice,1), COALESCE(name,'') FROM qingka_wangke_user WHERE uid = ?", operatorUID).Scan(&operatorMoney, &operatorAddPrice, &operatorName)
+	if err != nil {
+		return errors.New("操作者信息查询失败")
+	}
+
+	// 查目标用户
+	var targetUser, targetName string
+	var targetAddPrice float64
+	err = database.DB.QueryRow("SELECT user, COALESCE(name,''), COALESCE(addprice,1) FROM qingka_wangke_user WHERE uid = ?", targetUID).Scan(&targetUser, &targetName, &targetAddPrice)
+	if err != nil {
+		return errors.New("目标用户不存在")
+	}
+
+	// 按费率换算实际扣费（与普通充值一致）
+	kochu := math.Round(money*(operatorAddPrice/targetAddPrice)*100000) / 100000
+
+	// 管理员不扣费
+	if operatorUID != 1 && operatorMoney < kochu {
+		return fmt.Errorf("余额不足，需扣 %.2f 元，当前余额 %.2f 元", kochu, operatorMoney)
+	}
+
+	// 执行转账：按费率扣源、原额加目标
+	if operatorUID != 1 {
+		database.DB.Exec("UPDATE qingka_wangke_user SET money = money - ? WHERE uid = ?", kochu, operatorUID)
+	}
+	database.DB.Exec("UPDATE qingka_wangke_user SET money = money + ?, zcz = zcz + ? WHERE uid = ?", money, money, targetUID)
+
+	// 记录流水
+	wlog(operatorUID, "跨户充值", fmt.Sprintf("跨户充值给[%s](UID:%d) %.2f元,实际扣费%.5f元", targetName, targetUID, money, kochu), -kochu)
+	wlog(targetUID, "跨户充值", fmt.Sprintf("%s(UID:%d)跨户充值 %.2f元", operatorName, operatorUID, money), money)
+
 	return nil
 }

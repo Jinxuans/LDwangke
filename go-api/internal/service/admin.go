@@ -436,6 +436,8 @@ var publicConfigKeys = map[string]bool{
 	"user_yqzc": true, "login_slider_verify": true, "login_email_verify": true,
 	"webVfx_open": true, "webVfx": true,
 	"keywords": true, "description": true,
+	"checkin_enabled":      true,
+	"recharge_bonus_rules": true,
 }
 
 func (s *AdminService) GetPublicConfig() (map[string]string, error) {

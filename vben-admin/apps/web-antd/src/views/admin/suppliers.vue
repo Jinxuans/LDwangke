@@ -2,18 +2,19 @@
 import { ref, reactive, onMounted } from 'vue';
 import { Page } from '@vben/common-ui';
 import {
-  Card, Table, Button, Input, InputNumber, Space, Tag, Modal, Switch, message, Select, SelectOption,
+  Card, Table, Button, Input, InputNumber, Space, Tag, Modal, message, Select, SelectOption, Tabs, TabPane,
 } from 'ant-design-vue';
-import { PlusOutlined, EditOutlined, ImportOutlined, SyncOutlined, DeleteOutlined, DollarOutlined, ReloadOutlined } from '@ant-design/icons-vue';
+import { PlusOutlined, EditOutlined, ImportOutlined, SyncOutlined, DeleteOutlined, DollarOutlined, ReloadOutlined, ApiOutlined } from '@ant-design/icons-vue';
 import { getSupplierListApi, saveSupplierApi, importSupplierApi, syncSupplierStatusApi, deleteSupplierApi, getPlatformNamesApi, querySupplierBalanceApi, type SupplierItem } from '#/api/admin';
+import PlatformConfigPanel from './components/PlatformConfigPanel.vue';
 
+const activeTab = ref('suppliers');
 const loading = ref(false);
 const suppliers = ref<SupplierItem[]>([]);
 const editVisible = ref(false);
 const form = reactive({ hid: 0, pt: '', name: '', url: '', user: '', pass: '', token: '', status: '1' });
 const platformNames = ref<Record<string, string>>({});
 
-// 一键对接弹窗
 const importVisible = ref(false);
 const importLoading = ref(false);
 const importForm = reactive({ hid: 0, name: '', pricee: 1, category: '999999', fd: 0 });
@@ -105,7 +106,6 @@ async function queryBalance(hid: number) {
     const raw = await querySupplierBalanceApi(hid);
     const res = raw;
     const money = res?.money ?? '';
-    // 更新本地表格中的余额显示
     const sup = suppliers.value.find((s) => s.hid === hid);
     if (sup) sup.money = money;
     message.success(`${sup?.name || hid}: 余额 ${money}`);
@@ -149,63 +149,74 @@ onMounted(async () => {
 <template>
   <Page title="货源管理" content-class="p-4">
     <Card>
-      <div class="flex justify-between items-center mb-4">
-        <span class="text-sm text-gray-500">共 {{ suppliers.length }} 个货源</span>
-        <Space>
-          <Button :loading="batchBalanceLoading" @click="batchQueryBalance">
-            <template #icon><DollarOutlined /></template>
-            批量查余额
-          </Button>
-          <Button type="primary" @click="openEdit()">
-            <template #icon><PlusOutlined /></template>
-            添加货源
-          </Button>
-        </Space>
-      </div>
+      <Tabs v-model:activeKey="activeTab">
+        <!-- ===== Tab 1: 货源列表 ===== -->
+        <TabPane key="suppliers">
+          <template #tab>
+            <span class="font-medium">货源列表</span>
+          </template>
 
-      <Table :data-source="suppliers" :loading="loading" :pagination="false" row-key="hid" size="small" bordered :scroll="{ x: 1100 }">
-        <Table.Column title="HID" data-index="hid" :width="60" />
-        <Table.Column title="平台" :width="100">
-          <template #default="{ record }">
-            <Tag color="blue">{{ getPtName(record.pt) }}</Tag>
-          </template>
-        </Table.Column>
-        <Table.Column title="名称" data-index="name" :width="150" />
-        <Table.Column title="API 地址" data-index="url" ellipsis />
-        <Table.Column title="账号" data-index="user" :width="120" />
-        <Table.Column title="余额" :width="140">
-          <template #default="{ record }">
-            <div class="flex items-center gap-1">
-              <span>{{ record.money || '-' }}</span>
-              <Button
-                type="link"
-                size="small"
-                :loading="balanceLoading[record.hid]"
-                @click="queryBalance(record.hid)"
-                title="刷新余额"
-              >
-                <template #icon><ReloadOutlined /></template>
-              </Button>
-            </div>
-          </template>
-        </Table.Column>
-        <Table.Column title="状态" :width="80">
-          <template #default="{ record }">
-            <Tag :color="record.status === '1' ? 'green' : 'default'">{{ record.status === '1' ? '启用' : '禁用' }}</Tag>
-          </template>
-        </Table.Column>
-        <Table.Column title="添加时间" data-index="addtime" :width="160" />
-        <Table.Column title="操作" :width="220">
-          <template #default="{ record }">
+          <div class="flex justify-between items-center mb-4">
+            <span class="text-sm text-gray-500">共 {{ suppliers.length }} 个货源</span>
             <Space>
-              <Button type="link" size="small" @click="openEdit(record)"><EditOutlined /> 编辑</Button>
-              <Button type="link" size="small" @click="openImport(record)"><ImportOutlined /> 对接</Button>
-              <Button type="link" size="small" @click="handleSyncStatus(record.hid)"><SyncOutlined /> 同步</Button>
-              <Button type="link" size="small" danger @click="handleDelete(record.hid)"><DeleteOutlined /> 删除</Button>
+              <Button :loading="batchBalanceLoading" @click="batchQueryBalance">
+                <template #icon><DollarOutlined /></template>
+                批量查余额
+              </Button>
+              <Button type="primary" @click="openEdit()">
+                <template #icon><PlusOutlined /></template>
+                添加货源
+              </Button>
             </Space>
+          </div>
+
+          <Table :data-source="suppliers" :loading="loading" :pagination="false" row-key="hid" size="small" bordered :scroll="{ x: 1100 }">
+            <Table.Column title="HID" data-index="hid" :width="60" />
+            <Table.Column title="平台" :width="100">
+              <template #default="{ record }">
+                <Tag color="blue">{{ getPtName(record.pt) }}</Tag>
+              </template>
+            </Table.Column>
+            <Table.Column title="名称" data-index="name" :width="150" />
+            <Table.Column title="API 地址" data-index="url" ellipsis />
+            <Table.Column title="账号" data-index="user" :width="120" />
+            <Table.Column title="余额" :width="140">
+              <template #default="{ record }">
+                <div class="flex items-center gap-1">
+                  <span>{{ record.money || '-' }}</span>
+                  <Button type="link" size="small" :loading="balanceLoading[record.hid]" @click="queryBalance(record.hid)" title="刷新余额">
+                    <template #icon><ReloadOutlined /></template>
+                  </Button>
+                </div>
+              </template>
+            </Table.Column>
+            <Table.Column title="状态" :width="80">
+              <template #default="{ record }">
+                <Tag :color="record.status === '1' ? 'green' : 'default'">{{ record.status === '1' ? '启用' : '禁用' }}</Tag>
+              </template>
+            </Table.Column>
+            <Table.Column title="添加时间" data-index="addtime" :width="160" />
+            <Table.Column title="操作" :width="220">
+              <template #default="{ record }">
+                <Space>
+                  <Button type="link" size="small" @click="openEdit(record)"><EditOutlined /> 编辑</Button>
+                  <Button type="link" size="small" @click="openImport(record)"><ImportOutlined /> 对接</Button>
+                  <Button type="link" size="small" @click="handleSyncStatus(record.hid)"><SyncOutlined /> 同步</Button>
+                  <Button type="link" size="small" danger @click="handleDelete(record.hid)"><DeleteOutlined /> 删除</Button>
+                </Space>
+              </template>
+            </Table.Column>
+          </Table>
+        </TabPane>
+
+        <!-- ===== Tab 2: 平台接口配置 ===== -->
+        <TabPane key="platform-config">
+          <template #tab>
+            <span class="font-medium"><ApiOutlined class="mr-1" />平台接口配置</span>
           </template>
-        </Table.Column>
-      </Table>
+          <PlatformConfigPanel />
+        </TabPane>
+      </Tabs>
     </Card>
 
     <!-- 编辑货源 -->

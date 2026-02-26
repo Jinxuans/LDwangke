@@ -16,7 +16,7 @@ import {
   WalletOutlined, ShoppingCartOutlined, FileAddOutlined,
   UnorderedListOutlined, DollarOutlined, RocketOutlined,
   NotificationOutlined, TeamOutlined, SyncOutlined,
-  RiseOutlined, ThunderboltOutlined, CrownOutlined, GiftOutlined,
+  RiseOutlined, ThunderboltOutlined, CrownOutlined, GiftOutlined, CheckCircleOutlined,
 } from '@ant-design/icons-vue';
 import { getUserProfileApi, type UserProfile } from '#/api/user-center';
 import { useAccessStore } from '@vben/stores';
@@ -44,6 +44,8 @@ const editingConcurrency = ref(false);
 const newConcurrency = ref(5);
 const maintenanceMode = ref(false);
 const siteNotice = ref('');
+const checkinEnabled = ref(false);
+const dailyQuote = ref('欢迎回来，开始您一天的工作吧！');
 
 // ECharts refs
 const trendChartRef = ref<EchartsUIType>();
@@ -58,6 +60,7 @@ async function loadDashboard() {
     try {
       const cfg = await getSiteConfigApi();
       maintenanceMode.value = cfg?.bz === '1';
+      checkinEnabled.value = cfg?.checkin_enabled === '1';
       // qd_notice_open: 渠道公告开关，关闭时不显示 notice
       siteNotice.value = (cfg?.qd_notice_open !== '0' && cfg?.notice) ? cfg.notice : '';
       if (cfg?.tcgonggao) {
@@ -270,6 +273,19 @@ async function loadCheckinStatus() {
   } catch {}
 }
 
+async function fetchDailyQuote() {
+  try {
+    const res = await fetch('https://v1.hitokoto.cn/?c=i');
+    const data = await res.json();
+    if (data && data.hitokoto) {
+      dailyQuote.value = data.hitokoto;
+    }
+  } catch {
+    // fallback if api fails
+    dailyQuote.value = '今天也要加油哦！';
+  }
+}
+
 async function doCheckin() {
   checkinLoading.value = true;
   try {
@@ -281,11 +297,22 @@ async function doCheckin() {
   }
 }
 
-onMounted(() => { loadDashboard(); loadCheckinStatus(); });
+onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
 </script>
 
 <template>
-  <Page title="控制台" content-class="p-4" description="欢迎回来">
+  <Page title="控制台" content-class="p-4" :description="dailyQuote">
+    <template #extra>
+      <div v-if="checkinEnabled" class="flex items-center gap-2">
+        <div v-if="checkedIn" class="text-sm text-green-600 hidden sm:block">✓ 已签到，奖励 ¥{{ checkinReward }}</div>
+        <Button v-if="!checkedIn" type="primary" :loading="checkinLoading" @click="doCheckin">
+          <GiftOutlined /> 每日签到
+        </Button>
+        <Button v-else disabled>
+          <CheckCircleOutlined /> 今日已签到
+        </Button>
+      </div>
+    </template>
     <Spin :spinning="loading">
       <Alert v-if="maintenanceMode" type="warning" show-icon message="系统当前处于维护模式，仅管理员可正常使用。" class="mb-4" />
       <Alert v-if="siteNotice" type="info" show-icon :message="siteNotice" class="mb-4" />
@@ -430,22 +457,6 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); });
 
         <!-- 右侧面板 -->
         <Col :xs="24" :lg="hasAdminRole ? 8 : 10">
-          <!-- 签到 -->
-          <Card class="mb-3" size="small">
-            <template #title>
-              <div class="flex items-center gap-2">
-                <GiftOutlined style="color:#faad14" /><span>每日签到</span>
-              </div>
-            </template>
-            <div class="flex items-center justify-between">
-              <div v-if="checkedIn" class="text-sm text-green-600">✓ 已签到，奖励 ¥{{ checkinReward }}</div>
-              <div v-else class="text-sm text-gray-500 dark:text-gray-400">签到领取随机奖励</div>
-              <Button v-if="!checkedIn" type="primary" size="small" :loading="checkinLoading" @click="doCheckin">
-                <GiftOutlined /> 签到
-              </Button>
-            </div>
-          </Card>
-
           <!-- 用户排行 (管理员) -->
           <Card class="mb-3" size="small" v-if="hasAdminRole && topUsers.length > 0">
             <template #title>
@@ -478,7 +489,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); });
           </Card>
 
           <!-- 公告 -->
-          <Card size="small">
+          <Card size="small" class="hidden md:block">
             <template #title>
               <div class="flex items-center gap-2">
                 <NotificationOutlined style="color:#f59e0b" /><span>公告</span>

@@ -123,8 +123,6 @@ var platformRegistry = map[string]PlatformConfig{
 	"zy": {QueryAct: "local_time", SuccessCode: "0"},
 	// 乐学 - 标准查课，进度用 /api/search GET
 	"haha": {SuccessCode: "0", ReturnsYID: true, ExtraParams: true, ProgressPath: "/api/search", ProgressMethod: "GET"},
-	// WKTM - 进度用 chadanoid
-	"WKTM": {SuccessCode: "0", ReturnsYID: true, ProgressAct: "chadanoid"},
 	// hzw - 成功码"1"，返回 yid，进度用 chadan+id 参数 +username，暂停用 stop，日志用 cha_logwk
 	"hzw": {SuccessCode: "1", ReturnsYID: true, ProgressAct: "chadan", ProgressNoYID: "chadan", UseIDParam: true, AlwaysUsername: true, PauseAct: "stop", LogAct: "cha_logwk", BalanceMoneyField: "money"},
 	// 龙龙 - 下单 code=1, yid 在 data 数组，查单用 uuid 参数
@@ -326,7 +324,6 @@ func GetPlatformNames() map[string]string {
 	result := map[string]string{
 		"27":       "春秋",
 		"haha":     "乐学",
-		"WKTM":     "WKTM",
 		"hzw":      "hzw",
 		"zy":       "志塬查课",
 		"longlong": "龙龙平台",
@@ -1820,6 +1817,7 @@ func (s *SupplierService) QueryReport(sup *model.SupplierFull, reportID string) 
 	}
 	return code, answer, state, nil
 }
+
 // extractHost 从 URL 中提取主机名（用于限速 key）
 func extractHost(rawURL string) string {
 	rawURL = strings.TrimRight(rawURL, "/")

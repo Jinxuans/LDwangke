@@ -14,6 +14,7 @@ import {
   getAgentListApi, agentCreateApi, agentRechargeApi, agentDeductApi,
   agentChangeGradeApi, agentChangeStatusApi, agentResetPasswordApi,
   agentOpenKeyApi, agentSetInviteCodeApi, adminImpersonateApi,
+  agentCrossRechargeCheckApi, agentCrossRechargeApi,
 } from '#/api/admin';
 import { useAccessStore } from '@vben/stores';
 import { getAccessCodesApi, getUserInfoApi } from '#/api';
@@ -315,6 +316,42 @@ function handleSetInviteCode(uid: number) {
   });
 }
 
+// ===== 跨户充值 =====
+const crossRechargeAllowed = ref(false);
+const crossVisible = ref(false);
+const crossForm = ref({ uid: 0, targetName: '', money: 0 as number });
+const crossLoading = ref(false);
+
+async function loadCrossRechargePermission() {
+  try {
+    const res = await agentCrossRechargeCheckApi();
+    crossRechargeAllowed.value = res?.allowed ?? false;
+  } catch { /* ignore */ }
+}
+
+function openCrossRecharge(uid: number, name: string) {
+  crossForm.value = { uid, targetName: name || String(uid), money: 0 };
+  crossVisible.value = true;
+}
+
+async function handleCrossRecharge() {
+  if (!crossForm.value.money || crossForm.value.money <= 0) {
+    message.error('请输入有效金额');
+    return;
+  }
+  crossLoading.value = true;
+  try {
+    await agentCrossRechargeApi({ uid: crossForm.value.uid, money: crossForm.value.money });
+    message.success('跨户充值成功');
+    crossVisible.value = false;
+    loadData();
+  } catch (e: any) {
+    message.error(e?.message || '跨户充值失败');
+  } finally {
+    crossLoading.value = false;
+  }
+}
+
 // ===== 表格列 =====
 const columns = computed(() => {
   const cols: any[] = [];
@@ -339,7 +376,7 @@ const columns = computed(() => {
     { title: '邀请码', key: 'yqmCol', width: 100, align: 'center' },
     { title: '在线时间', dataIndex: 'endtime', key: 'endtime', width: 140, align: 'center' },
     { title: '添加时间', dataIndex: 'addtime', key: 'addtime', width: 140, align: 'center' },
-    { title: '操作', key: 'action', width: 200, align: 'center', fixed: 'right' },
+    { title: '操作', key: 'action', width: 150, align: 'center', fixed: 'right' },
   );
   return cols;
 });
@@ -347,6 +384,7 @@ const columns = computed(() => {
 onMounted(() => {
   loadData();
   loadGrades();
+  loadCrossRechargePermission();
 });
 </script>
 
@@ -382,6 +420,9 @@ onMounted(() => {
           <Button type="primary" @click="addVisible = true">
             <template #icon><PlusOutlined /></template>
             添加代理
+          </Button>
+          <Button v-if="isAdmin || crossRechargeAllowed" type="primary" @click="crossVisible = true; crossForm = { uid: 0, targetName: '', money: 0 }">
+            跨户充值
           </Button>
         </div>
       </Card>
@@ -423,12 +464,12 @@ onMounted(() => {
               <Tag v-else color="red" class="cursor-pointer" @click="handleSetInviteCode(record.uid)">无</Tag>
             </template>
             <template v-else-if="column.key === 'action'">
-              <Space :size="4" wrap>
-                <Button size="small" @click="openChangeGrade(record.uid)">改价</Button>
-                <Button size="small" @click="handleRecharge(record.uid)">充值</Button>
-                <Button v-if="isAdmin" size="small" danger @click="handleDeduct(record.uid)">扣款</Button>
-                <Button v-if="isAdmin" size="small" @click="handleResetPassword(record.uid)">重置密码</Button>
-                <Button v-if="isAdmin" size="small" type="primary" @click="handleImpersonate(record.uid)">进入</Button>
+              <Space :size="2" wrap>
+                <Button size="small" class="action-btn" @click="openChangeGrade(record.uid)">改价</Button>
+                <Button size="small" class="action-btn" @click="handleRecharge(record.uid)">充值</Button>
+                <Button v-if="isAdmin" size="small" class="action-btn" danger @click="handleDeduct(record.uid)">扣款</Button>
+                <Button v-if="isAdmin" size="small" class="action-btn" @click="handleResetPassword(record.uid)">重置</Button>
+                <Button v-if="isAdmin" size="small" class="action-btn" type="primary" @click="handleImpersonate(record.uid)">进入</Button>
               </Space>
             </template>
           </template>
@@ -475,6 +516,23 @@ onMounted(() => {
       </div>
     </Modal>
 
+    <!-- 跨户充值弹窗 -->
+    <Modal v-model:open="crossVisible" title="跨户充值" @ok="handleCrossRecharge" :confirm-loading="crossLoading" ok-text="确认充值">
+      <div class="space-y-3 py-2">
+        <div>
+          <label class="mb-1 block text-sm font-medium">目标用户 UID</label>
+          <InputNumber v-model:value="crossForm.uid" :min="1" placeholder="请输入目标用户UID" style="width: 100%" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium">充值金额</label>
+          <InputNumber v-model:value="crossForm.money" :min="1" :precision="2" placeholder="请输入充值金额" style="width: 100%" />
+        </div>
+        <div class="rounded bg-orange-50 dark:bg-orange-900/20 p-3 text-xs text-orange-600 dark:text-orange-400">
+          提示：实际扣费 = 充值金额 × (您的费率 / 目标用户费率)，充值金额直接充入目标账户。
+        </div>
+      </div>
+    </Modal>
+
     <!-- 修改等级弹窗 -->
     <Modal v-model:open="gradeVisible" title="修改等级" @ok="handleChangeGrade" :confirm-loading="gradeLoading">
       <div class="py-2">
@@ -487,3 +545,12 @@ onMounted(() => {
     </Modal>
   </Page>
 </template>
+
+<style scoped>
+.action-btn {
+  padding: 0 6px !important;
+  font-size: 12px !important;
+  height: 22px !important;
+  line-height: 20px !important;
+}
+</style>

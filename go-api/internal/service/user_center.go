@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"sort"
 	"strings"
@@ -32,9 +33,12 @@ func (s *UserCenterService) Profile(uid int, grade string) (*model.UserProfile, 
 		uid,
 	).Scan(&p.UID, &uuid, &p.User, &p.Name, &p.Money, &p.AddPrice, &p.Key, &p.YQM, &p.YQPrice, &p.Email, &p.PushToken, &p.ZCZ)
 	if err == nil {
-		// 可选字段：cdmoney、khcz（表中可能不存在）
+		// 可选字段：cdmoney（表中可能不存在）
 		database.DB.QueryRow("SELECT COALESCE(cdmoney,0) FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&p.CDMoney)
-		database.DB.QueryRow("SELECT COALESCE(khcz,0) FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&p.KHCZ)
+		// 跨户充值权限：基于系统配置 cross_recharge_uids
+		if NewAgentService().CrossRechargeAllowed(uid) {
+			p.KHCZ = 1
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("查询用户失败: %v", err)
@@ -145,6 +149,74 @@ func (s *UserCenterService) RemoveFavorite(uid, cid int) error {
 	return err
 }
 
+// ===== 充值赠送规则 =====
+
+type RechargeBonusRule struct {
+	Min      float64 `json:"min"`
+	Max      float64 `json:"max"`
+	BonusPct float64 `json:"bonus_pct"` // 赠送百分比，如 5 表示 5%
+}
+
+type RechargeBonusActivity struct {
+	Enabled  bool                `json:"enabled"`
+	Weekdays []int               `json:"weekdays"` // 星期几是活动日，0=周日 1=周一 ... 6=周六
+	Rules    []RechargeBonusRule `json:"rules"`    // 活动日独立的赠送规则（替换普通规则）
+	Hint     string              `json:"hint"`     // 活动日自定义提示文案
+}
+
+type RechargeBonusConfig struct {
+	Enabled  bool                  `json:"enabled"`
+	Rules    []RechargeBonusRule   `json:"rules"`
+	Activity RechargeBonusActivity `json:"activity"`
+}
+
+func (s *UserCenterService) GetRechargeBonusConfig() *RechargeBonusConfig {
+	var raw string
+	database.DB.QueryRow("SELECT `k` FROM qingka_wangke_config WHERE `v` = 'recharge_bonus_rules'").Scan(&raw)
+	if raw == "" {
+		return &RechargeBonusConfig{}
+	}
+	var cfg RechargeBonusConfig
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		return &RechargeBonusConfig{}
+	}
+	return &cfg
+}
+
+func (s *UserCenterService) CalcRechargeBonus(money float64) (bonus float64, pct float64, isActivity bool) {
+	cfg := s.GetRechargeBonusConfig()
+	if !cfg.Enabled || len(cfg.Rules) == 0 {
+		return 0, 0, false
+	}
+
+	// 检查是否活动日（按星期几判断）
+	rules := cfg.Rules
+	if cfg.Activity.Enabled && len(cfg.Activity.Weekdays) > 0 && len(cfg.Activity.Rules) > 0 {
+		weekday := int(time.Now().Weekday()) // 0=Sunday ... 6=Saturday
+		for _, w := range cfg.Activity.Weekdays {
+			if weekday == w {
+				isActivity = true
+				rules = cfg.Activity.Rules // 活动日使用独立规则
+				break
+			}
+		}
+	}
+
+	// 找到匹配的区间
+	for _, r := range rules {
+		if money >= r.Min && money < r.Max {
+			pct = r.BonusPct
+			break
+		}
+	}
+	if pct <= 0 {
+		return 0, 0, isActivity
+	}
+
+	bonus = math.Round(money*pct) / 100
+	return bonus, pct, isActivity
+}
+
 // ===== 支付状态检测 (按 PHP check_pay_status case) =====
 
 func (s *UserCenterService) CheckPayStatus(uid int, outTradeNo string) (bool, string, error) {
@@ -175,12 +247,21 @@ func (s *UserCenterService) CheckPayStatus(uid int, outTradeNo string) (bool, st
 		).Scan(&logCount)
 		if logCount == 0 && money > 0 {
 			now := time.Now().Format("2006-01-02 15:04:05")
-			database.DB.Exec("UPDATE qingka_wangke_user SET money = money + ?, zcz = zcz + ? WHERE uid = ?", money, money, uid)
+			// 计算充值赠送
+			bonus, _, _ := s.CalcRechargeBonus(money)
+			total := money + bonus
+			database.DB.Exec("UPDATE qingka_wangke_user SET money = money + ?, zcz = zcz + ? WHERE uid = ?", total, money, uid)
 			database.DB.Exec(
 				"INSERT INTO qingka_wangke_moneylog (uid, type, money, balance, remark, addtime) VALUES (?, '充值', ?, (SELECT money FROM qingka_wangke_user WHERE uid = ?), ?, ?)",
 				uid, money, uid, fmt.Sprintf("在线充值%.2f元[%s]", money, outTradeNo), now,
 			)
-			return true, fmt.Sprintf("支付成功，已到账 ¥%.2f", money), nil
+			if bonus > 0 {
+				database.DB.Exec(
+					"INSERT INTO qingka_wangke_moneylog (uid, type, money, balance, remark, addtime) VALUES (?, '充值赠送', ?, (SELECT money FROM qingka_wangke_user WHERE uid = ?), ?, ?)",
+					uid, bonus, uid, fmt.Sprintf("充值%.2f元赠送%.2f元", money, bonus), now,
+				)
+			}
+			return true, fmt.Sprintf("支付成功，已到账 ¥%.2f", total), nil
 		}
 		return true, "订单已支付", nil
 	}
@@ -237,7 +318,11 @@ func (s *UserCenterService) CheckPayStatus(uid int, outTradeNo string) (bool, st
 			return true, "订单已支付", nil
 		}
 
-		if _, err := tx.Exec("UPDATE qingka_wangke_user SET money = money + ?, zcz = zcz + ? WHERE uid = ?", money, money, uid); err != nil {
+		// 计算充值赠送
+		bonus, _, _ := s.CalcRechargeBonus(money)
+		total := money + bonus
+
+		if _, err := tx.Exec("UPDATE qingka_wangke_user SET money = money + ?, zcz = zcz + ? WHERE uid = ?", total, money, uid); err != nil {
 			return false, "", fmt.Errorf("余额更新失败，请联系客服")
 		}
 
@@ -245,11 +330,21 @@ func (s *UserCenterService) CheckPayStatus(uid int, outTradeNo string) (bool, st
 			"INSERT INTO qingka_wangke_moneylog (uid, type, money, balance, remark, addtime) VALUES (?, '充值', ?, (SELECT money FROM qingka_wangke_user WHERE uid = ?), ?, ?)",
 			uid, money, uid, fmt.Sprintf("在线充值%.2f元[%s]", money, outTradeNo), now,
 		)
+		if bonus > 0 {
+			tx.Exec(
+				"INSERT INTO qingka_wangke_moneylog (uid, type, money, balance, remark, addtime) VALUES (?, '充值赠送', ?, (SELECT money FROM qingka_wangke_user WHERE uid = ?), ?, ?)",
+				uid, bonus, uid, fmt.Sprintf("充值%.2f元赠送%.2f元", money, bonus), now,
+			)
+		}
 
 		if err := tx.Commit(); err != nil {
 			return false, "", errors.New("到账失败，请联系客服")
 		}
-		return true, fmt.Sprintf("支付成功，已到账 ¥%.2f", money), nil
+		msg := fmt.Sprintf("支付成功，已到账 ¥%.2f", money)
+		if bonus > 0 {
+			msg = fmt.Sprintf("支付成功，充值 ¥%.2f + 赠送 ¥%.2f = 到账 ¥%.2f", money, bonus, total)
+		}
+		return true, msg, nil
 	}
 
 	return false, "订单未支付，请完成支付后再刷新", nil

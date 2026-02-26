@@ -1653,10 +1653,13 @@ VALUES (1, 1, 'admin', 'admin123', 'Admin', '', '', '', 0, '0', 1, '', '', '', '
 
 -- System config
 INSERT IGNORE INTO qingka_wangke_config (v, k) VALUES
-('sitename', ''),('sykg', '1'),('version', '1.0.0'),('user_yqzc', '0'),
+('sitename', ''),('sykg', '0'),('version', '1.0.0'),('user_yqzc', '0'),
 ('sjqykg', '0'),('user_htkh', '0'),('dl_pkkg', '0'),('zdpay', '0'),
-('flkg', '1'),('fllx', '0'),('djfl', '0'),('notice', ''),
-('bz', ''),('logo', ''),('hlogo', ''),('tcgonggao', '');
+('flkg', '0'),('fllx', '0'),('djfl', '0'),('notice', ''),
+('bz', '0'),('logo', ''),('hlogo', ''),('tcgonggao', ''),
+('checkin_enabled', '0'),('checkin_order_required', '1'),
+('checkin_min_balance', '10'),('checkin_max_users', '100'),
+('checkin_min_reward', '0.1'),('checkin_max_reward', '2.0');
 
 -- Email pool config
 INSERT IGNORE INTO qingka_wangke_config (v, k) VALUES

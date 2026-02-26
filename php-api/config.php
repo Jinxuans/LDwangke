@@ -8,9 +8,9 @@ return [
     'database' => [
         'host'     => '127.0.0.1',
         'port'     => 3306,
-        'user'     => 'root',
-        'password' => '',
-        'dbname'   => '7777',
+        'user'     => '29_colnt_com',
+        'password' => 'ifMezaaH5FEP31Z8',
+        'dbname'   => '29_colnt_com',
         'charset'  => 'utf8mb4',
     ],
 

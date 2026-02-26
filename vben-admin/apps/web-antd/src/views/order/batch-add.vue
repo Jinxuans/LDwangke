@@ -2,10 +2,11 @@
 import { ref, computed, onMounted } from 'vue';
 import { Page } from '@vben/common-ui';
 import {
-  Card, Button, Table, Tag, Space, message, Spin, Alert, Statistic, Row, Col,
+  Card, Button, Input, Switch, Table, Tag, Space, message,
+  Spin, Alert, Statistic, Row, Col, Tooltip,
 } from 'ant-design-vue';
 import {
-  UploadOutlined, DeleteOutlined, SendOutlined,
+  UploadOutlined, DeleteOutlined, SendOutlined, HeartFilled,
 } from '@ant-design/icons-vue';
 import { useVbenForm } from '#/adapter/form';
 import {
@@ -15,6 +16,20 @@ import {
   type ClassItem,
   type ClassCategory,
 } from '#/api/class';
+import { getSiteConfigApi } from '#/api/admin';
+import { getFavoritesApi } from '#/api/user-center';
+import { aiReviseMultiline } from '#/utils/ai-revise';
+
+// ===== 开关状态（持久化到 localStorage） =====
+function loadSwitch(key: string, def: boolean): boolean {
+  try { return JSON.parse(localStorage.getItem(key) ?? String(def)); } catch { return def; }
+}
+function saveSwitch(key: string, val: boolean) {
+  localStorage.setItem(key, JSON.stringify(val));
+}
+
+const aiFlag = ref(loadSwitch('batch_ai_flag', true));
+const showCategoryToggle = ref(loadSwitch('batch_show_cate', true));
 
 const classLoading = ref(false);
 const classList = ref<ClassItem[]>([]);
@@ -22,6 +37,14 @@ const categoryList = ref<ClassCategory[]>([]);
 const activeCateId = ref<string>('');
 const selectedClassId = ref<number | undefined>(undefined);
 const submitLoading = ref(false);
+const showCategory = ref(true);
+const categoryType = ref(0);
+
+// 收藏
+const favoriteCourses = ref<string[]>([]);
+
+// 用户输入
+const rawText = ref('');
 
 interface ParsedLine {
   key: number;
@@ -35,8 +58,13 @@ interface ParsedLine {
 const parsedLines = ref<ParsedLine[]>([]);
 
 const filteredClassList = computed(() => {
-  if (!activeCateId.value) return classList.value;
-  return classList.value.filter((item) => String(item.fenlei) === activeCateId.value);
+  let list = classList.value;
+  if (activeCateId.value === 'collect') {
+    list = list.filter((item) => favoriteCourses.value.includes(String(item.cid)));
+  } else if (activeCateId.value) {
+    list = list.filter((item) => String(item.fenlei) === activeCateId.value);
+  }
+  return list;
 });
 
 const selectedClass = computed(() => {
@@ -50,7 +78,7 @@ const totalCost = computed(() => {
   return validCount.value * Number(selectedClass.value.price);
 });
 
-// ===== Vben 表单 =====
+// ===== Vben 表单（仅课程选择） =====
 const [BatchForm, batchFormApi] = useVbenForm({
   commonConfig: {
     componentProps: { class: 'w-full' },
@@ -77,16 +105,6 @@ const [BatchForm, batchFormApi] = useVbenForm({
         },
       }),
     },
-    {
-      component: 'Textarea',
-      fieldName: 'rawText',
-      label: '批量下单信息',
-      componentProps: {
-        rows: 8,
-        placeholder: '每行一个账号，格式：\n学校 账号 密码（空格分隔）\n例如：\n家里蹲大学 13800138000 123456\n清华大学 13900139000 654321\n\n也支持无学校格式：\n13800138000 123456',
-      },
-      formItemClass: 'items-baseline',
-    },
   ],
   wrapperClass: 'grid-cols-1',
 });
@@ -94,14 +112,24 @@ const [BatchForm, batchFormApi] = useVbenForm({
 async function loadClassData() {
   classLoading.value = true;
   try {
+    try {
+      const cfg = await getSiteConfigApi();
+      showCategory.value = cfg?.flkg !== '0';
+      categoryType.value = Number(cfg?.fllx) || 0;
+    } catch { /* ignore */ }
+
     const [classesRaw, categoriesRaw] = await Promise.all([
       getClassListApi(),
       getClassCategoriesApi(),
     ]);
-    const classes = classesRaw;
-    const categories = categoriesRaw;
-    classList.value = Array.isArray(classes) ? classes : [];
-    categoryList.value = Array.isArray(categories) ? categories : [];
+    classList.value = Array.isArray(classesRaw) ? classesRaw : [];
+    categoryList.value = Array.isArray(categoriesRaw) ? categoriesRaw : [];
+
+    // 加载收藏
+    try {
+      const favs = await getFavoritesApi();
+      favoriteCourses.value = (Array.isArray(favs) ? favs : []).map(String);
+    } catch { /* ignore */ }
   } catch (e) {
     console.error('加载课程失败:', e);
   } finally {
@@ -109,14 +137,24 @@ async function loadClassData() {
   }
 }
 
-async function handleParse() {
-  const values = await batchFormApi.getValues();
-  if (!values.rawText?.trim()) {
+// AI 校正（输入框失焦时）
+function handleBlurRevise() {
+  if (!aiFlag.value) return;
+  rawText.value = aiReviseMultiline(rawText.value);
+}
+
+function handleParse() {
+  if (!rawText.value?.trim()) {
     message.warning('请粘贴下单信息');
     return;
   }
 
-  const lines = values.rawText
+  // 解析前先执行 AI 校正
+  if (aiFlag.value) {
+    rawText.value = aiReviseMultiline(rawText.value);
+  }
+
+  const lines = rawText.value
     .replace(/\r\n/g, '\n')
     .split('\n')
     .map((l: string) => l.trim())
@@ -139,7 +177,7 @@ function removeLine(key: number) {
 
 function clearAll() {
   parsedLines.value = [];
-  batchFormApi.setFieldValue('rawText', '');
+  rawText.value = '';
 }
 
 async function handleSubmit() {
@@ -156,7 +194,6 @@ async function handleSubmit() {
 
   submitLoading.value = true;
   try {
-    // 批量提交：每个账号作为一条，无课程选择（kcid/kcname留空，由后台处理）
     await addOrderApi({
       cid: values.classId,
       data: validLines.map((l) => ({
@@ -190,23 +227,51 @@ const tableColumns = [
   <Page title="批量交单" content-class="p-4">
     <Spin :spinning="classLoading">
       <Card class="mb-4">
-        <!-- 分类选择 -->
-        <div class="flex flex-wrap gap-2 mb-4">
-          <Button
-            :type="activeCateId === '' ? 'primary' : 'default'"
-            size="small"
-            @click="activeCateId = ''"
-          >全部课程</Button>
-          <Button
-            v-for="cat in categoryList"
-            :key="cat.id"
-            :type="activeCateId === String(cat.id) ? 'primary' : 'default'"
-            size="small"
-            @click="activeCateId = String(cat.id)"
-          >{{ cat.name }}</Button>
+        <!-- 顶部开关栏 -->
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-base font-semibold m-0">批量交单</h3>
+          <Space>
+            <Tooltip title="显示/隐藏分类选择">
+              <Switch v-model:checked="showCategoryToggle" checked-children="分类" un-checked-children="隐藏" @change="(v: any) => saveSwitch('batch_show_cate', v)" />
+            </Tooltip>
+            <Tooltip title="若校正有误，请关闭此功能">
+              <Switch v-model:checked="aiFlag" checked-children="AI校正" un-checked-children="关闭" @change="(v: any) => saveSwitch('batch_ai_flag', v)" />
+            </Tooltip>
+          </Space>
         </div>
 
-        <!-- Vben 表单 -->
+        <!-- 分类选择 -->
+        <template v-if="showCategory && showCategoryToggle && categoryList.length > 0">
+          <div class="mb-4">
+            <label class="block text-sm text-gray-500 mb-2">选择分类</label>
+            <div class="flex flex-wrap gap-2">
+              <Button
+                :type="activeCateId === '' ? 'primary' : 'default'"
+                size="small"
+                @click="activeCateId = ''"
+              >全部课程</Button>
+              <Button
+                :type="activeCateId === 'collect' ? 'primary' : 'default'"
+                size="small"
+                :style="{ borderColor: '#eb2f96', color: activeCateId === 'collect' ? '' : '#eb2f96' }"
+                @click="activeCateId = activeCateId === 'collect' ? '' : 'collect'"
+              >
+                <template #icon><HeartFilled /></template>
+                收藏课程
+              </Button>
+              <Button
+                v-for="cat in categoryList"
+                :key="cat.id"
+                :type="activeCateId === String(cat.id) ? 'primary' : 'default'"
+                size="small"
+                :style="cat.recommend ? { borderColor: '#722ed1', color: activeCateId === String(cat.id) ? '' : '#722ed1', fontWeight: '600' } : {}"
+                @click="activeCateId = String(cat.id)"
+              >{{ cat.name }}</Button>
+            </div>
+          </div>
+        </template>
+
+        <!-- 课程选择 -->
         <BatchForm />
 
         <Alert
@@ -216,6 +281,17 @@ const tableColumns = [
           class="my-3"
           :message="`单价: ¥${selectedClass.price}（实际价格以服务器计算为准）`"
         />
+
+        <!-- 批量下单信息 -->
+        <div class="mb-4">
+          <label class="block text-sm text-gray-500 mb-1">批量下单信息</label>
+          <Input.TextArea
+            v-model:value="rawText"
+            :rows="8"
+            placeholder="每行一个账号，格式：&#10;学校 账号 密码（空格分隔）&#10;例如：&#10;家里蹲大学 13800138000 123456&#10;清华大学 13900139000 654321&#10;&#10;也支持无学校格式：&#10;13800138000 123456"
+            @blur="handleBlurRevise"
+          />
+        </div>
 
         <Space>
           <Button type="primary" @click="handleParse">

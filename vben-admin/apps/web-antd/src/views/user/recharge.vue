@@ -1,14 +1,79 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { Page } from '@vben/common-ui';
 import {
-  Card, Button, InputNumber, Table, Tag, Pagination, message, Alert, RadioGroup, RadioButton,
+  Card, Button, InputNumber, Input, Table, Tag, Pagination, message, Alert, RadioGroup, RadioButton, Divider,
 } from 'ant-design-vue';
-import { DollarOutlined, ReloadOutlined, AlipayCircleOutlined, WechatOutlined, QqOutlined } from '@ant-design/icons-vue';
+import { DollarOutlined, ReloadOutlined, AlipayCircleOutlined, WechatOutlined, QqOutlined, GiftOutlined, FireOutlined } from '@ant-design/icons-vue';
 import {
   getPayChannelsApi, createPayOrderApi, getPayOrdersApi, checkPayStatusApi,
   type PayOrder, type PayChannel,
 } from '#/api/user-center';
+import { useCardKeyApi } from '#/api/auxiliary';
+import { getSiteConfigApi } from '#/api/admin';
+
+// ===== 充值赠送规则 =====
+interface BonusRule { min: number; max: number; bonus_pct: number; }
+interface BonusActivity { enabled: boolean; weekdays: number[]; rules: BonusRule[]; hint?: string; }
+interface BonusConfig { enabled: boolean; rules: BonusRule[]; activity: BonusActivity; }
+
+const bonusConfig = ref<BonusConfig | null>(null);
+
+const isActivityDay = computed(() => {
+  if (!bonusConfig.value?.activity?.enabled) return false;
+  const weekday = new Date().getDay(); // 0=Sunday ... 6=Saturday
+  return (bonusConfig.value.activity.weekdays ?? []).includes(weekday);
+});
+
+// 活动日使用独立规则，非活动日使用普通规则
+const activeRules = computed(() => {
+  if (!bonusConfig.value?.enabled) return [];
+  if (isActivityDay.value && bonusConfig.value.activity.rules?.length) {
+    return bonusConfig.value.activity.rules;
+  }
+  return bonusConfig.value.rules;
+});
+
+const bonusPreview = computed(() => {
+  if (!activeRules.value.length || !amount.value) return null;
+  const money = amount.value;
+  let pct = 0;
+  for (const r of activeRules.value) {
+    if (money >= r.min && money < r.max) {
+      pct = r.bonus_pct;
+      break;
+    }
+  }
+  if (pct <= 0) return null;
+  const bonus = Math.round(money * pct) / 100;
+  return { pct, bonus, total: money + bonus };
+});
+
+async function loadBonusConfig() {
+  try {
+    const cfg = await getSiteConfigApi();
+    if (cfg?.recharge_bonus_rules) {
+      bonusConfig.value = JSON.parse(cfg.recharge_bonus_rules);
+    }
+  } catch { /* ignore */ }
+}
+
+// 卡密充值
+const cardKeyCode = ref('');
+const cardKeyLoading = ref(false);
+
+async function handleCardKey() {
+  const code = cardKeyCode.value.trim();
+  if (!code) { message.warning('请输入卡密'); return; }
+  cardKeyLoading.value = true;
+  try {
+    const res = await useCardKeyApi(code);
+    message.success(`充值成功，到账 ¥${res.money}`);
+    cardKeyCode.value = '';
+    loadOrders(1);
+  } catch (e: any) { message.error(e?.message || '卡密使用失败'); }
+  finally { cardKeyLoading.value = false; }
+}
 
 const quickAmounts = [50, 100, 200, 500, 1000];
 const amount = ref(50);
@@ -117,11 +182,34 @@ const columns = [
 onMounted(() => {
   loadChannels();
   loadOrders(1);
+  loadBonusConfig();
 });
 </script>
 
 <template>
   <Page title="充值" content-class="p-4">
+    <!-- 活动日提示（不展示具体规则） -->
+    <Alert v-if="isActivityDay" type="success" class="mb-4" show-icon>
+      <template #icon><FireOutlined class="text-red-500" /></template>
+      <template #message><span class="text-base font-bold text-red-500">{{ bonusConfig?.activity?.hint || '今日爆率很高，充值更划算！' }}</span></template>
+    </Alert>
+
+    <!-- 充值赠送规则展示（非活动日显示普通规则） -->
+    <Card v-if="bonusConfig?.enabled && bonusConfig.rules.length && !isActivityDay" class="mb-4">
+      <template #title>
+        <span><GiftOutlined class="mr-1 text-orange-500" />充值赠送活动</span>
+      </template>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div
+          v-for="(rule, idx) in bonusConfig.rules" :key="idx"
+          class="bonus-card"
+        >
+          <div class="text-xs text-gray-400">充值 ¥{{ rule.min }} ~ ¥{{ rule.max }}</div>
+          <div class="text-lg font-bold text-orange-500 my-1">赠送 {{ rule.bonus_pct }}%</div>
+        </div>
+      </div>
+    </Card>
+
     <Card title="在线充值" class="mb-4">
       <Alert message="选择金额和支付方式，点击立即充值后将跳转到支付页面。" type="info" show-icon class="mb-4" />
 
@@ -154,6 +242,16 @@ onMounted(() => {
         />
       </div>
 
+      <!-- 赠送预览 -->
+      <div v-if="bonusPreview" class="mb-4 p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+        <div class="flex items-center gap-2 flex-wrap">
+          <GiftOutlined class="text-orange-500" />
+          <span class="text-sm">充值 <b>¥{{ amount }}</b></span>
+          <span class="text-sm">→ 赠送 <b class="text-orange-500">¥{{ bonusPreview.bonus.toFixed(2) }}</b>（{{ bonusPreview.pct }}%）</span>
+          <span class="text-sm">→ 实际到账 <b class="text-green-600 text-base">¥{{ bonusPreview.total.toFixed(2) }}</b></span>
+        </div>
+      </div>
+
       <div class="mb-4" v-if="channels.length > 0">
         <div class="mb-2 font-medium">支付方式</div>
         <RadioGroup v-model:value="selectedChannel" button-style="solid" size="large">
@@ -176,7 +274,22 @@ onMounted(() => {
       >
         <template #icon><DollarOutlined /></template>
         立即充值 ¥{{ amount || 0 }}
+        <span v-if="bonusPreview" class="ml-1 text-xs opacity-80">（到账 ¥{{ bonusPreview.total.toFixed(2) }}）</span>
       </Button>
+    </Card>
+
+    <Card title="卡密充值" class="mb-4">
+      <div class="flex flex-col sm:flex-row gap-3">
+        <Input
+          v-model:value="cardKeyCode" placeholder="请输入卡密"
+          allow-clear size="large" class="flex-1"
+          @press-enter="handleCardKey"
+        />
+        <Button type="primary" size="large" :loading="cardKeyLoading" @click="handleCardKey"
+                class="sm:w-auto w-full">
+          兑换充值
+        </Button>
+      </div>
     </Card>
 
     <Card title="充值记录">
@@ -204,3 +317,21 @@ onMounted(() => {
     </Card>
   </Page>
 </template>
+
+<style scoped>
+.bonus-card {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  border: 1px solid #fed7aa;
+  text-align: center;
+  transition: transform 0.15s;
+}
+.bonus-card:hover {
+  transform: translateY(-2px);
+}
+html.dark .bonus-card {
+  background: linear-gradient(135deg, #431407, #7c2d12);
+  border-color: #9a3412;
+}
+</style>

@@ -68,6 +68,24 @@ const routes: RouteRecordRaw[] = [
           title: '每日签到',
         },
       },
+      {
+        name: 'UserActivities',
+        path: '/user/activities',
+        component: () => import('#/views/user/activities.vue'),
+        meta: {
+          icon: 'mdi:gift-outline',
+          title: '活动中心',
+        },
+      },
+      {
+        name: 'UserPledge',
+        path: '/user/pledge',
+        component: () => import('#/views/user/pledge.vue'),
+        meta: {
+          icon: 'mdi:shield-lock-outline',
+          title: '质押折扣',
+        },
+      },
     ],
   },
 ];

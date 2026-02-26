@@ -244,16 +244,6 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
-        name: 'AdminPlatformConfig',
-        path: '/admin/platform-config',
-        component: () => import('#/views/admin/platform-config.vue'),
-        meta: {
-          icon: 'mdi:api',
-          order: 6.6,
-          title: '平台接口配置',
-        },
-      },
-      {
         name: 'AdminSyncMonitor',
         path: '/admin/sync-monitor',
         component: () => import('#/views/admin/sync-monitor.vue'),
@@ -292,6 +282,48 @@ const routes: RouteRecordRaw[] = [
           order: 8.5,
           title: '签到管理',
         },
+      },
+      {
+        name: 'AdminAuxGroup',
+        path: '/admin/aux',
+        meta: {
+          icon: 'mdi:puzzle-plus-outline',
+          order: 9,
+          title: '辅助业务',
+        },
+        redirect: '/admin/cardkeys',
+        children: [
+          {
+            name: 'AdminCardKeys',
+            path: '/admin/cardkeys',
+            component: () => import('#/views/admin/cardkeys.vue'),
+            meta: {
+              icon: 'mdi:credit-card-plus-outline',
+              order: 1,
+              title: '卡密管理',
+            },
+          },
+          {
+            name: 'AdminActivities',
+            path: '/admin/activities',
+            component: () => import('#/views/admin/activities.vue'),
+            meta: {
+              icon: 'mdi:gift-outline',
+              order: 2,
+              title: '活动管理',
+            },
+          },
+          {
+            name: 'AdminPledge',
+            path: '/admin/pledge',
+            component: () => import('#/views/admin/pledge.vue'),
+            meta: {
+              icon: 'mdi:shield-lock-outline',
+              order: 3,
+              title: '质押管理',
+            },
+          },
+        ],
       },
     ],
   },

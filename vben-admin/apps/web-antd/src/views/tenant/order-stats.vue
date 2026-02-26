@@ -35,22 +35,22 @@ onMounted(load);
     <Row :gutter="[16, 16]">
       <Col :xs="24" :sm="12" :lg="6">
         <Card :loading="loading">
-          <Statistic title="今日订单" :value="stats.today" :prefix="h(ShoppingOutlined)" value-style="color: #1677ff" />
+          <Statistic title="今日订单" :value="stats.today" :prefix="h(ShoppingOutlined)" :value-style="{ color: '#1677ff' }" />
         </Card>
       </Col>
       <Col :xs="24" :sm="12" :lg="6">
         <Card :loading="loading">
-          <Statistic title="今日收入（元）" :value="stats.today_retail" :precision="2" :prefix="h(DollarOutlined)" value-style="color: #52c41a" />
+          <Statistic title="今日收入（元）" :value="stats.today_retail" :precision="2" :prefix="h(DollarOutlined)" :value-style="{ color: '#52c41a' }" />
         </Card>
       </Col>
       <Col :xs="24" :sm="12" :lg="6">
         <Card :loading="loading">
-          <Statistic title="待处理订单" :value="stats.pending" :prefix="h(ClockCircleOutlined)" value-style="color: #faad14" />
+          <Statistic title="待处理订单" :value="stats.pending" :prefix="h(ClockCircleOutlined)" :value-style="{ color: '#faad14' }" />
         </Card>
       </Col>
       <Col :xs="24" :sm="12" :lg="6">
         <Card :loading="loading">
-          <Statistic title="已完成订单" :value="stats.done" :prefix="h(CheckCircleOutlined)" value-style="color: #52c41a" />
+          <Statistic title="已完成订单" :value="stats.done" :prefix="h(CheckCircleOutlined)" :value-style="{ color: '#52c41a' }" />
         </Card>
       </Col>
       <Col :xs="24" :sm="12" :lg="6">

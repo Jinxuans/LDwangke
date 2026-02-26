@@ -111,6 +111,8 @@ func main() {
 
 	// ===== 公开路由（无需认证） =====
 	r.GET("/api/v1/site/config", handler.SiteConfigGet)
+	r.GET("/api/v1/checkorder", handler.CheckOrderPublic)
+	r.POST("/api/v1/checkorder", handler.CheckOrderPublic)
 
 	// ===== 外部API（密钥认证，对应 PHP apisub.php 密钥调用） =====
 	openapi := r.Group("/api/v1/open", middleware.APIKeyAuth())
@@ -223,6 +225,7 @@ func main() {
 			uc.GET("/logs", handler.UserLogList)
 			uc.POST("/checkin", handler.UserCheckin)
 			uc.GET("/checkin/status", handler.UserCheckinStatus)
+			uc.POST("/cardkey/use", handler.UserCardKeyUse)
 		}
 
 		// 代理管理（所有登录用户可访问）
@@ -238,6 +241,8 @@ func main() {
 			agent.POST("/open-key", handler.AgentOpenSecretKey)
 			agent.POST("/set-invite-code", handler.AgentSetInviteCode)
 			agent.POST("/migrate-superior", handler.AgentMigrateSuperior)
+			agent.GET("/cross-recharge-check", handler.AgentCrossRechargeCheck)
+			agent.POST("/cross-recharge", handler.AgentCrossRecharge)
 		}
 
 		// 管理后台（需要管理员权限）
@@ -370,6 +375,36 @@ func main() {
 
 			// 签到管理
 			admin.GET("/checkin/stats", handler.AdminCheckinStats)
+
+			// 卡密管理
+			admin.GET("/cardkeys", handler.AdminCardKeyList)
+			admin.POST("/cardkey/generate", handler.AdminCardKeyGenerate)
+			admin.POST("/cardkey/delete", handler.AdminCardKeyDelete)
+
+			// 活动管理
+			admin.GET("/activities", handler.AdminActivityList)
+			admin.POST("/activity/save", handler.AdminActivitySave)
+			admin.DELETE("/activity/:hid", handler.AdminActivityDelete)
+
+			// 质押管理
+			admin.GET("/pledge/configs", handler.AdminPledgeConfigList)
+			admin.POST("/pledge/config/save", handler.AdminPledgeConfigSave)
+			admin.DELETE("/pledge/config/:id", handler.AdminPledgeConfigDelete)
+			admin.POST("/pledge/config/toggle", handler.AdminPledgeConfigToggle)
+			admin.GET("/pledge/records", handler.AdminPledgeRecordList)
+
+		}
+
+		// 用户端：活动列表
+		api.GET("/activities", handler.UserActivityList)
+
+		// 用户端：质押
+		pledge := api.Group("/pledge")
+		{
+			pledge.GET("/configs", handler.UserPledgeConfigList)
+			pledge.POST("/create", handler.UserPledgeCreate)
+			pledge.POST("/cancel/:id", handler.UserPledgeCancel)
+			pledge.GET("/my", handler.UserPledgeList)
 		}
 	}
 
