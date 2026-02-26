@@ -1,0 +1,18 @@
+# Rust build artifacts
+target/
+
+# Database
+data/
+
+# Sensitive config (use config.example.toml as template)
+config.toml
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temp
+*.bak
+*.log

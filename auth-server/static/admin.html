@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>License Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Inter',-apple-system,"Segoe UI",system-ui,sans-serif;font-size:13px;transition:background .3s,color .3s;-webkit-font-smoothing:antialiased;}
+
+/* ── 亮色主题 (羊皮卷/液态玻璃风) ── */
+body{
+  /* 羊皮卷底色 (做旧米色) */
+  --bg:#f4eedc;
+  /* 卡片玻璃态：半透明白+米色透传 */
+  --bg-card:rgba(255,253,248,0.65);
+  --bg-hover:rgba(139,115,85,0.06);
+  --bg-th:rgba(139,115,85,0.04);
+  /* 边框：带质感的半透明棕色 */
+  --border:rgba(139,115,85,0.15);
+  --border-light:rgba(139,115,85,0.08);
+  --border-row:rgba(139,115,85,0.06);
+  /* 文字：深棕/墨黑色，符合复古感 */
+  --text:#4a3f35;
+  --text-2:#5c5044;
+  --text-3:#8c7d6c;
+  --text-4:#b3a696;
+  --text-5:#d6cdbf;
+  --text-6:#eae2d6;
+  --text-title:#2c241c;
+  
+  /* 输入框：更深的内凹玻璃感 */
+  --input-bg:rgba(139,115,85,0.05);
+  --input-border:rgba(139,115,85,0.2);
+  --modal-bg:rgba(44,36,28,0.4);
+  
+  /* 强调色：复古琥珀/赤褐色 */
+  --accent:#9c6644;
+  --accent-hover:#7a4f33;
+  --accent-soft:rgba(156,102,68,0.12);
+  --accent-glow:rgba(156,102,68,0.08);
+  
+  /* 标签颜色调整为低饱和度复古色 */
+  --tag-on-bg:rgba(79,111,82,0.15);--tag-on-c:#4f6f52;
+  --tag-off-bg:rgba(163,67,67,0.12);--tag-off-c:#a34343;
+  --tag-exp-bg:rgba(196,128,49,0.15);--tag-exp-c:#a66817;
+  --tag-log-bg:rgba(139,115,85,0.08);--tag-log-c:#7a6b5d;
+  
+  --toast-ok-bg:rgba(235,242,233,0.85);--toast-ok-c:#4f6f52;--toast-ok-b:rgba(79,111,82,0.2);
+  --toast-err-bg:rgba(250,237,237,0.85);--toast-err-c:#a34343;--toast-err-b:rgba(163,67,67,0.2);
+  
+  --key-bg:rgba(139,115,85,0.06);
+  --btn-danger-c:#a34343;--btn-danger-b:rgba(163,67,67,0.25);--btn-danger-hover:rgba(163,67,67,0.08);
+  
+  /* 侧栏：半透明深栗色玻璃态 */
+  --sidebar-bg:rgba(44,36,28,0.7);
+  --sidebar-hover:rgba(255,245,230,0.08);
+  --sidebar-active:rgba(156,102,68,0.2);
+  --sidebar-text:rgba(244,238,220,0.6);
+  --sidebar-text-active:#f4eedc;
+  --sidebar-icon:rgba(244,238,220,0.5);
+  --sidebar-icon-active:#e6bc98;
+  --select-arrow:%238c7d6c;
+}
+
+/* ── 暗色主题 (烧焦羊皮/暗玻璃) ── */
+body.dark{
+  --bg:#1f1b18;
+  --bg-card:rgba(44,38,34,0.65);
+  --bg-hover:rgba(244,238,220,0.04);
+  --bg-th:rgba(244,238,220,0.02);
+  --border:rgba(244,238,220,0.08);
+  --border-light:rgba(244,238,220,0.04);
+  --border-row:rgba(244,238,220,0.03);
+  --text:rgba(244,238,220,0.85);
+  --text-2:rgba(244,238,220,0.7);
+  --text-3:rgba(244,238,220,0.45);
+  --text-4:rgba(244,238,220,0.25);
+  --text-5:rgba(244,238,220,0.1);
+  --text-6:rgba(244,238,220,0.05);
+  --text-title:#fcfaf5;
+  --input-bg:rgba(15,13,11,0.4);
+  --input-border:rgba(244,238,220,0.12);
+  --modal-bg:rgba(15,13,11,0.75);
+  
+  --accent:#d4a373;
+  --accent-hover:#e6ccb2;
+  --accent-soft:rgba(212,163,115,0.15);
+  --accent-glow:rgba(212,163,115,0.06);
+  
+  --tag-on-bg:rgba(121,154,126,0.15);--tag-on-c:#799a7e;
+  --tag-off-bg:rgba(204,111,111,0.12);--tag-off-c:#cc6f6f;
+  --tag-exp-bg:rgba(219,161,89,0.15);--tag-exp-c:#dba159;
+  --tag-log-bg:rgba(244,238,220,0.06);--tag-log-c:rgba(244,238,220,0.4);
+  
+  --toast-ok-bg:rgba(44,54,45,0.85);--toast-ok-c:#9bc2a1;--toast-ok-b:rgba(121,154,126,0.2);
+  --toast-err-bg:rgba(64,36,36,0.85);--toast-err-c:#e89595;--toast-err-b:rgba(204,111,111,0.3);
+  
+  --key-bg:rgba(0,0,0,0.2);
+  --btn-danger-c:#cc6f6f;--btn-danger-b:rgba(204,111,111,0.25);--btn-danger-hover:rgba(204,111,111,0.08);
+  
+  --sidebar-bg:rgba(20,17,15,0.7);
+  --sidebar-hover:rgba(244,238,220,0.06);
+  --sidebar-active:rgba(212,163,115,0.15);
+  --sidebar-text:rgba(244,238,220,0.5);
+  --sidebar-text-active:#fcfaf5;
+  --sidebar-icon:rgba(244,238,220,0.4);
+  --sidebar-icon-active:#d4a373;
+  --select-arrow:%23a89d91;
+}
+body{
+  background:var(--bg);
+  color:var(--text);
+  /* 羊皮纸噪点纹理 */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(128,128,128,0.18);border-radius:10px;}
+::-webkit-scrollbar-thumb:hover{background:rgba(128,128,128,0.3);}
+
+/* ── 布局 ── */
+.layout{display:flex;height:100vh;}
+
+/* ── 侧栏 ── */
+.sidebar{width:60px;background:var(--sidebar-bg);backdrop-filter:blur(24px);display:flex;flex-direction:column;padding:16px 0;flex-shrink:0;border-right:1px solid rgba(255,255,255,0.05);transition:width .3s cubic-bezier(.4,0,.2,1);overflow:hidden;}
+.sidebar.expanded{width:200px;}
+.sidebar .logo-wrap{display:flex;align-items:center;gap:12px;padding:0 14px;margin-bottom:32px;height:32px;flex-shrink:0;}
+.sidebar .logo{width:32px;height:32px;min-width:32px;background:var(--text-title);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:var(--bg);letter-spacing:-.5px;}
+.sidebar .logo-text{font-size:14px;font-weight:600;color:rgba(255,255,255,0.85);white-space:nowrap;opacity:0;transition:opacity .2s;}
+.sidebar.expanded .logo-text{opacity:1;}
+.nav-item{height:40px;border-radius:10px;display:flex;align-items:center;gap:12px;margin:0 10px 4px;padding:0 11px;cursor:pointer;transition:all .2s ease;position:relative;flex-shrink:0;}
+.nav-item:hover{background:var(--sidebar-hover);}
+.nav-item.active{background:var(--sidebar-active);}
+.nav-item svg{width:18px;height:18px;min-width:18px;stroke:var(--sidebar-icon);stroke-width:1.8;fill:none;transition:stroke .2s;}
+.nav-item:hover svg{stroke:rgba(255,255,255,0.55);}
+.nav-item.active svg{stroke:var(--sidebar-icon-active);}
+.nav-item .nav-label{font-size:13px;color:var(--sidebar-text);white-space:nowrap;opacity:0;transition:opacity .2s,color .2s;}
+.nav-item:hover .nav-label{color:rgba(255,255,255,0.55);}
+.nav-item.active .nav-label{color:var(--sidebar-text-active);}
+.sidebar.expanded .nav-item .nav-label{opacity:1;}
+.nav-item .tip{position:absolute;left:54px;background:#1e293b;color:rgba(255,255,255,0.8);padding:6px 14px;border-radius:8px;font-size:12px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:100;border:1px solid rgba(255,255,255,0.06);box-shadow:0 4px 12px rgba(0,0,0,0.3);}
+.sidebar:not(.expanded) .nav-item:hover .tip{opacity:1;}
+.sidebar.expanded .nav-item .tip{display:none;}
+.sidebar-spacer{flex:1;}
+.sidebar-bottom{display:flex;flex-direction:column;gap:4px;}
+.toggle-btn{height:40px;border-radius:10px;display:flex;align-items:center;gap:12px;margin:0 10px 4px;padding:0 11px;cursor:pointer;transition:background .2s;flex-shrink:0;}
+.toggle-btn:hover{background:var(--sidebar-hover);}
+.toggle-btn svg{width:18px;height:18px;min-width:18px;stroke:var(--sidebar-icon);stroke-width:1.8;fill:none;transition:transform .3s cubic-bezier(.4,0,.2,1);}
+.sidebar.expanded .toggle-btn svg{transform:rotate(180deg);}
+
+/* ── 主体 ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;}
+.main::before{content:'';position:absolute;top:0;right:0;width:55%;height:55%;background:radial-gradient(ellipse at 80% 0%,var(--accent-glow) 0%,transparent 55%);pointer-events:none;z-index:0;}
+.content,.topbar,.tabs{position:relative;z-index:1;}
+
+/* ── 顶栏 ── */
+.topbar{height:56px;background:var(--bg-card);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 28px;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,0.02);}
+.topbar-left{display:flex;align-items:center;gap:16px;}
+.topbar-title{font-size:16px;font-weight:700;color:var(--text-title);letter-spacing:-0.025em;}
+.topbar-right{display:flex;align-items:center;gap:12px;}
+
+/* ── 选项卡 ── */
+.tabs{height:44px;background:var(--bg-card);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);display:flex;align-items:stretch;padding:0 28px;flex-shrink:0;}
+.tab{padding:0 18px;display:flex;align-items:center;font-size:13px;color:var(--text-3);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;font-weight:500;}
+.tab:hover{color:var(--text-2);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* ── 内容区 ── */
+.content{flex:1;overflow-y:auto;padding:24px 28px;}
+
+/* ── 登录 ── */
+#loginScreen{display:flex;align-items:center;justify-content:center;height:100%;position:relative;overflow:hidden;}
+#loginScreen::before,#loginScreen::after{content:'';position:absolute;border-radius:50%;filter:blur(80px);opacity:.35;pointer-events:none;animation:orb-float 8s ease-in-out infinite alternate;}
+#loginScreen::before{width:350px;height:350px;background:rgba(0,0,0,0.05);top:-80px;left:-60px;}
+#loginScreen::after{width:300px;height:300px;background:rgba(0,0,0,0.03);bottom:-60px;right:-40px;animation-delay:-4s;}
+body.dark #loginScreen::before,body.dark #loginScreen::after{background:rgba(255,255,255,0.03);}
+@keyframes orb-float{0%{transform:translate(0,0) scale(1)}100%{transform:translate(30px,20px) scale(1.1)}}
+.login-box{background:var(--bg-card);backdrop-filter:blur(24px);border:1px solid var(--border);border-radius:20px;padding:44px;width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.06);position:relative;overflow:hidden;z-index:1;animation:fadeUp .5s cubic-bezier(.16,1,.3,1);}
+@keyframes fadeUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+.login-box::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),transparent);opacity:.5;}
+.login-box h2{font-size:20px;font-weight:700;margin-bottom:8px;color:var(--text-title);letter-spacing:-0.025em;}
+.login-sub{font-size:13px;color:var(--text-3);margin-bottom:28px;line-height:1.5;}
+
+/* ── 输入框 ── */
+input,select{width:100%;height:40px;padding:0 14px;background:var(--input-bg);border:1px solid var(--input-border);border-radius:10px;font-size:13px;color:var(--text);outline:none;transition:border .2s,box-shadow .2s,background .2s;}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+input::placeholder{color:var(--text-3);}
+select{appearance:none;padding-right:32px;background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='var(--select-arrow)' d='M4 6l4 4 4-4'/%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right 10px center;background-size:12px;}
+
+/* ── 按钮 ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 18px;border:1px solid var(--input-border);border-radius:10px;background:var(--bg-card);color:var(--text);font-size:12px;cursor:pointer;transition:all .3s cubic-bezier(.4,0,.2,1);white-space:nowrap;font-weight:500;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,0.02);}
+.btn:hover{border-color:var(--accent);background:var(--bg-hover);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.05);}
+.btn:active{transform:translateY(1px);box-shadow:none;}
+.btn-primary{background:var(--accent);color:var(--bg);border:none;}
+.btn-primary:hover{background:var(--accent-hover);box-shadow:0 6px 20px var(--accent-soft);transform:translateY(-1px);}
+.btn-sm{height:30px;padding:0 14px;font-size:11px;font-weight:500;border-radius:8px;}
+.btn-text{border:none;background:none;color:var(--text-3);padding:0 8px;}
+.btn-text:hover{color:var(--text);background:none;}
+.btn-danger{color:var(--btn-danger-c);border-color:var(--btn-danger-b);}
+.btn-danger:hover{background:var(--btn-danger-hover);border-color:var(--btn-danger-c);}
+
+/* ── 统计卡片 ── */
+.stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:28px;}
+.stat-card{background:var(--bg-card);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;padding:22px 24px;transition:all .4s cubic-bezier(.16,1,.3,1);position:relative;box-shadow:inset 0 1px 1px rgba(255,255,255,0.4), 0 8px 24px rgba(0,0,0,0.02);}
+.stat-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:inset 0 1px 1px rgba(255,255,255,0.6), 0 12px 32px rgba(0,0,0,0.06);}
+.stat-card .label{font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;font-weight:600;}
+.stat-card .value{font-size:32px;font-weight:700;color:var(--text-title);line-height:1;letter-spacing:-0.03em;}
+
+/* ── 面板 ── */
+.panel{background:var(--bg-card);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;margin-bottom:20px;transition:all .4s cubic-bezier(.16,1,.3,1);overflow:hidden;box-shadow:inset 0 1px 1px rgba(255,255,255,0.3), 0 4px 16px rgba(0,0,0,0.02);}
+.panel:hover{box-shadow:inset 0 1px 1px rgba(255,255,255,0.5), 0 8px 24px rgba(0,0,0,0.04);}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border-light);}
+.panel-head .title{font-size:14px;font-weight:600;color:var(--text-title);letter-spacing:-0.01em;}
+.panel-body{padding:0;}
+.panel-foot{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border-light);font-size:12px;color:var(--text-3);}
+.panel-foot .pg-btns{display:flex;gap:6px;}
+
+/* ── 筛选条 ── */
+.filter-bar{display:flex;gap:10px;padding:14px 20px;border-bottom:1px solid var(--border-light);align-items:center;flex-wrap:wrap;}
+.filter-bar input,.filter-bar select{width:auto;height:34px;font-size:12px;}
+.filter-bar input{flex:1;min-width:200px;}
+
+/* ── 表格 ── */
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;padding:11px 20px;font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;background:var(--bg-th);border-bottom:1px solid var(--border-light);}
+td{padding:11px 20px;border-bottom:1px solid var(--border-row);font-size:13px;color:var(--text-2);vertical-align:middle;transition:background .15s;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--bg-hover);}
+.mono{font-family:"SF Mono",Consolas,"Courier New",monospace;font-size:12px;color:var(--text-3);}
+.sub{font-size:11px;color:var(--text-4);margin-top:2px;}
+
+/* ── 标签 ── */
+.tag{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:9999px;font-size:11px;font-weight:600;line-height:16px;}
+.tag::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.tag-on{background:var(--tag-on-bg);color:var(--tag-on-c);}.tag-on::before{background:var(--tag-on-c);box-shadow:0 0 6px var(--tag-on-c);}
+.tag-off{background:var(--tag-off-bg);color:var(--tag-off-c);}.tag-off::before{background:var(--tag-off-c);}
+.tag-exp{background:var(--tag-exp-bg);color:var(--tag-exp-c);}.tag-exp::before{background:var(--tag-exp-c);}
+.tag-log{background:var(--tag-log-bg);color:var(--tag-log-c);}.tag-log::before{background:var(--tag-log-c);}
+
+/* ── 操作列 ── */
+.acts{display:flex;gap:6px;flex-wrap:wrap;}
+
+/* ── 弹窗 ── */
+.modal-mask{position:fixed;inset:0;background:var(--modal-bg);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:200;}
+.modal-mask.open{display:flex;}
+.modal-box{background:var(--bg-card);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:20px;padding:32px;width:100%;max-width:440px;margin:16px;box-shadow:0 24px 64px rgba(0,0,0,0.1);animation:modalIn .3s cubic-bezier(.16,1,.3,1);}
+@keyframes modalIn{from{transform:scale(0.95) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+.modal-box h3{font-size:17px;font-weight:700;color:var(--text-title);margin-bottom:24px;letter-spacing:-0.025em;}
+.modal-box label{display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;font-weight:500;}
+.modal-box input,.modal-box select{margin-bottom:16px;}
+.modal-box .row{display:grid;gap:14px;}
+.modal-box .r2{grid-template-columns:1fr 1fr;}
+.modal-box .r3{grid-template-columns:1fr 1fr 1fr;}
+.modal-foot{display:flex;gap:10px;margin-top:8px;}
+.modal-foot .btn{flex:1;height:42px;font-size:14px;border-radius:12px;font-weight:600;}
+
+/* ── key ── */
+.key-out{background:var(--key-bg);border:1px solid var(--border);border-radius:12px;padding:20px;font-family:"SF Mono",Consolas,monospace;font-size:14px;color:var(--text-title);text-align:center;word-break:break-all;user-select:all;letter-spacing:.3px;font-weight:600;}
+
+/* ── toast ── */
+.toast{position:fixed;top:20px;right:20px;padding:14px 24px;border-radius:12px;font-size:13px;z-index:999;animation:tIn .3s cubic-bezier(.16,1,.3,1);font-weight:500;backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,0.06);}
+.toast-ok{background:var(--toast-ok-bg);color:var(--toast-ok-c);border:1px solid var(--toast-ok-b);}
+.toast-err{background:var(--toast-err-bg);color:var(--toast-err-c);border:1px solid var(--toast-err-b);}
+@keyframes tIn{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* ── 页面 ── */
+.page{display:none;}
+.page.active{display:block;animation:pageIn .3s ease;}
+@keyframes pageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── 主题切换 ── */
+.theme-toggle{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;}
+.theme-toggle:hover{border-color:var(--text-4);background:var(--bg-hover);}
+.theme-toggle svg{width:16px;height:16px;stroke:var(--text-3);stroke-width:2;fill:none;transition:stroke .2s;}
+
+body.dark .stat-card, body.dark .panel {box-shadow:inset 0 1px 1px rgba(255,255,255,0.05), 0 8px 24px rgba(0,0,0,0.2);}
+body.dark .stat-card:hover, body.dark .panel:hover {box-shadow:inset 0 1px 1px rgba(255,255,255,0.1), 0 12px 32px rgba(0,0,0,0.3);}
+body.dark .btn {box-shadow:0 2px 8px rgba(0,0,0,0.2);}
+body.dark .topbar {box-shadow:0 2px 10px rgba(0,0,0,0.2);}
+.empty-row td{text-align:center;padding:48px 20px !important;color:var(--text-4);font-size:13px;border:none !important;}
+.empty-row td::before{content:'';display:block;width:40px;height:40px;margin:0 auto 12px;border-radius:12px;background:var(--input-bg);border:1px dashed var(--border);}
+
+/* ── 连接状态点 ── */
+.conn-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;background:var(--text-4);vertical-align:middle;}
+.conn-dot.on{background:#22c55e;box-shadow:0 0 8px rgba(34,197,94,0.4);}
+
+/* ── 统计卡片颜色点缀 (单色统一) ── */
+.stat-card:nth-child(1){border-top:2px solid var(--text-4);}
+.stat-card:nth-child(2){border-top:2px solid var(--text-4);}
+.stat-card:nth-child(3){border-top:2px solid var(--text-4);}
+.stat-card:nth-child(4){border-top:2px solid var(--text-4);}
+.stat-card:nth-child(5){border-top:2px solid var(--text-4);}
+
+/* ── 响应式 ── */
+@media(max-width:1200px){.stat-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:768px){.stat-grid{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ▌ 左侧导航栏 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="logo-wrap">
+      <div class="logo">LC</div>
+      <span class="logo-text">License Console</span>
+    </div>
+    <div class="nav-item active" onclick="switchPage('dashboard')" id="nav-dashboard">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="nav-label">概览</span>
+      <span class="tip">概览</span>
+    </div>
+    <div class="nav-item" onclick="switchPage('licenses')" id="nav-licenses">
+      <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
+      <span class="nav-label">授权管理</span>
+      <span class="tip">授权管理</span>
+    </div>
+    <div class="nav-item" onclick="switchPage('logs')" id="nav-logs">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <span class="nav-label">操作日志</span>
+      <span class="tip">操作日志</span>
+    </div>
+    <div class="nav-item" onclick="switchPage('users')" id="nav-users" style="display:none">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+      <span class="nav-label">用户管理</span>
+      <span class="tip">用户管理</span>
+    </div>
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-bottom">
+      <div class="nav-item" onclick="logout()">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span class="nav-label">登出</span>
+        <span class="tip">登出</span>
+      </div>
+      <div class="toggle-btn" onclick="toggleSidebar()">
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ▌ 右侧主体 -->
+  <div class="main">
+
+    <!-- 顶栏 -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-title" id="pageTitle">概览</span>
+      </div>
+      <div class="topbar-right" id="topbarRight">
+        <span style="font-size:12px;color:var(--text-4);display:flex;align-items:center" id="connStatus"><span class="conn-dot" id="connDot"></span>未连接</span>
+        <button class="theme-toggle" onclick="toggleTheme()" title="切换主题">
+          <svg id="themeIcon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 选项卡区（仅授权管理页显示） -->
+    <div class="tabs" id="tabBar" style="display:none">
+      <div class="tab active" data-status="" onclick="filterTab(this)">全部</div>
+      <div class="tab" data-status="1" onclick="filterTab(this)">活跃</div>
+      <div class="tab" data-status="0" onclick="filterTab(this)">已吊销</div>
+      <div class="tab" data-status="2" onclick="filterTab(this)">已过期</div>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="content">
+
+      <!-- 登录 -->
+      <div id="loginScreen">
+        <div class="login-box">
+          <div style="text-align:center;margin-bottom:32px">
+            <div style="width:52px;height:52px;background:var(--text-title);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;color:var(--bg);margin-bottom:20px">LC</div>
+            <h2>License Console</h2>
+            <p class="login-sub">输入账号密码登录授权管理系统</p>
+          </div>
+          <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;font-weight:500">用户名</label>
+          <input id="loginUser" type="text" placeholder="输入用户名" style="margin-bottom:16px" />
+          <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;font-weight:500">密码</label>
+          <input id="loginPass" type="password" placeholder="输入密码" style="margin-bottom:24px" onkeyup="if(event.key==='Enter')login()" />
+          <button class="btn btn-primary" onclick="login()" style="width:100%;height:44px;font-size:14px;border-radius:12px;font-weight:600">登录</button>
+        </div>
+      </div>
+
+      <!-- ━━ 概览页 ━━ -->
+      <div id="page-dashboard" class="page">
+        <div class="stat-grid">
+          <div class="stat-card"><div class="label">Total</div><div class="value" id="statTotal">0</div></div>
+          <div class="stat-card"><div class="label">Active</div><div class="value" id="statActive">0</div></div>
+          <div class="stat-card"><div class="label">Revoked</div><div class="value" id="statRevoked">0</div></div>
+          <div class="stat-card"><div class="label">Expired</div><div class="value" id="statExpired">0</div></div>
+          <div class="stat-card"><div class="label">Online</div><div class="value" id="statOnline">0</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span class="title">最近授权</span><button class="btn btn-sm" onclick="switchPage('licenses')">查看全部</button></div>
+          <div class="panel-body"><table><thead><tr><th>授权码</th><th>域名</th><th>状态</th><th>到期</th></tr></thead><tbody id="recentBody"></tbody></table></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span class="title">最近操作</span><button class="btn btn-sm" onclick="switchPage('logs')">查看全部</button></div>
+          <div class="panel-body"><table><thead><tr><th>时间</th><th>操作</th><th>IP</th><th>详情</th></tr></thead><tbody id="recentLogBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- ━━ 授权管理页 ━━ -->
+      <div id="page-licenses" class="page">
+        <div class="panel">
+          <div class="filter-bar">
+            <input id="searchInput" placeholder="搜索授权码 / 域名 / 备注" onkeyup="if(event.key==='Enter')loadList()" />
+            <button class="btn btn-sm" onclick="loadList()">搜索</button>
+            <button class="btn btn-sm btn-primary" onclick="showModal('createModal')">新建授权码</button>
+          </div>
+          <div class="panel-body" style="overflow-x:auto">
+            <table>
+              <thead><tr><th style="width:44px">ID</th><th>授权码</th><th>域名</th><th>套餐</th><th>状态</th><th>机器码</th><th>到期时间</th><th>最后心跳</th><th>操作</th></tr></thead>
+              <tbody id="licenseBody"></tbody>
+            </table>
+          </div>
+          <div class="panel-foot">
+            <span id="pageInfo">0 条</span>
+            <div class="pg-btns">
+              <button class="btn btn-sm" onclick="prevPage()">上一页</button>
+              <button class="btn btn-sm" onclick="nextPage()">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ━━ 日志页 ━━ -->
+      <div id="page-logs" class="page">
+        <div class="panel">
+          <div class="filter-bar">
+            <input id="logLicenseId" placeholder="授权码 ID" style="flex:0;width:100px" />
+            <select id="logAction" style="width:120px">
+              <option value="">全部操作</option>
+              <option value="create">创建</option><option value="verify">验证</option>
+              <option value="bind">绑定</option><option value="unbind">解绑</option>
+              <option value="revoke">吊销</option><option value="enable">启用</option>
+              <option value="renew">续期</option><option value="heartbeat">心跳</option>
+            </select>
+            <button class="btn btn-sm" onclick="loadLogs()">查询</button>
+          </div>
+          <div class="panel-body" style="overflow-x:auto">
+            <table>
+              <thead><tr><th>时间</th><th style="width:60px">授权ID</th><th>操作</th><th>IP</th><th>详情</th></tr></thead>
+              <tbody id="logBody"></tbody>
+            </table>
+          </div>
+          <div class="panel-foot">
+            <span id="logPageInfo">0 条</span>
+            <div class="pg-btns">
+              <button class="btn btn-sm" onclick="prevLogPage()">上一页</button>
+              <button class="btn btn-sm" onclick="nextLogPage()">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ━━ 用户管理页 ━━ -->
+      <div id="page-users" class="page">
+        <div class="panel">
+          <div class="filter-bar">
+            <span style="font-size:14px;font-weight:600;color:var(--text-title)">用户列表</span>
+            <div style="flex:1"></div>
+            <button class="btn btn-sm btn-primary" onclick="showCreateUser()">新建用户</button>
+          </div>
+          <div class="panel-body" style="overflow-x:auto">
+            <table>
+              <thead><tr><th style="width:44px">ID</th><th>用户名</th><th>显示名</th><th>角色</th><th>状态</th><th>配额</th><th>创建时间</th><th>操作</th></tr></thead>
+              <tbody id="userBody"></tbody>
+            </table>
+          </div>
+          <div class="panel-foot">
+            <span id="userPageInfo">0 条</span>
+            <div class="pg-btns">
+              <button class="btn btn-sm" onclick="prevUserPage()">上一页</button>
+              <button class="btn btn-sm" onclick="nextUserPage()">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：新建/编辑用户 -->
+<div id="userModal" class="modal-mask">
+  <div class="modal-box" style="max-width:400px">
+    <h3 id="userModalTitle">新建用户</h3>
+    <input id="uId" type="hidden" />
+    <label>用户名</label><input id="uUsername" placeholder="登录用户名" />
+    <label>密码</label><input id="uPassword" type="password" placeholder="设置密码" />
+    <label>显示名</label><input id="uDisplayName" placeholder="显示名称" />
+    <div class="row r2">
+      <div><label>角色</label><select id="uRole"><option value="1">授权商</option><option value="2">普通用户</option></select></div>
+      <div><label>授权配额</label><input id="uMaxLicenses" type="number" value="100" /></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('userModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveUser()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：新建 -->
+<div id="createModal" class="modal-mask">
+  <div class="modal-box">
+    <h3>新建授权码</h3>
+    <label>域名</label><input id="cDomain" placeholder="example.com 或 * 不限" value="*" />
+    <label>备注</label><input id="cNote" placeholder="客户名称 / 说明" />
+    <div class="row r2">
+      <div><label>套餐</label><select id="cPlan"><option value="basic">基础版</option><option value="standard" selected>标准版</option><option value="enterprise">企业版</option></select></div>
+      <div><label>有效天数</label><input id="cExpireDays" type="number" value="365" /></div>
+    </div>
+    <div class="row r3">
+      <div><label>最大用户</label><input id="cMaxUsers" type="number" value="100" /></div>
+      <div><label>最大坐席</label><input id="cMaxAgents" type="number" value="50" /></div>
+      <div><label>换绑次数</label><input id="cMaxBind" type="number" value="3" /></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('createModal')">取消</button>
+      <button class="btn btn-primary" onclick="createLicense()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：续期 -->
+<div id="renewModal" class="modal-mask">
+  <div class="modal-box" style="max-width:360px">
+    <h3>续期授权码</h3>
+    <input id="renewId" type="hidden" />
+    <label>续期天数</label><input id="renewDays" type="number" value="365" />
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('renewModal')">取消</button>
+      <button class="btn btn-primary" onclick="renewLicense()">确认续期</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：授权码展示 -->
+<div id="keyModal" class="modal-mask">
+  <div class="modal-box" style="max-width:480px">
+    <h3>授权码已生成</h3>
+    <div class="key-out" id="newKeyDisplay"></div>
+    <p style="font-size:12px;color:var(--text-3);text-align:center;margin-top:10px">点击上方区域可全选复制</p>
+    <div class="modal-foot" style="margin-top:14px">
+      <button class="btn btn-primary" onclick="closeModal('keyModal')">确认</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API=window.location.origin+'/api/v1';
+let TOKEN=localStorage.getItem('jwt_token')||'';
+let currentUser=JSON.parse(localStorage.getItem('current_user')||'null');
+let page=1,total=0,limit=15,logPage=1,logTotal=0,userPage=1,userTotal=0;
+let currentStatus='';
+let currentPage='dashboard';
+const ROLE_NAMES={0:'超级管理员',1:'授权商',2:'普通用户'};
+
+/* ── 主题切换 ── */
+const sunSVG='<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+const moonSVG='<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>';
+function applyTheme(dark){
+  document.body.classList.toggle('dark',dark);
+  document.getElementById('themeIcon').innerHTML=dark?moonSVG:sunSVG;
+  localStorage.setItem('theme',dark?'dark':'light');
+}
+function toggleTheme(){applyTheme(!document.body.classList.contains('dark'));}
+(function(){const t=localStorage.getItem('theme');applyTheme(t!=='light');})();
+
+/* ── 侧栏展开/收起 ── */
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  sb.classList.toggle('expanded');
+  localStorage.setItem('sidebar_expanded',sb.classList.contains('expanded')?'1':'0');
+}
+(function(){if(localStorage.getItem('sidebar_expanded')==='1')document.getElementById('sidebar').classList.add('expanded');})();
+
+/* ── 页面切换 ── */
+function switchPage(name){
+  currentPage=name;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item[id]').forEach(n=>n.classList.remove('active'));
+  const el=document.getElementById('page-'+name);
+  const nav=document.getElementById('nav-'+name);
+  if(el)el.classList.add('active');
+  if(nav)nav.classList.add('active');
+  const titles={dashboard:'概览',licenses:'授权管理',logs:'操作日志',users:'用户管理'};
+  document.getElementById('pageTitle').textContent=titles[name]||'';
+  document.getElementById('tabBar').style.display=name==='licenses'?'flex':'none';
+  if(name==='dashboard'){loadDashboard();loadRecent();}
+  if(name==='licenses')loadList();
+  if(name==='logs')loadLogs();
+  if(name==='users')loadUsers();
+}
+
+/* ── 选项卡筛选 ── */
+function filterTab(el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  currentStatus=el.dataset.status;
+  page=1;loadList();
+}
+
+/* ── 基础 ── */
+function toast(m,ok=true){const e=document.createElement('div');e.className='toast '+(ok?'toast-ok':'toast-err');e.textContent=m;document.body.appendChild(e);setTimeout(()=>e.remove(),2500);}
+function showModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+async function api(method,path,body){
+  const o={method,headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'}};
+  if(body)o.body=JSON.stringify(body);
+  let r,d;
+  try{r=await fetch(API+path,o);}catch(e){toast('网络连接失败',false);throw e;}
+  try{d=await r.json();}catch(e){toast('服务器响应异常('+r.status+')',false);throw e;}
+  if(d.code!==0){toast(d.message||'请求失败',false);throw new Error(d.message);}
+  return d.data;
+}
+
+/* ── 登录 ── */
+window.onload=()=>{
+  if(TOKEN && currentUser){
+    onLoginSuccess(currentUser, true);
+  }
+};
+
+async function login(){
+  const username=document.getElementById('loginUser').value.trim();
+  const password=document.getElementById('loginPass').value.trim();
+  if(!username||!password)return toast('请输入用户名和密码',false);
+  try{
+    const o={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})};
+    const r=await fetch(API+'/auth/login',o),d=await r.json();
+    if(d.code!==0){toast(d.message||'登录失败',false);return;}
+    TOKEN=d.data.token;
+    currentUser=d.data.user;
+    localStorage.setItem('jwt_token',TOKEN);
+    localStorage.setItem('current_user',JSON.stringify(currentUser));
+    onLoginSuccess(currentUser, false);
+  }catch(e){toast('登录失败',false);}
+}
+
+function onLoginSuccess(user, silent){
+  document.getElementById('loginScreen').style.display='none';
+  const rn=ROLE_NAMES[user.role]||'用户';
+  document.getElementById('connStatus').innerHTML=`<span class="conn-dot on"></span>${user.display_name||user.username} (${rn})`;
+  document.getElementById('connStatus').style.color='#22c55e';
+  // 角色适配
+  document.getElementById('nav-users').style.display=user.role===0?'flex':'none';
+  // 普通用户隐藏创建按钮
+  document.querySelectorAll('.dealer-hide').forEach(el=>el.style.display=user.role===2?'none':'');
+  switchPage('dashboard');
+  if(!silent)toast('登录成功');
+}
+
+function logout(){
+  localStorage.removeItem('jwt_token');
+  localStorage.removeItem('current_user');
+  TOKEN='';currentUser=null;
+  document.getElementById('loginScreen').style.display='flex';
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('connStatus').innerHTML='<span class="conn-dot"></span>未登录';
+  document.getElementById('connStatus').style.color='var(--text-4)';
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPass').value='';
+  document.getElementById('nav-users').style.display='none';
+}
+
+/* ── 概览 ── */
+async function loadDashboard(){
+  const d=await api('GET','/admin/license/dashboard');
+  document.getElementById('statTotal').textContent=d.total||0;
+  document.getElementById('statActive').textContent=d.active||0;
+  document.getElementById('statRevoked').textContent=d.revoked||0;
+  document.getElementById('statExpired').textContent=d.expired||0;
+  document.getElementById('statOnline').textContent=d.online_now||0;
+}
+
+async function loadRecent(){
+  try{
+    const d=await api('GET','/admin/licenses?page=1&limit=5');
+    const tb=document.getElementById('recentBody');tb.innerHTML='';
+    (d.list||[]).forEach(l=>{
+      const st=l.status===1?'<span class="tag tag-on">活跃</span>':l.status===0?'<span class="tag tag-off">吊销</span>':'<span class="tag tag-exp">过期</span>';
+      tb.innerHTML+=`<tr><td class="mono">${l.license_key.substring(0,24)}</td><td>${l.domain}</td><td>${st}</td><td style="font-size:12px;color:var(--text-3)">${l.expire_at||'永久'}</td></tr>`;
+    });
+    if(!(d.list||[]).length)tb.innerHTML='<tr class="empty-row"><td colspan="4">暂无数据</td></tr>';
+  }catch(e){}
+  try{
+    const d=await api('GET','/admin/license/logs?page=1&limit=5');
+    const tb=document.getElementById('recentLogBody');tb.innerHTML='';
+    (d.list||[]).forEach(l=>{
+      tb.innerHTML+=`<tr><td style="font-size:12px;color:var(--text-3)">${l.created_at}</td><td><span class="tag tag-log">${l.action}</span></td><td style="color:var(--text-3)">${l.ip}</td><td style="color:var(--text-3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.detail||''}">${l.detail||''}</td></tr>`;
+    });
+    if(!(d.list||[]).length)tb.innerHTML='<tr class="empty-row"><td colspan="4">暂无日志</td></tr>';
+  }catch(e){}
+}
+
+/* ── 授权列表 ── */
+async function loadList(){
+  const kw=document.getElementById('searchInput').value;
+  let u=`/admin/licenses?page=${page}&limit=${limit}`;
+  if(kw)u+=`&keyword=${encodeURIComponent(kw)}`;
+  if(currentStatus!=='')u+=`&status=${currentStatus}`;
+  const d=await api('GET',u);total=d.total||0;
+  document.getElementById('pageInfo').textContent=`共 ${total} 条 · ${page} / ${Math.max(1,Math.ceil(total/limit))} 页`;
+  const tb=document.getElementById('licenseBody');tb.innerHTML='';
+  (d.list||[]).forEach(l=>{
+    const st=l.status===1?'<span class="tag tag-on">活跃</span>':l.status===0?'<span class="tag tag-off">吊销</span>':'<span class="tag tag-exp">过期</span>';
+    const mid=l.machine_id?`<span class="mono" style="font-size:11px" title="${l.machine_id}">${l.machine_id.substring(0,16)}</span>`:'<span style="color:var(--text-5)">-</span>';
+    const act=`<div class="acts">
+      ${l.status===1?`<button class="btn btn-sm btn-danger" onclick="revokeLicense(${l.id})">吊销</button>`:''}
+      ${l.status===0?`<button class="btn btn-sm" onclick="enableLicense(${l.id})">启用</button>`:''}
+      ${l.machine_id?`<button class="btn btn-sm" onclick="unbindLicense(${l.id})">解绑</button>`:''}
+      <button class="btn btn-sm" onclick="showRenew(${l.id})">续期</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteLicense(${l.id})">删除</button>
+    </div>`;
+    tb.innerHTML+=`<tr>
+      <td style="color:var(--text-3)">${l.id}</td>
+      <td><span class="mono">${l.license_key.substring(0,24)}</span><div class="sub">${l.note||''}</div></td>
+      <td>${l.domain}</td><td>${l.plan||'-'}</td><td>${st}</td><td>${mid}</td>
+      <td style="font-size:12px;color:var(--text-3)">${l.expire_at||'永久'}</td>
+      <td style="font-size:11px;color:var(--text-4)">${l.last_heartbeat||'-'}</td>
+      <td>${act}</td></tr>`;
+  });
+  if(!(d.list||[]).length)tb.innerHTML='<tr class="empty-row"><td colspan="9">暂无数据</td></tr>';
+}
+function prevPage(){if(page>1){page--;loadList();}}
+function nextPage(){if(page*limit<total){page++;loadList();}}
+
+/* ── 创建 ── */
+async function createLicense(){
+  const b={domain:document.getElementById('cDomain').value||'*',note:document.getElementById('cNote').value,plan:document.getElementById('cPlan').value,expire_days:parseInt(document.getElementById('cExpireDays').value)||365,max_users:parseInt(document.getElementById('cMaxUsers').value)||100,max_agents:parseInt(document.getElementById('cMaxAgents').value)||50,max_bind:parseInt(document.getElementById('cMaxBind').value)||3};
+  const d=await api('POST','/admin/license/create',b);closeModal('createModal');
+  document.getElementById('newKeyDisplay').textContent=d.license_key;showModal('keyModal');
+  if(currentPage==='dashboard'){loadDashboard();loadRecent();}else{loadList();}
+}
+
+/* ── 操作 ── */
+async function revokeLicense(id){if(!confirm('确定吊销此授权码？'))return;await api('POST','/admin/license/revoke',{id});toast('已吊销');loadList();loadDashboard();}
+async function enableLicense(id){await api('POST','/admin/license/enable',{id});toast('已启用');loadList();loadDashboard();}
+async function unbindLicense(id){if(!confirm('确定解绑机器码？'))return;await api('POST','/admin/license/unbind',{id});toast('已解绑');loadList();}
+async function deleteLicense(id){if(!confirm('永久删除此授权码？'))return;await api('DELETE',`/admin/license/delete/${id}`);toast('已删除');loadList();loadDashboard();}
+
+function showRenew(id){document.getElementById('renewId').value=id;showModal('renewModal');}
+async function renewLicense(){const id=+document.getElementById('renewId').value,days=+document.getElementById('renewDays').value||365;const d=await api('POST','/admin/license/renew',{id,expire_days:days});closeModal('renewModal');toast('续期至 '+d.expire_at);loadList();}
+
+/* ── 日志 ── */
+async function loadLogs(){
+  const lid=document.getElementById('logLicenseId').value,act=document.getElementById('logAction').value;
+  let u=`/admin/license/logs?page=${logPage}&limit=20`;if(lid)u+=`&license_id=${lid}`;if(act)u+=`&action=${act}`;
+  const d=await api('GET',u);logTotal=d.total||0;
+  document.getElementById('logPageInfo').textContent=`共 ${logTotal} 条 · ${logPage} / ${Math.max(1,Math.ceil(logTotal/20))} 页`;
+  const tb=document.getElementById('logBody');tb.innerHTML='';
+  (d.list||[]).forEach(l=>{
+    tb.innerHTML+=`<tr><td style="font-size:12px;color:var(--text-3)">${l.created_at}</td><td>${l.license_id}</td><td><span class="tag tag-log">${l.action}</span></td><td style="color:var(--text-3)">${l.ip}</td><td style="color:var(--text-3);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.detail||''}">${l.detail||''}</td></tr>`;
+  });
+  if(!(d.list||[]).length)tb.innerHTML='<tr class="empty-row"><td colspan="5">暂无日志</td></tr>';
+}
+function prevLogPage(){if(logPage>1){logPage--;loadLogs();}}
+function nextLogPage(){if(logPage*20<logTotal){logPage++;loadLogs();}}
+
+/* ── 用户管理 ── */
+async function loadUsers(){
+  const d=await api('GET',`/admin/users?page=${userPage}&limit=20`);
+  userTotal=d.total||0;
+  document.getElementById('userPageInfo').textContent=`共 ${userTotal} 条 · ${userPage} / ${Math.max(1,Math.ceil(userTotal/20))} 页`;
+  const tb=document.getElementById('userBody');tb.innerHTML='';
+  (d.list||[]).forEach(u=>{
+    const role=ROLE_NAMES[u.role]||u.role;
+    const roleCls=u.role===0?'tag-on':u.role===1?'tag-exp':'tag-log';
+    const st=u.status===1?'<span class="tag tag-on">启用</span>':'<span class="tag tag-off">禁用</span>';
+    const act=u.role===0?'<span style="color:var(--text-4)">—</span>':`<div class="acts">
+      <button class="btn btn-sm" onclick="editUser(${u.id})">编辑</button>
+      ${u.status===1?`<button class="btn btn-sm btn-danger" onclick="toggleUserStatus(${u.id},0)">禁用</button>`:`<button class="btn btn-sm" onclick="toggleUserStatus(${u.id},1)">启用</button>`}
+      <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">删除</button>
+    </div>`;
+    tb.innerHTML+=`<tr>
+      <td style="color:var(--text-3)">${u.id}</td>
+      <td><span class="mono">${u.username}</span></td>
+      <td>${u.display_name||'-'}</td>
+      <td><span class="tag ${roleCls}">${role}</span></td>
+      <td>${st}</td>
+      <td>${u.role===1?u.max_licenses:'-'}</td>
+      <td style="font-size:12px;color:var(--text-3)">${u.created_at}</td>
+      <td>${act}</td></tr>`;
+  });
+  if(!(d.list||[]).length)tb.innerHTML='<tr class="empty-row"><td colspan="8">暂无用户</td></tr>';
+}
+function prevUserPage(){if(userPage>1){userPage--;loadUsers();}}
+function nextUserPage(){if(userPage*20<userTotal){userPage++;loadUsers();}}
+
+function showCreateUser(){
+  document.getElementById('userModalTitle').textContent='新建用户';
+  document.getElementById('uId').value='';
+  document.getElementById('uUsername').value='';document.getElementById('uUsername').disabled=false;
+  document.getElementById('uPassword').value='';
+  document.getElementById('uDisplayName').value='';
+  document.getElementById('uRole').value='1';
+  document.getElementById('uMaxLicenses').value='100';
+  showModal('userModal');
+}
+
+async function editUser(id){
+  const d=await api('GET',`/admin/users?page=1&limit=100`);
+  const u=(d.list||[]).find(x=>x.id===id);
+  if(!u)return toast('用户不存在',false);
+  document.getElementById('userModalTitle').textContent='编辑用户';
+  document.getElementById('uId').value=u.id;
+  document.getElementById('uUsername').value=u.username;document.getElementById('uUsername').disabled=true;
+  document.getElementById('uPassword').value='';
+  document.getElementById('uDisplayName').value=u.display_name;
+  document.getElementById('uRole').value=u.role;
+  document.getElementById('uMaxLicenses').value=u.max_licenses;
+  showModal('userModal');
+}
+
+async function saveUser(){
+  const id=document.getElementById('uId').value;
+  if(id){
+    const b={id:+id,display_name:document.getElementById('uDisplayName').value,role:+document.getElementById('uRole').value,max_licenses:+document.getElementById('uMaxLicenses').value};
+    const pw=document.getElementById('uPassword').value;
+    if(pw)b.password=pw;
+    await api('POST','/admin/user/update',b);
+  }else{
+    const b={username:document.getElementById('uUsername').value,password:document.getElementById('uPassword').value,display_name:document.getElementById('uDisplayName').value,role:+document.getElementById('uRole').value,max_licenses:+document.getElementById('uMaxLicenses').value};
+    if(!b.username||!b.password)return toast('用户名和密码必填',false);
+    await api('POST','/admin/user/create',b);
+  }
+  closeModal('userModal');toast('保存成功');loadUsers();
+}
+
+async function toggleUserStatus(id,status){
+  await api('POST','/admin/user/update',{id,status});
+  toast(status===1?'已启用':'已禁用');loadUsers();
+}
+
+async function deleteUser(id){
+  if(!confirm('确定删除此用户？'))return;
+  await api('DELETE',`/admin/user/delete/${id}`);
+  toast('已删除');loadUsers();
+}
+</script>
+</body>
+</html>

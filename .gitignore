@@ -49,6 +49,11 @@ Cline/
 # SSL challenge
 .well-known/
 
+# Auth server (Rust)
+auth-server/target/
+auth-server/data/
+auth-server/config.toml
+
 # Temp
 *.bak
 *.bak2
