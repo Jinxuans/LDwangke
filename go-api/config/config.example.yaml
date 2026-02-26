@@ -30,7 +30,7 @@ cache:
   class_list_ttl: 300    # 课程列表缓存5分钟
 
 license:
-  server_url: "https://qingka.top"          # 授权站地址
+  server_url: "https://auth.qingka.top"      # 授权站地址
   license_key: ""                              # 授权码（留空则从 key_file 读取）
   key_file: "/www/wwwroot/qingka/license.key"  # 授权码文件路径
   domain: ""                                   # 当前站点域名（宝塔插件自动写入）
