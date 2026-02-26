@@ -1708,3 +1708,81 @@ CREATE TABLE IF NOT EXISTS `qingka_tenant_product` (
   UNIQUE KEY `uk_tid_cid` (`tid`,`cid`),
   KEY `idx_tid` (`tid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Table structure for table `qingka_mall_pay_order`
+--
+
+DROP TABLE IF EXISTS `qingka_mall_pay_order`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `qingka_mall_pay_order` (
+  `id`            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `out_trade_no`  VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '商户订单号',
+  `trade_no`      VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '第三方流水号',
+  `tid`           INT          NOT NULL DEFAULT 0  COMMENT '店铺ID',
+  `cid`           INT          NOT NULL DEFAULT 0  COMMENT '商品ID',
+  `account`       VARCHAR(128) NOT NULL DEFAULT '' COMMENT 'C端填写的账号',
+  `password`      VARCHAR(128) NOT NULL DEFAULT '' COMMENT 'C端填写的密码',
+  `remark`        VARCHAR(255) NOT NULL DEFAULT '' COMMENT '备注',
+  `pay_type`      VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '支付方式 alipay/wxpay/qqpay',
+  `money`         DECIMAL(10,2) NOT NULL DEFAULT 0  COMMENT '支付金额',
+  `status`        TINYINT      NOT NULL DEFAULT 0  COMMENT '0待支付 1已支付 2已下单 -1失败',
+  `order_id`      INT          NOT NULL DEFAULT 0  COMMENT '关联的业务订单ID',
+  `c_uid`         INT          NOT NULL DEFAULT 0  COMMENT 'C端用户ID',
+  `course_id`     VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '选择的课程ID',
+  `course_name`   VARCHAR(255) NOT NULL DEFAULT '' COMMENT '选择的课程名称',
+  `course_kcjs`   VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '课程结束时间',
+  `ip`            VARCHAR(64)  NOT NULL DEFAULT '',
+  `addtime`       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `paytime`       DATETIME     NULL     DEFAULT NULL COMMENT '支付完成时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_out_trade_no` (`out_trade_no`),
+  KEY `idx_tid` (`tid`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商城C端支付订单';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `qingka_wangke_huodong_record`
+--
+
+DROP TABLE IF EXISTS `qingka_wangke_huodong_record`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `qingka_wangke_huodong_record` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `hid` int(11) NOT NULL COMMENT '活动ID',
+  `uid` int(11) NOT NULL COMMENT '用户ID',
+  `progress` int(11) NOT NULL DEFAULT 0 COMMENT '当前进度',
+  `status` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0进行中 1已完成 2已领取',
+  `addtime` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_hid_uid` (`hid`, `uid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='活动参与记录';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `qingka_wangke_push_logs`
+--
+
+DROP TABLE IF EXISTS `qingka_wangke_push_logs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `qingka_wangke_push_logs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '推送ID',
+  `order_id` int(11) DEFAULT NULL COMMENT '订单ID',
+  `uid` varchar(255) DEFAULT NULL COMMENT '用户UID',
+  `type` varchar(32) DEFAULT NULL COMMENT '推送类型: wxpusher/email/showdoc',
+  `receiver_email` varchar(255) DEFAULT NULL COMMENT '接收人邮箱',
+  `receiver_uid` varchar(64) DEFAULT NULL COMMENT '接收人微信uid',
+  `showdoc_url` varchar(255) DEFAULT NULL COMMENT 'ShowDoc推送地址',
+  `content` text COMMENT '推送内容',
+  `status` enum('成功','失败') DEFAULT NULL COMMENT '推送状态',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '推送时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_order_id` (`order_id`),
+  KEY `idx_type` (`type`),
+  KEY `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='推送日志';
+/*!40101 SET character_set_client = @saved_cs_client */;
