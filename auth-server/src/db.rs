@@ -33,7 +33,6 @@ CREATE TABLE IF NOT EXISTS license (
     note TEXT NOT NULL DEFAULT '',
     plan TEXT NOT NULL DEFAULT 'standard',
     max_users INTEGER NOT NULL DEFAULT 0,
-    max_agents INTEGER NOT NULL DEFAULT 0,
     status INTEGER NOT NULL DEFAULT 1,
     expire_at TEXT,
     last_heartbeat TEXT,
@@ -45,7 +44,6 @@ CREATE TABLE IF NOT EXISTS license (
     is_trial INTEGER NOT NULL DEFAULT 0,
     month_rebind_count INTEGER NOT NULL DEFAULT 0,
     last_rebind_month TEXT NOT NULL DEFAULT '',
-    config TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
@@ -117,7 +115,7 @@ pub fn init(config: &AppConfig) -> DbPool {
 
 // ===== 查询 =====
 
-const SELECT_COLS: &str = "id,license_key,domain,machine_id,note,plan,max_users,max_agents,status,expire_at,last_heartbeat,last_ip,version,bind_count,max_bind,dealer_id,is_trial,month_rebind_count,last_rebind_month,config,created_at,updated_at";
+const SELECT_COLS: &str = "id,license_key,domain,machine_id,note,plan,max_users,status,expire_at,last_heartbeat,last_ip,version,bind_count,max_bind,dealer_id,is_trial,month_rebind_count,last_rebind_month,created_at,updated_at";
 
 fn map_license(row: &rusqlite::Row) -> rusqlite::Result<License> {
     Ok(License {
@@ -128,21 +126,19 @@ fn map_license(row: &rusqlite::Row) -> rusqlite::Result<License> {
         note: row.get(4)?,
         plan: row.get(5)?,
         max_users: row.get(6)?,
-        max_agents: row.get(7)?,
-        status: row.get(8)?,
-        expire_at: row.get(9)?,
-        last_heartbeat: row.get(10)?,
-        last_ip: row.get(11)?,
-        version: row.get(12)?,
-        bind_count: row.get(13)?,
-        max_bind: row.get(14)?,
-        dealer_id: row.get(15)?,
-        is_trial: row.get(16)?,
-        month_rebind_count: row.get(17)?,
-        last_rebind_month: row.get(18)?,
-        config: row.get(19)?,
-        created_at: row.get(20)?,
-        updated_at: row.get(21)?,
+        status: row.get(7)?,
+        expire_at: row.get(8)?,
+        last_heartbeat: row.get(9)?,
+        last_ip: row.get(10)?,
+        version: row.get(11)?,
+        bind_count: row.get(12)?,
+        max_bind: row.get(13)?,
+        dealer_id: row.get(14)?,
+        is_trial: row.get(15)?,
+        month_rebind_count: row.get(16)?,
+        last_rebind_month: row.get(17)?,
+        created_at: row.get(18)?,
+        updated_at: row.get(19)?,
     })
 }
 
@@ -328,8 +324,8 @@ pub fn create_license(db: &DbPool, key: &str, req: &CreateLicenseRequest) -> Res
     };
 
     let sql = format!(
-        "INSERT INTO license (license_key, domain, note, plan, max_users, max_agents, max_bind, expire_at, dealer_id, is_trial, config)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10)"
+        "INSERT INTO license (license_key, domain, note, plan, max_users, max_bind, expire_at, dealer_id, is_trial)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0)"
     );
     c.execute(
         &sql,
@@ -339,11 +335,9 @@ pub fn create_license(db: &DbPool, key: &str, req: &CreateLicenseRequest) -> Res
             req.note,
             req.plan,
             req.max_users,
-            req.max_agents,
             req.max_bind,
             expire_at,
             req.dealer_id,
-            req.config,
         ],
     )
     .map_err(|e| format!("创建失败: {}", e))?;
@@ -373,17 +367,9 @@ pub fn update_license(db: &DbPool, req: &UpdateLicenseRequest) -> Result<(), Str
         sets.push("max_users=?");
         vals.push(Box::new(v));
     }
-    if let Some(v) = req.max_agents {
-        sets.push("max_agents=?");
-        vals.push(Box::new(v));
-    }
     if let Some(ref v) = req.max_bind {
         sets.push("max_bind=?");
         vals.push(Box::new(v));
-    }
-    if let Some(ref v) = req.config {
-        sets.push("config=?");
-        vals.push(Box::new(v.clone()));
     }
 
     if sets.is_empty() {
@@ -661,8 +647,8 @@ pub fn batch_create(db: &DbPool, keys: &[String], req: &crate::model::BatchCreat
     let mut results = Vec::new();
     for key in keys {
         let sql = format!(
-            "INSERT INTO license (license_key, domain, note, plan, max_users, max_agents, max_bind, expire_at, dealer_id, is_trial, config)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10)"
+            "INSERT INTO license (license_key, domain, note, plan, max_users, max_bind, expire_at, dealer_id, is_trial)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0)"
         );
         tx.execute(
             &sql,
@@ -672,11 +658,9 @@ pub fn batch_create(db: &DbPool, keys: &[String], req: &crate::model::BatchCreat
                 req.note,
                 req.plan,
                 req.max_users,
-                req.max_agents,
                 req.max_bind,
                 expire_at,
                 req.dealer_id,
-                req.config,
             ],
         ).map_err(|e| format!("创建失败: {}", e))?;
         let id = tx.last_insert_rowid();
@@ -741,7 +725,7 @@ pub fn create_trial_license(db: &DbPool, key: &str, machine_id: &str, domain: &s
         .format("%Y-%m-%d %H:%M:%S")
         .to_string();
     c.execute(
-        "INSERT INTO license (license_key, domain, machine_id, note, plan, max_users, max_agents, max_bind, expire_at, is_trial, bind_count) VALUES (?1,?2,?3,'试用授权','trial',10,5,1,?4,1,1)",
+        "INSERT INTO license (license_key, domain, machine_id, note, plan, max_users, max_bind, expire_at, is_trial, bind_count) VALUES (?1,?2,?3,'试用授权','trial',10,1,?4,1,1)",
         params![key, domain, machine_id, &expire_at],
     ).map_err(|e| format!("创建试用授权失败: {}", e))?;
     Ok(c.last_insert_rowid())

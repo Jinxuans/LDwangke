@@ -89,8 +89,8 @@ fi
 echo -e "${YELLOW}[5/6] 打包更新文件...${NC}"
 
 cd "$TMP_DIR/backend" && tar -czf "$UPDATE_DIR/backend.tar.gz" .
-cd "$TMP_DIR/frontend" && tar -czf "$UPDATE_DIR/frontend.tar.gz" .
-cd "$TMP_DIR/mall" && tar -czf "$UPDATE_DIR/mall.tar.gz" .
+cd "$TMP_DIR/frontend" && tar -czf "$UPDATE_DIR/frontend.tar.gz" --exclude='favicon.ico' .
+cd "$TMP_DIR/mall" && tar -czf "$UPDATE_DIR/mall.tar.gz" --exclude='favicon.ico' .
 cd "$TMP_DIR/php-api" && tar -czf "$UPDATE_DIR/php-api.tar.gz" . 2>/dev/null || true
 
 # 打包插件本身

@@ -197,7 +197,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
         <div class="domain-display">
           <span>🌐</span>
           <span class="domain-text" id="currentDomain">-</span>
-          <button class="btn btn-primary" onclick="applySSL()">申请 SSL</button>
           <button class="btn btn-danger" onclick="removeDomain()">解绑域名</button>
         </div>
       </div>
@@ -471,16 +470,6 @@ function removeDomain() {
   });
 }
 
-function applySSL() {
-  if (QK._busy) return;
-  QK._busy = true;
-  var idx = layer.msg('申请 SSL 中...', {icon: 16, shade: 0.1, time: 0});
-  req('apply_ssl', null, function(res) {
-    layer.close(idx);
-    QK._busy = false;
-    layer.msg(res.msg || (res.status ? 'SSL 申请成功' : 'SSL 申请失败'), {icon: res.status ? 1 : 2});
-  });
-}
 
 // Update
 function checkUpdate() {

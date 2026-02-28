@@ -183,13 +183,7 @@ pub async fn verify(
             plan: license.plan.clone(),
             expire_at: license.expire_at,
             max_users: license.max_users,
-            max_agents: license.max_agents,
             is_trial: license.is_trial == 1,
-            config: if license.config.is_empty() {
-                None
-            } else {
-                serde_json::from_str(&license.config).ok()
-            },
             message: None,
         };
 
@@ -200,9 +194,7 @@ pub async fn verify(
             "plan": verify_resp.plan,
             "expire_at": verify_resp.expire_at,
             "max_users": verify_resp.max_users,
-            "max_agents": verify_resp.max_agents,
             "is_trial": verify_resp.is_trial,
-            "config": verify_resp.config,
             "notices": notices,
         })), Some(verify_resp))
     })
@@ -1012,6 +1004,67 @@ pub async fn admin_batch_renew(
         Ok(results) => Json(ApiResponse::success(serde_json::json!({ "count": results.len() }))),
         Err(e) => Json(ApiResponse::error(400, &e)),
     }
+}
+
+/// POST /api/v1/admin/license/batch_enable
+pub async fn admin_batch_enable(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(req): Json<IdsRequest>,
+) -> Json<ApiResponse> {
+    if claims.role == 2 { return Json(ApiResponse::error(403, "无权操作")); }
+    let db = state.db.clone();
+    let who = claims.username.clone();
+
+    let keys = tokio::task::spawn_blocking(move || {
+        let keys = db::batch_set_status(&db, &req.ids, 1);
+        for &id in &req.ids {
+            db::add_log(&db, id, "enable", &who, "批量启用");
+        }
+        keys
+    }).await.unwrap();
+
+    for k in &keys { state.cache.invalidate(k); }
+    Json(ApiResponse::success(serde_json::json!({ "count": keys.len() })))
+}
+
+/// POST /api/v1/admin/license/batch_delete
+pub async fn admin_batch_delete(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(req): Json<IdsRequest>,
+) -> Json<ApiResponse> {
+    if claims.role == 2 { return Json(ApiResponse::error(403, "无权操作")); }
+    let db = state.db.clone();
+
+    let keys = tokio::task::spawn_blocking(move || {
+        db::batch_delete(&db, &req.ids)
+    }).await.unwrap();
+
+    for k in &keys { state.cache.invalidate(k); }
+    Json(ApiResponse::success(serde_json::json!({ "count": keys.len() })))
+}
+
+/// POST /api/v1/admin/license/batch_unbind
+pub async fn admin_batch_unbind(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(req): Json<IdsRequest>,
+) -> Json<ApiResponse> {
+    if claims.role == 2 { return Json(ApiResponse::error(403, "无权操作")); }
+    let db = state.db.clone();
+    let who = claims.username.clone();
+
+    let keys = tokio::task::spawn_blocking(move || {
+        let keys = db::batch_unbind(&db, &req.ids);
+        for &id in &req.ids {
+            db::add_log(&db, id, "unbind", &who, "批量解绑");
+        }
+        keys
+    }).await.unwrap();
+
+    for k in &keys { state.cache.invalidate(k); }
+    Json(ApiResponse::success(serde_json::json!({ "count": keys.len() })))
 }
 
 // ===== 试用授权（公开接口） =====

@@ -162,7 +162,7 @@ class qingka_manager_main:
 
     def _verify_license(self, key):
         try:
-            import urllib.request, hmac as _hmac
+            import urllib.request, urllib.error, hmac as _hmac
             domain = self._get_domain()
             mid = ''
             if os.path.isfile('/etc/machine-id'):
@@ -176,8 +176,18 @@ class qingka_manager_main:
                 'version': '', 'timestamp': ts, 'sign': sign
             }).encode()
             req = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json', 'User-Agent': 'QingkaPlugin/1.0'})
-            resp = urllib.request.urlopen(req, timeout=10)
-            result = json.loads(resp.read().decode())
+            try:
+                resp = urllib.request.urlopen(req, timeout=10)
+                result = json.loads(resp.read().decode())
+            except urllib.error.HTTPError as he:
+                # 服务器返回非200状态码时，读取响应体中的真实错误信息
+                try:
+                    err_body = json.loads(he.read().decode())
+                    err_msg = err_body.get('message', err_body.get('msg', str(he)))
+                except Exception:
+                    err_msg = 'HTTP %d: %s' % (he.code, he.reason)
+                public.WriteLog('qingka_manager', '授权验证被拒绝: %s (key=%s..)' % (err_msg, key[:8]))
+                return False, err_msg
             if result.get('code') == 0 and result.get('data', {}).get('valid'):
                 # 缓存授权结果（带 HMAC 签名防篡改）
                 cache_path = os.path.join(self.__site_dir, '.license_cache')
@@ -186,8 +196,11 @@ class qingka_manager_main:
                 cache_sign = self._cache_sign(cache_data)
                 public.writeFile(cache_path, json.dumps({'d': cache_data, 's': cache_sign}))
                 return True, '授权有效'
-            return False, result.get('message', result.get('msg', '授权码无效'))
+            err_msg = result.get('message', result.get('msg', '授权码无效'))
+            public.WriteLog('qingka_manager', '授权验证失败: code=%s msg=%s (key=%s..)' % (result.get('code'), err_msg, key[:8]))
+            return False, err_msg
         except Exception as e:
+            public.WriteLog('qingka_manager', '授权验证异常: %s (key=%s..)' % (str(e), key[:8]))
             cache_path = os.path.join(self.__site_dir, '.license_cache')
             if os.path.isfile(cache_path):
                 try:
@@ -209,7 +222,32 @@ class qingka_manager_main:
     def _get_client_secret(self):
         """获取客户端签名密钥"""
         return self.__client_secret
-    # ==================== 状态 ====================
+
+    def _require_license(self):
+        """快速授权校验（优先查本地缓存，未授权返回错误 returnMsg，已授权返回 None）"""
+        key = self._get_license_key()
+        if not key:
+            return public.returnMsg(False, '请先在「首页概览」输入授权码')
+        # 优先检查本地缓存（无需网络请求）
+        cache_path = os.path.join(self.__site_dir, '.license_cache')
+        if os.path.isfile(cache_path):
+            try:
+                raw = json.loads(public.readFile(cache_path))
+                cache_data = raw.get('d', '')
+                cache_sign = raw.get('s', '')
+                if cache_data and cache_sign == self._cache_sign(cache_data):
+                    c = json.loads(cache_data)
+                    if c.get('key') == key and time.time() - c.get('ts', 0) < 86400 * 7:
+                        return None  # 缓存有效，放行
+            except Exception:
+                pass
+        # 缓存无效，走网络验证
+        ok, msg = self._verify_license(key)
+        if not ok:
+            return public.returnMsg(False, '授权验证失败: %s' % msg)
+        return None  # 验证通过
+
+    # ==================== 状态 ==
 
     def get_status(self, args):
         pid = self._get_pid()
@@ -496,6 +534,8 @@ class qingka_manager_main:
 
     def restart_all(self, args):
         """同时重启 Go + PHP 两个服务"""
+        check = self._require_license()
+        if check: return check
         results = []
         has_error = False
         self.stop(args)
@@ -590,8 +630,8 @@ class qingka_manager_main:
             public.WriteLog('qingka_manager', '心跳发送失败: %s' % str(e))
 
     def setup_heartbeat_cron(self, args=None):
-        """注册心跳 cron 任务（每5分钟）"""
-        cron_line = '*/5 * * * * cd %s && python3 -c "import qingka_manager_main; qingka_manager_main.qingka_manager_main().cron_heartbeat()" >> /dev/null 2>&1' % self.__plugin_path
+        """注册心跳 cron 任务（每12小时）"""
+        cron_line = '0 */12 * * * cd %s && python3 -c "import qingka_manager_main; qingka_manager_main.qingka_manager_main().cron_heartbeat()" >> /dev/null 2>&1' % self.__plugin_path
         cron_id = 'qingka_heartbeat'
         # 检查是否已存在
         try:
@@ -614,6 +654,8 @@ class qingka_manager_main:
 
     def setup_systemd(self, args):
         """注册 Go + PHP 为 systemd 服务，实现开机自启和崩溃自动重启"""
+        check = self._require_license()
+        if check: return check
         results = []
         # Go 服务
         go_service = '''[Unit]
@@ -670,6 +712,8 @@ WantedBy=multi-user.target
 
     def remove_systemd(self, args):
         """移除 systemd 服务"""
+        check = self._require_license()
+        if check: return check
         public.ExecShell('systemctl stop qingka-api.service 2>/dev/null')
         public.ExecShell('systemctl stop qingka-php.service 2>/dev/null')
         public.ExecShell('systemctl disable qingka-api.service 2>/dev/null')
@@ -717,6 +761,8 @@ WantedBy=multi-user.target
         return public.returnMsg(True, public.readFile(self.__config_file))
 
     def save_config(self, args):
+        check = self._require_license()
+        if check: return check
         if not hasattr(args, 'config'):
             return public.returnMsg(False, '未提供配置内容')
         try:
@@ -739,6 +785,8 @@ WantedBy=multi-user.target
     # ==================== 域名管理 ====================
 
     def setup_domain(self, args):
+        check = self._require_license()
+        if check: return check
         domain = getattr(args, 'domain', '').strip()
         if not domain:
             return public.returnMsg(False, '请输入域名')
@@ -874,6 +922,8 @@ WantedBy=multi-user.target
         return public.returnMsg(True, '域名 %s 绑定成功' % domain)
 
     def remove_domain(self, args):
+        check = self._require_license()
+        if check: return check
         domain = self._get_domain()
         if not domain:
             return public.returnMsg(False, '当前未绑定域名')
@@ -896,43 +946,6 @@ WantedBy=multi-user.target
         self._save_domain('')
         public.serviceReload()
         return public.returnMsg(True, '已解绑域名 %s' % domain)
-
-    def apply_ssl(self, args):
-        domain = self._get_domain()
-        if not domain:
-            return public.returnMsg(False, '请先绑定域名')
-        if not re.match(r'^[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+$', domain) or len(domain) > 253:
-            return public.returnMsg(False, '域名格式异常，请重新绑定')
-        # 方案 1: 宝塔面板内置 SSL 申请 (panelSSL)
-        try:
-            import panelSSL
-            ssl_obj = panelSSL.panelSSL()
-            sargs = type('Args', (), {'siteName': domain, 'domains': json.dumps([domain]), 'force': 'true', 'auth_type': 'http'})()
-            result = ssl_obj.apply_cert_api(sargs)
-            if isinstance(result, dict) and result.get('status'):
-                return public.returnMsg(True, 'SSL 证书申请成功')
-        except Exception as e:
-            public.WriteLog('qingka_manager', '宝塔SSL申请失败: %s' % str(e))
-        # 方案 2: 宝塔 acme.sh
-        acme_paths = ['/root/.acme.sh/acme.sh', '/usr/local/bin/acme.sh', '/www/server/panel/pyenv/bin/acme.sh']
-        acme = next((p for p in acme_paths if os.path.isfile(p)), None)
-        if acme:
-            result = public.ExecShell('%s --issue -d %s --webroot %s --force 2>&1' % (acme, domain, self._get_site_root()))
-            output = str(result[0]) + str(result[1])
-            if 'Cert success' in output or 'already been issued' in output:
-                cert_dir = '/www/server/panel/vhost/cert/%s' % domain
-                os.makedirs(cert_dir, exist_ok=True)
-                public.ExecShell('%s --install-cert -d %s --key-file %s/privkey.pem --fullchain-file %s/fullchain.pem --reloadcmd "/etc/init.d/nginx reload" 2>&1' % (acme, domain, cert_dir, cert_dir))
-                self._enable_ssl_nginx(domain, cert_dir)
-                return public.returnMsg(True, 'SSL 证书申请成功')
-        # 方案 3: certbot
-        certbot = public.ExecShell('which certbot 2>/dev/null')[0].strip()
-        if certbot:
-            result = public.ExecShell('certbot --nginx -d %s --non-interactive --agree-tos --register-unsafely-without-email 2>&1' % domain)
-            output = str(result[0]) + str(result[1])
-            if 'Congratulations' in output or 'Successfully' in output:
-                return public.returnMsg(True, 'SSL 证书申请成功')
-        return public.returnMsg(False, 'SSL 申请失败。请在宝塔面板「网站」中手动为 %s 申请 SSL 证书，或先在宝塔「网站」中添加该域名站点' % domain)
 
     # ==================== 远程更新 ====================
 
@@ -963,6 +976,8 @@ WantedBy=multi-user.target
         return public.returnMsg(True, json.dumps(data))
 
     def do_update(self, args):
+        check = self._require_license()
+        if check: return check
         update_type = getattr(args, 'type', 'full')
         if update_type not in ('full', 'backend', 'frontend', 'mall', 'php-api'):
             return public.returnMsg(False, '无效的更新类型: %s' % update_type)
@@ -1005,6 +1020,8 @@ WantedBy=multi-user.target
             return public.returnMsg(False, '更新失败: %s' % str(e))
 
     def rollback(self, args):
+        check = self._require_license()
+        if check: return check
         bin_path = os.path.join(self.__go_dir, self.__bin_name)
         bak_path = bin_path + '.bak'
         if not os.path.isfile(bak_path):
@@ -1034,6 +1051,8 @@ WantedBy=multi-user.target
         return public.returnMsg(True, json.dumps(data))
 
     def run_db_update(self, args):
+        check = self._require_license()
+        if check: return check
         try:
             self._run_migrations()
             return public.returnMsg(True, '数据库迁移执行完成')
@@ -1046,6 +1065,8 @@ WantedBy=multi-user.target
 
     def verify_db(self, args):
         """模式1: 检验标准数据库并补全 —— 不删除任何已有数据，只补缺失的部分"""
+        check = self._require_license()
+        if check: return check
         db_info = self._read_db_config()
         if not db_info:
             return public.returnMsg(False, '无法读取数据库配置，请检查 config.yaml')
@@ -1139,6 +1160,8 @@ WantedBy=multi-user.target
 
     def reset_db(self, args):
         """模式2: 重置一套全新的标准数据库 —— 删除所有表后重新创建"""
+        check = self._require_license()
+        if check: return check
         confirm = getattr(args, 'confirm', '')
         if confirm != 'YES':
             return public.returnMsg(False, '危险操作！请传入 confirm=YES 确认重置。此操作将删除所有数据！')
@@ -1236,7 +1259,7 @@ WantedBy=multi-user.target
             secret_file = os.path.join(self.__site_dir, '.client_secret')
             if not os.path.isfile(secret_file):
                 os.makedirs(self.__site_dir, exist_ok=True)
-                public.writeFile(secret_file, '3f48cd7beb7c6a492b0119c40f3caf114e23a3acb3d43365939c1325b8d6a72d')
+                public.writeFile(secret_file, self.__client_secret)
                 os.chmod(secret_file, 0o600)
 
             # 2. 从更新源下载文件
@@ -1390,25 +1413,6 @@ WantedBy=multi-user.target
 
     # ==================== 内部方法 ====================
 
-    def _enable_ssl_nginx(self, domain, cert_dir):
-        try:
-            import panelSite
-            sargs = type('Args', (), {'siteName': domain, 'first_domain': domain})()
-            panelSite.panelSite().SetSSLConf(sargs)
-        except Exception:
-            conf_file = '/www/server/panel/vhost/nginx/%s.conf' % domain
-            if not os.path.isfile(conf_file): return
-            content = public.readFile(conf_file)
-            if 'ssl_certificate' in content: return
-            ssl_str = """    ssl_certificate    /www/server/panel/vhost/cert/%s/fullchain.pem;
-    ssl_certificate_key    /www/server/panel/vhost/cert/%s/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers EECDH+CHACHA20:EECDH+AES128:RSA+AES128:EECDH+AES256:RSA+AES256:!MD5;
-    ssl_prefer_server_ciphers on;""" % (domain, domain)
-            content = content.replace('#error_page 404/404.html;', '#error_page 404/404.html;\n' + ssl_str)
-            content = content.replace('listen 80;', 'listen 80;\n    listen 443 ssl http2;')
-            public.writeFile(conf_file, content)
-        public.serviceReload()
     def _exec_sql(self, db_user, db_pass, db_name, sql):
         return self._safe_mysql_cmd(db_user, db_pass, db_name, sql_cmd=sql)
     def _get_port(self):
@@ -1485,6 +1489,12 @@ WantedBy=multi-user.target
                     chunk = resp.read(8192)
                     if not chunk: break
                     f.write(chunk)
+            # 前端/商城更新时保护网站图标
+            favicon_backup = None
+            if '/frontend' in url or '/mall' in url:
+                favicon_path = os.path.join(target_dir, 'favicon.ico')
+                if os.path.isfile(favicon_path):
+                    favicon_backup = public.readFile(favicon_path)
             # 后端特殊处理：备份旧二进制 + 保护配置文件
             config_backup = None
             php_config_backup = None
@@ -1509,6 +1519,8 @@ WantedBy=multi-user.target
                 public.writeFile(self.__config_file, config_backup)
             if php_config_backup is not None:
                 public.writeFile(os.path.join(self.__php_dir, 'config.php'), php_config_backup)
+            if favicon_backup is not None:
+                public.writeFile(os.path.join(target_dir, 'favicon.ico'), favicon_backup)
         finally:
             if os.path.isfile(tmp): os.remove(tmp)
 
@@ -1648,6 +1660,8 @@ WantedBy=multi-user.target
                 public.WriteLog('qingka_manager', '迁移 %s 失败: %s' % (sql, str(e)))
 
     def update_plugin(self, args):
+        check = self._require_license()
+        if check: return check
         try:
             import urllib.request, tempfile
             url = self.__update_server + '/update/plugin.tar.gz'
