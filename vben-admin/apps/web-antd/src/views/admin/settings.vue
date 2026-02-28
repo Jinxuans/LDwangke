@@ -4,14 +4,17 @@ import { Page } from '@vben/common-ui';
 import {
   Card, Button, Input, InputNumber, Switch, Select, SelectOption,
   message, Spin, Tabs, TabPane, Row, Col, Divider, Tag, Checkbox,
+  Table, Modal, Badge,
 } from 'ant-design-vue';
 import {
   SaveOutlined, ReloadOutlined, DesktopOutlined, TeamOutlined,
   CreditCardOutlined, AppstoreOutlined, SearchOutlined, SettingOutlined,
   LayoutOutlined, SafetyCertificateOutlined, GiftOutlined,
-  PlusOutlined, DeleteOutlined,
+  PlusOutlined, DeleteOutlined, DatabaseOutlined, SyncOutlined,
+  ApiOutlined, CheckCircleOutlined, ExclamationCircleOutlined, ThunderboltOutlined,
 } from '@ant-design/icons-vue';
-import { getConfigApi, saveConfigApi, getPayDataApi, savePayDataApi } from '#/api/admin';
+import { getConfigApi, saveConfigApi, getPayDataApi, savePayDataApi, dbSyncTestApi, dbSyncExecuteApi, dbCompatCheckApi, dbCompatFixApi } from '#/api/admin';
+import type { SyncResult, SyncTestResult, DBCompatCheckResult, DBCompatFixResult } from '#/api/admin';
 import { updatePreferences } from '@vben/preferences';
 
 const loading = ref(false);
@@ -172,6 +175,106 @@ function toggleWeekday(day: number) {
   wds.sort((a, b) => a - b);
   syncBonusConfig();
 }
+
+// ===== 数据库同步 =====
+const syncForm = ref({
+  host: 'localhost',
+  port: 3306,
+  db_name: '',
+  user: 'root',
+  password: '',
+  update_existing: false,
+});
+const dbTesting = ref(false);
+const dbSyncing = ref(false);
+const dbTestResult = ref<SyncTestResult | null>(null);
+const dbSyncResult = ref<SyncResult | null>(null);
+const dbTableLabels: Record<string, string> = {
+  qingka_wangke_huoyuan: '货源',
+  qingka_wangke_user: '用户',
+  qingka_wangke_fenlei: '分类',
+  qingka_wangke_class: '商品',
+  qingka_wangke_order: '订单',
+};
+const canDbSync = computed(() => syncForm.value.host && syncForm.value.db_name && syncForm.value.user);
+
+async function doDbTest() {
+  dbTesting.value = true;
+  dbTestResult.value = null;
+  try {
+    dbTestResult.value = await dbSyncTestApi(syncForm.value);
+    if (dbTestResult.value.connected) message.success('连接成功');
+    else message.error('连接失败: ' + (dbTestResult.value.error || '未知错误'));
+  } catch (e: any) {
+    message.error('测试失败: ' + (e?.message || e));
+  } finally {
+    dbTesting.value = false;
+  }
+}
+
+async function doDbSync() {
+  if (!canDbSync.value) { message.warning('请填写完整的数据库连接信息'); return; }
+  dbSyncing.value = true;
+  dbSyncResult.value = null;
+  try {
+    dbSyncResult.value = await dbSyncExecuteApi(syncForm.value);
+    if (dbSyncResult.value.success) message.success('同步完成');
+    else message.warning('同步完成，但有部分错误');
+  } catch (e: any) {
+    message.error('同步失败: ' + (e?.message || e));
+  } finally {
+    dbSyncing.value = false;
+  }
+}
+
+const dbSyncColumns = [
+  { title: '数据类型', dataIndex: 'label', key: 'label', width: 100 },
+  { title: '总数', dataIndex: 'total', key: 'total', width: 80 },
+  { title: '新增', dataIndex: 'inserted', key: 'inserted', width: 80 },
+  { title: '更新', dataIndex: 'updated', key: 'updated', width: 80 },
+  { title: '跳过', dataIndex: 'skipped', key: 'skipped', width: 80 },
+  { title: '失败', dataIndex: 'failed', key: 'failed', width: 80 },
+];
+
+// ===== 数据库结构检测 =====
+const dbChecking = ref(false);
+const dbFixing = ref(false);
+const dbCheckResult = ref<DBCompatCheckResult | null>(null);
+const dbFixResult = ref<DBCompatFixResult | null>(null);
+const dbSubTab = ref('sync');
+
+async function doDbCheck() {
+  dbChecking.value = true;
+  dbCheckResult.value = null;
+  dbFixResult.value = null;
+  try {
+    dbCheckResult.value = await dbCompatCheckApi();
+  } catch (e: any) {
+    message.error('检查失败: ' + (e?.message || e));
+  } finally {
+    dbChecking.value = false;
+  }
+}
+
+async function doDbFix() {
+  dbFixing.value = true;
+  dbFixResult.value = null;
+  try {
+    dbFixResult.value = await dbCompatFixApi();
+    message.success('修复完成');
+    await doDbCheck();
+  } catch (e: any) {
+    message.error('修复失败: ' + (e?.message || e));
+  } finally {
+    dbFixing.value = false;
+  }
+}
+
+const missingColColumns = [
+  { title: '表名', dataIndex: 'table', key: 'table' },
+  { title: '列名', dataIndex: 'column', key: 'column' },
+  { title: '类型', dataIndex: 'type', key: 'type' },
+];
 
 onMounted(async () => { await loadAll(); parseBonusConfig(); });
 </script>
@@ -706,6 +809,277 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                   <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">关闭后移动端将不再因误判而自动跳转，PC端也不再拦截开发者工具</div>
                 </Col>
               </Row>
+            </div>
+          </TabPane>
+
+          <!-- 数据库工具 -->
+          <TabPane key="dbtools">
+            <template #tab><DatabaseOutlined class="mr-1" />数据库工具</template>
+            <div class="tab-body" style="max-width: 1000px; margin: 0 auto;">
+              <Tabs v-model:activeKey="dbSubTab" size="middle" :tabBarStyle="{ marginBottom: '24px' }">
+                <!-- 数据同步 -->
+                <TabPane key="sync" tab="数据同步">
+                  <div class="mb-6">
+                    <h3 class="text-base sm:text-lg font-medium mb-1">从其他系统同步数据</h3>
+                    <div class="text-gray-500 text-xs sm:text-sm">连接到外部 MySQL 数据库，将货源、用户、分类、商品、订单同步到当前系统。</div>
+                  </div>
+
+                  <Card title="外部数据库连接" size="small" :bordered="true" class="mb-6 shadow-sm">
+                    <Row :gutter="[24, 16]" class="mt-2">
+                      <Col :xs="24" :sm="12" :lg="12">
+                        <label class="field-label">数据库地址</label>
+                        <Input v-model:value="syncForm.host" placeholder="localhost" />
+                      </Col>
+                      <Col :xs="24" :sm="12" :lg="12">
+                        <label class="field-label">数据库端口</label>
+                        <InputNumber v-model:value="syncForm.port" :min="1" :max="65535" style="width: 100%" />
+                      </Col>
+                      <Col :xs="24" :sm="12" :lg="12">
+                        <label class="field-label">数据库名</label>
+                        <Input v-model:value="syncForm.db_name" placeholder="请输入数据库名" />
+                      </Col>
+                      <Col :xs="24" :sm="12" :lg="12">
+                        <label class="field-label">数据库用户名</label>
+                        <Input v-model:value="syncForm.user" placeholder="root" />
+                      </Col>
+                      <Col :xs="24" :sm="12" :lg="12">
+                        <label class="field-label">数据库密码</label>
+                        <Input.Password v-model:value="syncForm.password" placeholder="请输入数据库密码" />
+                      </Col>
+                      <Col :xs="24" :sm="12" :lg="12">
+                        <div class="h-full flex items-end pb-1">
+                          <div class="switch-row w-full h-[32px] mb-0 border-transparent shadow-sm bg-gray-50 dark:bg-gray-800">
+                            <div>
+                              <span class="text-xs sm:text-sm font-medium">覆盖更新已存在数据</span>
+                            </div>
+                            <Switch v-model:checked="syncForm.update_existing" size="small" />
+                          </div>
+                        </div>
+                      </Col>
+                    </Row>
+                    
+                    <div class="flex flex-wrap gap-3 mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+                      <Button @click="doDbTest" :loading="dbTesting" :disabled="!canDbSync" class="w-full sm:w-32">
+                        <template #icon><ApiOutlined /></template>
+                        测试连接
+                      </Button>
+                      <Button type="primary" @click="doDbSync" :loading="dbSyncing" :disabled="!canDbSync" class="w-full sm:w-32">
+                        <template #icon><SyncOutlined /></template>
+                        开始同步
+                      </Button>
+                    </div>
+                  </Card>
+
+                  <!-- 测试结果 -->
+                  <div v-if="dbTestResult" class="mb-6 animate-fade-in">
+                    <Card size="small" :bordered="true" class="shadow-sm border-l-4" :class="dbTestResult.connected ? 'border-l-green-500' : 'border-l-red-500'">
+                      <template #title>
+                        <span :class="dbTestResult.connected ? 'text-green-600' : 'text-red-500'">
+                          <CheckCircleOutlined v-if="dbTestResult.connected" class="mr-1" />
+                          <ExclamationCircleOutlined v-else class="mr-1" />
+                          {{ dbTestResult.connected ? '连接成功' : '连接失败' }}
+                        </span>
+                      </template>
+                      <template v-if="dbTestResult.connected && dbTestResult.tables">
+                        <div class="flex flex-wrap gap-3">
+                          <Tag v-for="(count, tbl) in dbTestResult.tables" :key="tbl" :color="count >= 0 ? 'blue' : 'red'" class="px-3 py-1 text-sm border-0 bg-blue-50 dark:bg-blue-900/30">
+                            {{ dbTableLabels[tbl] || tbl }} <Divider type="vertical" class="mx-2" /> <span class="font-semibold">{{ count >= 0 ? count : '缺失' }}</span>
+                          </Tag>
+                        </div>
+                      </template>
+                      <div v-if="dbTestResult.error" class="text-red-500">{{ dbTestResult.error }}</div>
+                    </Card>
+                  </div>
+
+                  <!-- 同步结果 -->
+                  <Spin :spinning="dbSyncing" tip="正在同步数据，请勿关闭页面...">
+                    <div v-if="dbSyncResult" class="animate-fade-in">
+                      <Card size="small" :bordered="true" class="shadow-sm border-l-4" :class="dbSyncResult.success ? 'border-l-green-500' : 'border-l-orange-500'">
+                        <template #title>
+                          <span :class="dbSyncResult.success ? 'text-green-600' : 'text-orange-500'">
+                            <CheckCircleOutlined v-if="dbSyncResult.success" class="mr-1" />
+                            <ExclamationCircleOutlined v-else class="mr-1" />
+                            {{ dbSyncResult.success ? '同步成功' : '同步完成（有警告）' }}
+                          </span>
+                        </template>
+                        <template #extra>
+                          <span class="text-gray-400 text-xs">{{ dbSyncResult.sync_time }}</span>
+                        </template>
+                        
+                        <div class="text-gray-600 dark:text-gray-400 mb-4">{{ dbSyncResult.summary }}</div>
+                        
+                        <div class="overflow-x-auto">
+                          <Table
+                            :dataSource="dbSyncResult.details"
+                            :columns="dbSyncColumns"
+                            :pagination="false"
+                            size="small"
+                            rowKey="table"
+                            bordered
+                            class="mb-4 min-w-[500px]"
+                          >
+                            <template #bodyCell="{ column, record }">
+                              <template v-if="column.key === 'label'">
+                                <span class="font-medium">{{ record.label }}</span>
+                              </template>
+                              <template v-else-if="column.key === 'inserted' && record.inserted > 0">
+                                <span class="text-green-600 font-medium">+{{ record.inserted }}</span>
+                              </template>
+                              <template v-else-if="column.key === 'updated' && record.updated > 0">
+                                <span class="text-blue-500 font-medium">{{ record.updated }}</span>
+                              </template>
+                              <template v-else-if="column.key === 'failed' && record.failed > 0">
+                                <span class="text-red-500 font-medium">{{ record.failed }}</span>
+                              </template>
+                              <template v-else>
+                                <span class="text-gray-400">{{ record[column.key] }}</span>
+                              </template>
+                            </template>
+                          </Table>
+                        </div>
+                        
+                        <div v-if="dbSyncResult.errors && dbSyncResult.errors.length > 0" class="bg-red-50 dark:bg-red-900/20 p-3 rounded-md mt-4">
+                          <div class="text-red-600 font-medium mb-2">错误日志：</div>
+                          <div v-for="(err, i) in dbSyncResult.errors" :key="i" class="text-red-500 text-xs mb-1">{{ err }}</div>
+                        </div>
+                      </Card>
+                    </div>
+                  </Spin>
+                </TabPane>
+
+                <!-- 结构检测 -->
+                <TabPane key="compat" tab="结构检测">
+                  <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+                    <div>
+                      <h3 class="text-base sm:text-lg font-medium mb-1">数据库结构完整性</h3>
+                      <div class="text-gray-500 text-xs sm:text-sm">自动对比当前数据库与系统标准结构，检测缺失的表和列。</div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
+                      <Button @click="doDbCheck" :loading="dbChecking" class="flex-1 sm:flex-none">
+                        <template #icon><ReloadOutlined /></template>
+                        扫描数据库
+                      </Button>
+                      <Button type="primary" danger @click="doDbFix" :loading="dbFixing" :disabled="dbChecking" class="flex-1 sm:flex-none">
+                        <template #icon><ThunderboltOutlined /></template>
+                        一键修复
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Spin :spinning="dbChecking" tip="正在扫描数据库结构...">
+                    <template v-if="dbCheckResult">
+                      <Row :gutter="[12, 12]" class="mb-6">
+                        <Col :xs="24" :sm="8">
+                          <div class="bg-blue-50 dark:bg-blue-900/20 p-3 sm:p-4 rounded-lg border border-blue-100 dark:border-blue-800 text-center">
+                            <div class="text-2xl sm:text-3xl font-bold text-blue-600 mb-1">{{ dbCheckResult.total_tables }}</div>
+                            <div class="text-xs sm:text-sm text-gray-500">核心表总数</div>
+                          </div>
+                        </Col>
+                        <Col :xs="12" :sm="8">
+                          <div class="bg-green-50 dark:bg-green-900/20 p-3 sm:p-4 rounded-lg border border-green-100 dark:border-green-800 text-center">
+                            <div class="text-2xl sm:text-3xl font-bold text-green-600 mb-1">{{ dbCheckResult.existing_tables.length }}</div>
+                            <div class="text-xs sm:text-sm text-gray-500">正常表数量</div>
+                          </div>
+                        </Col>
+                        <Col :xs="12" :sm="8">
+                          <div class="p-3 sm:p-4 rounded-lg border text-center" :class="(dbCheckResult.missing_tables.length > 0 || dbCheckResult.missing_columns.length > 0) ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800' : 'bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700'">
+                            <div class="text-2xl sm:text-3xl font-bold mb-1" :class="(dbCheckResult.missing_tables.length > 0 || dbCheckResult.missing_columns.length > 0) ? 'text-red-500' : 'text-gray-400'">{{ dbCheckResult.missing_tables.length + dbCheckResult.missing_columns.length }}</div>
+                            <div class="text-xs sm:text-sm text-gray-500">异常项 (表/列)</div>
+                          </div>
+                        </Col>
+                      </Row>
+
+                      <div v-if="dbCheckResult.missing_tables.length === 0 && dbCheckResult.missing_columns.length === 0" class="bg-green-50 border border-green-200 rounded-lg p-6 text-center text-green-600 my-8 dark:bg-green-900/20 dark:border-green-800">
+                        <CheckCircleOutlined class="text-4xl mb-3 block" />
+                        <h4 class="text-lg font-medium">数据库结构完美匹配</h4>
+                        <p class="text-sm opacity-80 mt-1">没有发现任何缺失的核心表或数据列，系统运行状态良好。</p>
+                      </div>
+
+                      <div v-else class="space-y-6">
+                        <Card v-if="dbCheckResult.missing_tables.length > 0" title="缺失的核心表" size="small" class="border-red-200">
+                          <template #extra><Badge :count="dbCheckResult.missing_tables.length" :number-style="{ backgroundColor: '#ff4d4f' }" /></template>
+                          <div class="flex flex-wrap gap-2">
+                            <Tag v-for="t in dbCheckResult.missing_tables" :key="t" color="error" class="px-3 py-1">{{ t }}</Tag>
+                          </div>
+                        </Card>
+
+                        <Card v-if="dbCheckResult.missing_columns.length > 0" title="缺失的数据列" size="small" class="border-orange-200">
+                          <template #extra><Badge :count="dbCheckResult.missing_columns.length" :number-style="{ backgroundColor: '#faad14' }" /></template>
+                          <Table :dataSource="dbCheckResult.missing_columns" :columns="missingColColumns" :pagination="false" size="small" bordered />
+                        </Card>
+                      </div>
+
+                      <div class="mt-8 border-t border-gray-100 dark:border-gray-800 pt-6">
+                        <h4 class="text-md font-medium text-gray-700 dark:text-gray-300 mb-4">数据库概览</h4>
+                        <div class="space-y-4">
+                          <div>
+                            <div class="text-sm text-gray-500 mb-2">已存在的系统核心表 ({{ dbCheckResult.existing_tables.length }})</div>
+                            <div class="flex flex-wrap gap-2">
+                              <Tag v-for="t in dbCheckResult.existing_tables" :key="t" class="bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">{{ t }}</Tag>
+                            </div>
+                          </div>
+                          
+                          <div v-if="dbCheckResult.extra_tables && dbCheckResult.extra_tables.length > 0">
+                            <div class="text-sm text-gray-500 mb-2">按需创建的扩展表/其他表 ({{ dbCheckResult.extra_tables.length }})</div>
+                            <div class="flex flex-wrap gap-2">
+                              <Tag v-for="t in dbCheckResult.extra_tables" :key="t" class="bg-gray-50 border-gray-200 text-gray-500 dark:bg-gray-800 dark:border-gray-700 opacity-70">{{ t }}</Tag>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                  </Spin>
+
+                  <!-- 修复结果 -->
+                  <Modal v-model:open="dbFixing" title="正在修复结构..." :footer="null" :closable="false" :maskClosable="false">
+                    <div class="py-8 text-center">
+                      <Spin size="large" />
+                      <div class="mt-4 text-gray-500">正在自动创建缺失的表和列，请稍候...</div>
+                    </div>
+                  </Modal>
+
+                  <Modal :open="!!dbFixResult" title="修复完成" @ok="dbFixResult = null" @cancel="dbFixResult = null" width="600px">
+                    <template v-if="dbFixResult">
+                      <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg mb-4">
+                        <div class="font-medium mb-1">{{ dbFixResult.summary }}</div>
+                        <div class="text-xs text-gray-400">执行时间：{{ dbFixResult.fix_time }}</div>
+                      </div>
+                      
+                      <div v-if="dbFixResult.tables_created.length > 0" class="mb-4">
+                        <div class="text-sm font-medium text-green-600 mb-2">成功创建表：</div>
+                        <div class="flex flex-wrap gap-2">
+                          <Tag v-for="t in dbFixResult.tables_created" :key="t" color="success">{{ t }}</Tag>
+                        </div>
+                      </div>
+                      
+                      <div v-if="dbFixResult.columns_added.length > 0" class="mb-4">
+                        <div class="text-sm font-medium text-blue-500 mb-2">成功添加列：</div>
+                        <div class="flex flex-wrap gap-2">
+                          <Tag v-for="c in dbFixResult.columns_added" :key="c" color="processing">{{ c }}</Tag>
+                        </div>
+                      </div>
+                      
+                      <div v-if="dbFixResult.errors.length > 0" class="mb-4 bg-red-50 p-3 rounded">
+                        <div class="text-sm font-medium text-red-500 mb-2">发生错误：</div>
+                        <ul class="list-disc pl-4 mb-0 text-xs text-red-500 space-y-1">
+                          <li v-for="(err, i) in dbFixResult.errors" :key="i">{{ err }}</li>
+                        </ul>
+                      </div>
+                      
+                      <div v-if="dbFixResult.admin_created" class="mt-4 p-3 bg-orange-50 border border-orange-200 rounded text-orange-600 text-sm flex items-start gap-2">
+                        <ExclamationCircleOutlined class="mt-0.5" />
+                        <div>
+                          <strong>安全警告：</strong><br/>
+                          系统检测到缺失管理员账号，已自动创建初始账号：<br/>
+                          账号：<code class="bg-white px-1 rounded">admin</code><br/>
+                          密码：<code class="bg-white px-1 rounded">admin123</code><br/>
+                          请务必在登录后立即修改密码！
+                        </div>
+                      </div>
+                    </template>
+                  </Modal>
+                </TabPane>
+              </Tabs>
             </div>
           </TabPane>
         </Tabs>

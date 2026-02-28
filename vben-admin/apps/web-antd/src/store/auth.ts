@@ -1,18 +1,47 @@
 import type { Recordable, UserInfo } from '@vben/types';
 
-import { ref } from 'vue';
+import { h, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { DEFAULT_HOME_PATH, LOGIN_PATH } from '@vben/constants';
 import { updatePreferences } from '@vben/preferences';
 import { resetAllStores, useAccessStore, useUserStore } from '@vben/stores';
 
-import { notification } from 'ant-design-vue';
+import { notification, Modal, Input } from 'ant-design-vue';
 import { defineStore } from 'pinia';
 
 import { getAccessCodesApi, getUserInfoApi, loginApi, logoutApi, registerApi } from '#/api';
 import { getSiteConfigApi } from '#/api/admin';
 import { $t } from '#/locales';
+
+function showPass2Modal(): Promise<string | null> {
+  return new Promise((resolve) => {
+    let pass2Value = '';
+    Modal.confirm({
+      title: '管理员二级密码验证',
+      icon: null,
+      width: 'min(90vw, 360px)',
+      centered: true,
+      content: h('div', { style: 'margin-top:12px' }, [
+        h('p', { style: 'color:#666;font-size:13px;margin-bottom:12px' }, '检测到管理员账号，请输入二级密码继续登录'),
+        h(Input.Password, {
+          placeholder: '请输入二级密码',
+          onChange: (e: any) => { pass2Value = e.target.value; },
+          onPressEnter: () => {
+            if (pass2Value) {
+              Modal.destroyAll();
+              resolve(pass2Value);
+            }
+          },
+        }),
+      ]),
+      okText: '确认',
+      cancelText: '取消',
+      onOk() { resolve(pass2Value || null); },
+      onCancel() { resolve(null); },
+    });
+  });
+}
 
 export const useAuthStore = defineStore('auth', () => {
   const accessStore = useAccessStore();
@@ -57,7 +86,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       // 如果返回 code 为 5，表示需要管理员二次验证（后端已根据 pass2_kg 开关判断）
       if ((res as any).code === 5) {
-        const pass2 = window.prompt('检测到管理员账号，请输入管理员二级密码：');
+        const pass2 = await showPass2Modal();
         if (!pass2) {
           loginLoading.value = false;
           return { userInfo: null };
@@ -109,8 +138,9 @@ export const useAuthStore = defineStore('auth', () => {
         if (userInfo?.realName) {
           notification.success({
             description: `${$t('authentication.loginSuccessDesc')}:${userInfo?.realName}`,
-            duration: 3,
+            duration: 2,
             message: $t('authentication.loginSuccess'),
+            style: { width: 'min(90vw, 300px)' },
           });
         }
       }

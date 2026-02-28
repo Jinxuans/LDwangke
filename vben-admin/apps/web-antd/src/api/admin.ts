@@ -671,3 +671,79 @@ export async function getTurboStatusApi() {
 export async function setTurboModeApi(mode: string) {
   return requestClient.post<TurboStatus>('/admin/ops/turbo', { mode });
 }
+
+// ===== 数据库兼容工具 =====
+export interface MissingColumnInfo {
+  table: string;
+  column: string;
+  type: string;
+}
+
+export interface DBCompatCheckResult {
+  check_time: string;
+  total_tables: number;
+  missing_tables: string[];
+  existing_tables: string[];
+  extra_tables: string[];
+  missing_columns: MissingColumnInfo[];
+  summary: string;
+}
+
+export interface DBCompatFixResult {
+  fix_time: string;
+  tables_created: string[];
+  columns_added: string[];
+  errors: string[];
+  admin_created: boolean;
+  summary: string;
+}
+
+export async function dbCompatCheckApi() {
+  return requestClient.get<DBCompatCheckResult>('/admin/db-compat/check');
+}
+
+export async function dbCompatFixApi() {
+  return requestClient.post<DBCompatFixResult>('/admin/db-compat/fix');
+}
+
+// ===== 数据同步工具 =====
+export interface SyncRequest {
+  host: string;
+  port: number;
+  db_name: string;
+  user: string;
+  password: string;
+  update_existing: boolean;
+}
+
+export interface SyncTestResult {
+  connected: boolean;
+  tables: Record<string, number>;
+  error?: string;
+}
+
+export interface SyncTableInfo {
+  table: string;
+  label: string;
+  total: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+}
+
+export interface SyncResult {
+  sync_time: string;
+  success: boolean;
+  details: SyncTableInfo[];
+  errors: string[];
+  summary: string;
+}
+
+export async function dbSyncTestApi(data: SyncRequest) {
+  return requestClient.post<SyncTestResult>('/admin/db-sync/test', data);
+}
+
+export async function dbSyncExecuteApi(data: SyncRequest) {
+  return requestClient.post<SyncResult>('/admin/db-sync/execute', data);
+}

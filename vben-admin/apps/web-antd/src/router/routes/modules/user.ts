@@ -7,7 +7,7 @@ const routes: RouteRecordRaw[] = [
     component: BasicLayout,
     meta: {
       icon: 'mdi:account-circle-outline',
-      order: 10,
+      order: 11,
       title: '用户中心',
     },
     name: 'User',

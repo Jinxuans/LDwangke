@@ -5,7 +5,7 @@ import { computed, ref, watch, onMounted, onUnmounted, h } from 'vue';
 
 import { AuthenticationLoginExpiredModal } from '@vben/common-ui';
 import { useWatermark } from '@vben/hooks';
-import { CircleUserRound, ArrowRightLeft } from '@vben/icons';
+import { CircleUserRound, ArrowRightLeft, Settings } from '@vben/icons';
 import {
   BasicLayout,
   LockScreen,
@@ -14,12 +14,13 @@ import {
 } from '@vben/layouts';
 import { preferences, updatePreferences } from '@vben/preferences';
 import { useAccessStore, useUserStore } from '@vben/stores';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 import { Modal, Input, InputNumber, message } from 'ant-design-vue';
 import { $t } from '#/locales';
 import { useAuthStore } from '#/store';
 import { getSiteConfigApi } from '#/api/admin';
+import { getMenuConfigs } from '#/api/menu-config';
 import { migrateSuperiorApi } from '#/api/user-center';
 import { getAccessCodesApi, getUserInfoApi } from '#/api';
 import { getChatSessionsApi, markChatReadApi } from '#/api/chat';
@@ -73,19 +74,79 @@ const showDot = computed(() =>
 );
 
 const router = useRouter();
+const route = useRoute();
 
-const menus = computed(() => [
-  {
-    handler: () => { router.push('/user/profile'); },
-    icon: CircleUserRound,
-    text: '我的资料',
+// --- 动态菜单切换：admin 路径下只显示后台管理子菜单，其他路径隐藏后台管理 ---
+const fullMenusBackup = ref<any[]>([]);
+let menusSynced = false;
+
+watch(
+  () => accessStore.accessMenus,
+  (menus) => {
+    if (!menusSynced && menus.length > 0) {
+      fullMenusBackup.value = [...menus];
+      menusSynced = true;
+      swapMenusForRoute(route.path);
+    }
   },
-  {
-    handler: () => { openMigrateModal(); },
-    icon: ArrowRightLeft,
-    text: '上级迁移',
+  { immediate: true },
+);
+
+function swapMenusForRoute(path: string) {
+  if (!fullMenusBackup.value.length) return;
+  if (path.startsWith('/admin')) {
+    const adminMenu = fullMenusBackup.value.find((m: any) => m.path === '/admin');
+    if (adminMenu?.children?.length) {
+      accessStore.setAccessMenus(adminMenu.children);
+    }
+  } else {
+    accessStore.setAccessMenus(
+      fullMenusBackup.value.filter((m: any) => m.path !== '/admin'),
+    );
+  }
+}
+
+watch(
+  () => router.currentRoute.value.path,
+  (path) => {
+    if (menusSynced) swapMenusForRoute(path);
   },
-]);
+  { flush: 'sync' },
+);
+
+const isAdmin = computed(() => {
+  const roles = userStore.userInfo?.roles ?? [];
+  return roles.some((r: string) => r === 'super' || r === 'admin');
+});
+
+const onAdminPage = computed(() => route.path.startsWith('/admin'));
+
+const menus = computed(() => {
+  const list = [
+    {
+      handler: () => { router.push('/user/profile'); },
+      icon: CircleUserRound,
+      text: '我的资料',
+    },
+    {
+      handler: () => { openMigrateModal(); },
+      icon: ArrowRightLeft,
+      text: '上级迁移',
+    },
+  ];
+  if (isAdmin.value) {
+    list.push({
+      handler: () => {
+        const target = onAdminPage.value ? '/' : '/admin';
+        swapMenusForRoute(target);
+        router.push(target);
+      },
+      icon: Settings,
+      text: onAdminPage.value ? '返回前台' : '后台管理',
+    });
+  }
+  return list;
+});
 
 const avatar = computed(() => {
   const username = userStore.userInfo?.username || '';
@@ -249,6 +310,41 @@ onMounted(async () => {
       });
     }
   } catch { /* ignore */ }
+
+  // 加载菜单配置并应用排序/可见性
+  try {
+    const menuConfigs = await getMenuConfigs();
+    if (menuConfigs?.length) {
+      const configMap = new Map(menuConfigs.map((c: any) => [c.menu_key, c]));
+      // 修改路由 meta
+      for (const r of router.getRoutes()) {
+        const cfg = configMap.get(r.name as string);
+        if (cfg) {
+          if (typeof cfg.sort_order === 'number') r.meta.order = cfg.sort_order;
+          r.meta.hideInMenu = cfg.visible === 0;
+        }
+      }
+      // 重建菜单（触发 accessMenus 重排）
+      if (fullMenusBackup.value.length) {
+        // 对备份菜单递归应用排序
+        const applySort = (items: any[]) => {
+          for (const item of items) {
+            const cfg = configMap.get(item.name);
+            if (cfg) {
+              item.meta = { ...item.meta, order: cfg.sort_order };
+              if (cfg.visible === 0) item.meta.hideInMenu = true;
+              else delete item.meta.hideInMenu;
+            }
+            if (item.children?.length) applySort(item.children);
+          }
+          items.sort((a: any, b: any) => (a.meta?.order ?? 0) - (b.meta?.order ?? 0));
+        };
+        applySort(fullMenusBackup.value);
+        swapMenusForRoute(route.path);
+      }
+    }
+  } catch { /* ignore */ }
+
   loadChatNotifications();
   notifyTimer = setInterval(loadChatNotifications, 30000);
 });

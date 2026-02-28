@@ -1364,6 +1364,31 @@ WantedBy=multi-user.target
         except Exception as e:
             return public.returnMsg(False, '安装失败: %s' % str(e))
 
+    # ==================== 演示模式 ====================
+
+    __demo_flag = '/www/wwwroot/qingka/go-api/.demo_mode'
+
+    def get_demo_mode(self, args):
+        """获取演示模式状态"""
+        enabled = os.path.isfile(self.__demo_flag)
+        return public.returnMsg(True, json.dumps({'enabled': enabled}))
+
+    def set_demo_mode(self, args):
+        """设置演示模式开关"""
+        enabled = getattr(args, 'enabled', 'false')
+        if isinstance(enabled, str):
+            enabled = enabled.lower() in ('true', '1', 'yes')
+        if enabled:
+            os.makedirs(os.path.dirname(self.__demo_flag), exist_ok=True)
+            public.writeFile(self.__demo_flag, 'demo')
+            public.WriteLog('qingka_manager', '演示模式已开启')
+            return public.returnMsg(True, '演示模式已开启，所有写操作将被拦截')
+        else:
+            if os.path.isfile(self.__demo_flag):
+                os.remove(self.__demo_flag)
+            public.WriteLog('qingka_manager', '演示模式已关闭')
+            return public.returnMsg(True, '演示模式已关闭')
+
     # ==================== 卸载 ====================
 
     def full_uninstall(self, args):

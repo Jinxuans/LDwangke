@@ -7,7 +7,7 @@ const routes: RouteRecordRaw[] = [
     component: BasicLayout,
     meta: {
       icon: 'mdi:chat-processing-outline',
-      order: 5,
+      order: 9,
       title: '在线客服',
     },
     name: 'Chat',

@@ -27,6 +27,15 @@ func main() {
 	// 连接 Redis
 	cache.Connect(cfg.Redis)
 
+	// 初始化图图强国表
+	handler.TutuQGEnsureTable()
+
+	// 初始化土拨鼠论文表
+	handler.TuboshuEnsureTable()
+
+	// 初始化菜单配置表
+	handler.MenuEnsureTable()
+
 	// 初始化对接并发队列（5并发，1000缓冲）
 	// checker: 查 DB dockstatus=1 判断对接是否成功，用于准确统计 completed/failed
 	dockChecker := func(oid int64) bool {
@@ -57,6 +66,9 @@ func main() {
 
 	// 定时同步"进行中"订单的进度（可被狂暴模式热替换间隔）
 	service.InitSyncTicker(2 * time.Minute)
+
+	// 启动 HZW 实时进度 Socket 客户端
+	go service.StartHZWSocket()
 
 	// 自动商品同步定时任务（间隔从 sync_config 读取，默认30分钟）
 	go func() {
@@ -115,6 +127,7 @@ func main() {
 	// 初始化路由
 	r := gin.Default()
 	r.Use(middleware.CORS())
+	r.Use(middleware.DemoGuard())
 	r.Static("/uploads", "./uploads")
 
 	// ===== 公开路由 =====
@@ -176,6 +189,9 @@ func main() {
 		api.GET("/user/info", handler.UserInfo)
 		api.GET("/auth/codes", handler.AccessCodes)
 
+		// 菜单配置（所有登录用户可读取，用于动态菜单）
+		api.GET("/menus", handler.AdminMenuList)
+
 		// 订单
 		order := api.Group("/order")
 		{
@@ -193,6 +209,131 @@ func main() {
 			order.GET("/resubmit", handler.OrderResubmit)
 			order.POST("/pup-reset", handler.OrderPupReset)
 			order.GET("/logs", handler.OrderLogs)
+		}
+
+		// 图图强国
+		tutuqg := api.Group("/tutuqg")
+		{
+			tutuqg.GET("/orders", handler.TutuQGOrderList)
+			tutuqg.POST("/price", handler.TutuQGGetPrice)
+			tutuqg.POST("/add", handler.TutuQGAddOrder)
+			tutuqg.POST("/delete", handler.TutuQGDeleteOrder)
+			tutuqg.POST("/renew", handler.TutuQGRenewOrder)
+			tutuqg.POST("/change-password", handler.TutuQGChangePassword)
+			tutuqg.POST("/change-token", handler.TutuQGChangeToken)
+			tutuqg.POST("/refund", handler.TutuQGRefundOrder)
+			tutuqg.POST("/sync", handler.TutuQGSyncOrder)
+			tutuqg.POST("/batch-sync", handler.TutuQGBatchSync)
+			tutuqg.POST("/toggle-renew", handler.TutuQGToggleAutoRenew)
+		}
+
+		// YF打卡
+		yfdk := api.Group("/yfdk")
+		{
+			yfdk.GET("/config", handler.YFDKConfigGet)
+			yfdk.POST("/config", handler.YFDKConfigSave)
+			yfdk.POST("/price", handler.YFDKGetPrice)
+			yfdk.GET("/projects", handler.YFDKGetProjects)
+			yfdk.POST("/account-info", handler.YFDKGetAccountInfo)
+			yfdk.POST("/schools", handler.YFDKGetSchools)
+			yfdk.POST("/search-schools", handler.YFDKSearchSchools)
+			yfdk.GET("/orders", handler.YFDKOrderList)
+			yfdk.POST("/add", handler.YFDKAddOrder)
+			yfdk.POST("/delete", handler.YFDKDeleteOrder)
+			yfdk.POST("/renew", handler.YFDKRenewOrder)
+			yfdk.POST("/save", handler.YFDKSaveOrder)
+			yfdk.POST("/manual-clock", handler.YFDKManualClock)
+			yfdk.POST("/logs", handler.YFDKGetOrderLogs)
+			yfdk.POST("/detail", handler.YFDKGetOrderDetail)
+			yfdk.POST("/patch-report", handler.YFDKPatchReport)
+			yfdk.POST("/calculate-patch-cost", handler.YFDKCalculatePatchCost)
+		}
+
+		// 泰山打卡
+		sxdk := api.Group("/sxdk")
+		{
+			sxdk.GET("/config", handler.SXDKConfigGet)
+			sxdk.POST("/config", handler.SXDKConfigSave)
+			sxdk.POST("/price", handler.SXDKGetPrice)
+			sxdk.GET("/orders", handler.SXDKOrderList)
+			sxdk.POST("/add", handler.SXDKAddOrder)
+			sxdk.POST("/delete", handler.SXDKDeleteOrder)
+			sxdk.POST("/edit", handler.SXDKEditOrder)
+			sxdk.POST("/search-phone-info", handler.SXDKSearchPhoneInfo)
+			sxdk.POST("/get-log", handler.SXDKGetLog)
+			sxdk.POST("/now-check", handler.SXDKNowCheck)
+			sxdk.POST("/change-check-code", handler.SXDKChangeCheckCode)
+			sxdk.POST("/change-holiday-code", handler.SXDKChangeHolidayCode)
+			sxdk.POST("/get-wx-push", handler.SXDKGetWxPush)
+			sxdk.POST("/query-source-order", handler.SXDKQuerySourceOrder)
+			sxdk.POST("/sync", handler.SXDKSyncOrders)
+			sxdk.POST("/get-userrow", handler.SXDKGetUserrow)
+			sxdk.POST("/get-async-task", handler.SXDKGetAsyncTask)
+			sxdk.POST("/xxy-school-list", handler.SXDKXxyGetSchoolList)
+			sxdk.POST("/xxy-address-search", handler.SXDKXxyAddressSearch)
+			sxdk.POST("/xxt-school-list", handler.SXDKXxtGetSchoolList)
+		}
+
+		// 小米运动
+		xm := api.Group("/xm")
+		{
+			xm.GET("/projects", handler.XMGetProjects)
+			xm.POST("/add-order", handler.XMAddOrder)
+			xm.GET("/orders", handler.XMGetOrders)
+			xm.POST("/query-run", handler.XMQueryRun)
+			xm.GET("/refund", handler.XMRefundOrder)
+			xm.GET("/delete", handler.XMDeleteOrder)
+			xm.GET("/sync", handler.XMSyncOrder)
+			xm.GET("/order-logs", handler.XMGetOrderLogs)
+		}
+
+		// 鲸鱼运动
+		w := api.Group("/w")
+		{
+			w.GET("/apps", handler.WGetApps)
+			w.POST("/add-order", handler.WAddOrder)
+			w.GET("/orders", handler.WGetOrders)
+			w.POST("/refund", handler.WRefundOrder)
+			w.GET("/sync", handler.WSyncOrder)
+			w.GET("/resume", handler.WResumeOrder)
+		}
+
+		// Appui打卡
+		appui := api.Group("/appui")
+		{
+			appui.GET("/config", handler.AppuiConfigGet)
+			appui.POST("/config", handler.AppuiConfigSave)
+			appui.POST("/price", handler.AppuiGetPrice)
+			appui.GET("/courses", handler.AppuiGetCourses)
+			appui.GET("/orders", handler.AppuiOrderList)
+			appui.POST("/add", handler.AppuiAddOrder)
+			appui.POST("/edit", handler.AppuiEditOrder)
+			appui.POST("/renew", handler.AppuiRenewOrder)
+			appui.POST("/delete", handler.AppuiDeleteOrder)
+		}
+
+		// 闪电运动
+		sdxy := api.Group("/sdxy")
+		{
+			sdxy.GET("/config", handler.SDXYConfigGet)
+			sdxy.POST("/config", handler.SDXYConfigSave)
+			sdxy.GET("/price", handler.SDXYGetPrice)
+			sdxy.GET("/orders", handler.SDXYOrderList)
+			sdxy.POST("/add", handler.SDXYAddOrder)
+			sdxy.POST("/delete", handler.SDXYDeleteOrder)
+		}
+
+		// 运动世界
+		ydsj := api.Group("/ydsj")
+		{
+			ydsj.GET("/config", handler.YDSJConfigGet)
+			ydsj.POST("/config", handler.YDSJConfigSave)
+			ydsj.POST("/price", handler.YDSJGetPrice)
+			ydsj.GET("/schools", handler.YDSJGetSchools)
+			ydsj.GET("/orders", handler.YDSJOrderList)
+			ydsj.POST("/add", handler.YDSJAddOrder)
+			ydsj.POST("/refund", handler.YDSJRefundOrder)
+			ydsj.POST("/toggle-run", handler.YDSJToggleRun)
 		}
 
 		// 聊天
@@ -232,6 +373,15 @@ func main() {
 
 		// 公告（用户端）
 		api.GET("/announcements", handler.AnnouncementListPublic)
+
+		// 土拨鼠论文
+		tbs := api.Group("/tuboshu")
+		{
+			tbs.GET("/config", handler.TuboshuUserConfigGet)
+			tbs.POST("/route", handler.TuboshuRoute)
+			tbs.POST("/route-formdata", handler.TuboshuRouteFormData)
+			tbs.GET("/orders", handler.TuboshuOrderList)
+		}
 
 		// 动态模块（运动/实习/论文）
 		api.GET("/modules", handler.ModuleList)
@@ -390,6 +540,53 @@ func main() {
 			admin.GET("/sync/logs", handler.SyncLogs)
 			admin.GET("/sync/suppliers", handler.SyncMonitoredSuppliers)
 
+			// 龙龙一键对接工具
+			admin.GET("/longlong-tool/config", handler.LonglongToolGetConfig)
+			admin.POST("/longlong-tool/config", handler.LonglongToolSaveConfig)
+
+			// 图图强国配置
+			admin.GET("/tutuqg/config", handler.TutuQGConfigGet)
+			admin.POST("/tutuqg/config", handler.TutuQGConfigSave)
+
+			// 土拨鼠论文配置
+			admin.GET("/tuboshu/config", handler.TuboshuConfigGet)
+			admin.POST("/tuboshu/config", handler.TuboshuConfigSave)
+			admin.POST("/tuboshu/price-config", handler.TuboshuSavePriceConfig)
+
+			// YF打卡配置
+			admin.GET("/yfdk/config", handler.YFDKConfigGet)
+			admin.POST("/yfdk/config", handler.YFDKConfigSave)
+
+			// 泰山打卡配置
+			admin.GET("/sxdk/config", handler.SXDKConfigGet)
+			admin.POST("/sxdk/config", handler.SXDKConfigSave)
+
+			// HZW实时进度Socket配置
+			admin.GET("/hzw-socket/config", handler.HZWSocketConfigGet)
+			admin.POST("/hzw-socket/config", handler.HZWSocketConfigSave)
+
+			// 小米运动项目管理
+			admin.GET("/xm-project/list", handler.XMAdminListProjects)
+			admin.POST("/xm-project/save", handler.XMAdminSaveProject)
+			admin.DELETE("/xm-project/delete", handler.XMAdminDeleteProject)
+
+			// 鲸鱼运动项目管理
+			admin.GET("/w-app/list", handler.WAdminListApps)
+			admin.POST("/w-app/save", handler.WAdminSaveApp)
+			admin.DELETE("/w-app/delete", handler.WAdminDeleteApp)
+
+			// 学妹平台专属接口
+			admin.POST("/xuemei/shouhou", handler.XueMeiShouHou)
+			admin.GET("/xuemei/getcity", handler.XueMeiGetCity)
+			admin.POST("/xuemei/getcity", handler.XueMeiGetCity)
+			admin.POST("/xuemei/editip", handler.XueMeiEditIP)
+			admin.POST("/xuemei/youxian", handler.XueMeiYouXian)
+			admin.GET("/xuemei/getname", handler.XueMeiGetName)
+			admin.POST("/xuemei/getname", handler.XueMeiGetName)
+			admin.POST("/xuemei/editname", handler.XueMeiEditName)
+			admin.GET("/xuemei/zhs-log", handler.XueMeiChaZhsLog)
+			admin.POST("/xuemei/zhs-log", handler.XueMeiChaZhsLog)
+
 			// 邮箱轮询池
 			admin.GET("/email-pool", handler.AdminEmailPoolList)
 			admin.POST("/email-pool/save", handler.AdminEmailPoolSave)
@@ -436,12 +633,26 @@ func main() {
 			admin.POST("/activity/save", handler.AdminActivitySave)
 			admin.DELETE("/activity/:hid", handler.AdminActivityDelete)
 
+			// 数据库兼容工具
+			admin.GET("/db-compat/check", handler.AdminDBCompatCheck)
+			admin.POST("/db-compat/fix", handler.AdminDBCompatFix)
+			admin.POST("/db-sync/test", handler.AdminDBSyncTest)
+			admin.POST("/db-sync/execute", handler.AdminDBSyncExecute)
+
 			// 质押管理
 			admin.GET("/pledge/configs", handler.AdminPledgeConfigList)
 			admin.POST("/pledge/config/save", handler.AdminPledgeConfigSave)
 			admin.DELETE("/pledge/config/:id", handler.AdminPledgeConfigDelete)
 			admin.POST("/pledge/config/toggle", handler.AdminPledgeConfigToggle)
 			admin.GET("/pledge/records", handler.AdminPledgeRecordList)
+
+			// 菜单管理
+			admin.GET("/menus", handler.AdminMenuList)
+			admin.POST("/menus", handler.AdminMenuSave)
+
+			// 演示模式
+			admin.GET("/demo-mode", handler.AdminGetDemoMode)
+			admin.POST("/demo-mode", handler.AdminSetDemoMode)
 
 		}
 

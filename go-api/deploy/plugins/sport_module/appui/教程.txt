@@ -1,0 +1,7 @@
+1.将文件上传至根目录解压
+2.在appui/config.php 里面写入对应的uid和key
+3.在appui/course.json 里面设置商品价格（计算方法就是设置的价格*费率就是下单价格）
+3.宝塔计划任务挂进度：
+shell脚本内容：cd  /www/wwwroot/你的根目录文件名/appui && sudo -u root php cron.php
+
+下单价格支持小数点后四位，如果部分模板使用该套娃代码之后发现价格后四位无法显示，请更换备用api文件即可解决。

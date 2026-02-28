@@ -7,7 +7,7 @@ const routes: RouteRecordRaw[] = [
     component: BasicLayout,
     meta: {
       icon: 'mdi:store-outline',
-      order: 15,
+      order: 13,
       title: '商城管理',
     },
     name: 'Tenant',

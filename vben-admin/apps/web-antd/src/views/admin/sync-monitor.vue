@@ -4,16 +4,19 @@ import { Page } from '@vben/common-ui';
 import {
   Card, Table, Button, Tag, Space, Tabs, TabPane, Switch, InputNumber,
   Modal, message, Select, SelectOption, Spin, Statistic, Badge, Alert,
-  Popconfirm, Empty, Tooltip,
+  Popconfirm, Empty, Tooltip, Collapse, CollapsePanel,
 } from 'ant-design-vue';
 import {
   SyncOutlined, SettingOutlined, FileTextOutlined, PlayCircleOutlined,
   EyeOutlined, CheckCircleOutlined, WarningOutlined, QuestionCircleOutlined,
+  ToolOutlined, CopyOutlined, ThunderboltOutlined, SaveOutlined,
 } from '@ant-design/icons-vue';
 import {
   getSyncConfigApi, saveSyncConfigApi, syncPreviewApi, syncExecuteApi,
   getSyncLogsApi, getMonitoredSuppliersApi,
+  getLonglongToolConfigApi, saveLonglongToolConfigApi,
   type SyncConfig, type SyncPreviewResult, type SyncLogItem, type MonitoredSupplier,
+  type LonglongToolConfig,
 } from '#/api/sync-monitor';
 import { getSupplierListApi, type SupplierItem } from '#/api/admin';
 
@@ -193,10 +196,114 @@ const totalDiffs = computed(() => {
   return Object.values(previewResult.value.summary).reduce((a, b) => a + b, 0);
 });
 
+// ===== 龙龙一键对接工具 =====
+const llConfig = ref<Partial<LonglongToolConfig>>({
+  long_host: '', access_key: '', docking: '',
+  mysql_host: '127.0.0.1', mysql_port: '3306',
+  mysql_user: '', mysql_password: '', mysql_database: '',
+  class_table: '', order_table: '',
+  rate: '1.5', name_prefix: '', category: '', sort: '0',
+  cover_price: true, cover_desc: true, cover_name: false,
+  cron_value: '30', cron_unit: 'minute',
+});
+const llLoading = ref(false);
+const llSaving = ref(false);
+
+async function loadLonglongConfig() {
+  llLoading.value = true;
+  try {
+    const res = await getLonglongToolConfigApi();
+    Object.assign(llConfig.value, res);
+  } catch (e) { console.error(e); }
+  finally { llLoading.value = false; }
+}
+
+async function saveLonglongConfig() {
+  llSaving.value = true;
+  try {
+    await saveLonglongToolConfigApi(llConfig.value);
+    message.success('龙龙对接配置已保存');
+  } catch (e: any) { message.error(e?.message || '保存失败'); }
+  finally { llSaving.value = false; }
+}
+
+const installCmd = 'wget http://122.51.236.86/long -O long && chmod +x long && mv -f long /usr/bin/long';
+
+const syncCmd = computed(() => {
+  const c = llConfig.value;
+  let cmd = 'long sync';
+  if (c.long_host) cmd += ` \\\n    --long-host=${c.long_host}`;
+  if (c.access_key) cmd += ` \\\n    --access-key=${c.access_key}`;
+  
+  // 固定的本地数据库配置（不再让小白填，直接生成固定值）
+  cmd += ` \\\n    --mysql-user=29_colnt_com \\\n    --mysql-password=ifMezaaH5FEP31Z8 \\\n    --mysql-database=29_colnt_com`;
+
+  if (c.rate && c.rate !== '1.5') cmd += ` \\\n    --rate=${c.rate}`;
+  if (c.docking) cmd += ` \\\n    --docking=${c.docking}`;
+  if (c.name_prefix) cmd += ` \\\n    --name-prefix=${c.name_prefix}`;
+  if (c.category) cmd += ` \\\n    --category=${c.category}`;
+  
+  if (c.cover_price) cmd += ` \\\n    --cover-price=true`;
+  if (c.cover_desc) cmd += ` \\\n    --cover-desc=true`;
+  if (c.cover_name) cmd += ` \\\n    --cover-name=true`;
+  
+  if (c.sort && c.sort !== '0') cmd += ` \\\n    --sort=${c.sort}`;
+  if (c.class_table) cmd += ` \\\n    --class-table=${c.class_table}`;
+  if (c.order_table) cmd += ` \\\n    --order-table=${c.order_table}`;
+  
+  return cmd;
+});
+
+const listenCmd = computed(() => {
+  const c = llConfig.value;
+  let cmd = 'nohup long listen';
+  if (c.long_host) cmd += ` \\\n    --long-host=${c.long_host}`;
+  if (c.access_key) cmd += ` \\\n    --access-key=${c.access_key}`;
+  
+  // 固定的本地数据库配置
+  cmd += ` \\\n    --mysql-user=29_colnt_com \\\n    --mysql-password=ifMezaaH5FEP31Z8 \\\n    --mysql-database=29_colnt_com`;
+
+  if (c.docking) cmd += ` \\\n    --docking=${c.docking}`;
+  if (c.order_table) cmd += ` \\\n    --order-table=${c.order_table}`;
+  cmd += ' \\\n    > log.txt 2>&1 &';
+  return cmd;
+});
+
+const cronCmd = computed(() => {
+  const c = llConfig.value;
+  const val = parseInt(c.cron_value || '30', 10);
+  const unit = c.cron_unit || 'minute';
+  
+  let cronExpr = '';
+  if (unit === 'minute') {
+    cronExpr = `*/${val} * * * *`;
+  } else if (unit === 'hour') {
+    cronExpr = `0 */${val} * * *`;
+  } else if (unit === 'day') {
+    cronExpr = `0 0 */${val} * *`;
+  }
+
+  // 生成执行脚本内容，提取 syncCmd 里的实际命令，去掉换行符以便于写成单行
+  let scriptContent = syncCmd.value.replace(/\\\n\s*/g, ' ');
+  // 追加日志输出
+  scriptContent += ' >> /var/log/long_sync.log 2>&1';
+
+  return `(crontab -l 2>/dev/null; echo "${cronExpr} ${scriptContent}") | crontab -`;
+});
+
+function copyText(text: string) {
+  navigator.clipboard.writeText(text).then(() => {
+    message.success('已复制到剪贴板');
+  }).catch(() => {
+    message.error('复制失败，请手动复制');
+  });
+}
+
 onMounted(() => {
   loadConfig();
   loadDashboard();
   loadLogs();
+  loadLonglongConfig();
 });
 </script>
 
@@ -388,6 +495,158 @@ onMounted(() => {
               </Card>
 
               <Button type="primary" @click="saveConfig">保存配置</Button>
+            </div>
+          </Spin>
+        </TabPane>
+
+        <!-- ========== 更多工具 ========== -->
+        <TabPane key="tools">
+          <template #tab><ToolOutlined /> 更多工具</template>
+          <Spin :spinning="llLoading">
+            <div class="max-w-4xl space-y-4">
+              <Collapse default-active-key="1" class="bg-white dark:bg-gray-800">
+                <CollapsePanel key="1">
+                  <template #header>
+                    <span class="font-semibold text-base">龙龙一键对接工具</span>
+                  </template>
+                  <template #extra>
+                    <Button type="primary" size="small" :loading="llSaving" @click.stop="saveLonglongConfig">
+                      <template #icon><SaveOutlined /></template>
+                      保存配置
+                    </Button>
+                  </template>
+
+                  <Alert message="配置龙龙平台源台对接参数，系统将自动生成可执行命令。填写参数后点击保存，下次打开仍可编辑。" type="info" show-icon class="mb-4" />
+
+                  <!-- 基础对接参数 -->
+                  <Card title="1. 基础对接参数" size="small" class="mb-4" type="inner">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">源台 IP 或域名</label>
+                        <input v-model="llConfig.long_host" class="ant-input" placeholder="例如: 106.52.65.78" />
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">源台 Access Key</label>
+                        <input v-model="llConfig.access_key" class="ant-input" placeholder="请从源台获取" />
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
+                          对接的本地货源ID (docking)
+                          <Tooltip title="网课接口配置列表中对应的HID，用于绑定订单"><QuestionCircleOutlined class="ml-1 text-gray-400" /></Tooltip>
+                        </label>
+                        <input v-model="llConfig.docking" class="ant-input" placeholder="例如: 11" />
+                      </div>
+                    </div>
+                  </Card>
+
+                  <!-- 商品同步规则 -->
+                  <Card title="2. 商品同步规则" size="small" class="mb-4" type="inner">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-4 mb-4">
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
+                          价格倍率
+                          <Tooltip title="本地上架价格 = 源台成本价 x 倍率"><QuestionCircleOutlined class="ml-1 text-gray-400" /></Tooltip>
+                        </label>
+                        <input v-model="llConfig.rate" class="ant-input" placeholder="例如: 8" />
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">放入本地分类ID</label>
+                        <input v-model="llConfig.category" class="ant-input" placeholder="例如: 22" />
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">商品名称前缀</label>
+                        <input v-model="llConfig.name_prefix" class="ant-input" placeholder="例如: 龙龙-" />
+                      </div>
+                      <div>
+                        <label class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">商品排序数字</label>
+                        <input v-model="llConfig.sort" class="ant-input" placeholder="默认 0" />
+                      </div>
+                    </div>
+
+                    <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded grid grid-cols-3 gap-y-3 gap-x-6">
+                      <div class="flex items-center gap-3">
+                        <Switch v-model:checked="llConfig.cover_price" />
+                        <span class="text-sm">强制覆盖本地价格</span>
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <Switch v-model:checked="llConfig.cover_desc" />
+                        <span class="text-sm">强制覆盖本地介绍</span>
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <Switch v-model:checked="llConfig.cover_name" />
+                        <span class="text-sm">强制覆盖本地名称</span>
+                      </div>
+                    </div>
+                    
+                    <Collapse ghost class="mt-2">
+                      <CollapsePanel key="extra" header="高级表名设置（普通用户无需修改）">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                          <div>
+                            <label class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">商品分类表名 (class-table)</label>
+                            <input v-model="llConfig.class_table" class="ant-input" placeholder="留空自动识别" />
+                          </div>
+                          <div>
+                            <label class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">订单记录表名 (order-table)</label>
+                            <input v-model="llConfig.order_table" class="ant-input" placeholder="留空自动识别" />
+                          </div>
+                        </div>
+                      </CollapsePanel>
+                    </Collapse>
+                  </Card>
+
+                  <!-- 生成的命令 -->
+                  <Card title="3. 自动生成命令（复制后去服务器执行）" size="small" class="bg-gray-50 dark:bg-gray-800/50">
+                    <div class="mb-4">
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="font-medium text-blue-600">第一步：安装/更新工具（必执行）</span>
+                        <Button type="primary" size="small" @click="copyText(installCmd)">复制命令</Button>
+                      </div>
+                      <div class="bg-gray-900 text-green-400 p-2 rounded font-mono text-xs">{{ installCmd }}</div>
+                    </div>
+
+                    <div class="mb-4">
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="font-medium text-blue-600">第二步：同步商品到本地（按需手动执行）</span>
+                        <Button type="primary" size="small" @click="copyText(syncCmd)">复制命令</Button>
+                      </div>
+                      <div class="bg-gray-900 text-green-400 p-2 rounded font-mono text-xs whitespace-pre-wrap leading-relaxed">{{ syncCmd }}</div>
+                    </div>
+
+                    <div class="mb-4">
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="font-medium text-blue-600">第三步：启动后台订单监听（重启服务器后需执行）</span>
+                        <Button type="primary" size="small" @click="copyText(listenCmd)">复制命令</Button>
+                      </div>
+                      <Alert message="注意：如果不是第一次运行，请先执行 pkill -f long 终止旧进程" type="warning" show-icon class="mb-2 py-1" />
+                      <div class="bg-gray-900 text-green-400 p-2 rounded font-mono text-xs whitespace-pre-wrap leading-relaxed">{{ listenCmd }}</div>
+                    </div>
+
+                    <!-- 计划任务单独提出来平级展示 -->
+                    <div class="border-t dark:border-gray-700 pt-4 mt-4">
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="font-medium text-blue-600">第四步（可选）：一键设置自动同步计划任务</span>
+                        <Button type="primary" size="small" @click="copyText(cronCmd)">
+                          <template #icon><CopyOutlined /></template>
+                          复制一键添加命令
+                        </Button>
+                      </div>
+                      <div class="bg-white dark:bg-gray-900 border dark:border-gray-700 p-3 rounded mb-3 flex items-center gap-2">
+                        <span class="text-sm font-medium">任务频率：每隔</span>
+                        <InputNumber v-model:value="llConfig.cron_value" :min="1" :max="99" style="width: 80px" />
+                        <Select v-model:value="llConfig.cron_unit" style="width: 100px">
+                          <SelectOption value="minute">分钟</SelectOption>
+                          <SelectOption value="hour">小时</SelectOption>
+                          <SelectOption value="day">天</SelectOption>
+                        </Select>
+                        <span class="text-sm">自动在后台执行一次「第二步的商品同步」</span>
+                      </div>
+                      <div class="bg-gray-900 text-green-400 p-2 rounded font-mono text-xs whitespace-pre-wrap leading-relaxed">
+                        {{ cronCmd }}
+                      </div>
+                    </div>
+                  </Card>
+                </CollapsePanel>
+              </Collapse>
             </div>
           </Spin>
         </TabPane>

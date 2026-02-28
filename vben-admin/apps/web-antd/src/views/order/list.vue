@@ -26,6 +26,7 @@ import {
   Popconfirm,
   Collapse,
   CollapsePanel,
+  Table,
 } from 'ant-design-vue';
 import {
   SearchOutlined,

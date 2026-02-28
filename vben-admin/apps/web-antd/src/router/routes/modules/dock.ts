@@ -6,10 +6,9 @@ const routes: RouteRecordRaw[] = [
   {
     component: BasicLayout,
     meta: {
-      authority: ['super', 'admin'],
-      icon: 'mdi:connection',
-      order: 15,
-      title: '对接中心',
+      icon: 'mdi:file-document-outline',
+      order: 16,
+      title: '接口文档',
     },
     name: 'Dock',
     path: '/dock',
@@ -20,8 +19,8 @@ const routes: RouteRecordRaw[] = [
         path: '/dock/index',
         component: () => import('#/views/dock/index.vue'),
         meta: {
-          icon: 'mdi:connection',
-          title: '对接中心',
+          icon: 'mdi:file-document-outline',
+          title: '接口文档',
         },
       },
     ],

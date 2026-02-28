@@ -1,0 +1,67 @@
+{
+  "data": [
+    {
+      "pid": "1",
+      "name": "校友邦",
+      "content": "支持上，下班打卡！周报！",
+      "price": "0.10",
+      "yes_school": 0
+    },
+    {
+      "pid": "2",
+      "name": "职校家园",
+      "content": "支持打卡，日报，周报，月报",
+      "price": "0.10",
+      "yes_school": 0
+    },
+    {
+      "pid": "3",
+      "name": "慧职教",
+      "content": "支持打卡、实习汇报！",
+      "price": "0.10",
+      "yes_school": 1
+    },
+    {
+      "pid": "4",
+      "name": "黔职通",
+      "content": "包上班打卡，下班打卡，日报、周报、月报！",
+      "price": "0.10",
+      "yes_school": 0
+    },
+    {
+      "pid": "5",
+      "name": "学习通",
+      "content": "学习通包上班打卡！包打卡，日报！周报！月报！",
+      "price": "0.10",
+      "yes_school": 0
+    },
+    {
+      "pid": "6",
+      "name": "习行学生版",
+      "content": "暂且只支持打卡！",
+      "price": "0.10",
+      "yes_school": 1
+    },
+    {
+      "pid": "7",
+      "name": "工学云",
+      "content": "包上，下班打卡，日报，周报，月报！",
+      "price": "0.10",
+      "yes_school": 0
+    },
+    {
+      "pid": "8",
+      "name": "习讯云",
+      "content": "包打卡！",
+      "price": "0.10",
+      "yes_school": 1
+    },
+    {
+      "pid": "9",
+      "name": "广西职业院校公众号",
+      "content": "包打卡，该业务请设置8点打卡，8点之前网站进不去",
+      "price": "0.10",
+      "yes_school": 0
+    }
+  ]
+}

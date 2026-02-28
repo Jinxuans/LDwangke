@@ -753,7 +753,35 @@ func (s *AdminService) DashboardStats() (map[string]interface{}, error) {
 	statusDist := s.getOrderStatusDistribution()
 	stats["status_distribution"] = statusDist
 
+	// 用户消费排行 (近7天)
+	topUsers := s.getTopUsers(7)
+	stats["top_users"] = topUsers
+
 	return stats, nil
+}
+
+func (s *AdminService) getTopUsers(days int) []map[string]interface{} {
+	rows, err := database.DB.Query(
+		"SELECT o.uid, COALESCE(u.user,''), COUNT(*), COALESCE(SUM(o.fees),0) FROM qingka_wangke_order o LEFT JOIN qingka_wangke_user u ON o.uid=u.uid WHERE o.addtime >= CURDATE() - INTERVAL ? DAY GROUP BY o.uid ORDER BY SUM(o.fees) DESC LIMIT 5",
+		days-1,
+	)
+	if err != nil {
+		return []map[string]interface{}{}
+	}
+	defer rows.Close()
+
+	var list []map[string]interface{}
+	for rows.Next() {
+		var uid, cnt int
+		var username string
+		var total float64
+		rows.Scan(&uid, &username, &cnt, &total)
+		list = append(list, map[string]interface{}{"uid": uid, "username": username, "orders": cnt, "total": total})
+	}
+	if list == nil {
+		list = []map[string]interface{}{}
+	}
+	return list
 }
 
 func (s *AdminService) getWeekTrend() []map[string]interface{} {

@@ -21,9 +21,9 @@ import {
 import { getUserProfileApi, type UserProfile } from '#/api/user-center';
 import { useAccessStore } from '@vben/stores';
 import {
-  getDashboardStatsApi, getStatsReportApi, getPublicAnnouncementsApi,
+  getDashboardStatsApi, getPublicAnnouncementsApi,
   getQueueStatsApi, setQueueConcurrencyApi, getSiteConfigApi,
-  type DashboardStats, type StatsReport, type AnnouncementItem, type QueueStats,
+  type DashboardStats, type AnnouncementItem, type QueueStats,
 } from '#/api/admin';
 import { userCheckinApi, userCheckinStatusApi } from '#/api/checkin';
 
@@ -37,7 +37,6 @@ const { isDark } = usePreferences();
 const loading = ref(false);
 const profile = ref<UserProfile | null>(null);
 const dashStats = ref<DashboardStats | null>(null);
-const statsReport = ref<StatsReport | null>(null);
 const announcements = ref<AnnouncementItem[]>([]);
 const queueStats = ref<QueueStats | null>(null);
 const editingConcurrency = ref(false);
@@ -64,7 +63,7 @@ async function loadDashboard() {
       // qd_notice_open: 渠道公告开关，关闭时不显示 notice
       siteNotice.value = (cfg?.qd_notice_open !== '0' && cfg?.notice) ? cfg.notice : '';
       if (cfg?.tcgonggao) {
-        Modal.info({ title: '系统公告', content: cfg.tcgonggao, okText: '我知道了', width: 480 });
+        Modal.info({ title: '系统公告', content: cfg.tcgonggao, okText: '我知道了', width: 'min(90vw, 400px)' });
       }
     } catch { /* ignore */ }
 
@@ -73,13 +72,11 @@ async function loadDashboard() {
 
     // 根据角色决定是否加载管理员数据
     if (hasAdminRole.value) {
-      const [stats, report, ann] = await Promise.all([
+      const [stats, ann] = await Promise.all([
         getDashboardStatsApi(),
-        getStatsReportApi(7),
         getPublicAnnouncementsApi(1, 5),
       ]);
       dashStats.value = stats;
-      statsReport.value = report;
       announcements.value = ann.list || [];
       try {
         const qs = await getQueueStatsApi();
@@ -181,7 +178,7 @@ function renderCharts() {
   }
 
   // 饼图
-  const byStatus = statsReport.value?.by_status || [];
+  const byStatus: any[] = (dashStats.value as any)?.status_distribution || [];
   if (byStatus.length > 0) {
     const statusColors: Record<string, string> = {
       '已完成': '#10b981', '进行中': '#6366f1', '待处理': '#f59e0b',
@@ -235,7 +232,7 @@ const recentOrderColumns = [
 ];
 
 // 用户排行
-const topUsers = computed(() => statsReport.value?.top_users?.slice(0, 5) || []);
+const topUsers = computed(() => (dashStats.value as any)?.top_users?.slice(0, 5) || []);
 
 // 快捷操作
 const quickActions = [
@@ -317,88 +314,76 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
       <Alert v-if="maintenanceMode" type="warning" show-icon message="系统当前处于维护模式，仅管理员可正常使用。" class="mb-4" />
       <Alert v-if="siteNotice" type="info" show-icon :message="siteNotice" class="mb-4" />
       <!-- 统计卡片 -->
-      <Row :gutter="[16, 16]">
+      <Row :gutter="[12, 12]">
         <Col :xs="12" :lg="6">
-          <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
-            <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-blue-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-blue-500/10"></div>
-            <div class="relative z-10 flex items-center justify-between mb-4">
-              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-xl text-blue-600 transition-colors group-hover:bg-blue-100 dark:bg-blue-500/20 dark:text-blue-400 dark:group-hover:bg-blue-500/30">
+          <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
+            <div class="flex items-center gap-2.5 mb-2">
+              <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
                 <WalletOutlined />
               </div>
+              <span class="text-xs text-gray-500">账户余额</span>
             </div>
-            <div class="relative z-10">
-              <div class="text-3xl font-bold text-gray-800 dark:text-gray-100">
-                <span class="text-xl mr-1">¥</span>{{ (profile?.money || 0).toFixed(2) }}
-              </div>
-              <div class="mt-1 text-sm font-medium text-gray-500">账户余额</div>
-              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
-                <span>总充值 <span class="font-medium text-gray-500 dark:text-gray-400">¥{{ (profile?.zcz || 0).toFixed(2) }}</span></span>
-              </div>
+            <div class="text-xl font-bold text-gray-800 dark:text-gray-100">
+              <span class="text-sm mr-0.5">¥</span>{{ (profile?.money || 0).toFixed(2) }}
+            </div>
+            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800">
+              总充值 <span class="font-medium text-gray-500">¥{{ (profile?.zcz || 0).toFixed(2) }}</span>
             </div>
           </div>
         </Col>
 
         <Col :xs="12" :lg="6">
-          <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
-            <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-green-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-green-500/10"></div>
-            <div class="relative z-10 flex items-center justify-between mb-4">
-              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-green-50 text-xl text-green-600 transition-colors group-hover:bg-green-100 dark:bg-green-500/20 dark:text-green-400 dark:group-hover:bg-green-500/30">
+          <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
+            <div class="flex items-center gap-2.5 mb-2">
+              <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400">
                 <ShoppingCartOutlined />
               </div>
+              <span class="text-xs text-gray-500">今日订单</span>
             </div>
-            <div class="relative z-10">
-              <div class="text-3xl font-bold text-gray-800 dark:text-gray-100">{{ profile?.today_orders || dashStats?.today_orders || 0 }}</div>
-              <div class="mt-1 text-sm font-medium text-gray-500">今日订单</div>
-              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
-                <span>总订单 <span class="font-medium text-gray-500 dark:text-gray-400">{{ profile?.order_total || dashStats?.total_orders || 0 }}</span></span>
-              </div>
+            <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ profile?.today_orders || dashStats?.today_orders || 0 }}</div>
+            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800">
+              总订单 <span class="font-medium text-gray-500">{{ profile?.order_total || dashStats?.total_orders || 0 }}</span>
             </div>
           </div>
         </Col>
 
         <Col :xs="12" :lg="6">
-          <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
-            <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-orange-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-orange-500/10"></div>
-            <div class="relative z-10 flex items-center justify-between mb-4">
-              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-50 text-xl text-orange-600 transition-colors group-hover:bg-orange-100 dark:bg-orange-500/20 dark:text-orange-400 dark:group-hover:bg-orange-500/30">
+          <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
+            <div class="flex items-center gap-2.5 mb-2">
+              <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
                 <DollarOutlined />
               </div>
+              <span class="text-xs text-gray-500">{{ hasAdminRole ? '今日收入' : '今日消费' }}</span>
             </div>
-            <div class="relative z-10">
-              <div class="text-3xl font-bold text-gray-800 dark:text-gray-100">
-                <span class="text-xl mr-1">¥</span>{{ (hasAdminRole ? (dashStats?.today_income || 0) : (profile?.today_spend || 0)).toFixed(2) }}
-              </div>
-              <div class="mt-1 text-sm font-medium text-gray-500">{{ hasAdminRole ? '今日收入' : '今日消费' }}</div>
-              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-if="hasAdminRole">
-                <span class="flex items-center gap-1"><SyncOutlined /> 进行中 <span class="font-medium text-gray-500 dark:text-gray-400">{{ dashStats?.processing_orders || 0 }} 单</span></span>
-              </div>
-              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-else>
-                <span>&nbsp;</span>
-              </div>
+            <div class="text-xl font-bold text-gray-800 dark:text-gray-100">
+              <span class="text-sm mr-0.5">¥</span>{{ (hasAdminRole ? (dashStats?.today_income || 0) : (profile?.today_spend || 0)).toFixed(2) }}
+            </div>
+            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-if="hasAdminRole">
+              <span class="flex items-center gap-1"><SyncOutlined /> 进行中 <span class="font-medium text-gray-500">{{ dashStats?.processing_orders || 0 }} 单</span></span>
+            </div>
+            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-else>
+              <span>&nbsp;</span>
             </div>
           </div>
         </Col>
 
         <Col :xs="12" :lg="6">
-          <div class="relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md dark:border-gray-800 dark:bg-[#141414] group">
-            <div class="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-purple-50 opacity-50 transition-transform duration-500 group-hover:scale-150 dark:bg-purple-500/10"></div>
-            <div class="relative z-10 flex items-center justify-between mb-4">
-              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-xl text-purple-600 transition-colors group-hover:bg-purple-100 dark:bg-purple-500/20 dark:text-purple-400 dark:group-hover:bg-purple-500/30">
+          <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
+            <div class="flex items-center gap-2.5 mb-2">
+              <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400">
                 <TeamOutlined />
               </div>
+              <span class="text-xs text-gray-500">{{ hasAdminRole ? '注册用户' : '我的代理' }}</span>
             </div>
-            <div class="relative z-10">
-              <div class="text-3xl font-bold text-gray-800 dark:text-gray-100">{{ hasAdminRole ? (dashStats?.user_count || 0) : (profile?.dailitongji?.dlzs || 0) }}</div>
-              <div class="mt-1 text-sm font-medium text-gray-500">{{ hasAdminRole ? '注册用户' : '我的代理' }}</div>
-              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-if="hasAdminRole">
-                <span>平台余额 <span class="font-medium text-gray-500 dark:text-gray-400">¥{{ (dashStats?.total_balance || 0).toFixed(2) }}</span></span>
-              </div>
-              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-else-if="profile?.dailitongji">
-                <span>今日交单 <span class="font-medium text-gray-500 dark:text-gray-400">{{ profile.dailitongji.jrjd || 0 }}</span></span>
-              </div>
-              <div class="mt-3 flex items-center text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-else>
-                <span>&nbsp;</span>
-              </div>
+            <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ hasAdminRole ? (dashStats?.user_count || 0) : (profile?.dailitongji?.dlzs || 0) }}</div>
+            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-if="hasAdminRole">
+              平台余额 <span class="font-medium text-gray-500">¥{{ (dashStats?.total_balance || 0).toFixed(2) }}</span>
+            </div>
+            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-else-if="profile?.dailitongji">
+              今日交单 <span class="font-medium text-gray-500">{{ profile.dailitongji.jrjd || 0 }}</span>
+            </div>
+            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-else>
+              <span>&nbsp;</span>
             </div>
           </div>
         </Col>

@@ -1,0 +1,23 @@
+11.3更新，
+1.将一下内容完整复制到你的数据库sql执行即可，然后填上你的uid和ley即可
+2.替换xm_apis.php文件以及xm_order.php即可
+本次更新 将订单页面的删除按钮和同步按钮进行删除 避免有人出现删除订单后无法退款的情况 如果需要请在操作那里自行添加按钮（api没删除）
+前端下单页面可以自行交给ai进行美化
+
+INSERT INTO `xm_project` (`name`, `p_id`, `status`, `description`, `price`, `url`, `key`, `uid`, `token`, `type`, `query`, `password`, `is_deleted`) 
+VALUES (
+    '人脸乐跑', 
+    5, 
+    0, 
+    '按次计费，按照规则进行随机公里，请到 http://lepaoauth.bdlp.xyz 进行授权，并前往 http://record2.bdlp.xyz 进行上传人脸视频', 
+    5.1860, 
+    'https://spiderman.icu/api/xm_apis.php', 
+    NULL, 
+    NULL, 
+    NULL, 
+    '0', 
+    1, 
+    0, 
+    0
+);
+

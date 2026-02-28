@@ -52,6 +52,139 @@ const routes: RouteRecordRaw[] = [
       },
     ],
   },
+  {
+    component: BasicLayout,
+    meta: {
+      icon: 'lucide:clipboard-check',
+      order: 2,
+      title: '打卡业务',
+    },
+    name: 'Checkin',
+    path: '/checkin',
+    redirect: '/yfdk/index',
+    children: [
+      {
+        name: 'YFDKIndex',
+        path: '/yfdk/index',
+        component: () => import('#/views/order/yfdk.vue'),
+        meta: {
+          icon: 'lucide:clipboard-check',
+          title: 'YF打卡',
+        },
+      },
+      {
+        name: 'SXDKIndex',
+        path: '/sxdk/index',
+        component: () => import('#/views/order/sxdk.vue'),
+        meta: {
+          icon: 'lucide:mountain',
+          title: '泰山打卡',
+        },
+      },
+      {
+        name: 'AppuiIndex',
+        path: '/appui/index',
+        component: () => import('#/views/order/appui.vue'),
+        meta: {
+          icon: 'lucide:smartphone',
+          title: 'Appui打卡',
+        },
+      },
+    ],
+  },
+  {
+    component: BasicLayout,
+    meta: {
+      icon: 'lucide:activity',
+      order: 3,
+      title: '运动业务',
+    },
+    name: 'Sports',
+    path: '/sports',
+    redirect: '/sdxy/index',
+    children: [
+      {
+        name: 'SDXYIndex',
+        path: '/sdxy/index',
+        component: () => import('#/views/order/sdxy.vue'),
+        meta: {
+          icon: 'lucide:zap',
+          title: '闪电运动',
+        },
+      },
+      {
+        name: 'YDSJIndex',
+        path: '/ydsj/index',
+        component: () => import('#/views/order/ydsj.vue'),
+        meta: {
+          icon: 'lucide:footprints',
+          title: '运动世界',
+        },
+      },
+      {
+        name: 'XMIndex',
+        path: '/xm/index',
+        component: () => import('#/views/order/xm.vue'),
+        meta: {
+          icon: 'lucide:activity',
+          title: '小米运动',
+        },
+      },
+      {
+        name: 'WRunIndex',
+        path: '/w/index',
+        component: () => import('#/views/order/w.vue'),
+        meta: {
+          icon: 'lucide:waves',
+          title: '鲸鱼运动',
+        },
+      },
+    ],
+  },
+  {
+    component: BasicLayout,
+    meta: {
+      icon: 'mdi:star-shooting-outline',
+      order: 4,
+      title: '图图强国',
+    },
+    name: 'TutuQG',
+    path: '/tutuqg',
+    redirect: '/tutuqg/index',
+    children: [
+      {
+        name: 'TutuQGIndex',
+        path: '/tutuqg/index',
+        component: () => import('#/views/order/tutuqg.vue'),
+        meta: {
+          hideInMenu: true,
+          title: '图图强国',
+        },
+      },
+    ],
+  },
+  {
+    component: BasicLayout,
+    meta: {
+      icon: 'mdi:file-document-edit-outline',
+      order: 5,
+      title: '土拨鼠论文',
+    },
+    name: 'Tuboshu',
+    path: '/tuboshu',
+    redirect: '/tuboshu/index',
+    children: [
+      {
+        name: 'TuboshuIndex',
+        path: '/tuboshu/index',
+        component: () => import('#/views/order/tuboshu.vue'),
+        meta: {
+          hideInMenu: true,
+          title: '土拨鼠论文',
+        },
+      },
+    ],
+  },
 ];
 
 export default routes;

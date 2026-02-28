@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>土拨鼠论文</title>
+  <link href="https://unpkg.com/quasar@2.10.1/dist/quasar.prod.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/@afyercu/tuboshu-components@0.0.28/dist/lib/tuboshu-components.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js",
+      "tuboshu-components": "https://unpkg.com/@afyercu/tuboshu-components@0.0.28/dist/lib/index.es.js"
+    }
+  }
+  </script>
+  <style>
+    body { margin: 0; background: transparent; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    p { padding: 0; margin: 0; }
+    @media (max-width: 768px) {
+      .container { padding: 0; }
+      .tabs-container { padding: 10px; width: 100%; overflow-x: auto; }
+    }
+    #loading {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 200px; font-size: 16px; color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">正在加载组件...</div>
+  <div id="app" style="display: none;">
+    <subsite-provider :config="priceConfig" :price-ratio="priceRatio" :is-admin="isAdmin">
+      <div class="container">
+        <tabs v-model="currentTab">
+          <tabs-list class="w-full tabs-container">
+            <tabs-trigger
+              v-for="([,page], index) in Object.entries(pages).filter(([pageKey, page]) => !hidePage.includes(pageKey)).filter(([,page]) => page.__name !== 'SubsitePage' || showPriceConfig)"
+              :key="index" :value="page.__name">
+              {{ pageNameMap[page.__name] || page.__name }}
+            </tabs-trigger>
+          </tabs-list>
+          <tabs-content v-for="(page, index) in pages" :key="index" :value="page.__name" style="min-height: calc(100vh - 60px);">
+            <component :is="page"></component>
+          </tabs-content>
+        </tabs>
+      </div>
+    </subsite-provider>
+  </div>
+
+  <script>window.process = { env: { NODE_ENV: 'production' } };</script>
+  <script src="https://code.iconify.design/1/1.0.6/iconify.min.js" defer></script>
+  <script type="module">
+    import { createApp, shallowRef } from 'vue'
+    import { setupVueApp } from 'tuboshu-components'
+    import * as TuBoShu from 'tuboshu-components'
+
+    // 从 sessionStorage 读取参数（父页面写入）
+    let authToken = '';
+    let adminFlag = false;
+    try {
+      const authData = JSON.parse(sessionStorage.getItem('tuboshu_auth') || '{}');
+      authToken = authData.token || '';
+      adminFlag = !!authData.admin;
+    } catch (e) {
+      console.warn('[Tuboshu] 读取认证信息失败', e);
+    }
+    const apiRouteUrl = '/api/tuboshu/route';
+    const apiFormDataUrl = '/api/tuboshu/route-formdata';
+    const configUrl = '/api/tuboshu/config';
+
+    // 自行加载配置
+    let priceConfigData = {};
+    let priceRatioData = 5;
+    try {
+      const resp = await fetch(configUrl, { headers: { 'Authorization': authToken } });
+      if (resp.ok) {
+        const json = await resp.json();
+        const cfg = json?.data ?? json;
+        priceConfigData = { ...(cfg?.price_config ?? {}), PAGE_VISIBILITY: cfg?.page_visibility ?? {} };
+        priceRatioData = cfg?.user_price_ratio ?? cfg?.price_ratio ?? 5;
+      }
+    } catch (e) {
+      console.warn('[Tuboshu] 加载配置失败', e);
+    }
+
+    const pages = shallowRef(TuBoShu.pages);
+    const pageVisibility = priceConfigData.PAGE_VISIBILITY || {};
+    const hidePage = Object.keys(TuBoShu.pages).filter(
+      page => pageVisibility.hasOwnProperty(page) && pageVisibility[page] === false
+    );
+
+    const pageNameMap = {
+      ComponentStagePage: '订单提交',
+      ChatPage: '简单订单',
+      ChartPage: '图表生成',
+      TemplatePage: 'Word模板生成',
+      ReductionPage: '降AIGC/降重',
+      AccountTable: '生成记录',
+      SubsitePage: '价格设置',
+      TicketPage: '工单反馈',
+      PointsExchangePage: '点数兑换',
+      ThesisGeneratePage: '智码方舟',
+      KnowledgeBasePage: '知识库',
+    };
+
+    const app = createApp({
+      data() {
+        return {
+          currentTab: 'ComponentStagePage',
+          showPriceConfig: adminFlag,
+          isAdmin: adminFlag,
+          priceConfig: priceConfigData,
+          pageNameMap: { ...TuBoShu.pageNameMap, ...pageNameMap },
+          priceRatio: Number(priceRatioData),
+        }
+      },
+      methods: {
+        handleApiRequest(event) {
+          const { payload } = event.detail;
+
+          const handleResponse = (requestId, result) => {
+            window.dispatchEvent(new CustomEvent('api_response', {
+              detail: { requestId, payload: result }
+            }));
+          };
+
+          const isFormData = payload.specialConfig?.type === 'formData';
+          if (isFormData) {
+            payload.data.append('path', payload.url);
+            payload.data.append('method', payload.method);
+          }
+
+          const isBlobResponse = payload.specialConfig?.responseType === 'blob';
+          const fetchOptions = isFormData
+            ? { method: 'POST', body: payload.data, headers: { 'Authorization': authToken } }
+            : {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': authToken },
+                body: JSON.stringify({
+                  method: payload.method || 'GET',
+                  path: payload.url,
+                  params: payload.data,
+                  isBlob: isBlobResponse
+                })
+              };
+
+          fetch(isFormData ? apiFormDataUrl : apiRouteUrl, fetchOptions)
+            .then(res => isBlobResponse ? res.blob() : res.json())
+            .then(result => handleResponse(payload.id, result))
+            .catch(error => {
+              console.error('[Tuboshu] API failed:', error);
+              handleResponse(payload.id, { success: false, message: error.message });
+            });
+        },
+      },
+      beforeMount() {
+        window.addEventListener('api_request', this.handleApiRequest);
+      },
+      mounted() {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        window.parent.postMessage({ type: 'tuboshu_loaded' }, '*');
+      },
+      unmounted() {
+        window.removeEventListener('api_request', this.handleApiRequest);
+      },
+      setup() {
+        return { pages, hidePage };
+      }
+    });
+
+    setupVueApp(app);
+  </script>
+</body>
+</html>

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -164,6 +165,8 @@ var platformRegistry = map[string]PlatformConfig{
 	"lgwk": {QueryAct: "lgwk_custom", SuccessCode: "0"},
 	// 天河(skyriver) - 成功码"1"，返回yid，进度用/api/chadan1，改密用xgmm(oid/newpass)，分类用getfl，工单用submitWorkOrder/queryWorkOrder
 	"skyriver": {SuccessCode: "1", ReturnsYID: true, ProgressPath: "/api/chadan1", ProgressNoYID: "chadan", ChangePassAct: "xgmm", ChangePassParam: "newpass", ChangePassIDParam: "oid", CategoryAct: "getfl", ReportAct: "submitWorkOrder", GetReportAct: "queryWorkOrder", BalanceMoneyField: "money"},
+	// 学妹 - 成功码"0"，返回yid，进度用chadan(username)，暂停用ikunStop，改密用gaimi(oid/pwd)，日志用cha_logwk(oid)，售后用shouhou
+	"xuemei": {SuccessCode: "0", ReturnsYID: true, ProgressAct: "chadan", ProgressNoYID: "chadan", AlwaysUsername: true, PauseAct: "ikunStop", ChangePassAct: "gaimi", ChangePassIDParam: "oid", ChangePassParam: "pwd", LogAct: "cha_logwk", LogIDParam: "oid", BalanceMoneyField: "money"},
 }
 
 // dbConfigCache 数据库平台配置缓存
@@ -359,6 +362,7 @@ func GetPlatformNames() map[string]string {
 		"lgwk":     "lgwk",
 		"Benz":     "奔驰",
 		"skyriver": "天河",
+		"xuemei":   "学妹",
 	}
 
 	dbConfigMu.RLock()
@@ -787,43 +791,112 @@ func (s *SupplierService) GetSupplierCategories(sup *model.SupplierFull) map[str
 		baseURL = "http://" + baseURL
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
-	var resp *http.Response
-	var err error
+	client := &http.Client{Timeout: 8 * time.Second}
 
-	if cfg.ReportAuthType == "token_only" && cfg.UseJSON {
-		// 2xx 等 token_only 平台：JSON POST 到 /api/getcate
-		apiURL := baseURL + "/api/" + cfg.CategoryAct
-		jsonData, _ := json.Marshal(map[string]string{"token": sup.Pass})
-		req, _ := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonData)))
-		req.Header.Set("Content-Type", "application/json")
-		resp, err = client.Do(req)
-	} else {
-		cateURL := s.buildSupplierURL(sup.URL, cfg.CategoryAct)
-		formData := url.Values{}
-		formData.Set("uid", sup.User)
-		formData.Set("key", sup.Pass)
-		resp, err = client.PostForm(cateURL, formData)
+	// 确定要尝试的分类 act 列表
+	tryActs := []string{}
+	if cfg.CategoryAct != "" {
+		tryActs = append(tryActs, cfg.CategoryAct)
 	}
-	if err != nil {
+	// 常见分类 act 作为 fallback
+	for _, fallback := range []string{"getfl", "getcate", "getfenlei"} {
+		found := false
+		for _, a := range tryActs {
+			if a == fallback {
+				found = true
+				break
+			}
+		}
+		if !found {
+			tryActs = append(tryActs, fallback)
+		}
+	}
+
+	for _, act := range tryActs {
+		var resp *http.Response
+		var err error
+
+		if cfg.ReportAuthType == "token_only" && cfg.UseJSON {
+			apiURL := baseURL + "/api/" + act
+			jsonData, _ := json.Marshal(map[string]string{"token": sup.Pass})
+			req, _ := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonData)))
+			req.Header.Set("Content-Type", "application/json")
+			resp, err = client.Do(req)
+		} else {
+			cateURL := s.buildSupplierURL(sup.URL, act)
+			formData := url.Values{}
+			formData.Set("uid", sup.User)
+			formData.Set("key", sup.Pass)
+			resp, err = client.PostForm(cateURL, formData)
+		}
+		if err != nil {
+			log.Printf("[GetSupplierCategories] act=%s 请求失败: %v", act, err)
+			continue
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		m := parseCategoryResponse(body)
+		if len(m) > 0 {
+			log.Printf("[GetSupplierCategories] pt=%s act=%s 成功获取 %d 个分类", sup.PT, act, len(m))
+			return m
+		}
+	}
+
+	log.Printf("[GetSupplierCategories] pt=%s 所有分类 act 均未获取到数据", sup.PT)
+	return nil
+}
+
+// parseCategoryResponse 解析分类响应，兼容多种字段名格式
+func parseCategoryResponse(body []byte) map[string]string {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil
 	}
-	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	var result struct {
-		Data []struct {
-			ID   interface{} `json:"id"`
-			Name string      `json:"name"`
-		} `json:"data"`
+	// 提取 data 数组（兼容 data / list / fenlei 字段）
+	var dataArr []interface{}
+	for _, key := range []string{"data", "list", "fenlei", "category", "categories"} {
+		if v, ok := raw[key]; ok && v != nil {
+			dataBytes, _ := json.Marshal(v)
+			if err := json.Unmarshal(dataBytes, &dataArr); err == nil && len(dataArr) > 0 {
+				break
+			}
+		}
 	}
-	json.Unmarshal(body, &result)
+
+	if len(dataArr) == 0 {
+		return nil
+	}
 
 	m := map[string]string{}
-	for _, fl := range result.Data {
-		fid := fmt.Sprintf("%v", fl.ID)
-		if fid != "" && fl.Name != "" {
-			m[fid] = fl.Name
+	for _, item := range dataArr {
+		itemMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		// 提取 ID：兼容 id / fid / fenlei_id / category_id
+		fid := ""
+		for _, idKey := range []string{"id", "fid", "fenlei_id", "category_id", "cate_id", "typeId", "type_id"} {
+			if v, ok := itemMap[idKey]; ok && v != nil {
+				fid = fmt.Sprintf("%v", v)
+				break
+			}
+		}
+		// 提取名称：兼容 name / fname / fenleiName / fenlei_name / category_name / catname / typeName / type_name / title
+		fname := ""
+		for _, nameKey := range []string{"name", "fname", "fenleiName", "fenlei_name", "category_name", "catname", "typeName", "type_name", "title", "label"} {
+			if v, ok := itemMap[nameKey]; ok && v != nil {
+				s := fmt.Sprintf("%v", v)
+				if s != "" && s != "<nil>" {
+					fname = s
+					break
+				}
+			}
+		}
+		if fid != "" && fid != "<nil>" && fid != "0" && fname != "" {
+			m[fid] = fname
 		}
 	}
 	return m
@@ -921,12 +994,13 @@ func (s *SupplierService) GetSupplierClasses(sup *model.SupplierFull) ([]Supplie
 			}
 		}
 		catName := ""
-		if cn, ok := d["category_name"]; ok {
-			catName = fmt.Sprintf("%v", cn)
-		}
-		if catName == "" {
-			if fn, ok := d["fenleiName"]; ok {
-				catName = fmt.Sprintf("%v", fn)
+		for _, ck := range []string{"category_name", "fenleiName", "fenlei_name", "catname", "typeName", "type_name", "catName"} {
+			if cn, ok := d[ck]; ok {
+				s := fmt.Sprintf("%v", cn)
+				if s != "" && s != "<nil>" {
+					catName = s
+					break
+				}
 			}
 		}
 		items = append(items, SupplierClassItem{
@@ -1720,6 +1794,54 @@ func (s *SupplierService) QueryBalance(hid int) (map[string]interface{}, error) 
 			database.DB.Exec("UPDATE qingka_wangke_huoyuan SET money = ? WHERE hid = ?", money, hid)
 		}
 		return result, nil
+	}
+
+	// 土拨鼠平台：GET /userInfo，satoken 认证
+	if sup.PT == "tuboshu" {
+		baseURL := strings.TrimRight(sup.URL, "/")
+		if !strings.HasPrefix(baseURL, "http") {
+			baseURL = "https://" + baseURL
+		}
+		// API 需要 /api/ 前缀
+		if !strings.HasSuffix(baseURL, "/api") {
+			baseURL = baseURL + "/api"
+		}
+		apiURL := baseURL + "/userInfo"
+		log.Printf("[Tuboshu Balance] URL=%s Token=%s", apiURL, sup.Token[:min(len(sup.Token), 20)]+"...")
+		req, reqErr := http.NewRequest("GET", apiURL, nil)
+		if reqErr != nil {
+			return nil, fmt.Errorf("构建请求失败：%v", reqErr)
+		}
+		req.Header.Set("Authorization", "Bearer "+sup.Token)
+		req.Header.Set("Accept", "application/json")
+		resp, err := s.client.Do(req)
+		if err != nil {
+			log.Printf("[Tuboshu Balance] 请求失败: %v", err)
+			return nil, fmt.Errorf("请求土拨鼠余额接口失败：%v", err)
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[Tuboshu Balance] HTTP %d, Body=%s", resp.StatusCode, string(body[:min(len(body), 500)]))
+		var raw map[string]interface{}
+		if err := json.Unmarshal(body, &raw); err != nil {
+			return nil, fmt.Errorf("解析土拨鼠响应失败：%s", string(body))
+		}
+		// 提取 point 字段作为余额
+		money := "0"
+		if data, ok := raw["data"].(map[string]interface{}); ok {
+			if pt, ok := data["point"]; ok {
+				money = fmt.Sprintf("%v", pt)
+			}
+		}
+		database.DB.Exec("UPDATE qingka_wangke_huoyuan SET money = ? WHERE hid = ?", money, hid)
+		return map[string]interface{}{
+			"code":  200,
+			"money": money,
+			"pt":    sup.PT,
+			"name":  sup.Name,
+			"hid":   hid,
+			"raw":   raw,
+		}, nil
 	}
 
 	cfg := GetPlatformConfig(sup.PT)

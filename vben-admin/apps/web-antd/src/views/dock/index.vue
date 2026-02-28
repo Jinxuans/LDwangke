@@ -80,7 +80,7 @@ const apis = [
 ];
 </script>
 <template>
-  <Page title="对接中心" content-class="p-4">
+  <Page title="接口文档" content-class="p-4">
     <Alert class="mb-4" type="info" show-icon message="下游系统可通过以下API接口对接本平台，实现自动查课、下单、查询订单等功能。对接方式与您对接上游完全一致。" />
 
     <!-- 密钥信息 -->

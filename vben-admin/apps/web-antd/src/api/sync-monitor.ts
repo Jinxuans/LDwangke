@@ -92,3 +92,34 @@ export async function getSyncLogsApi(params: { page?: number; page_size?: number
 export async function getMonitoredSuppliersApi() {
   return requestClient.get<MonitoredSupplier[]>('/admin/sync/suppliers');
 }
+
+// ===== 龙龙一键对接工具 =====
+export interface LonglongToolConfig {
+  long_host: string;
+  access_key: string;
+  mysql_host: string;
+  mysql_port: string;
+  mysql_user: string;
+  mysql_password: string;
+  mysql_database: string;
+  class_table: string;
+  order_table: string;
+  docking: string;
+  rate: string;
+  name_prefix: string;
+  category: string;
+  cover_price: boolean;
+  cover_desc: boolean;
+  cover_name: boolean;
+  sort: string;
+  cron_value: string;
+  cron_unit: string;
+}
+
+export async function getLonglongToolConfigApi() {
+  return requestClient.get<LonglongToolConfig>('/admin/longlong-tool/config');
+}
+
+export async function saveLonglongToolConfigApi(data: Partial<LonglongToolConfig>) {
+  return requestClient.post('/admin/longlong-tool/config', data);
+}
