@@ -25,11 +25,11 @@ type SyncRequest struct {
 
 // SyncResult 同步结果
 type SyncResult struct {
-	SyncTime   string           `json:"sync_time"`
-	Success    bool             `json:"success"`
-	Details    []SyncTableInfo  `json:"details"`
-	Errors     []string         `json:"errors"`
-	Summary    string           `json:"summary"`
+	SyncTime string          `json:"sync_time"`
+	Success  bool            `json:"success"`
+	Details  []SyncTableInfo `json:"details"`
+	Errors   []string        `json:"errors"`
+	Summary  string          `json:"summary"`
 }
 
 // SyncTableInfo 每张表的同步统计
@@ -45,9 +45,9 @@ type SyncTableInfo struct {
 
 // SyncTestResult 连接测试结果
 type SyncTestResult struct {
-	Connected bool              `json:"connected"`
-	Tables    map[string]int    `json:"tables"`
-	Error     string            `json:"error,omitempty"`
+	Connected bool           `json:"connected"`
+	Tables    map[string]int `json:"tables"`
+	Error     string         `json:"error,omitempty"`
 }
 
 type DBSyncService struct{}
@@ -69,7 +69,10 @@ func (s *DBSyncService) connectExternal(req SyncRequest) (*sql.DB, error) {
 	cfg.DBName = req.DBName
 	cfg.ParseTime = true
 	cfg.Collation = "utf8mb4_general_ci"
-	cfg.Params = map[string]string{"sql_mode": "''"}
+	cfg.Params = map[string]string{
+		"charset":  "utf8mb4",
+		"sql_mode": "''",
+	}
 
 	db, err := sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
@@ -79,6 +82,9 @@ func (s *DBSyncService) connectExternal(req SyncRequest) (*sql.DB, error) {
 		db.Close()
 		return nil, fmt.Errorf("无法连接到数据库: %v", err)
 	}
+	// 强制设置字符集，防止乱码
+	db.Exec("SET NAMES utf8mb4")
+	db.Exec("SET CHARACTER SET utf8mb4")
 	db.SetMaxOpenConns(5)
 	db.SetConnMaxLifetime(2 * time.Minute)
 	return db, nil
@@ -98,6 +104,13 @@ func (s *DBSyncService) TestConnection(req SyncRequest) (*SyncTestResult, error)
 		"qingka_wangke_fenlei":  "分类",
 		"qingka_wangke_class":   "商品",
 		"qingka_wangke_order":   "订单",
+		"qingka_wangke_dengji":  "等级",
+		"qingka_wangke_config":  "配置",
+		"qingka_wangke_gonggao": "公告",
+		"qingka_wangke_mijia":   "密价",
+		"qingka_wangke_km":      "卡密",
+		"qingka_wangke_pay":     "支付",
+		"qingka_wangke_log":     "日志",
 	}
 
 	counts := make(map[string]int)
@@ -133,11 +146,17 @@ func (s *DBSyncService) Execute(req SyncRequest) (*SyncResult, error) {
 		label string
 		fn    func(*sql.DB, bool) (*SyncTableInfo, error)
 	}{
+		{"qingka_wangke_dengji", "等级", s.syncDengji},
 		{"qingka_wangke_huoyuan", "货源", s.syncHuoyuan},
 		{"qingka_wangke_user", "用户", s.syncUsers},
 		{"qingka_wangke_fenlei", "分类", s.syncFenlei},
 		{"qingka_wangke_class", "商品", s.syncClass},
+		{"qingka_wangke_config", "配置", s.syncConfig},
+		{"qingka_wangke_gonggao", "公告", s.syncGonggao},
+		{"qingka_wangke_mijia", "密价", s.syncMijia},
+		{"qingka_wangke_km", "卡密", s.syncKm},
 		{"qingka_wangke_order", "订单", s.syncOrders},
+		{"qingka_wangke_pay", "支付", s.syncPay},
 	}
 
 	totalInserted, totalUpdated := 0, 0
@@ -284,16 +303,16 @@ func (s *DBSyncService) syncUsers(extDB *sql.DB, updateExisting bool) (*SyncTabl
 func (s *DBSyncService) syncFenlei(extDB *sql.DB, updateExisting bool) (*SyncTableInfo, error) {
 	info := &SyncTableInfo{}
 
-	rows, err := extDB.Query("SELECT id, COALESCE(sort,0), COALESCE(name,''), COALESCE(status,'1'), COALESCE(time,''), COALESCE(recommend,0) FROM qingka_wangke_fenlei")
+	rows, err := extDB.Query("SELECT id, COALESCE(sort,0), COALESCE(name,''), COALESCE(status,'1'), COALESCE(time,''), COALESCE(zk,''), COALESCE(zkl,''), COALESCE(zkj,'') FROM qingka_wangke_fenlei")
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var id, sort, recommend int
-		var name, status, timeStr string
-		if err := rows.Scan(&id, &sort, &name, &status, &timeStr, &recommend); err != nil {
+		var id, sort int
+		var name, status, timeStr, zk, zkl, zkj string
+		if err := rows.Scan(&id, &sort, &name, &status, &timeStr, &zk, &zkl, &zkj); err != nil {
 			info.Failed++
 			continue
 		}
@@ -305,8 +324,8 @@ func (s *DBSyncService) syncFenlei(extDB *sql.DB, updateExisting bool) (*SyncTab
 		if exists > 0 {
 			if updateExisting {
 				_, err := database.DB.Exec(
-					"UPDATE qingka_wangke_fenlei SET sort=?, name=?, status=?, time=?, recommend=? WHERE id=?",
-					sort, name, status, timeStr, recommend, id)
+					"UPDATE qingka_wangke_fenlei SET sort=?, name=?, status=?, time=?, zk=?, zkl=?, zkj=? WHERE id=?",
+					sort, name, status, timeStr, zk, zkl, zkj, id)
 				if err != nil {
 					info.Failed++
 				} else {
@@ -317,8 +336,8 @@ func (s *DBSyncService) syncFenlei(extDB *sql.DB, updateExisting bool) (*SyncTab
 			}
 		} else {
 			_, err := database.DB.Exec(
-				"INSERT INTO qingka_wangke_fenlei (id, sort, name, status, time, recommend) VALUES (?, ?, ?, ?, ?, ?)",
-				id, sort, name, status, timeStr, recommend)
+				"INSERT INTO qingka_wangke_fenlei (id, sort, name, status, time, zk, zkl, zkj) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+				id, sort, name, status, timeStr, zk, zkl, zkj)
 			if err != nil {
 				info.Failed++
 			} else {
@@ -434,6 +453,271 @@ func (s *DBSyncService) syncOrders(extDB *sql.DB, updateExisting bool) (*SyncTab
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				oid, uid, cid, hid, ptname, school, name, user, pass, kcid, kcname, fees, noun,
 				addtime, ip, dockstatus, status, process, yid)
+			if err != nil {
+				info.Failed++
+			} else {
+				info.Inserted++
+			}
+		}
+	}
+	return info, nil
+}
+
+// syncDengji 同步等级表
+func (s *DBSyncService) syncDengji(extDB *sql.DB, updateExisting bool) (*SyncTableInfo, error) {
+	info := &SyncTableInfo{}
+	rows, err := extDB.Query("SELECT id, COALESCE(sort,'0'), COALESCE(name,''), COALESCE(rate,0), COALESCE(money,0), COALESCE(addkf,'0'), COALESCE(gjkf,'0'), COALESCE(status,'1'), COALESCE(time,'') FROM qingka_wangke_dengji")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int
+		var sort, name, addkf, gjkf, status, timeStr string
+		var rate, money float64
+		if err := rows.Scan(&id, &sort, &name, &rate, &money, &addkf, &gjkf, &status, &timeStr); err != nil {
+			info.Failed++
+			continue
+		}
+		info.Total++
+		var exists int
+		database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_dengji WHERE id = ?", id).Scan(&exists)
+		if exists > 0 {
+			if updateExisting {
+				_, err := database.DB.Exec("UPDATE qingka_wangke_dengji SET sort=?, name=?, rate=?, money=?, addkf=?, gjkf=?, status=?, time=? WHERE id=?",
+					sort, name, rate, money, addkf, gjkf, status, timeStr, id)
+				if err != nil {
+					info.Failed++
+				} else {
+					info.Updated++
+				}
+			} else {
+				info.Skipped++
+			}
+		} else {
+			_, err := database.DB.Exec("INSERT INTO qingka_wangke_dengji (id, sort, name, rate, money, addkf, gjkf, status, time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				id, sort, name, rate, money, addkf, gjkf, status, timeStr)
+			if err != nil {
+				info.Failed++
+			} else {
+				info.Inserted++
+			}
+		}
+	}
+	return info, nil
+}
+
+// syncConfig 同步配置表
+func (s *DBSyncService) syncConfig(extDB *sql.DB, updateExisting bool) (*SyncTableInfo, error) {
+	info := &SyncTableInfo{}
+	rows, err := extDB.Query("SELECT COALESCE(v,''), COALESCE(k,'') FROM qingka_wangke_config")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var v, k string
+		if err := rows.Scan(&v, &k); err != nil {
+			info.Failed++
+			continue
+		}
+		info.Total++
+		var exists int
+		database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_config WHERE v = ?", v).Scan(&exists)
+		if exists > 0 {
+			if updateExisting {
+				_, err := database.DB.Exec("UPDATE qingka_wangke_config SET k=? WHERE v=?", k, v)
+				if err != nil {
+					info.Failed++
+				} else {
+					info.Updated++
+				}
+			} else {
+				info.Skipped++
+			}
+		} else {
+			_, err := database.DB.Exec("INSERT INTO qingka_wangke_config (v, k) VALUES (?, ?)", v, k)
+			if err != nil {
+				info.Failed++
+			} else {
+				info.Inserted++
+			}
+		}
+	}
+	return info, nil
+}
+
+// syncGonggao 同步公告表
+func (s *DBSyncService) syncGonggao(extDB *sql.DB, updateExisting bool) (*SyncTableInfo, error) {
+	info := &SyncTableInfo{}
+	rows, err := extDB.Query("SELECT id, COALESCE(title,''), COALESCE(content,''), COALESCE(time,''), COALESCE(uid,0), COALESCE(status,'1'), COALESCE(zhiding,'0'), COALESCE(uptime,''), COALESCE(author,'') FROM qingka_wangke_gonggao")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, uid int
+		var title, content, timeStr, status, zhiding, uptime, author string
+		if err := rows.Scan(&id, &title, &content, &timeStr, &uid, &status, &zhiding, &uptime, &author); err != nil {
+			info.Failed++
+			continue
+		}
+		info.Total++
+		var exists int
+		database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_gonggao WHERE id = ?", id).Scan(&exists)
+		if exists > 0 {
+			if updateExisting {
+				_, err := database.DB.Exec("UPDATE qingka_wangke_gonggao SET title=?, content=?, time=?, uid=?, status=?, zhiding=?, uptime=?, author=? WHERE id=?",
+					title, content, timeStr, uid, status, zhiding, uptime, author, id)
+				if err != nil {
+					info.Failed++
+				} else {
+					info.Updated++
+				}
+			} else {
+				info.Skipped++
+			}
+		} else {
+			_, err := database.DB.Exec("INSERT INTO qingka_wangke_gonggao (id, title, content, time, uid, status, zhiding, uptime, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				id, title, content, timeStr, uid, status, zhiding, uptime, author)
+			if err != nil {
+				info.Failed++
+			} else {
+				info.Inserted++
+			}
+		}
+	}
+	return info, nil
+}
+
+// syncMijia 同步密价表
+func (s *DBSyncService) syncMijia(extDB *sql.DB, updateExisting bool) (*SyncTableInfo, error) {
+	info := &SyncTableInfo{}
+	rows, err := extDB.Query("SELECT mid, COALESCE(uid,0), COALESCE(cid,0), COALESCE(mode,0), COALESCE(price,'0'), COALESCE(addtime,'') FROM qingka_wangke_mijia")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var mid, uid, cid, mode int
+		var price, addtime string
+		if err := rows.Scan(&mid, &uid, &cid, &mode, &price, &addtime); err != nil {
+			info.Failed++
+			continue
+		}
+		info.Total++
+		var exists int
+		database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_mijia WHERE mid = ?", mid).Scan(&exists)
+		if exists > 0 {
+			if updateExisting {
+				_, err := database.DB.Exec("UPDATE qingka_wangke_mijia SET uid=?, cid=?, mode=?, price=?, addtime=? WHERE mid=?",
+					uid, cid, mode, price, addtime, mid)
+				if err != nil {
+					info.Failed++
+				} else {
+					info.Updated++
+				}
+			} else {
+				info.Skipped++
+			}
+		} else {
+			_, err := database.DB.Exec("INSERT INTO qingka_wangke_mijia (mid, uid, cid, mode, price, addtime) VALUES (?, ?, ?, ?, ?, ?)",
+				mid, uid, cid, mode, price, addtime)
+			if err != nil {
+				info.Failed++
+			} else {
+				info.Inserted++
+			}
+		}
+	}
+	return info, nil
+}
+
+// syncKm 同步卡密表
+func (s *DBSyncService) syncKm(extDB *sql.DB, updateExisting bool) (*SyncTableInfo, error) {
+	info := &SyncTableInfo{}
+	rows, err := extDB.Query("SELECT id, COALESCE(content,''), COALESCE(money,0), COALESCE(status,0), COALESCE(uid,0), COALESCE(addtime,''), COALESCE(usedtime,'') FROM qingka_wangke_km")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, money, status, uid int
+		var content, addtime, usedtime string
+		if err := rows.Scan(&id, &content, &money, &status, &uid, &addtime, &usedtime); err != nil {
+			info.Failed++
+			continue
+		}
+		info.Total++
+		var exists int
+		database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_km WHERE id = ?", id).Scan(&exists)
+		if exists > 0 {
+			if updateExisting {
+				_, err := database.DB.Exec("UPDATE qingka_wangke_km SET content=?, money=?, status=?, uid=?, addtime=?, usedtime=? WHERE id=?",
+					content, money, status, uid, addtime, usedtime, id)
+				if err != nil {
+					info.Failed++
+				} else {
+					info.Updated++
+				}
+			} else {
+				info.Skipped++
+			}
+		} else {
+			_, err := database.DB.Exec("INSERT INTO qingka_wangke_km (id, content, money, status, uid, addtime, usedtime) VALUES (?, ?, ?, ?, ?, ?, ?)",
+				id, content, money, status, uid, addtime, usedtime)
+			if err != nil {
+				info.Failed++
+			} else {
+				info.Inserted++
+			}
+		}
+	}
+	return info, nil
+}
+
+// syncPay 同步支付表
+func (s *DBSyncService) syncPay(extDB *sql.DB, updateExisting bool) (*SyncTableInfo, error) {
+	info := &SyncTableInfo{}
+	rows, err := extDB.Query(`SELECT oid, COALESCE(out_trade_no,''), COALESCE(trade_no,''),
+		COALESCE(type,''), COALESCE(uid,0), COALESCE(num,1),
+		addtime, endtime,
+		COALESCE(name,''), COALESCE(money,'0'), COALESCE(ip,''),
+		COALESCE(domain,''), COALESCE(status,0)
+		FROM qingka_wangke_pay`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var oid, uid, num, status int
+		var outTradeNo, tradeNo, payType, name, money, ip, domain string
+		var addtime, endtime sql.NullTime
+		if err := rows.Scan(&oid, &outTradeNo, &tradeNo, &payType, &uid, &num,
+			&addtime, &endtime, &name, &money, &ip, &domain, &status); err != nil {
+			info.Failed++
+			continue
+		}
+		info.Total++
+		var exists int
+		database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_pay WHERE oid = ?", oid).Scan(&exists)
+		if exists > 0 {
+			if updateExisting {
+				_, err := database.DB.Exec(`UPDATE qingka_wangke_pay SET out_trade_no=?, trade_no=?, type=?, uid=?, num=?,
+					addtime=?, endtime=?, name=?, money=?, ip=?, domain=?, status=? WHERE oid=?`,
+					outTradeNo, tradeNo, payType, uid, num, addtime, endtime, name, money, ip, domain, status, oid)
+				if err != nil {
+					info.Failed++
+				} else {
+					info.Updated++
+				}
+			} else {
+				info.Skipped++
+			}
+		} else {
+			_, err := database.DB.Exec(`INSERT INTO qingka_wangke_pay (oid, out_trade_no, trade_no, type, uid, num,
+				addtime, endtime, name, money, ip, domain, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				oid, outTradeNo, tradeNo, payType, uid, num, addtime, endtime, name, money, ip, domain, status)
 			if err != nil {
 				info.Failed++
 			} else {

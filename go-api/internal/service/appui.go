@@ -263,7 +263,7 @@ func (s *AppuiService) AddOrder(uid int, form map[string]interface{}) (string, e
 		if msg == "" {
 			msg = "上游下单失败"
 		}
-		return "", fmt.Errorf(msg)
+		return "", fmt.Errorf("%s", msg)
 	}
 
 	yid := mapGetString(result, "yid")

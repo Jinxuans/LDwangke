@@ -254,7 +254,7 @@ func (s *YDSJService) AddOrder(uid int, form map[string]interface{}) (string, er
 		if msg == "" {
 			msg = "上游下单失败"
 		}
-		return "", fmt.Errorf(msg)
+		return "", fmt.Errorf("%s", msg)
 	}
 
 	yid := mapGetString(result, "yid")

@@ -273,7 +273,7 @@ func (s *SDXYService) AddOrder(uid int, form map[string]interface{}) (string, er
 		if msg == "" {
 			msg = "下单失败"
 		}
-		return "", fmt.Errorf(msg)
+		return "", fmt.Errorf("%s", msg)
 	}
 
 	// 解析上游响应
@@ -350,7 +350,7 @@ func (s *SDXYService) RefundOrder(uid int, aggOrderId string, isAdmin bool) (str
 		if msg == "" {
 			msg = "退款失败"
 		}
-		return "", fmt.Errorf(msg)
+		return "", fmt.Errorf("%s", msg)
 	}
 
 	// 计算退款金额: price * remainNum
@@ -403,7 +403,7 @@ func (s *SDXYService) PauseOrder(uid int, aggOrderId string, pause int, isAdmin 
 		if msg == "" {
 			msg = "操作失败"
 		}
-		return "", fmt.Errorf(msg)
+		return "", fmt.Errorf("%s", msg)
 	}
 
 	database.DB.Exec("UPDATE qingka_wangke_flash_sdxy SET pause = ? WHERE agg_order_id = ? LIMIT 1", pause, aggOrderId)
