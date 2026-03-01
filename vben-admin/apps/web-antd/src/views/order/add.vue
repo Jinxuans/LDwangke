@@ -5,7 +5,7 @@ import {
   Card, Button, Select, SelectOption, Input, Switch,
   Table, Checkbox, Tag, Space, Alert, Spin, Tooltip, message, Modal, Empty,
 } from 'ant-design-vue';
-import { SearchOutlined, CheckOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons-vue';
+import { SearchOutlined, CheckOutlined, HeartOutlined, HeartFilled, EditOutlined, PlusOutlined, DeleteOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons-vue';
 import { useVbenForm } from '#/adapter/form';
 import {
   getClassListApi,
@@ -17,9 +17,10 @@ import {
   type CourseQueryResult,
   type CourseItem,
 } from '#/api/class';
-import { getSiteConfigApi } from '#/api/admin';
+import { getSiteConfigApi, saveConfigApi } from '#/api/admin';
 import { getFavoritesApi, addFavoriteApi, removeFavoriteApi } from '#/api/user-center';
 import { aiReviseMultiline } from '#/utils/ai-revise';
+import { useAccessStore } from '@vben/stores';
 
 // ===== 开关状态（持久化到 localStorage） =====
 function loadSwitch(key: string, def: boolean): boolean {
@@ -59,6 +60,55 @@ const checkedCourses = ref<Array<{ userinfo: string; userName: string; data: Cou
 
 // 用户输入
 const userInfo = ref('');
+
+// ===== 推荐渠道 =====
+const accessStore = useAccessStore();
+const hasAdminRole = computed(() => {
+  const codes = accessStore.accessCodes;
+  return Array.isArray(codes) && codes.includes('admin');
+});
+
+interface RecommendChannel {
+  name: string;
+  desc: string;
+}
+
+const recommendChannels = ref<RecommendChannel[]>([]);
+const editingChannels = ref(false);
+const editChannelList = ref<RecommendChannel[]>([]);
+const savingChannels = ref(false);
+
+function startEditChannels() {
+  editChannelList.value = JSON.parse(JSON.stringify(recommendChannels.value));
+  editingChannels.value = true;
+}
+
+function cancelEditChannels() {
+  editingChannels.value = false;
+}
+
+function addChannel() {
+  editChannelList.value.push({ name: '', desc: '' });
+}
+
+function removeChannel(idx: number) {
+  editChannelList.value.splice(idx, 1);
+}
+
+async function saveChannels() {
+  const valid = editChannelList.value.filter(c => c.name.trim());
+  savingChannels.value = true;
+  try {
+    await saveConfigApi({ recommend_channels: JSON.stringify(valid) });
+    recommendChannels.value = valid;
+    editingChannels.value = false;
+    message.success('推荐渠道已保存');
+  } catch (e: any) {
+    message.error(e?.message || '保存失败');
+  } finally {
+    savingChannels.value = false;
+  }
+}
 
 // 按分类过滤的课程列表
 const filteredClassList = computed(() => {
@@ -114,6 +164,12 @@ async function loadClassData() {
       showCategory.value = cfg?.flkg !== '0';
       categoryType.value = Number(cfg?.fllx) || 0;
       xdsmopen.value = cfg?.xdsmopen === '1';
+      // 加载推荐渠道
+      if (cfg?.recommend_channels) {
+        try {
+          recommendChannels.value = JSON.parse(cfg.recommend_channels);
+        } catch { /* ignore */ }
+      }
     } catch { /* ignore */ }
 
     const [classesRaw, categoriesRaw] = await Promise.all([
@@ -303,149 +359,217 @@ onMounted(loadClassData);
 
 <template>
   <Page title="查课交单" content-class="p-4">
-    <Spin :spinning="classLoading">
-      <Card class="mb-4">
-        <!-- 顶部开关栏 -->
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-base font-semibold m-0">查课交单</h3>
-          <Space>
-            <Tooltip title="显示/隐藏分类选择">
-              <Switch v-model:checked="showCategoryToggle" checked-children="分类" un-checked-children="隐藏" @change="(v: any) => saveSwitch('order_show_cate', v)" />
-            </Tooltip>
-            <Tooltip title="切换输入模式">
-              <Switch v-model:checked="isMultiline" checked-children="多行" un-checked-children="单行" @change="(v: any) => saveSwitch('order_multiline', v)" />
-            </Tooltip>
-            <Tooltip title="若校正有误，请关闭此功能">
-              <Switch v-model:checked="aiFlag" checked-children="AI校正" un-checked-children="关闭" @change="(v: any) => saveSwitch('order_ai_flag', v)" />
-            </Tooltip>
-          </Space>
-        </div>
+    <div class="flex gap-4" style="align-items: flex-start">
+      <!-- 左侧：查课交单主区域 -->
+      <div class="min-w-0 flex-1">
+        <Spin :spinning="classLoading">
+          <Card class="mb-4">
+            <!-- 顶部开关栏 -->
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-base font-semibold m-0">查课交单</h3>
+              <Space>
+                <Tooltip title="显示/隐藏分类选择">
+                  <Switch v-model:checked="showCategoryToggle" checked-children="分类" un-checked-children="隐藏" @change="(v: any) => saveSwitch('order_show_cate', v)" />
+                </Tooltip>
+                <Tooltip title="切换输入模式">
+                  <Switch v-model:checked="isMultiline" checked-children="多行" un-checked-children="单行" @change="(v: any) => saveSwitch('order_multiline', v)" />
+                </Tooltip>
+                <Tooltip title="若校正有误，请关闭此功能">
+                  <Switch v-model:checked="aiFlag" checked-children="AI校正" un-checked-children="关闭" @change="(v: any) => saveSwitch('order_ai_flag', v)" />
+                </Tooltip>
+              </Space>
+            </div>
 
-        <!-- 分类选择 -->
-        <template v-if="showCategory && showCategoryToggle && categoryList.length > 0">
-          <div class="mb-4">
-            <label class="block text-sm text-gray-500 mb-2">选择分类</label>
-            <!-- fllx=0 按钮模式 -->
-            <div v-if="categoryType === 0" class="flex flex-wrap gap-2">
-              <Button
-                :type="activeCateId === '' ? 'primary' : 'default'"
-                size="small"
-                @click="activeCateId = ''"
-              >全部课程</Button>
-              <Button
-                :type="activeCateId === 'collect' ? 'primary' : 'default'"
-                size="small"
-                :style="{ borderColor: '#eb2f96', color: activeCateId === 'collect' ? '' : '#eb2f96' }"
-                @click="activeCateId = activeCateId === 'collect' ? '' : 'collect'"
-              >
-                <template #icon><HeartFilled /></template>
-                收藏课程
-              </Button>
-              <Button
-                v-for="cat in categoryList"
-                :key="cat.id"
-                :type="activeCateId === String(cat.id) ? 'primary' : 'default'"
-                size="small"
-                :style="cat.recommend ? { borderColor: '#722ed1', color: activeCateId === String(cat.id) ? '' : '#722ed1', fontWeight: '600' } : {}"
-                @click="activeCateId = String(cat.id)"
-              >{{ cat.name }}</Button>
-            </div>
-            <!-- fllx=1 下拉框模式 -->
-            <div v-else-if="categoryType === 1">
-              <Select
-                :value="activeCateId || undefined"
-                placeholder="选择分类"
-                allow-clear
-                style="width: 200px"
-                @change="(v: any) => activeCateId = v ? String(v) : ''"
-              >
-                <SelectOption value="collect">收藏课程</SelectOption>
-                <SelectOption v-for="cat in categoryList" :key="cat.id" :value="String(cat.id)">
-                  {{ cat.name }}
-                </SelectOption>
-              </Select>
-            </div>
-            <!-- fllx=2 单选框模式 -->
-            <div v-else class="flex flex-wrap gap-3">
-              <label class="cursor-pointer" @click="activeCateId = activeCateId === 'collect' ? '' : 'collect'">
-                <input type="radio" :checked="activeCateId === 'collect'" class="mr-1" />
-                收藏课程
-              </label>
-              <label
-                v-for="cat in categoryList"
-                :key="cat.id"
-                class="cursor-pointer"
-                @click="activeCateId = activeCateId === String(cat.id) ? '' : String(cat.id)"
-              >
-                <input type="radio" :checked="activeCateId === String(cat.id)" class="mr-1" />
-                {{ cat.name }}
-              </label>
-            </div>
-          </div>
-        </template>
+            <!-- 分类选择 -->
+            <template v-if="showCategory && showCategoryToggle && categoryList.length > 0">
+              <div class="mb-4">
+                <label class="block text-sm text-gray-500 mb-2">选择分类</label>
+                <!-- fllx=0 按钮模式 -->
+                <div v-if="categoryType === 0" class="flex flex-wrap gap-2">
+                  <Button
+                    :type="activeCateId === '' ? 'primary' : 'default'"
+                    size="small"
+                    @click="activeCateId = ''"
+                  >全部课程</Button>
+                  <Button
+                    :type="activeCateId === 'collect' ? 'primary' : 'default'"
+                    size="small"
+                    :style="{ borderColor: '#eb2f96', color: activeCateId === 'collect' ? '' : '#eb2f96' }"
+                    @click="activeCateId = activeCateId === 'collect' ? '' : 'collect'"
+                  >
+                    <template #icon><HeartFilled /></template>
+                    收藏课程
+                  </Button>
+                  <Button
+                    v-for="cat in categoryList"
+                    :key="cat.id"
+                    :type="activeCateId === String(cat.id) ? 'primary' : 'default'"
+                    size="small"
+                    :style="cat.recommend ? { borderColor: '#722ed1', color: activeCateId === String(cat.id) ? '' : '#722ed1', fontWeight: '600' } : {}"
+                    @click="activeCateId = String(cat.id)"
+                  >{{ cat.name }}</Button>
+                </div>
+                <!-- fllx=1 下拉框模式 -->
+                <div v-else-if="categoryType === 1">
+                  <Select
+                    :value="activeCateId || undefined"
+                    placeholder="选择分类"
+                    allow-clear
+                    style="width: 200px"
+                    @change="(v: any) => activeCateId = v ? String(v) : ''"
+                  >
+                    <SelectOption value="collect">收藏课程</SelectOption>
+                    <SelectOption v-for="cat in categoryList" :key="cat.id" :value="String(cat.id)">
+                      {{ cat.name }}
+                    </SelectOption>
+                  </Select>
+                </div>
+                <!-- fllx=2 单选框模式 -->
+                <div v-else class="flex flex-wrap gap-3">
+                  <label class="cursor-pointer" @click="activeCateId = activeCateId === 'collect' ? '' : 'collect'">
+                    <input type="radio" :checked="activeCateId === 'collect'" class="mr-1" />
+                    收藏课程
+                  </label>
+                  <label
+                    v-for="cat in categoryList"
+                    :key="cat.id"
+                    class="cursor-pointer"
+                    @click="activeCateId = activeCateId === String(cat.id) ? '' : String(cat.id)"
+                  >
+                    <input type="radio" :checked="activeCateId === String(cat.id)" class="mr-1" />
+                    {{ cat.name }}
+                  </label>
+                </div>
+              </div>
+            </template>
 
-        <!-- 课程选择 + 收藏按钮 -->
-        <div class="flex items-end gap-2 mb-3">
-          <div class="flex-1">
-            <OrderForm />
-          </div>
-          <Tooltip :title="isFavorite ? '取消收藏' : '添加收藏'" v-if="selectedClassId">
-            <Button
-              :type="isFavorite ? 'primary' : 'default'"
-              danger
-              @click="toggleFavorite"
-              class="mb-[24px]"
+            <!-- 课程选择 + 收藏按钮 -->
+            <div class="flex items-end gap-2 mb-3">
+              <div class="flex-1">
+                <OrderForm />
+              </div>
+              <Tooltip :title="isFavorite ? '取消收藏' : '添加收藏'" v-if="selectedClassId">
+                <Button
+                  :type="isFavorite ? 'primary' : 'default'"
+                  danger
+                  @click="toggleFavorite"
+                  class="mb-[24px]"
+                >
+                  <template #icon>
+                    <HeartFilled v-if="isFavorite" />
+                    <HeartOutlined v-else />
+                  </template>
+                  {{ isFavorite ? '已收藏' : '收藏' }}
+                </Button>
+              </Tooltip>
+            </div>
+
+            <!-- 课程说明 -->
+            <Alert
+              v-if="selectedClassTips"
+              type="warning"
+              show-icon
+              class="my-3"
             >
-              <template #icon>
-                <HeartFilled v-if="isFavorite" />
-                <HeartOutlined v-else />
+              <template #message>
+                <div class="text-sm" v-html="selectedClassTips"></div>
               </template>
-              {{ isFavorite ? '已收藏' : '收藏' }}
-            </Button>
-          </Tooltip>
-        </div>
+            </Alert>
 
-        <!-- 课程说明 -->
-        <Alert
-          v-if="selectedClassTips"
-          type="warning"
-          show-icon
-          class="my-3"
-        >
-          <template #message>
-            <div class="text-sm" v-html="selectedClassTips"></div>
+            <!-- 下单信息（单行 / 多行） -->
+            <div class="mb-4">
+              <label class="block text-sm text-gray-500 mb-1">下单信息</label>
+              <Input.TextArea
+                v-if="isMultiline"
+                v-model:value="userInfo"
+                :rows="5"
+                placeholder="下单格式：&#10;学校 账号 密码 (空格分开)&#10;例如：家里蹲大学 13872325008 123456&#10;多账号换行输入"
+                @blur="handleBlurRevise"
+              />
+              <Input
+                v-else
+                v-model:value="userInfo"
+                placeholder="单行模式：家里蹲大学 13872325008 123456"
+                @blur="handleBlurRevise"
+                @press-enter="handleQuery"
+              />
+            </div>
+
+            <!-- 操作按钮 -->
+            <Space>
+              <Button type="primary" :loading="queryLoading" @click="handleQuery">
+                <template #icon><SearchOutlined /></template>
+                立即查询
+              </Button>
+              <Tag v-if="xdsmopen" color="blue">扫码下单已开启</Tag>
+            </Space>
+          </Card>
+        </Spin>
+      </div>
+
+      <!-- 右侧：推荐渠道 -->
+      <div class="hidden lg:block" style="width: 300px; flex-shrink: 0">
+        <Card size="small" style="position: sticky; top: 16px">
+          <template #title>
+            <div class="flex items-center gap-2">
+              <span class="text-base font-semibold">{{ hasAdminRole ? '推荐渠道编辑' : '推荐渠道' }}</span>
+            </div>
           </template>
-        </Alert>
+          <template #extra v-if="hasAdminRole">
+            <Button v-if="!editingChannels" type="link" size="small" @click="startEditChannels">
+              <EditOutlined /> 编辑
+            </Button>
+            <Space v-else>
+              <Button type="link" size="small" :loading="savingChannels" @click="saveChannels">
+                <SaveOutlined /> 保存
+              </Button>
+              <Button type="link" size="small" danger @click="cancelEditChannels">
+                <CloseOutlined /> 取消
+              </Button>
+            </Space>
+          </template>
 
-        <!-- 下单信息（单行 / 多行） -->
-        <div class="mb-4">
-          <label class="block text-sm text-gray-500 mb-1">下单信息</label>
-          <Input.TextArea
-            v-if="isMultiline"
-            v-model:value="userInfo"
-            :rows="5"
-            placeholder="下单格式：&#10;学校 账号 密码 (空格分开)&#10;例如：家里蹲大学 13872325008 123456&#10;多账号换行输入"
-            @blur="handleBlurRevise"
-          />
-          <Input
-            v-else
-            v-model:value="userInfo"
-            placeholder="单行模式：家里蹲大学 13872325008 123456"
-            @blur="handleBlurRevise"
-            @press-enter="handleQuery"
-          />
-        </div>
+          <!-- 编辑模式 (管理员) -->
+          <template v-if="editingChannels && hasAdminRole">
+            <div class="space-y-3">
+              <div v-for="(ch, idx) in editChannelList" :key="idx" class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                <div class="flex items-center gap-2 mb-2">
+                  <Input v-model:value="ch.name" placeholder="渠道名称" size="small" class="flex-1" />
+                  <Button type="text" danger size="small" @click="removeChannel(idx)">
+                    <DeleteOutlined />
+                  </Button>
+                </div>
+                <Input.TextArea v-model:value="ch.desc" placeholder="渠道说明（选填）" :rows="2" size="small" />
+              </div>
+              <Button type="dashed" block @click="addChannel">
+                <PlusOutlined /> 添加渠道
+              </Button>
+            </div>
+          </template>
 
-        <!-- 操作按钮 -->
-        <Space>
-          <Button type="primary" :loading="queryLoading" @click="handleQuery">
-            <template #icon><SearchOutlined /></template>
-            立即查询
-          </Button>
-          <Tag v-if="xdsmopen" color="blue">扫码下单已开启</Tag>
-        </Space>
-      </Card>
-    </Spin>
+          <!-- 展示模式 -->
+          <template v-else>
+            <div v-if="recommendChannels.length > 0" class="space-y-3">
+              <div
+                v-for="(ch, idx) in recommendChannels"
+                :key="idx"
+                class="rounded-lg border border-blue-100 bg-blue-50/50 p-3 dark:border-blue-900 dark:bg-blue-950/30"
+              >
+                <div class="flex items-center gap-2 mb-1">
+                  <Tag color="blue" class="m-0">{{ idx + 1 }}</Tag>
+                  <span class="font-semibold text-sm text-gray-800 dark:text-gray-200">{{ ch.name }}</span>
+                </div>
+                <div v-if="ch.desc" class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed whitespace-pre-wrap">{{ ch.desc }}</div>
+              </div>
+            </div>
+            <div v-else class="flex flex-col items-center py-8 text-gray-400 dark:text-gray-500">
+              <span class="text-sm">暂无推荐渠道</span>
+              <span v-if="hasAdminRole" class="text-xs mt-1">点击右上角编辑按钮添加</span>
+            </div>
+          </template>
+        </Card>
+      </div>
+    </div>
 
     <!-- 选课弹窗 -->
     <Modal
