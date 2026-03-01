@@ -223,6 +223,9 @@ func (s *DBCompatService) getExpectedSchema() []TableDef {
 				{Name: "uid", Type: "INT(11)", NotNull: false, Default: "0"},
 				{Name: "status", Type: "VARCHAR(10)", NotNull: false, Default: "'1'"},
 				{Name: "zhiding", Type: "VARCHAR(10)", NotNull: false, Default: "'0'"},
+				{Name: "uptime", Type: "TEXT", NotNull: false},
+				{Name: "author", Type: "TEXT", NotNull: false},
+				{Name: "visibility", Type: "INT", NotNull: true, Default: "0"},
 			},
 		},
 	}

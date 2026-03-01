@@ -9,6 +9,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// YDSJEnsureTable 启动时建表
+func YDSJEnsureTable() {
+	svc := service.NewYDSJService()
+	svc.EnsureTable()
+}
+
 // ---------- 配置 ----------
 
 func YDSJConfigGet(c *gin.Context) {

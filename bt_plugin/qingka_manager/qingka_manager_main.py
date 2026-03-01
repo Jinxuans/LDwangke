@@ -1643,16 +1643,32 @@ WantedBy=multi-user.target
 
     # 关键数据表列表（init_db.sql 中所有表）
     _REQUIRED_TABLES = [
+        # 核心表
         'qingka_wangke_user', 'qingka_wangke_config', 'qingka_wangke_order',
         'qingka_wangke_class', 'qingka_wangke_fenlei', 'qingka_wangke_dengji',
         'qingka_wangke_huoyuan', 'qingka_wangke_log', 'qingka_wangke_moneylog',
-        'qingka_wangke_km', 'qingka_wangke_gongdan', 'qingka_wangke_gongdan_msg',
-        'qingka_wangke_gonggao', 'qingka_wangke_huodong', 'qingka_wangke_mijia',
-        'qingka_chat_list', 'qingka_chat_msg', 'qingka_mail',
-        'qingka_platform_config', 'qingka_dynamic_module',
+        'qingka_wangke_km', 'qingka_wangke_gonggao', 'qingka_wangke_huodong',
+        'qingka_wangke_mijia', 'qingka_wangke_pay', 'qingka_wangke_user_favorite',
+        'qingka_wangke_checkin', 'qingka_wangke_ticket', 'qingka_wangke_push_logs',
+        'qingka_wangke_huodong_record', 'qingka_wangke_zhiya_config', 'qingka_wangke_zhiya_records',
+        'qingka_wangke_sync_config', 'qingka_wangke_sync_log',
+        # 聊天/邮件
+        'qingka_chat_list', 'qingka_chat_msg', 'qingka_chat_msg_archive', 'qingka_mail',
         'qingka_smtp_config', 'qingka_email_pool', 'qingka_email_template',
         'qingka_email_log', 'qingka_email_send_log',
-        'mlsx_gslb', 'mlsx_wj_wq',
+        # 平台/模块/菜单
+        'qingka_platform_config', 'qingka_dynamic_module', 'menu_config',
+        # 商城/租户
+        'qingka_mall_pay_order', 'qingka_tenant', 'qingka_tenant_product', 'qingka_c_user',
+        # 辅助模块
+        'mlsx_gslb', 'mlsx_wj_wq', 'qingka_wangke_flash_sdxy',
+        # 打卡/运动
+        'qingka_wangke_appui', 'qingka_wangke_yfdk', 'qingka_wangke_sxdk',
+        'qingka_wangke_hzw_ydsj', 'xm_project', 'xm_order',
+        'w_app', 'w_order',
+        # 图图强国/土拨鼠
+        'tutuqg', 'qingka_wangke_dialogue',
+        'points_product', 'points_product_code', 'points_exchange_record',
     ]
 
     def _verify_tables(self, db_user, db_pass, db_name):

@@ -11,6 +11,11 @@ import (
 
 var wService = service.NewWService()
 
+// WEnsureTable 启动时建表
+func WEnsureTable() {
+	wService.EnsureTable()
+}
+
 // WGetApps 获取项目列表（用户视角）
 func WGetApps(c *gin.Context) {
 	uid := c.GetInt("uid")

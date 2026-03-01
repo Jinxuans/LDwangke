@@ -176,14 +176,8 @@ const routes: RouteRecordRaw[] = [
           order: 5,
           title: '上游对接',
         },
-        redirect: '/admin/upstream-config',
+        redirect: '/admin/mijia',
         children: [
-          {
-            name: 'AdminUpstreamConfig',
-            path: '/admin/upstream-config',
-            component: () => import('#/views/admin/upstream-config.vue'),
-            meta: { icon: 'mdi:api', order: 1, title: '对接中心' },
-          },
           {
             name: 'AdminMiJia',
             path: '/admin/mijia',

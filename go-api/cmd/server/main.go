@@ -36,6 +36,12 @@ func main() {
 	// 初始化菜单配置表
 	handler.MenuEnsureTable()
 
+	// 初始化运动世界表
+	handler.YDSJEnsureTable()
+
+	// 初始化鲸鱼运动表
+	handler.WEnsureTable()
+
 	// 初始化对接并发队列（5并发，1000缓冲）
 	// checker: 查 DB dockstatus=1 判断对接是否成功，用于准确统计 completed/failed
 	dockChecker := func(oid int64) bool {

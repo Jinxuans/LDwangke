@@ -196,6 +196,7 @@ CREATE TABLE IF NOT EXISTS `qingka_wangke_gonggao` (
   `zhiding` varchar(11) NOT NULL DEFAULT '0',
   `uptime` text,
   `author` text,
+  `visibility` int NOT NULL DEFAULT 0 COMMENT '可见范围 0全体 1直属代理',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -999,3 +1000,172 @@ INSERT IGNORE INTO `qingka_email_template` (`code`, `name`, `subject`, `content`
 ('system_notify', '系统通知', '{site_name} - {notify_title}',
  '<p style=\"color:#555;line-height:1.8;\">{notify_content}</p>',
  'site_name,notify_title,notify_content,username,email,time', 1, NOW());
+
+-- 34. 图图强国订单表
+CREATE TABLE IF NOT EXISTS `tutuqg` (
+  `oid` int NOT NULL AUTO_INCREMENT,
+  `uid` int NOT NULL,
+  `user` varchar(255) NOT NULL,
+  `pass` varchar(255) NOT NULL,
+  `kcname` varchar(255) NOT NULL,
+  `days` varchar(255) NOT NULL,
+  `ptname` varchar(255) NOT NULL,
+  `fees` varchar(255) NOT NULL,
+  `addtime` varchar(255) NOT NULL,
+  `IP` varchar(255) DEFAULT NULL,
+  `status` varchar(255) DEFAULT NULL,
+  `remarks` varchar(255) DEFAULT NULL,
+  `guid` varchar(255) DEFAULT NULL,
+  `score` varchar(255) NOT NULL,
+  `scores` varchar(255) DEFAULT NULL,
+  `zdxf` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`oid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图图强国订单表';
+
+-- 35. 小米运动项目表
+CREATE TABLE IF NOT EXISTS `xm_project` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL COMMENT '项目名称',
+  `p_id` INT DEFAULT 0 COMMENT '源项目ID',
+  `status` TINYINT DEFAULT 0 COMMENT '0上架 1下架',
+  `description` TEXT NULL COMMENT '项目说明',
+  `price` DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '单价',
+  `url` VARCHAR(255) DEFAULT NULL COMMENT '对接URL',
+  `key` VARCHAR(255) DEFAULT NULL COMMENT '对接密钥',
+  `uid` VARCHAR(255) DEFAULT NULL COMMENT '对接UID',
+  `token` VARCHAR(1024) DEFAULT NULL COMMENT '对接JWT token',
+  `type` VARCHAR(50) DEFAULT NULL COMMENT '项目类型',
+  `query` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否支持查询',
+  `password` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否需要密码',
+  `is_deleted` TINYINT DEFAULT 0 COMMENT '软删除标记',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小米运动对接项目表';
+
+-- 36. 小米运动订单表
+CREATE TABLE IF NOT EXISTS `xm_order` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `y_oid` BIGINT DEFAULT NULL COMMENT '源订单ID',
+  `user_id` BIGINT NOT NULL COMMENT '用户ID',
+  `school` VARCHAR(255) NOT NULL COMMENT '学校名称',
+  `account` VARCHAR(255) NOT NULL COMMENT '账号',
+  `password` VARCHAR(255) NOT NULL COMMENT '密码',
+  `type` INT DEFAULT NULL COMMENT '跑步类型',
+  `project_id` BIGINT NOT NULL COMMENT '项目ID',
+  `status` VARCHAR(50) NOT NULL COMMENT '订单状态',
+  `total_km` INT NOT NULL COMMENT '下单总公里数',
+  `run_km` FLOAT DEFAULT NULL COMMENT '已跑公里',
+  `run_date` JSON NOT NULL COMMENT '跑步日期',
+  `start_day` DATE NOT NULL COMMENT '开始日期',
+  `start_time` VARCHAR(5) NOT NULL COMMENT '每日开始时间',
+  `end_time` VARCHAR(5) NOT NULL COMMENT '每日结束时间',
+  `deduction` DECIMAL(18,2) DEFAULT 0 COMMENT '扣费金额',
+  `is_deleted` TINYINT(1) DEFAULT 0 COMMENT '软删除标记',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_is_deleted` (`is_deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小米运动跑步订单表';
+
+-- 37. 土拨鼠论文订单表
+CREATE TABLE IF NOT EXISTS `qingka_wangke_dialogue` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `uid` int NOT NULL,
+  `title` varchar(255) NOT NULL DEFAULT '',
+  `state` varchar(50) NOT NULL DEFAULT '',
+  `download_url` varchar(500) NOT NULL DEFAULT '',
+  `addtime` varchar(50) NOT NULL DEFAULT '',
+  `ip` varchar(50) NOT NULL DEFAULT '',
+  `source_id` bigint NOT NULL DEFAULT 0,
+  `dialogue_id` varchar(255) NOT NULL DEFAULT '',
+  `point` decimal(10,2) NOT NULL DEFAULT 0,
+  `type` varchar(50) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  KEY `idx_uid` (`uid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='土拨鼠论文订单表';
+
+-- 35. 鲸鱼运动项目表
+CREATE TABLE IF NOT EXISTS `w_app` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL COMMENT '项目名称',
+  `code` VARCHAR(50) NOT NULL COMMENT '项目代码',
+  `org_app_id` VARCHAR(10) NOT NULL COMMENT '源项目ID',
+  `status` TINYINT DEFAULT 0 COMMENT '0上架 1下架',
+  `description` TEXT NULL COMMENT '项目说明',
+  `price` DECIMAL(18,2) NOT NULL DEFAULT 1 COMMENT '单价',
+  `cac_type` VARCHAR(2) NOT NULL COMMENT 'TS按次 KM按公里',
+  `url` VARCHAR(255) NOT NULL COMMENT '对接URL',
+  `key` VARCHAR(255) DEFAULT NULL COMMENT '对接密钥',
+  `uid` VARCHAR(255) DEFAULT NULL COMMENT '对接UID',
+  `token` VARCHAR(1024) DEFAULT NULL COMMENT '源台token',
+  `type` VARCHAR(50) NOT NULL COMMENT '项目类型',
+  `deleted` TINYINT DEFAULT 0 COMMENT '软删除',
+  `created` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='W对接项目表';
+
+-- 36. 鲸鱼运动订单表
+CREATE TABLE IF NOT EXISTS `w_order` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `agg_order_id` VARCHAR(10) DEFAULT NULL UNIQUE COMMENT 'W源台订单ID',
+  `user_id` BIGINT NOT NULL COMMENT '用户ID',
+  `school` VARCHAR(255) DEFAULT NULL COMMENT '学校名称',
+  `account` VARCHAR(255) NOT NULL COMMENT '账号',
+  `password` VARCHAR(255) NOT NULL COMMENT '密码',
+  `app_id` BIGINT NOT NULL COMMENT '项目ID',
+  `status` VARCHAR(50) NOT NULL COMMENT '订单状态',
+  `num` INT NOT NULL COMMENT '次数',
+  `cost` DECIMAL(18,2) DEFAULT 0 COMMENT '金额',
+  `pause` TINYINT(1) DEFAULT 0 COMMENT '是否暂停',
+  `sub_order` JSON DEFAULT NULL COMMENT '子订单',
+  `deleted` TINYINT(1) DEFAULT 0 COMMENT '软删除',
+  `created` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_deleted` (`deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='W跑步订单表';
+
+-- 40. 积分商品表
+CREATE TABLE IF NOT EXISTS `points_product` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL,
+  `description` TEXT,
+  `image_url` VARCHAR(500),
+  `price` DECIMAL(10,2) NOT NULL,
+  `status` ENUM('ENABLED','DISABLED') NOT NULL DEFAULT 'ENABLED',
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分商品表';
+
+-- 41. 积分商品兑换码表
+CREATE TABLE IF NOT EXISTS `points_product_code` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `product_id` INT NOT NULL,
+  `code` VARCHAR(500) NOT NULL,
+  `status` ENUM('AVAILABLE','EXCHANGED') NOT NULL DEFAULT 'AVAILABLE',
+  `exchanged_by` INT DEFAULT NULL,
+  `exchanged_at` DATETIME DEFAULT NULL,
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_product_status` (`product_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分商品兑换码';
+
+-- 42. 积分兑换记录表
+CREATE TABLE IF NOT EXISTS `points_exchange_record` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `uid` INT NOT NULL,
+  `product_id` INT NOT NULL,
+  `product_name` VARCHAR(255) NOT NULL,
+  `code_id` INT NOT NULL,
+  `code` VARCHAR(500) NOT NULL,
+  `points_cost` DECIMAL(10,2) NOT NULL,
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_uid` (`uid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分兑换记录表';

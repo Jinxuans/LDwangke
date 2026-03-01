@@ -72,6 +72,56 @@ func NewWService() *WService {
 	}
 }
 
+// EnsureTable 确保鲸鱼运动相关表存在
+func (s *WService) EnsureTable() {
+	_, err := database.DB.Exec(`CREATE TABLE IF NOT EXISTS w_app (
+		id BIGINT NOT NULL AUTO_INCREMENT,
+		name VARCHAR(255) NOT NULL COMMENT '项目名称',
+		code VARCHAR(50) NOT NULL COMMENT '项目代码',
+		org_app_id VARCHAR(10) NOT NULL COMMENT '源项目ID',
+		status TINYINT DEFAULT 0 COMMENT '0上架 1下架',
+		description TEXT NULL COMMENT '项目说明',
+		price DECIMAL(18,2) NOT NULL DEFAULT 1 COMMENT '单价',
+		cac_type VARCHAR(2) NOT NULL COMMENT 'TS按次 KM按公里',
+		url VARCHAR(255) NOT NULL COMMENT '对接URL',
+		` + "`key`" + ` VARCHAR(255) DEFAULT NULL COMMENT '对接密钥',
+		uid VARCHAR(255) DEFAULT NULL COMMENT '对接UID',
+		token VARCHAR(1024) DEFAULT NULL COMMENT '源台token',
+		type VARCHAR(50) NOT NULL COMMENT '项目类型',
+		deleted TINYINT DEFAULT 0 COMMENT '软删除',
+		created DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		PRIMARY KEY (id)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='W对接项目表'`)
+	if err != nil {
+		fmt.Printf("[W] 建 w_app 表失败: %v\n", err)
+	}
+
+	_, err = database.DB.Exec(`CREATE TABLE IF NOT EXISTS w_order (
+		id BIGINT NOT NULL AUTO_INCREMENT,
+		agg_order_id VARCHAR(10) DEFAULT NULL UNIQUE COMMENT 'W源台订单ID',
+		user_id BIGINT NOT NULL COMMENT '用户ID',
+		school VARCHAR(255) DEFAULT NULL COMMENT '学校名称',
+		account VARCHAR(255) NOT NULL COMMENT '账号',
+		password VARCHAR(255) NOT NULL COMMENT '密码',
+		app_id BIGINT NOT NULL COMMENT '项目ID',
+		status VARCHAR(50) NOT NULL COMMENT '订单状态',
+		num INT NOT NULL COMMENT '次数',
+		cost DECIMAL(18,2) DEFAULT 0 COMMENT '金额',
+		pause TINYINT(1) DEFAULT 0 COMMENT '是否暂停',
+		sub_order JSON DEFAULT NULL COMMENT '子订单',
+		deleted TINYINT(1) DEFAULT 0 COMMENT '软删除',
+		created DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		PRIMARY KEY (id),
+		KEY idx_user_id (user_id),
+		KEY idx_deleted (deleted)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='W跑步订单表'`)
+	if err != nil {
+		fmt.Printf("[W] 建 w_order 表失败: %v\n", err)
+	}
+}
+
 // ---------- HTTP 工具 ----------
 
 func (s *WService) httpReq(method, reqURL string, body interface{}, headers map[string]string) (map[string]interface{}, error) {
