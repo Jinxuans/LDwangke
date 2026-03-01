@@ -342,7 +342,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
       <!-- 左右两栏布局 -->
       <div class="flex flex-col lg:flex-row gap-3 lg:items-stretch">
         <!-- 左侧：主内容区，占满剩余宽度 -->
-        <div class="min-w-0 flex-1 order-2 lg:order-1">
+        <div class="min-w-0 flex-1 order-1">
           <!-- 统计卡片 -->
           <Row :gutter="[8, 8]">
             <!-- 卡片 1: 账户余额 -->
@@ -579,7 +579,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
         </div>
 
         <!-- 右侧：侧边栏 (公告 + 排行等) -->
-        <div class="flex flex-col gap-3 w-full lg:w-[300px] lg:flex-shrink-0 order-1 lg:order-2">
+        <div class="flex flex-col gap-3 w-full lg:w-[300px] lg:flex-shrink-0 order-2">
           <!-- 公告卡片 -->
           <Card size="small" :body-style="{ padding: '8px 12px' }">
             <template #title>
