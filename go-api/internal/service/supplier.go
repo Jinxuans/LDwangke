@@ -596,20 +596,36 @@ func (s *SupplierService) callSupplierQuery(sup *model.SupplierFull, cls *model.
 		return nil, fmt.Errorf("读取响应失败：%v", err)
 	}
 
-	var raw struct {
-		Code     interface{}        `json:"code"`
-		Msg      string             `json:"msg"`
-		UserName string             `json:"userName"`
-		Data     []model.CourseItem `json:"data"`
-	}
+	var raw map[string]interface{}
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("解析响应失败：%s", string(body))
 	}
 
+	msg, _ := raw["msg"].(string)
+	userName, _ := raw["userName"].(string)
+
+	var items []model.CourseItem
+	if dataArr, ok := raw["data"].([]interface{}); ok {
+		for _, item := range dataArr {
+			if m, ok := item.(map[string]interface{}); ok {
+				items = append(items, model.CourseItem{
+					ID:             toString(m["id"]),
+					Name:           toString(m["name"]),
+					KCJS:           toString(m["kcjs"]),
+					StudyStartTime: toString(m["studyStartTime"]),
+					StudyEndTime:   toString(m["studyEndTime"]),
+					ExamStartTime:  toString(m["examStartTime"]),
+					ExamEndTime:    toString(m["examEndTime"]),
+					Complete:       toString(m["complete"]),
+				})
+			}
+		}
+	}
+
 	return &model.SupplierQueryResult{
-		Msg:      raw.Msg,
-		UserName: raw.UserName,
-		Data:     raw.Data,
+		Msg:      msg,
+		UserName: userName,
+		Data:     items,
 	}, nil
 }
 
