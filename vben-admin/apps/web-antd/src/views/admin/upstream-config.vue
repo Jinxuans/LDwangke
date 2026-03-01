@@ -104,6 +104,7 @@ const sdxySaving = ref(false);
 // 运动世界
 const ydsjConfig = reactive<YDSJConfig>({
   base_url: '',
+  token: '',
   uid: '',
   key: '',
   price_multiple: 5,
@@ -582,13 +583,10 @@ onMounted(() => {
                   </template>
                   <Form layout="vertical" :colon="false">
                     <FormItem label="API 地址">
-                      <Input v-model:value="ydsjConfig.base_url" placeholder="https://..." />
+                      <Input v-model:value="ydsjConfig.base_url" placeholder="http://103.149.27.248:5000" />
                     </FormItem>
-                    <FormItem label="上游 UID">
-                      <Input v-model:value="ydsjConfig.uid" placeholder="请输入 UID" />
-                    </FormItem>
-                    <FormItem label="密钥">
-                      <Input.Password v-model:value="ydsjConfig.key" placeholder="请输入密钥" />
+                    <FormItem label="Bearer Token">
+                      <Input.Password v-model:value="ydsjConfig.token" placeholder="请输入上游 Bearer Token" />
                     </FormItem>
                     <Row :gutter="12">
                       <Col :span="12">

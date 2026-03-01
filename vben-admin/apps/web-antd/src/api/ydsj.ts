@@ -2,6 +2,7 @@ import { requestClient } from '#/api/request';
 
 export interface YDSJConfig {
   base_url: string;
+  token: string;
   uid: string;
   key: string;
   price_multiple: number;

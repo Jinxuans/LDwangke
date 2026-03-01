@@ -1,11 +1,15 @@
 package service
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	"go-api/internal/database"
@@ -17,9 +21,10 @@ var ydsjSchoolsJSON []byte
 // ---------- 数据结构 ----------
 
 type YDSJConfig struct {
-	BaseURL          string  `json:"base_url"`           // 上游API地址
-	UID              string  `json:"uid"`                // 上游用户UID
-	Key              string  `json:"key"`                // 上游密钥
+	BaseURL          string  `json:"base_url"`           // 上游API地址 如 http://103.149.27.248:5000
+	Token            string  `json:"token"`              // 上游 Bearer Token
+	UID              string  `json:"uid"`                // (旧字段，保留兼容)
+	Key              string  `json:"key"`                // (旧字段，保留兼容)
 	PriceMultiple    float64 `json:"price_multiple"`     // 运动世界价格倍率
 	XbdMorningPrice  float64 `json:"xbd_morning_price"`  // 小步点晨跑价格
 	XbdExercisePrice float64 `json:"xbd_exercise_price"` // 小步点课外跑价格
@@ -117,9 +122,65 @@ func (s *YDSJService) EnsureTable() {
 	}
 }
 
+// ---------- 上游 HTTP 工具 ----------
+
+// ydsjRequest 向上游发起带 Bearer Token 的请求
+func (s *YDSJService) ydsjRequest(method, urlPath string, body interface{}) ([]byte, error) {
+	cfg, err := s.GetConfig()
+	if err != nil || cfg.BaseURL == "" || cfg.Token == "" {
+		return nil, fmt.Errorf("运动世界未配置上游接口或Token")
+	}
+	return s.ydsjRequestWithCfg(cfg, method, urlPath, body)
+}
+
+func (s *YDSJService) ydsjRequestWithCfg(cfg *YDSJConfig, method, urlPath string, body interface{}) ([]byte, error) {
+	var reqBody io.Reader
+	if body != nil {
+		data, _ := json.Marshal(body)
+		reqBody = bytes.NewReader(data)
+	}
+
+	fullURL := strings.TrimRight(cfg.BaseURL, "/") + urlPath
+	req, err := http.NewRequest(method, fullURL, reqBody)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("上游请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
+}
+
 // ---------- 学校列表 ----------
 
 func (s *YDSJService) GetSchools() ([]map[string]interface{}, error) {
+	cfg, err := s.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// 优先从上游 API 获取
+	if cfg.BaseURL != "" && cfg.Token != "" {
+		respBody, err := s.ydsjRequestWithCfg(cfg, "GET", "/user/getSchool", nil)
+		if err == nil {
+			var schools []map[string]interface{}
+			if json.Unmarshal(respBody, &schools) == nil && len(schools) > 0 {
+				return schools, nil
+			}
+		} else {
+			log.Printf("[YDSJ] 上游学校列表请求失败: %v，回退本地", err)
+		}
+	}
+
+	// 回退: 读取本地嵌入 JSON
 	var wrapper struct {
 		Data []map[string]interface{} `json:"data"`
 	}
@@ -244,12 +305,28 @@ func (s *YDSJService) ListOrders(uid int, isAdmin bool, page, limit int, searchT
 	return orders, total, nil
 }
 
+// weekNumToNames 将 "1,2,3,4,5" 转换为 ["周一","周二",...]
+func weekNumToNames(runWeek string) []string {
+	nameMap := map[string]string{"1": "周一", "2": "周二", "3": "周三", "4": "周四", "5": "周五", "6": "周六", "7": "周日"}
+	var names []string
+	for _, w := range strings.Split(runWeek, ",") {
+		w = strings.TrimSpace(w)
+		if n, ok := nameMap[w]; ok {
+			names = append(names, n)
+		}
+	}
+	if len(names) == 0 {
+		names = []string{"周一", "周二", "周三", "周四", "周五", "周六", "周日"}
+	}
+	return names
+}
+
 // ---------- 下单 ----------
 
 func (s *YDSJService) AddOrder(uid int, form map[string]interface{}) (string, error) {
 	cfg, err := s.GetConfig()
-	if err != nil || cfg.BaseURL == "" {
-		return "", fmt.Errorf("运动世界未配置上游接口")
+	if err != nil || cfg.BaseURL == "" || cfg.Token == "" {
+		return "", fmt.Errorf("运动世界未配置上游接口或Token")
 	}
 
 	school := mapGetString(form, "school")
@@ -281,41 +358,50 @@ func (s *YDSJService) AddOrder(uid int, form map[string]interface{}) (string, er
 		return "", fmt.Errorf("余额不足，需要 %.2f 元，当前余额 %.2f 元", totalFee, balance)
 	}
 
-	// 上游下单
-	formData := map[string]string{
-		"login_uid":    cfg.UID,
-		"login_key":    cfg.Key,
-		"act":          "add",
-		"school":       school,
-		"user":         user,
-		"pass":         pass,
-		"distance":     distance,
-		"run_type":     fmt.Sprintf("%d", runType),
-		"start_hour":   startHour,
-		"start_minute": startMinute,
-		"end_hour":     endHour,
-		"end_minute":   endMinute,
-		"run_week":     runWeek,
+	if school == "" {
+		school = "自动识别"
 	}
 
-	resp, err := httpPostForm(cfg.BaseURL+"/ydsj/api.php", formData, 30)
+	// 上游下单（新API格式）
+	upstreamBody := map[string]interface{}{
+		"xh":          user,
+		"password":    pass,
+		"schoolName":  school,
+		"when":        weekNumToNames(runWeek),
+		"km":          distance,
+		"startHour":   startHour,
+		"startMinute": startMinute,
+		"endHour":     endHour,
+		"endMinute":   endMinute,
+		"bz":          "",
+		"runType":     runType,
+		"reservation": 0,
+	}
+
+	respBody, err := s.ydsjRequestWithCfg(cfg, "POST", "/order/submitOrder", upstreamBody)
 	if err != nil {
 		return "", fmt.Errorf("上游请求失败: %v", err)
 	}
 
 	var result map[string]interface{}
-	json.Unmarshal(resp, &result)
+	json.Unmarshal(respBody, &result)
 
-	code := int(mapGetFloat(result, "code"))
-	if code != 0 && code != 1 {
-		msg := mapGetString(result, "msg")
+	success, _ := result["success"].(bool)
+	msg := mapGetString(result, "msg")
+	if !success {
 		if msg == "" {
 			msg = "上游下单失败"
 		}
 		return "", fmt.Errorf("%s", msg)
 	}
 
-	yid := mapGetString(result, "yid")
+	// 从上游响应中提取订单ID
+	yid := ""
+	if data, ok := result["data"].(map[string]interface{}); ok {
+		if oid, ok := data["orderid"]; ok {
+			yid = fmt.Sprintf("%v", oid)
+		}
+	}
 
 	// 扣费
 	database.DB.Exec("UPDATE qingka_wangke_user SET money = money - ? WHERE uid = ?", totalFee, uid)
