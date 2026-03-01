@@ -1,11 +1,12 @@
 <script lang="ts" setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  Card, Table, InputNumber, Switch, Button, Tabs, TabPane, Tag, Space, message, Spin,
+  InputNumber, Switch, Button, Tabs, TabPane, Tag, Space, message, Spin, Input, Tooltip,
 } from 'ant-design-vue';
-import { ReloadOutlined, SaveOutlined, MenuOutlined } from '@ant-design/icons-vue';
+import { ReloadOutlined, SaveOutlined, UpOutlined, DownOutlined, EditOutlined, CheckOutlined } from '@ant-design/icons-vue';
 import { Page } from '@vben/common-ui';
+import { IconifyIcon } from '@vben/icons';
 import { getMenuConfigs, saveMenuConfigs } from '#/api/menu-config';
 import type { MenuConfigItem } from '#/api/menu-config';
 
@@ -224,44 +225,21 @@ function moveDown(list: MenuRow[], index: number) {
   list.splice(index, 2, next, current);
 }
 
-const frontendColumns = computed(() => [
-  {
-    title: '菜单名称',
-    dataIndex: 'title',
-    key: 'title',
-    width: 200,
-  },
-  {
-    title: '路由 Key',
-    dataIndex: 'menu_key',
-    key: 'menu_key',
-    width: 180,
-  },
-  {
-    title: '图标',
-    dataIndex: 'icon',
-    key: 'icon',
-    width: 160,
-    ellipsis: true,
-  },
-  {
-    title: '排序',
-    dataIndex: 'sort_order',
-    key: 'sort_order',
-    width: 120,
-  },
-  {
-    title: '显示',
-    dataIndex: 'visible',
-    key: 'visible',
-    width: 80,
-  },
-  {
-    title: '操作',
-    key: 'action',
-    width: 120,
-  },
-]);
+// 编辑标题
+const editingKey = ref<string>('');
+const editingTitle = ref('');
+
+function startEditTitle(item: MenuRow) {
+  editingKey.value = item.menu_key;
+  editingTitle.value = item.title;
+}
+function confirmEditTitle(item: MenuRow) {
+  item.title = editingTitle.value;
+  editingKey.value = '';
+}
+function cancelEditTitle() {
+  editingKey.value = '';
+}
 
 onMounted(loadData);
 </script>
@@ -283,98 +261,159 @@ onMounted(loadData);
 
     <Spin :spinning="loading">
       <Tabs v-model:activeKey="activeTab">
+        <!-- ===== 前台菜单 ===== -->
         <TabPane key="frontend" tab="前台菜单">
-          <Card :bordered="false">
-            <Table
-              :columns="frontendColumns"
-              :dataSource="frontendMenus"
-              :pagination="false"
-              rowKey="menu_key"
-              size="middle"
+          <div class="space-y-2">
+            <div
+              v-for="(item, index) in frontendMenus"
+              :key="item.menu_key"
+              class="group rounded-lg border bg-white p-3 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+              :class="[
+                item.level === 0 ? 'border-blue-200 dark:border-blue-800' : 'border-gray-200 ml-8',
+                item.visible === 0 ? 'opacity-50' : '',
+              ]"
             >
-              <template #bodyCell="{ column, record, index }">
-                <template v-if="column.key === 'title'">
-                  <span :style="{ paddingLeft: record.level * 24 + 'px' }">
-                    <Tag v-if="record.level === 0" color="blue">顶级</Tag>
-                    <Tag v-else-if="record.level === 1" color="green">子级</Tag>
-                    {{ record.title }}
-                  </span>
-                </template>
-                <template v-else-if="column.key === 'icon'">
-                  <span class="text-xs text-gray-400">{{ record.icon || '-' }}</span>
-                </template>
-                <template v-else-if="column.key === 'sort_order'">
-                  <InputNumber
-                    v-model:value="record.sort_order"
-                    :min="-99"
-                    :max="999"
-                    size="small"
-                    style="width: 80px"
-                  />
-                </template>
-                <template v-else-if="column.key === 'visible'">
+              <div class="flex items-center gap-3">
+                <!-- 图标 -->
+                <div
+                  class="flex h-9 w-9 items-center justify-center rounded-lg text-lg"
+                  :class="item.level === 0 ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-50 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+                >
+                  <IconifyIcon v-if="item.icon" :icon="item.icon" :style="{ fontSize: '18px' }" />
+                  <span v-else class="text-sm">-</span>
+                </div>
+
+                <!-- 标题 + key -->
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <Tag v-if="item.level === 0" color="blue" class="m-0" style="font-size:11px">顶级</Tag>
+                    <Tag v-else color="green" class="m-0" style="font-size:11px">子级</Tag>
+                    <!-- 内联编辑标题 -->
+                    <template v-if="editingKey === item.menu_key">
+                      <Input v-model:value="editingTitle" size="small" style="width:140px" @press-enter="confirmEditTitle(item)" />
+                      <Button type="link" size="small" @click="confirmEditTitle(item)"><CheckOutlined /></Button>
+                      <Button type="link" size="small" danger @click="cancelEditTitle">取消</Button>
+                    </template>
+                    <template v-else>
+                      <span class="font-medium text-sm text-gray-800 dark:text-gray-200">{{ item.title }}</span>
+                      <Tooltip title="编辑标题">
+                        <EditOutlined class="cursor-pointer text-gray-300 hover:text-blue-500 transition-colors text-xs" @click="startEditTitle(item)" />
+                      </Tooltip>
+                    </template>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-0.5 font-mono">{{ item.menu_key }}</div>
+                </div>
+
+                <!-- 排序 -->
+                <div class="flex items-center gap-1">
+                  <span class="text-xs text-gray-400 mr-1 hidden sm:inline">排序</span>
+                  <InputNumber v-model:value="item.sort_order" :min="-99" :max="999" size="small" style="width:70px" />
+                </div>
+
+                <!-- 显示开关 -->
+                <Tooltip :title="item.visible === 1 ? '点击隐藏' : '点击显示'">
                   <Switch
-                    :checked="record.visible === 1"
-                    @change="(val: boolean) => (record.visible = val ? 1 : 0)"
+                    :checked="item.visible === 1"
+                    @change="(val: boolean) => (item.visible = val ? 1 : 0)"
                     size="small"
+                    :checked-children="'显'"
+                    :un-checked-children="'隐'"
                   />
-                </template>
-                <template v-else-if="column.key === 'action'">
-                  <Space size="small">
-                    <Button size="small" @click="moveUp(frontendMenus, index)" :disabled="index === 0">↑</Button>
-                    <Button size="small" @click="moveDown(frontendMenus, index)" :disabled="index === frontendMenus.length - 1">↓</Button>
-                  </Space>
-                </template>
-              </template>
-            </Table>
-          </Card>
+                </Tooltip>
+
+                <!-- 排序按钮 -->
+                <Space size="small">
+                  <Tooltip title="上移">
+                    <Button size="small" shape="circle" :disabled="index === 0" @click="moveUp(frontendMenus, index)">
+                      <template #icon><UpOutlined /></template>
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title="下移">
+                    <Button size="small" shape="circle" :disabled="index === frontendMenus.length - 1" @click="moveDown(frontendMenus, index)">
+                      <template #icon><DownOutlined /></template>
+                    </Button>
+                  </Tooltip>
+                </Space>
+              </div>
+            </div>
+          </div>
         </TabPane>
 
+        <!-- ===== 后台菜单 ===== -->
         <TabPane key="backend" tab="后台菜单">
-          <Card :bordered="false">
-            <Table
-              :columns="frontendColumns"
-              :dataSource="backendMenus"
-              :pagination="false"
-              rowKey="menu_key"
-              size="middle"
+          <div class="space-y-2">
+            <div
+              v-for="(item, index) in backendMenus"
+              :key="item.menu_key"
+              class="group rounded-lg border bg-white p-3 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+              :class="[
+                item.level === 1 ? 'border-indigo-200 dark:border-indigo-800' : 'border-gray-200 ml-8',
+                item.visible === 0 ? 'opacity-50' : '',
+              ]"
             >
-              <template #bodyCell="{ column, record, index }">
-                <template v-if="column.key === 'title'">
-                  <span :style="{ paddingLeft: record.level * 24 + 'px' }">
-                    <Tag v-if="record.level === 1" color="blue">分组</Tag>
-                    <Tag v-else-if="record.level === 2" color="green">子级</Tag>
-                    {{ record.title }}
-                  </span>
-                </template>
-                <template v-else-if="column.key === 'icon'">
-                  <span class="text-xs text-gray-400">{{ record.icon || '-' }}</span>
-                </template>
-                <template v-else-if="column.key === 'sort_order'">
-                  <InputNumber
-                    v-model:value="record.sort_order"
-                    :min="-99"
-                    :max="999"
-                    size="small"
-                    style="width: 80px"
-                  />
-                </template>
-                <template v-else-if="column.key === 'visible'">
+              <div class="flex items-center gap-3">
+                <!-- 图标 -->
+                <div
+                  class="flex h-9 w-9 items-center justify-center rounded-lg text-lg"
+                  :class="item.level === 1 ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-50 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+                >
+                  <IconifyIcon v-if="item.icon" :icon="item.icon" :style="{ fontSize: '18px' }" />
+                  <span v-else class="text-sm">-</span>
+                </div>
+
+                <!-- 标题 + key -->
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <Tag v-if="item.level === 1" color="blue" class="m-0" style="font-size:11px">分组</Tag>
+                    <Tag v-else color="green" class="m-0" style="font-size:11px">子级</Tag>
+                    <template v-if="editingKey === item.menu_key">
+                      <Input v-model:value="editingTitle" size="small" style="width:140px" @press-enter="confirmEditTitle(item)" />
+                      <Button type="link" size="small" @click="confirmEditTitle(item)"><CheckOutlined /></Button>
+                      <Button type="link" size="small" danger @click="cancelEditTitle">取消</Button>
+                    </template>
+                    <template v-else>
+                      <span class="font-medium text-sm text-gray-800 dark:text-gray-200">{{ item.title }}</span>
+                      <Tooltip title="编辑标题">
+                        <EditOutlined class="cursor-pointer text-gray-300 hover:text-blue-500 transition-colors text-xs" @click="startEditTitle(item)" />
+                      </Tooltip>
+                    </template>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-0.5 font-mono">{{ item.menu_key }}</div>
+                </div>
+
+                <!-- 排序 -->
+                <div class="flex items-center gap-1">
+                  <span class="text-xs text-gray-400 mr-1 hidden sm:inline">排序</span>
+                  <InputNumber v-model:value="item.sort_order" :min="-99" :max="999" size="small" style="width:70px" />
+                </div>
+
+                <!-- 显示开关 -->
+                <Tooltip :title="item.visible === 1 ? '点击隐藏' : '点击显示'">
                   <Switch
-                    :checked="record.visible === 1"
-                    @change="(val: boolean) => (record.visible = val ? 1 : 0)"
+                    :checked="item.visible === 1"
+                    @change="(val: boolean) => (item.visible = val ? 1 : 0)"
                     size="small"
+                    :checked-children="'显'"
+                    :un-checked-children="'隐'"
                   />
-                </template>
-                <template v-else-if="column.key === 'action'">
-                  <Space size="small">
-                    <Button size="small" @click="moveUp(backendMenus, index)" :disabled="index === 0">↑</Button>
-                    <Button size="small" @click="moveDown(backendMenus, index)" :disabled="index === backendMenus.length - 1">↓</Button>
-                  </Space>
-                </template>
-              </template>
-            </Table>
-          </Card>
+                </Tooltip>
+
+                <!-- 排序按钮 -->
+                <Space size="small">
+                  <Tooltip title="上移">
+                    <Button size="small" shape="circle" :disabled="index === 0" @click="moveUp(backendMenus, index)">
+                      <template #icon><UpOutlined /></template>
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title="下移">
+                    <Button size="small" shape="circle" :disabled="index === backendMenus.length - 1" @click="moveDown(backendMenus, index)">
+                      <template #icon><DownOutlined /></template>
+                    </Button>
+                  </Tooltip>
+                </Space>
+              </div>
+            </div>
+          </div>
         </TabPane>
       </Tabs>
     </Spin>

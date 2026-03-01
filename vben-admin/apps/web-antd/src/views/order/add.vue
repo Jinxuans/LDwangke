@@ -359,9 +359,9 @@ onMounted(loadClassData);
 
 <template>
   <Page title="查课交单" content-class="p-4">
-    <div class="flex gap-4" style="align-items: flex-start">
+    <div class="flex flex-col lg:flex-row gap-4" style="align-items: flex-start">
       <!-- 左侧：查课交单主区域 -->
-      <div class="min-w-0 flex-1">
+      <div class="w-full lg:flex-1 lg:min-w-0">
         <Spin :spinning="classLoading">
           <Card class="mb-4">
             <!-- 顶部开关栏 -->
@@ -508,7 +508,7 @@ onMounted(loadClassData);
       </div>
 
       <!-- 右侧：推荐渠道 -->
-      <div class="hidden lg:block" style="width: 300px; flex-shrink: 0">
+      <div class="w-full lg:w-[300px]" style="flex-shrink: 0">
         <Card size="small" style="position: sticky; top: 16px">
           <template #title>
             <div class="flex items-center gap-2">
