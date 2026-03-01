@@ -157,3 +157,18 @@ export async function longlongToolSyncApi() {
 export async function getLonglongToolStatusApi() {
   return requestClient.get<LonglongToolStatus>('/admin/longlong-tool/status');
 }
+
+export interface LonglongCLICheck {
+  installed: boolean;
+  path: string;
+  os: string;
+  message: string;
+}
+
+export async function longlongToolCheckCLIApi() {
+  return requestClient.get<LonglongCLICheck>('/admin/longlong-tool/cli-check');
+}
+
+export async function longlongToolInstallCLIApi() {
+  return requestClient.post<{ msg: string }>('/admin/longlong-tool/cli-install');
+}

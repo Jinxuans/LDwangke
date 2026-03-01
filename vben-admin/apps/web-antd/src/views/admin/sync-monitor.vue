@@ -9,15 +9,16 @@ import {
 import {
   SyncOutlined, SettingOutlined, FileTextOutlined, PlayCircleOutlined,
   EyeOutlined, CheckCircleOutlined, WarningOutlined, QuestionCircleOutlined,
-  ToolOutlined, ThunderboltOutlined, SaveOutlined,
+  ToolOutlined, ThunderboltOutlined, SaveOutlined, DownloadOutlined,
 } from '@ant-design/icons-vue';
 import {
   getSyncConfigApi, saveSyncConfigApi, syncPreviewApi, syncExecuteApi,
   getSyncLogsApi, getMonitoredSuppliersApi, getAutoSyncStatusApi,
   getLonglongToolConfigApi, saveLonglongToolConfigApi,
   longlongToolSyncApi, getLonglongToolStatusApi,
+  longlongToolCheckCLIApi, longlongToolInstallCLIApi,
   type SyncConfig, type SyncPreviewResult, type SyncLogItem, type MonitoredSupplier,
-  type AutoSyncStatus, type LonglongToolConfig, type LonglongToolStatus,
+  type AutoSyncStatus, type LonglongToolConfig, type LonglongToolStatus, type LonglongCLICheck,
 } from '#/api/sync-monitor';
 import { getSupplierListApi, type SupplierItem } from '#/api/admin';
 
@@ -216,16 +217,20 @@ const llLoading = ref(false);
 const llSaving = ref(false);
 const llSyncing = ref(false);
 const llStatus = ref<Partial<LonglongToolStatus>>({});
+const llCLI = ref<Partial<LonglongCLICheck>>({});
+const llInstalling = ref(false);
 
 async function loadLonglongConfig() {
   llLoading.value = true;
   try {
-    const [cfgRes, statusRes] = await Promise.all([
+    const [cfgRes, statusRes, cliRes] = await Promise.all([
       getLonglongToolConfigApi(),
       getLonglongToolStatusApi(),
+      longlongToolCheckCLIApi(),
     ]);
     Object.assign(llConfig.value, cfgRes);
     Object.assign(llStatus.value, statusRes);
+    Object.assign(llCLI.value, cliRes);
   } catch (e) { console.error(e); }
   finally { llLoading.value = false; }
 }
@@ -256,6 +261,17 @@ async function refreshLLStatus() {
     const st = await getLonglongToolStatusApi();
     Object.assign(llStatus.value, st);
   } catch (e) { console.error(e); }
+}
+
+async function installLonglongCLI() {
+  llInstalling.value = true;
+  try {
+    const res = await longlongToolInstallCLIApi();
+    message.success(res?.msg || '安装成功');
+    const cliRes = await longlongToolCheckCLIApi();
+    Object.assign(llCLI.value, cliRes);
+  } catch (e: any) { message.error(e?.message || '安装失败'); }
+  finally { llInstalling.value = false; }
 }
 
 onMounted(() => {
@@ -499,15 +515,39 @@ onMounted(() => {
                     </Button>
                   </template>
 
-                  <Alert message="龙龙平台已内置到系统，无需在服务器上安装命令行工具。保存配置后，系统后台自动执行产品同步和订单监听。" type="info" show-icon class="mb-4" />
+                  <!-- CLI 工具状态 -->
+                  <Card size="small" class="mb-4" type="inner">
+                    <template #title>
+                      <span class="flex items-center gap-2">
+                        <DownloadOutlined />
+                        CLI 工具状态
+                      </span>
+                    </template>
+                    <div class="flex items-center justify-between flex-wrap gap-3">
+                      <div class="flex items-center gap-3">
+                        <Badge :status="llCLI.installed ? 'success' : 'error'" />
+                        <span class="text-sm">{{ llCLI.message || '检测中...' }}</span>
+                        <Tag v-if="llCLI.installed" color="green">{{ llCLI.path }}</Tag>
+                        <Tag v-if="llCLI.os === 'windows'" color="orange">Windows 开发环境</Tag>
+                      </div>
+                      <div class="flex gap-2">
+                        <Button type="primary" :loading="llInstalling" :disabled="llCLI.os === 'windows'" @click="installLonglongCLI">
+                          <template #icon><DownloadOutlined /></template>
+                          {{ llCLI.installed ? '更新 CLI 工具' : '一键安装 CLI 工具' }}
+                        </Button>
+                      </div>
+                    </div>
+                    <Alert v-if="!llCLI.installed && llCLI.os !== 'windows'" message="产品同步需要先安装 long CLI 工具，请点击上方按钮一键安装。订单监听功能无需 CLI 工具。" type="warning" show-icon class="mt-3" />
+                    <Alert v-if="llCLI.os === 'windows'" message="long CLI 仅支持 Linux 服务器。本地 Windows 开发环境下产品同步不可用，部署到服务器后可正常使用。" type="info" show-icon class="mt-3" />
+                  </Card>
 
                   <!-- 运行状态 -->
                   <Card title="运行状态" size="small" class="mb-4" type="inner">
                     <div class="grid grid-cols-2 gap-4 md:grid-cols-4 mb-3">
                       <div class="text-center">
-                        <Badge :status="llStatus.sync_running ? 'processing' : 'default'" />
+                        <Badge :status="llCLI.installed ? (llStatus.sync_running ? 'processing' : 'success') : 'default'" />
                         <span class="ml-1 text-sm">产品同步</span>
-                        <div class="text-xs text-gray-400 mt-1">{{ llStatus.sync_running ? '运行中' : '未启动' }}</div>
+                        <div class="text-xs text-gray-400 mt-1">{{ llCLI.installed ? (llStatus.sync_running ? '运行中' : '就绪') : '需安装CLI' }}</div>
                       </div>
                       <div class="text-center">
                         <Badge :status="llStatus.listen_running ? 'processing' : 'default'" />

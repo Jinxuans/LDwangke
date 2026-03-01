@@ -643,6 +643,8 @@ func main() {
 			admin.POST("/longlong-tool/config", handler.LonglongToolSaveConfig)
 			admin.POST("/longlong-tool/sync", handler.LonglongToolSync)
 			admin.GET("/longlong-tool/status", handler.LonglongToolStatus)
+			admin.GET("/longlong-tool/cli-check", handler.LonglongToolCheckCLI)
+			admin.POST("/longlong-tool/cli-install", handler.LonglongToolInstallCLI)
 
 			// 图图强国配置
 			admin.GET("/tutuqg/config", handler.TutuQGConfigGet)

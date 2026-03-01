@@ -105,3 +105,18 @@ func LonglongToolSync(c *gin.Context) {
 func LonglongToolStatus(c *gin.Context) {
 	response.Success(c, service.LonglongStatus())
 }
+
+// LonglongToolCheckCLI 检查 long CLI 工具安装状态
+func LonglongToolCheckCLI(c *gin.Context) {
+	response.Success(c, service.LonglongCheckCLI())
+}
+
+// LonglongToolInstallCLI 一键安装 long CLI 工具
+func LonglongToolInstallCLI(c *gin.Context) {
+	msg, err := service.LonglongInstallCLI()
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.SuccessMsg(c, msg)
+}
