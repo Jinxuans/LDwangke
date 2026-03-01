@@ -13,11 +13,11 @@ import {
 } from '@ant-design/icons-vue';
 import {
   getSyncConfigApi, saveSyncConfigApi, syncPreviewApi, syncExecuteApi,
-  getSyncLogsApi, getMonitoredSuppliersApi,
+  getSyncLogsApi, getMonitoredSuppliersApi, getAutoSyncStatusApi,
   getLonglongToolConfigApi, saveLonglongToolConfigApi,
   longlongToolSyncApi, getLonglongToolStatusApi,
   type SyncConfig, type SyncPreviewResult, type SyncLogItem, type MonitoredSupplier,
-  type LonglongToolConfig, type LonglongToolStatus,
+  type AutoSyncStatus, type LonglongToolConfig, type LonglongToolStatus,
 } from '#/api/sync-monitor';
 import { getSupplierListApi, type SupplierItem } from '#/api/admin';
 
@@ -103,12 +103,17 @@ function removeSkipCategory(id: string) {
 // ===== 仪表盘 =====
 const monitored = ref<MonitoredSupplier[]>([]);
 const dashLoading = ref(false);
+const autoSyncStatus = ref<Partial<AutoSyncStatus>>({});
 
 async function loadDashboard() {
   dashLoading.value = true;
   try {
-    const res = await getMonitoredSuppliersApi();
-    monitored.value = res ?? [];
+    const [supRes, statusRes] = await Promise.all([
+      getMonitoredSuppliersApi(),
+      getAutoSyncStatusApi(),
+    ]);
+    monitored.value = supRes ?? [];
+    Object.assign(autoSyncStatus.value, statusRes);
   } catch (e) { console.error(e); }
   finally { dashLoading.value = false; }
 }
@@ -269,6 +274,30 @@ onMounted(() => {
         <TabPane key="dashboard">
           <template #tab><SyncOutlined /> 同步概况</template>
           <Spin :spinning="dashLoading">
+            <!-- 定时同步状态 -->
+            <Card size="small" class="mb-4" :bordered="true">
+              <div class="flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-4">
+                  <div>
+                    <Badge :status="autoSyncStatus.enabled ? (autoSyncStatus.running ? 'processing' : 'success') : 'default'" />
+                    <span class="font-semibold">定时同步</span>
+                    <Tag :color="autoSyncStatus.enabled ? 'green' : 'default'" class="ml-2">
+                      {{ autoSyncStatus.enabled ? `已开启（每${autoSyncStatus.interval}分钟）` : '未开启' }}
+                    </Tag>
+                    <Tag v-if="autoSyncStatus.running" color="blue">同步中...</Tag>
+                  </div>
+                  <div v-if="autoSyncStatus.total_runs" class="text-xs text-gray-400">
+                    累计 {{ autoSyncStatus.total_runs }} 次
+                  </div>
+                </div>
+                <div class="flex items-center gap-4 text-xs text-gray-400">
+                  <span v-if="autoSyncStatus.last_run_time">上次：{{ autoSyncStatus.last_run_time }}（{{ autoSyncStatus.last_result }}）</span>
+                  <span v-if="autoSyncStatus.next_run_time">下次：{{ autoSyncStatus.next_run_time }}</span>
+                  <Button size="small" @click="loadDashboard"><template #icon><SyncOutlined /></template></Button>
+                </div>
+              </div>
+            </Card>
+
             <Alert v-if="!monitored.length" message="未配置监听货源，请在「同步设置」中选择要监听的货源" type="info" show-icon class="mb-4" />
             <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               <Card v-for="sup in monitored" :key="sup.hid" size="small" :bordered="true" hoverable>

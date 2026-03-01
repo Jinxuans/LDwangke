@@ -96,7 +96,9 @@ func main() {
 			if cfg != nil && cfg.AutoSyncInterval > 0 {
 				interval = cfg.AutoSyncInterval
 			}
-			time.Sleep(time.Duration(interval) * time.Minute)
+			dur := time.Duration(interval) * time.Minute
+			service.SetAutoSyncNextRun(time.Now().Add(dur))
+			time.Sleep(dur)
 			service.AutoShelfCron()
 		}
 	}()
@@ -571,6 +573,7 @@ func main() {
 			admin.POST("/sync/execute", handler.SyncExecute)
 			admin.GET("/sync/logs", handler.SyncLogs)
 			admin.GET("/sync/suppliers", handler.SyncMonitoredSuppliers)
+			admin.GET("/sync/auto-status", handler.AutoSyncStatusHandler)
 
 			// 龙龙一键对接工具
 			admin.GET("/longlong-tool/config", handler.LonglongToolGetConfig)

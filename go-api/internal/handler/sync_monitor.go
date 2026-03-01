@@ -3,8 +3,8 @@ package handler
 import (
 	"strconv"
 
-	"go-api/internal/service"
 	"go-api/internal/response"
+	"go-api/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -90,6 +90,11 @@ func SyncLogs(c *gin.Context) {
 		"page":      page,
 		"page_size": pageSize,
 	})
+}
+
+// AutoSyncStatusHandler 获取自动同步运行状态
+func AutoSyncStatusHandler(c *gin.Context) {
+	response.Success(c, service.AutoSyncStatus())
 }
 
 // SyncMonitoredSuppliers 获取被监听的货源概况

@@ -93,6 +93,21 @@ export async function getMonitoredSuppliersApi() {
   return requestClient.get<MonitoredSupplier[]>('/admin/sync/suppliers');
 }
 
+// ===== 自动商品同步状态 =====
+export interface AutoSyncStatus {
+  enabled: boolean;
+  interval: number;
+  running: boolean;
+  last_run_time: string;
+  last_result: string;
+  total_runs: number;
+  next_run_time: string;
+}
+
+export async function getAutoSyncStatusApi() {
+  return requestClient.get<AutoSyncStatus>('/admin/sync/auto-status');
+}
+
 // ===== 龙龙一键对接工具 =====
 export interface LonglongToolConfig {
   long_host: string;
