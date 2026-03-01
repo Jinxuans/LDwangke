@@ -330,73 +330,90 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
           <!-- 统计卡片 -->
           <Row :gutter="[12, 12]">
             <Col :xs="12" :lg="6">
-              <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
-                <div class="flex items-center gap-2.5 mb-2">
-                  <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
-                    <WalletOutlined />
+              <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-[#141414] hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-2">
+                    <div class="flex h-8 w-8 items-center justify-center rounded bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+                      <WalletOutlined />
+                    </div>
+                    <span class="text-sm text-gray-500 font-medium">账户余额</span>
                   </div>
-                  <span class="text-xs text-gray-500">账户余额</span>
                 </div>
-                <div class="text-xl font-bold text-gray-800 dark:text-gray-100">
-                  <span class="text-sm mr-0.5">¥</span>{{ (profile?.money || 0).toFixed(2) }}
+                <div class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1">
+                  <span class="text-base mr-0.5 font-normal text-gray-500">¥</span>{{ (profile?.money || 0).toFixed(2) }}
                 </div>
-                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800">
-                  总充值 <span class="font-medium text-gray-500">¥{{ (profile?.zcz || 0).toFixed(2) }}</span>
+                <div class="mt-3 flex items-center justify-between text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
+                  <span>总充值</span>
+                  <span class="font-medium text-gray-600 dark:text-gray-300">¥{{ (profile?.zcz || 0).toFixed(2) }}</span>
                 </div>
               </div>
             </Col>
 
             <Col :xs="12" :lg="6">
-              <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
-                <div class="flex items-center gap-2.5 mb-2">
-                  <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400">
-                    <ShoppingCartOutlined />
+              <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-[#141414] hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-2">
+                    <div class="flex h-8 w-8 items-center justify-center rounded bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400">
+                      <ShoppingCartOutlined />
+                    </div>
+                    <span class="text-sm text-gray-500 font-medium">今日订单</span>
                   </div>
-                  <span class="text-xs text-gray-500">今日订单</span>
                 </div>
-                <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ profile?.today_orders || dashStats?.today_orders || 0 }}</div>
-                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800">
-                  总订单 <span class="font-medium text-gray-500">{{ profile?.order_total || dashStats?.total_orders || 0 }}</span>
+                <div class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1">
+                  {{ profile?.today_orders || dashStats?.today_orders || 0 }}
+                </div>
+                <div class="mt-3 flex items-center justify-between text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800">
+                  <span>总订单</span>
+                  <span class="font-medium text-gray-600 dark:text-gray-300">{{ profile?.order_total || dashStats?.total_orders || 0 }} 单</span>
                 </div>
               </div>
             </Col>
 
             <Col :xs="12" :lg="6">
-              <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
-                <div class="flex items-center gap-2.5 mb-2">
-                  <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
-                    <DollarOutlined />
+              <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-[#141414] hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-2">
+                    <div class="flex h-8 w-8 items-center justify-center rounded bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
+                      <DollarOutlined />
+                    </div>
+                    <span class="text-sm text-gray-500 font-medium">{{ hasAdminRole ? '今日收入' : '今日消费' }}</span>
                   </div>
-                  <span class="text-xs text-gray-500">{{ hasAdminRole ? '今日收入' : '今日消费' }}</span>
                 </div>
-                <div class="text-xl font-bold text-gray-800 dark:text-gray-100">
-                  <span class="text-sm mr-0.5">¥</span>{{ (hasAdminRole ? (dashStats?.today_income || 0) : (profile?.today_spend || 0)).toFixed(2) }}
+                <div class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1">
+                  <span class="text-base mr-0.5 font-normal text-gray-500">¥</span>{{ (hasAdminRole ? (dashStats?.today_income || 0) : (profile?.today_spend || 0)).toFixed(2) }}
                 </div>
-                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-if="hasAdminRole">
-                  <span class="flex items-center gap-1"><SyncOutlined /> 进行中 <span class="font-medium text-gray-500">{{ dashStats?.processing_orders || 0 }} 单</span></span>
+                <div class="mt-3 flex items-center justify-between text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-if="hasAdminRole">
+                  <span class="flex items-center gap-1"><SyncOutlined /> 进行中</span>
+                  <span class="font-medium text-orange-500">{{ dashStats?.processing_orders || 0 }} 单</span>
                 </div>
-                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-else>
+                <div class="mt-3 flex items-center justify-between text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-else>
                   <span>&nbsp;</span>
                 </div>
               </div>
             </Col>
 
             <Col :xs="12" :lg="6">
-              <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
-                <div class="flex items-center gap-2.5 mb-2">
-                  <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400">
-                    <TeamOutlined />
+              <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-[#141414] hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-2">
+                    <div class="flex h-8 w-8 items-center justify-center rounded bg-purple-50 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400">
+                      <TeamOutlined />
+                    </div>
+                    <span class="text-sm text-gray-500 font-medium">{{ hasAdminRole ? '注册用户' : '我的代理' }}</span>
                   </div>
-                  <span class="text-xs text-gray-500">{{ hasAdminRole ? '注册用户' : '我的代理' }}</span>
                 </div>
-                <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ hasAdminRole ? (dashStats?.user_count || 0) : (profile?.dailitongji?.dlzs || 0) }}</div>
-                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-if="hasAdminRole">
-                  平台余额 <span class="font-medium text-gray-500">¥{{ (dashStats?.total_balance || 0).toFixed(2) }}</span>
+                <div class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-1">
+                  {{ hasAdminRole ? (dashStats?.user_count || 0) : (profile?.dailitongji?.dlzs || 0) }}
                 </div>
-                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-else-if="profile?.dailitongji">
-                  今日交单 <span class="font-medium text-gray-500">{{ profile.dailitongji.jrjd || 0 }}</span>
+                <div class="mt-3 flex items-center justify-between text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-if="hasAdminRole">
+                  <span>平台余额</span>
+                  <span class="font-medium text-gray-600 dark:text-gray-300">¥{{ (dashStats?.total_balance || 0).toFixed(2) }}</span>
                 </div>
-                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-else>
+                <div class="mt-3 flex items-center justify-between text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-else-if="profile?.dailitongji">
+                  <span>今日交单</span>
+                  <span class="font-medium text-gray-600 dark:text-gray-300">{{ profile.dailitongji.jrjd || 0 }} 单</span>
+                </div>
+                <div class="mt-3 flex items-center justify-between text-xs text-gray-400 border-t border-gray-50 pt-3 dark:border-gray-800" v-else>
                   <span>&nbsp;</span>
                 </div>
               </div>
