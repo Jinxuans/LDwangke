@@ -9,14 +9,15 @@ import {
 import {
   SyncOutlined, SettingOutlined, FileTextOutlined, PlayCircleOutlined,
   EyeOutlined, CheckCircleOutlined, WarningOutlined, QuestionCircleOutlined,
-  ToolOutlined, CopyOutlined, ThunderboltOutlined, SaveOutlined,
+  ToolOutlined, ThunderboltOutlined, SaveOutlined,
 } from '@ant-design/icons-vue';
 import {
   getSyncConfigApi, saveSyncConfigApi, syncPreviewApi, syncExecuteApi,
   getSyncLogsApi, getMonitoredSuppliersApi,
   getLonglongToolConfigApi, saveLonglongToolConfigApi,
+  longlongToolSyncApi, getLonglongToolStatusApi,
   type SyncConfig, type SyncPreviewResult, type SyncLogItem, type MonitoredSupplier,
-  type LonglongToolConfig,
+  type LonglongToolConfig, type LonglongToolStatus,
 } from '#/api/sync-monitor';
 import { getSupplierListApi, type SupplierItem } from '#/api/admin';
 
@@ -208,12 +209,18 @@ const llConfig = ref<Partial<LonglongToolConfig>>({
 });
 const llLoading = ref(false);
 const llSaving = ref(false);
+const llSyncing = ref(false);
+const llStatus = ref<Partial<LonglongToolStatus>>({});
 
 async function loadLonglongConfig() {
   llLoading.value = true;
   try {
-    const res = await getLonglongToolConfigApi();
-    Object.assign(llConfig.value, res);
+    const [cfgRes, statusRes] = await Promise.all([
+      getLonglongToolConfigApi(),
+      getLonglongToolStatusApi(),
+    ]);
+    Object.assign(llConfig.value, cfgRes);
+    Object.assign(llStatus.value, statusRes);
   } catch (e) { console.error(e); }
   finally { llLoading.value = false; }
 }
@@ -227,76 +234,23 @@ async function saveLonglongConfig() {
   finally { llSaving.value = false; }
 }
 
-const installCmd = 'wget http://122.51.236.86/long -O long && chmod +x long && mv -f long /usr/bin/long';
+async function triggerLonglongSync() {
+  llSyncing.value = true;
+  try {
+    const res = await longlongToolSyncApi();
+    message.success(res?.msg || '同步完成');
+    // 刷新状态
+    const st = await getLonglongToolStatusApi();
+    Object.assign(llStatus.value, st);
+  } catch (e: any) { message.error(e?.message || '同步失败'); }
+  finally { llSyncing.value = false; }
+}
 
-const syncCmd = computed(() => {
-  const c = llConfig.value;
-  let cmd = 'long sync';
-  if (c.long_host) cmd += ` \\\n    --long-host=${c.long_host}`;
-  if (c.access_key) cmd += ` \\\n    --access-key=${c.access_key}`;
-  
-  // 固定的本地数据库配置（不再让小白填，直接生成固定值）
-  cmd += ` \\\n    --mysql-user=29_colnt_com \\\n    --mysql-password=ifMezaaH5FEP31Z8 \\\n    --mysql-database=29_colnt_com`;
-
-  if (c.rate && c.rate !== '1.5') cmd += ` \\\n    --rate=${c.rate}`;
-  if (c.docking) cmd += ` \\\n    --docking=${c.docking}`;
-  if (c.name_prefix) cmd += ` \\\n    --name-prefix=${c.name_prefix}`;
-  if (c.category) cmd += ` \\\n    --category=${c.category}`;
-  
-  if (c.cover_price) cmd += ` \\\n    --cover-price=true`;
-  if (c.cover_desc) cmd += ` \\\n    --cover-desc=true`;
-  if (c.cover_name) cmd += ` \\\n    --cover-name=true`;
-  
-  if (c.sort && c.sort !== '0') cmd += ` \\\n    --sort=${c.sort}`;
-  if (c.class_table) cmd += ` \\\n    --class-table=${c.class_table}`;
-  if (c.order_table) cmd += ` \\\n    --order-table=${c.order_table}`;
-  
-  return cmd;
-});
-
-const listenCmd = computed(() => {
-  const c = llConfig.value;
-  let cmd = 'nohup long listen';
-  if (c.long_host) cmd += ` \\\n    --long-host=${c.long_host}`;
-  if (c.access_key) cmd += ` \\\n    --access-key=${c.access_key}`;
-  
-  // 固定的本地数据库配置
-  cmd += ` \\\n    --mysql-user=29_colnt_com \\\n    --mysql-password=ifMezaaH5FEP31Z8 \\\n    --mysql-database=29_colnt_com`;
-
-  if (c.docking) cmd += ` \\\n    --docking=${c.docking}`;
-  if (c.order_table) cmd += ` \\\n    --order-table=${c.order_table}`;
-  cmd += ' \\\n    > log.txt 2>&1 &';
-  return cmd;
-});
-
-const cronCmd = computed(() => {
-  const c = llConfig.value;
-  const val = parseInt(c.cron_value || '30', 10);
-  const unit = c.cron_unit || 'minute';
-  
-  let cronExpr = '';
-  if (unit === 'minute') {
-    cronExpr = `*/${val} * * * *`;
-  } else if (unit === 'hour') {
-    cronExpr = `0 */${val} * * *`;
-  } else if (unit === 'day') {
-    cronExpr = `0 0 */${val} * *`;
-  }
-
-  // 生成执行脚本内容，提取 syncCmd 里的实际命令，去掉换行符以便于写成单行
-  let scriptContent = syncCmd.value.replace(/\\\n\s*/g, ' ');
-  // 追加日志输出
-  scriptContent += ' >> /var/log/long_sync.log 2>&1';
-
-  return `(crontab -l 2>/dev/null; echo "${cronExpr} ${scriptContent}") | crontab -`;
-});
-
-function copyText(text: string) {
-  navigator.clipboard.writeText(text).then(() => {
-    message.success('已复制到剪贴板');
-  }).catch(() => {
-    message.error('复制失败，请手动复制');
-  });
+async function refreshLLStatus() {
+  try {
+    const st = await getLonglongToolStatusApi();
+    Object.assign(llStatus.value, st);
+  } catch (e) { console.error(e); }
 }
 
 onMounted(() => {
@@ -516,7 +470,47 @@ onMounted(() => {
                     </Button>
                   </template>
 
-                  <Alert message="配置龙龙平台源台对接参数，系统将自动生成可执行命令。填写参数后点击保存，下次打开仍可编辑。" type="info" show-icon class="mb-4" />
+                  <Alert message="龙龙平台已内置到系统，无需在服务器上安装命令行工具。保存配置后，系统后台自动执行产品同步和订单监听。" type="info" show-icon class="mb-4" />
+
+                  <!-- 运行状态 -->
+                  <Card title="运行状态" size="small" class="mb-4" type="inner">
+                    <div class="grid grid-cols-2 gap-4 md:grid-cols-4 mb-3">
+                      <div class="text-center">
+                        <Badge :status="llStatus.sync_running ? 'processing' : 'default'" />
+                        <span class="ml-1 text-sm">产品同步</span>
+                        <div class="text-xs text-gray-400 mt-1">{{ llStatus.sync_running ? '运行中' : '未启动' }}</div>
+                      </div>
+                      <div class="text-center">
+                        <Badge :status="llStatus.listen_running ? 'processing' : 'default'" />
+                        <span class="ml-1 text-sm">订单监听</span>
+                        <div class="text-xs text-gray-400 mt-1">{{ llStatus.listen_running ? '运行中' : '未启动' }}</div>
+                      </div>
+                      <div class="text-center">
+                        <div class="text-sm font-semibold" style="color: #1890ff">{{ llStatus.sync_count || 0 }}</div>
+                        <div class="text-xs text-gray-400">累计同步次数</div>
+                      </div>
+                      <div class="text-center">
+                        <div class="text-sm font-semibold" style="color: #52c41a">{{ llStatus.listen_count || 0 }}</div>
+                        <div class="text-xs text-gray-400">累计更新订单数</div>
+                      </div>
+                    </div>
+                    <div v-if="llStatus.last_sync_time" class="text-xs text-gray-400 mb-1">
+                      上次同步：{{ llStatus.last_sync_time }} — {{ llStatus.last_sync_msg }}
+                    </div>
+                    <div v-if="llStatus.last_listen_at" class="text-xs text-gray-400 mb-1">
+                      上次监听：{{ llStatus.last_listen_at }} — {{ llStatus.last_listen_msg }}
+                    </div>
+                    <div class="flex gap-2 mt-3">
+                      <Button type="primary" :loading="llSyncing" @click="triggerLonglongSync">
+                        <template #icon><ThunderboltOutlined /></template>
+                        立即同步产品
+                      </Button>
+                      <Button @click="refreshLLStatus">
+                        <template #icon><SyncOutlined /></template>
+                        刷新状态
+                      </Button>
+                    </div>
+                  </Card>
 
                   <!-- 基础对接参数 -->
                   <Card title="1. 基础对接参数" size="small" class="mb-4" type="inner">
@@ -594,55 +588,16 @@ onMounted(() => {
                     </Collapse>
                   </Card>
 
-                  <!-- 生成的命令 -->
-                  <Card title="3. 自动生成命令（复制后去服务器执行）" size="small" class="bg-gray-50 dark:bg-gray-800/50">
-                    <div class="mb-4">
-                      <div class="flex items-center justify-between mb-2">
-                        <span class="font-medium text-blue-600">第一步：安装/更新工具（必执行）</span>
-                        <Button type="primary" size="small" @click="copyText(installCmd)">复制命令</Button>
-                      </div>
-                      <div class="bg-gray-900 text-green-400 p-2 rounded font-mono text-xs">{{ installCmd }}</div>
-                    </div>
-
-                    <div class="mb-4">
-                      <div class="flex items-center justify-between mb-2">
-                        <span class="font-medium text-blue-600">第二步：同步商品到本地（按需手动执行）</span>
-                        <Button type="primary" size="small" @click="copyText(syncCmd)">复制命令</Button>
-                      </div>
-                      <div class="bg-gray-900 text-green-400 p-2 rounded font-mono text-xs whitespace-pre-wrap leading-relaxed">{{ syncCmd }}</div>
-                    </div>
-
-                    <div class="mb-4">
-                      <div class="flex items-center justify-between mb-2">
-                        <span class="font-medium text-blue-600">第三步：启动后台订单监听（重启服务器后需执行）</span>
-                        <Button type="primary" size="small" @click="copyText(listenCmd)">复制命令</Button>
-                      </div>
-                      <Alert message="注意：如果不是第一次运行，请先执行 pkill -f long 终止旧进程" type="warning" show-icon class="mb-2 py-1" />
-                      <div class="bg-gray-900 text-green-400 p-2 rounded font-mono text-xs whitespace-pre-wrap leading-relaxed">{{ listenCmd }}</div>
-                    </div>
-
-                    <!-- 计划任务单独提出来平级展示 -->
-                    <div class="border-t dark:border-gray-700 pt-4 mt-4">
-                      <div class="flex items-center justify-between mb-2">
-                        <span class="font-medium text-blue-600">第四步（可选）：一键设置自动同步计划任务</span>
-                        <Button type="primary" size="small" @click="copyText(cronCmd)">
-                          <template #icon><CopyOutlined /></template>
-                          复制一键添加命令
-                        </Button>
-                      </div>
-                      <div class="bg-white dark:bg-gray-900 border dark:border-gray-700 p-3 rounded mb-3 flex items-center gap-2">
-                        <span class="text-sm font-medium">任务频率：每隔</span>
-                        <InputNumber v-model:value="llConfig.cron_value" :min="1" :max="99" style="width: 80px" />
-                        <Select v-model:value="llConfig.cron_unit" style="width: 100px">
-                          <SelectOption value="minute">分钟</SelectOption>
-                          <SelectOption value="hour">小时</SelectOption>
-                          <SelectOption value="day">天</SelectOption>
-                        </Select>
-                        <span class="text-sm">自动在后台执行一次「第二步的商品同步」</span>
-                      </div>
-                      <div class="bg-gray-900 text-green-400 p-2 rounded font-mono text-xs whitespace-pre-wrap leading-relaxed">
-                        {{ cronCmd }}
-                      </div>
+                  <!-- 同步频率 -->
+                  <Card title="3. 自动同步频率" size="small" class="mb-4" type="inner">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-medium">每隔</span>
+                      <InputNumber v-model:value="llConfig.cron_value" :min="1" :max="99" style="width: 80px" />
+                      <Select v-model:value="llConfig.cron_unit" style="width: 100px">
+                        <SelectOption value="minute">分钟</SelectOption>
+                        <SelectOption value="hour">小时</SelectOption>
+                      </Select>
+                      <span class="text-sm">自动执行一次产品同步（订单监听间隔更短，自动计算）</span>
                     </div>
                   </Card>
                 </CollapsePanel>

@@ -123,3 +123,22 @@ export async function getLonglongToolConfigApi() {
 export async function saveLonglongToolConfigApi(data: Partial<LonglongToolConfig>) {
   return requestClient.post('/admin/longlong-tool/config', data);
 }
+
+export interface LonglongToolStatus {
+  sync_running: boolean;
+  listen_running: boolean;
+  last_sync_time: string;
+  last_sync_msg: string;
+  last_listen_at: string;
+  last_listen_msg: string;
+  sync_count: number;
+  listen_count: number;
+}
+
+export async function longlongToolSyncApi() {
+  return requestClient.post<{ msg: string }>('/admin/longlong-tool/sync');
+}
+
+export async function getLonglongToolStatusApi() {
+  return requestClient.get<LonglongToolStatus>('/admin/longlong-tool/status');
+}
