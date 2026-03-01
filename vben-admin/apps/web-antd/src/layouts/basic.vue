@@ -19,7 +19,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { Modal, Input, InputNumber, message } from 'ant-design-vue';
 import { $t } from '#/locales';
 import { useAuthStore } from '#/store';
-import { getSiteConfigApi } from '#/api/admin';
+import { getSiteConfigApi, getPublicAnnouncementsApi } from '#/api/admin';
 import { getMenuConfigs } from '#/api/menu-config';
 import { migrateSuperiorApi } from '#/api/user-center';
 import { getAccessCodesApi, getUserInfoApi } from '#/api';
@@ -33,27 +33,62 @@ const notifications = ref<NotificationItem[]>([]);
 const notifySessionMap = ref<Map<string, number>>(new Map());
 let notifyTimer: ReturnType<typeof setInterval> | null = null;
 
+// 已读公告ID集合（存 localStorage）
+const readAnnIds = ref<Set<number>>(new Set(
+  JSON.parse(localStorage.getItem('__read_ann_ids') || '[]'),
+));
+function markAnnRead(id: number) {
+  readAnnIds.value.add(id);
+  localStorage.setItem('__read_ann_ids', JSON.stringify([...readAnnIds.value]));
+}
+
 async function loadChatNotifications() {
   try {
-    const raw = await getChatSessionsApi();
-    const sessions = raw;
-    if (!Array.isArray(sessions)) return;
+    // 1) 聊天消息
+    const chatItems: (NotificationItem & { _key: string })[] = [];
     const map = new Map<string, number>();
-    notifications.value = sessions
-      .filter((s: any) => s.unread_count > 0)
-      .map((s: any) => {
-        const key = `chat_${s.list_id}`;
-        map.set(key, s.list_id);
-        return {
-          avatar: `https://q1.qlogo.cn/g?b=qq&nk=${s.uid || s.name}&s=640`,
-          date: formatNotifyTime(s.last_time),
-          isRead: false,
-          message: s.last_msg || '',
-          title: `${s.name}（${s.unread_count}条未读）`,
-          _key: key,
-        } as NotificationItem & { _key: string };
-      });
+    try {
+      const raw = await getChatSessionsApi();
+      const sessions = raw;
+      if (Array.isArray(sessions)) {
+        for (const s of sessions) {
+          if (s.unread_count <= 0) continue;
+          const key = `chat_${s.list_id}`;
+          map.set(key, s.list_id);
+          chatItems.push({
+            avatar: `https://q1.qlogo.cn/g?b=qq&nk=${s.uid || s.name}&s=640`,
+            date: formatNotifyTime(s.last_time),
+            isRead: false,
+            message: s.last_msg || '',
+            title: `${s.name}（${s.unread_count}条未读）`,
+            _key: key,
+          });
+        }
+      }
+    } catch { /* ignore */ }
     notifySessionMap.value = map;
+
+    // 2) 公告
+    const annItems: (NotificationItem & { _key: string; _content?: string })[] = [];
+    try {
+      const annRes = await getPublicAnnouncementsApi(1, 10);
+      if (annRes?.list?.length) {
+        for (const a of annRes.list) {
+          annItems.push({
+            avatar: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="%23f59e0b"/><text x="32" y="42" text-anchor="middle" font-size="32" fill="white">📢</text></svg>'),
+            date: a.time ? a.time.slice(0, 16) : '',
+            isRead: readAnnIds.value.has(a.id),
+            message: a.title,
+            title: (a.zhiding === '1' ? '[置顶] ' : '') + '系统公告',
+            _key: `ann_${a.id}`,
+            _content: a.content,
+          } as any);
+        }
+      }
+    } catch { /* ignore */ }
+
+    // 合并：公告在前，聊天在后
+    notifications.value = [...annItems, ...chatItems];
   } catch { /* ignore */ }
 }
 
@@ -173,12 +208,28 @@ function handleMakeAll() {
 
 function handleNoticeRead(item: NotificationItem) {
   item.isRead = true;
-  const key = (item as any)._key;
-  const listId = key ? notifySessionMap.value.get(key) : undefined;
-  if (listId) {
-    markChatReadApi(listId).catch(() => {});
+  const key = (item as any)._key as string;
+  if (key?.startsWith('ann_')) {
+    // 公告：弹窗显示内容
+    const annId = parseInt(key.replace('ann_', ''), 10);
+    markAnnRead(annId);
+    Modal.info({
+      title: item.message || '系统公告',
+      content: h('div', {
+        style: 'white-space:pre-wrap;max-height:400px;overflow:auto',
+        innerHTML: (item as any)._content || item.message || '',
+      }),
+      okText: '知道了',
+      width: 'min(90vw, 500px)',
+    });
+  } else {
+    // 聊天消息
+    const listId = key ? notifySessionMap.value.get(key) : undefined;
+    if (listId) {
+      markChatReadApi(listId).catch(() => {});
+    }
+    router.push('/chat');
   }
-  router.push('/chat');
 }
 
 function handleViewAll() {
