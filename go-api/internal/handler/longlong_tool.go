@@ -5,6 +5,7 @@ import (
 
 	"go-api/internal/database"
 	"go-api/internal/response"
+	"go-api/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -88,4 +89,19 @@ func LonglongToolSaveConfig(c *gin.Context) {
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
+}
+
+// LonglongToolSync 手动触发一次产品同步
+func LonglongToolSync(c *gin.Context) {
+	msg, err := service.LonglongSyncOnce()
+	if err != nil {
+		response.BusinessError(c, -1, "同步失败: "+err.Error())
+		return
+	}
+	response.SuccessMsg(c, msg)
+}
+
+// LonglongToolStatus 获取同步/监听运行状态
+func LonglongToolStatus(c *gin.Context) {
+	response.Success(c, service.LonglongStatus())
 }

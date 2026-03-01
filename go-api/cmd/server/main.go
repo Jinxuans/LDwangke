@@ -82,6 +82,9 @@ func main() {
 	// 启动闪电运动(闪动校园)订单状态同步
 	go service.StartSDXYCron()
 
+	// 启动龙龙内置同步&监听（替代 long sync / long listen 命令行工具）
+	go service.StartLonglongDaemon()
+
 	// 自动商品同步定时任务（间隔从 sync_config 读取，默认30分钟）
 	go func() {
 		// 启动5分钟后先执行一次
@@ -572,6 +575,8 @@ func main() {
 			// 龙龙一键对接工具
 			admin.GET("/longlong-tool/config", handler.LonglongToolGetConfig)
 			admin.POST("/longlong-tool/config", handler.LonglongToolSaveConfig)
+			admin.POST("/longlong-tool/sync", handler.LonglongToolSync)
+			admin.GET("/longlong-tool/status", handler.LonglongToolStatus)
 
 			// 图图强国配置
 			admin.GET("/tutuqg/config", handler.TutuQGConfigGet)
