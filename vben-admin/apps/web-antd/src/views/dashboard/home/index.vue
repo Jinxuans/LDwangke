@@ -485,6 +485,67 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
             </Row>
           </Card>
 
+          <!-- 移动端公告 + 排行 (仅小屏显示，大屏走右侧栏) -->
+          <div class="mt-3 flex flex-col gap-3 lg:hidden">
+            <Card size="small" :body-style="{ padding: '8px 12px' }">
+              <template #title>
+                <div class="flex items-center gap-2">
+                  <NotificationOutlined style="color:#f59e0b" /><span>公告</span>
+                </div>
+              </template>
+              <List :data-source="announcements" size="small" v-if="announcements.length > 0" :split="false">
+                <template #renderItem="{ item }">
+                  <ListItem style="cursor:pointer; padding: 6px 0;" @click="showAnnouncement(item)">
+                    <ListItemMeta>
+                      <template #title>
+                        <div class="flex items-center gap-1.5 mb-0.5">
+                          <Tag v-if="item.zhiding === '1'" color="red" class="text-[10px] px-1 py-0 border-0 leading-tight m-0">置顶</Tag>
+                          <span class="text-sm font-medium leading-tight truncate" :title="item.title">{{ item.title }}</span>
+                        </div>
+                      </template>
+                      <template #description>
+                        <div class="text-[11px] text-gray-400 dark:text-gray-500 leading-none">{{ item.time }}</div>
+                      </template>
+                    </ListItemMeta>
+                  </ListItem>
+                </template>
+              </List>
+              <div v-else class="flex flex-col items-center py-6 text-gray-400 dark:text-gray-500">
+                <NotificationOutlined class="mb-2 text-2xl" />
+                <span>暂无公告</span>
+              </div>
+            </Card>
+            <Card size="small" :body-style="{ padding: '8px 12px' }">
+              <template #title>
+                <div class="flex items-center gap-2">
+                  <CrownOutlined style="color:#f59e0b" /><span>消费排行</span>
+                </div>
+              </template>
+              <template #extra>
+                <Segmented v-model:value="rankPeriod" size="small" :options="rankPeriodOptions" />
+              </template>
+              <Spin :spinning="rankLoading" size="small">
+                <div v-if="rankList.length > 0" class="space-y-2">
+                  <div v-for="(u, idx) in rankList" :key="u.uid" class="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors" :class="idx < 3 ? 'bg-amber-50/60 dark:bg-amber-900/10' : 'hover:bg-gray-50 dark:hover:bg-gray-800'">
+                    <div class="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white flex-shrink-0" :class="idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-gray-300'">{{ idx + 1 }}</div>
+                    <Avatar :src="u.avatar" :size="32" class="flex-shrink-0 shadow-sm border border-gray-100 dark:border-gray-700">{{ u.username?.charAt(0) || '?' }}</Avatar>
+                    <div class="min-w-0 flex-1 ml-1">
+                      <div class="flex items-center justify-between mb-0.5">
+                        <span class="text-[13px] font-medium truncate text-gray-700 dark:text-gray-300">{{ u.username || `UID:${u.uid}` }}</span>
+                        <span class="text-xs text-orange-500 font-bold flex-shrink-0 ml-1">¥{{ Number(u.total).toFixed(2) }}</span>
+                      </div>
+                      <div class="text-[11px] text-gray-400 leading-tight">UID: {{ u.uid }} <span class="mx-1 opacity-50">|</span> {{ u.orders }} 单</div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="flex flex-col items-center py-6 text-gray-400 dark:text-gray-500">
+                  <CrownOutlined class="mb-1.5 text-xl" />
+                  <span class="text-xs">暂无排行数据</span>
+                </div>
+              </Spin>
+            </Card>
+          </div>
+
           <!-- 图表区域 (管理员可见) -->
           <Row :gutter="[12, 12]" class="mt-3" v-if="hasAdminRole">
             <Col :xs="24" :lg="14">
@@ -548,8 +609,8 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
           </Row>
         </div>
 
-        <!-- 右侧：侧边栏 (公告 + 排行等) -->
-        <div class="flex flex-col gap-3 w-full lg:w-[300px] lg:flex-shrink-0 order-2">
+        <!-- 右侧：侧边栏 (公告 + 排行等)，仅大屏显示 -->
+        <div class="hidden lg:flex flex-col gap-3 lg:w-[300px] lg:flex-shrink-0 order-2">
           <!-- 公告卡片 -->
           <Card size="small" :body-style="{ padding: '8px 12px' }">
             <template #title>
