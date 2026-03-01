@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  InputNumber, Switch, Button, Tabs, TabPane, Tag, Space, message, Spin, Input, Tooltip,
+  InputNumber, Switch, Button, Tabs, TabPane, Tag, Space, message, Spin, Input, Tooltip, Popover,
 } from 'ant-design-vue';
 import { ReloadOutlined, SaveOutlined, UpOutlined, DownOutlined, EditOutlined, CheckOutlined } from '@ant-design/icons-vue';
 import { Page } from '@vben/common-ui';
@@ -241,6 +241,38 @@ function cancelEditTitle() {
   editingKey.value = '';
 }
 
+// 编辑图标
+const editingIconKey = ref<string>('');
+const editingIconValue = ref('');
+
+function startEditIcon(item: MenuRow) {
+  editingIconKey.value = item.menu_key;
+  editingIconValue.value = item.icon;
+}
+function confirmEditIcon(item: MenuRow) {
+  item.icon = editingIconValue.value.trim();
+  editingIconKey.value = '';
+}
+function cancelEditIcon() {
+  editingIconKey.value = '';
+}
+
+// 常用 mdi 图标列表
+const commonMdiIcons = [
+  'mdi:home', 'mdi:cog-outline', 'mdi:account-circle-outline', 'mdi:chart-bar',
+  'mdi:book-open-page-variant-outline', 'mdi:file-document-outline', 'mdi:store-outline',
+  'mdi:menu', 'mdi:bell-outline', 'mdi:shield-check-outline', 'mdi:cash-multiple',
+  'mdi:account-group-outline', 'mdi:chat-processing-outline', 'mdi:wallet-plus-outline',
+  'mdi:history', 'mdi:calendar-check', 'mdi:gift-outline', 'mdi:star-shooting-outline',
+  'mdi:connection', 'mdi:bookshelf', 'mdi:file-tree-outline', 'mdi:tune-variant',
+  'mdi:bullhorn-outline', 'mdi:medal-outline', 'mdi:headset', 'mdi:package-variant',
+  'mdi:receipt-text-outline', 'mdi:credit-card-settings-outline', 'mdi:storefront-outline',
+  'mdi:ticket-confirmation-outline', 'mdi:file-search-outline', 'mdi:file-multiple-outline',
+  'mdi:account-supervisor-outline', 'mdi:book-education-outline', 'mdi:rocket-launch-outline',
+  'mdi:database-outline', 'mdi:hammer-wrench', 'mdi:palette-outline', 'mdi:eye-outline',
+  'mdi:lock-outline', 'mdi:key-outline', 'mdi:email-outline', 'mdi:phone-outline',
+];
+
 onMounted(loadData);
 </script>
 
@@ -274,14 +306,50 @@ onMounted(loadData);
               ]"
             >
               <div class="flex items-center gap-3">
-                <!-- 图标 -->
-                <div
-                  class="flex h-9 w-9 items-center justify-center rounded-lg text-lg"
-                  :class="item.level === 0 ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-50 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+                <!-- 图标（点击编辑） -->
+                <Popover
+                  :open="editingIconKey === item.menu_key"
+                  trigger="click"
+                  placement="bottomLeft"
+                  @openChange="(v: boolean) => { if (v) startEditIcon(item); else cancelEditIcon(); }"
                 >
-                  <IconifyIcon v-if="item.icon" :icon="item.icon" :style="{ fontSize: '18px' }" />
-                  <span v-else class="text-sm">-</span>
-                </div>
+                  <template #content>
+                    <div style="width: 320px">
+                      <div class="mb-2">
+                        <div class="text-xs text-gray-400 mb-1">输入图标名称（如 mdi:home）</div>
+                        <div class="flex items-center gap-2">
+                          <Input v-model:value="editingIconValue" size="small" placeholder="mdi:icon-name" class="flex-1" @press-enter="confirmEditIcon(item)" />
+                          <Button type="primary" size="small" @click="confirmEditIcon(item)"><CheckOutlined /></Button>
+                        </div>
+                      </div>
+                      <div v-if="editingIconValue" class="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded dark:bg-gray-800">
+                        <span class="text-xs text-gray-400">预览：</span>
+                        <IconifyIcon :icon="editingIconValue" :style="{ fontSize: '20px' }" />
+                      </div>
+                      <div class="text-xs text-gray-400 mb-1">常用图标（点击选择）</div>
+                      <div class="grid grid-cols-8 gap-0.5 max-h-[180px] overflow-y-auto" style="scrollbar-width: thin">
+                        <Tooltip v-for="ic in commonMdiIcons" :key="ic" :title="ic">
+                          <div
+                            class="flex items-center justify-center rounded cursor-pointer h-8 w-8 transition-colors"
+                            :class="editingIconValue === ic ? 'bg-blue-50 text-blue-500 ring-1 ring-blue-300' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'"
+                            @click="editingIconValue = ic"
+                          >
+                            <IconifyIcon :icon="ic" :style="{ fontSize: '16px' }" />
+                          </div>
+                        </Tooltip>
+                      </div>
+                    </div>
+                  </template>
+                  <Tooltip title="点击修改图标">
+                    <div
+                      class="flex h-9 w-9 items-center justify-center rounded-lg text-lg cursor-pointer transition-all hover:ring-2 hover:ring-blue-300"
+                      :class="item.level === 0 ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-50 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+                    >
+                      <IconifyIcon v-if="item.icon" :icon="item.icon" :style="{ fontSize: '18px' }" />
+                      <span v-else class="text-sm">-</span>
+                    </div>
+                  </Tooltip>
+                </Popover>
 
                 <!-- 标题 + key -->
                 <div class="min-w-0 flex-1">
@@ -352,14 +420,50 @@ onMounted(loadData);
               ]"
             >
               <div class="flex items-center gap-3">
-                <!-- 图标 -->
-                <div
-                  class="flex h-9 w-9 items-center justify-center rounded-lg text-lg"
-                  :class="item.level === 1 ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-50 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+                <!-- 图标（点击编辑） -->
+                <Popover
+                  :open="editingIconKey === item.menu_key"
+                  trigger="click"
+                  placement="bottomLeft"
+                  @openChange="(v: boolean) => { if (v) startEditIcon(item); else cancelEditIcon(); }"
                 >
-                  <IconifyIcon v-if="item.icon" :icon="item.icon" :style="{ fontSize: '18px' }" />
-                  <span v-else class="text-sm">-</span>
-                </div>
+                  <template #content>
+                    <div style="width: 320px">
+                      <div class="mb-2">
+                        <div class="text-xs text-gray-400 mb-1">输入图标名称（如 mdi:home）</div>
+                        <div class="flex items-center gap-2">
+                          <Input v-model:value="editingIconValue" size="small" placeholder="mdi:icon-name" class="flex-1" @press-enter="confirmEditIcon(item)" />
+                          <Button type="primary" size="small" @click="confirmEditIcon(item)"><CheckOutlined /></Button>
+                        </div>
+                      </div>
+                      <div v-if="editingIconValue" class="flex items-center gap-2 mb-2 p-2 bg-gray-50 rounded dark:bg-gray-800">
+                        <span class="text-xs text-gray-400">预览：</span>
+                        <IconifyIcon :icon="editingIconValue" :style="{ fontSize: '20px' }" />
+                      </div>
+                      <div class="text-xs text-gray-400 mb-1">常用图标（点击选择）</div>
+                      <div class="grid grid-cols-8 gap-0.5 max-h-[180px] overflow-y-auto" style="scrollbar-width: thin">
+                        <Tooltip v-for="ic in commonMdiIcons" :key="ic" :title="ic">
+                          <div
+                            class="flex items-center justify-center rounded cursor-pointer h-8 w-8 transition-colors"
+                            :class="editingIconValue === ic ? 'bg-blue-50 text-blue-500 ring-1 ring-blue-300' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'"
+                            @click="editingIconValue = ic"
+                          >
+                            <IconifyIcon :icon="ic" :style="{ fontSize: '16px' }" />
+                          </div>
+                        </Tooltip>
+                      </div>
+                    </div>
+                  </template>
+                  <Tooltip title="点击修改图标">
+                    <div
+                      class="flex h-9 w-9 items-center justify-center rounded-lg text-lg cursor-pointer transition-all hover:ring-2 hover:ring-blue-300"
+                      :class="item.level === 1 ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-50 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
+                    >
+                      <IconifyIcon v-if="item.icon" :icon="item.icon" :style="{ fontSize: '18px' }" />
+                      <span v-else class="text-sm">-</span>
+                    </div>
+                  </Tooltip>
+                </Popover>
 
                 <!-- 标题 + key -->
                 <div class="min-w-0 flex-1">
