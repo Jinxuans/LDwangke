@@ -209,6 +209,9 @@ func main() {
 		// 菜单配置（所有登录用户可读取，用于动态菜单）
 		api.GET("/menus", handler.AdminMenuList)
 
+		// 消费排行榜（所有登录用户可见）
+		api.GET("/top-consumers", handler.TopConsumers)
+
 		// 订单
 		order := api.Group("/order")
 		{

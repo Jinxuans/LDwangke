@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Page } from '@vben/common-ui';
 import { usePreferences } from '@vben/preferences';
@@ -10,7 +10,7 @@ import {
 } from '@vben/plugins/echarts';
 import {
   Card, Row, Col, Spin, Button, Table, Tag, List, ListItem, ListItemMeta, Progress, Modal,
-  Statistic, Alert,
+  Statistic, Alert, Segmented, Avatar,
 } from 'ant-design-vue';
 import {
   WalletOutlined, ShoppingCartOutlined, FileAddOutlined,
@@ -23,7 +23,8 @@ import { useAccessStore } from '@vben/stores';
 import {
   getDashboardStatsApi, getPublicAnnouncementsApi,
   getQueueStatsApi, setQueueConcurrencyApi, getSiteConfigApi,
-  type DashboardStats, type AnnouncementItem, type QueueStats,
+  getTopConsumersApi,
+  type DashboardStats, type AnnouncementItem, type QueueStats, type TopConsumer,
 } from '#/api/admin';
 import { userCheckinApi, userCheckinStatusApi } from '#/api/checkin';
 
@@ -45,6 +46,20 @@ const maintenanceMode = ref(false);
 const siteNotice = ref('');
 const checkinEnabled = ref(false);
 const dailyQuote = ref('欢迎回来，开始您一天的工作吧！');
+
+// 消费排行榜
+const rankPeriod = ref('day');
+const rankPeriodOptions = [{ value: 'day', label: '日' }, { value: 'week', label: '周' }, { value: 'month', label: '月' }];
+const rankList = ref<TopConsumer[]>([]);
+const rankLoading = ref(false);
+
+async function loadRankList() {
+  rankLoading.value = true;
+  try {
+    rankList.value = await getTopConsumersApi(rankPeriod.value);
+  } catch { rankList.value = []; }
+  rankLoading.value = false;
+}
 
 // ECharts refs
 const trendChartRef = ref<EchartsUIType>();
@@ -87,6 +102,8 @@ async function loadDashboard() {
       const ann = await getPublicAnnouncementsApi(1, 5);
       announcements.value = ann.list || [];
     }
+    // 加载消费排行榜
+    loadRankList();
   } catch (e) {
     console.error('加载失败:', e);
   } finally {
@@ -95,6 +112,8 @@ async function loadDashboard() {
     renderCharts();
   }
 }
+
+watch(rankPeriod, () => loadRankList());
 
 function renderCharts() {
   // 趋势图
@@ -230,9 +249,6 @@ const recentOrderColumns = [
   { title: '费用', key: 'fees', width: 90 },
   { title: '时间', dataIndex: 'addtime', key: 'addtime', width: 150 },
 ];
-
-// 用户排行
-const topUsers = computed(() => (dashStats.value as any)?.top_users?.slice(0, 5) || []);
 
 // 快捷操作
 const quickActions = [
@@ -593,35 +609,45 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
             </div>
           </Card>
 
-          <!-- 用户排行 (管理员) 移到右侧 -->
-          <Card size="small" v-if="hasAdminRole && topUsers.length > 0">
+          <!-- 消费排行榜（所有用户可见） -->
+          <Card size="small" :body-style="{ padding: '8px 12px' }">
             <template #title>
               <div class="flex items-center gap-2">
                 <CrownOutlined style="color:#f59e0b" /><span>消费排行</span>
               </div>
             </template>
-            <div class="space-y-3">
-              <div v-for="(u, idx) in topUsers" :key="u.uid" class="flex items-center gap-3">
+            <template #extra>
+              <Segmented v-model:value="rankPeriod" size="small" :options="rankPeriodOptions" />
+            </template>
+            <Spin :spinning="rankLoading" size="small">
+              <div v-if="rankList.length > 0" class="space-y-1.5">
                 <div
-                  class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white"
-                  :class="idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-gray-300'"
-                >{{ idx + 1 }}</div>
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center justify-between text-sm">
-                    <span class="truncate font-medium">{{ u.username || `UID:${u.uid}` }}</span>
-                    <span class="text-orange-500 font-medium">¥{{ Number(u.total).toFixed(2) }}</span>
+                  v-for="(u, idx) in rankList"
+                  :key="u.uid"
+                  class="flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors"
+                  :class="idx < 3 ? 'bg-amber-50/60 dark:bg-amber-900/10' : 'hover:bg-gray-50 dark:hover:bg-gray-800'"
+                >
+                  <div
+                    class="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white flex-shrink-0"
+                    :class="idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-gray-300'"
+                  >{{ idx + 1 }}</div>
+                  <Avatar :src="u.avatar" :size="28" class="flex-shrink-0">
+                    {{ u.username?.charAt(0) || '?' }}
+                  </Avatar>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-medium truncate text-gray-700 dark:text-gray-300">{{ u.username || `UID:${u.uid}` }}</span>
+                      <span class="text-xs text-orange-500 font-semibold flex-shrink-0 ml-1">¥{{ Number(u.total).toFixed(2) }}</span>
+                    </div>
+                    <div class="text-[10px] text-gray-400 leading-tight">UID:{{ u.uid }} · {{ u.orders }}单</div>
                   </div>
-                  <Progress
-                    :percent="topUsers[0] ? Math.round((u.total / topUsers[0].total) * 100) : 0"
-                    :show-info="false"
-                    :stroke-color="idx === 0 ? '#f59e0b' : idx === 1 ? '#9ca3af' : '#d97706'"
-                    size="small"
-                    class="mt-1"
-                  />
                 </div>
-                <span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{{ u.orders }}单</span>
               </div>
-            </div>
+              <div v-else class="flex flex-col items-center py-6 text-gray-400 dark:text-gray-500">
+                <CrownOutlined class="mb-1.5 text-xl" />
+                <span class="text-xs">暂无排行数据</span>
+              </div>
+            </Spin>
           </Card>
         </div>
       </div>

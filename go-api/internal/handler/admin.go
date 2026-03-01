@@ -26,6 +26,14 @@ func AdminDashboard(c *gin.Context) {
 	response.Success(c, stats)
 }
 
+// ===== 消费排行榜 =====
+
+func TopConsumers(c *gin.Context) {
+	period := c.DefaultQuery("period", "day")
+	list := adminService.GetTopConsumers(period)
+	response.Success(c, list)
+}
+
 // ===== 用户管理 =====
 
 func AdminUserList(c *gin.Context) {

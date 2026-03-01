@@ -770,6 +770,57 @@ func (s *AdminService) DashboardStats() (map[string]interface{}, error) {
 	return stats, nil
 }
 
+// GetTopConsumers 消费排行榜（公开给所有登录用户）
+// period: day / week / month
+func (s *AdminService) GetTopConsumers(period string) []map[string]interface{} {
+	var interval string
+	switch period {
+	case "week":
+		interval = "INTERVAL 6 DAY"
+	case "month":
+		interval = "INTERVAL 29 DAY"
+	default: // day
+		interval = "INTERVAL 0 DAY"
+	}
+
+	query := "SELECT o.uid, COALESCE(u.user,''), COALESCE(u.faceimg,''), COUNT(*), COALESCE(SUM(o.fees),0) " +
+		"FROM qingka_wangke_order o LEFT JOIN qingka_wangke_user u ON o.uid=u.uid " +
+		"WHERE o.addtime >= CURDATE() - " + interval + " " +
+		"GROUP BY o.uid ORDER BY SUM(o.fees) DESC LIMIT 10"
+
+	rows, err := database.DB.Query(query)
+	if err != nil {
+		return []map[string]interface{}{}
+	}
+	defer rows.Close()
+
+	var list []map[string]interface{}
+	for rows.Next() {
+		var uid, cnt int
+		var username, faceimg string
+		var total float64
+		rows.Scan(&uid, &username, &faceimg, &cnt, &total)
+
+		// 如果没有头像，尝试用 user 字段作为 QQ 号生成头像
+		avatar := faceimg
+		if avatar == "" && username != "" {
+			avatar = "https://q1.qlogo.cn/g?b=qq&nk=" + username + "&s=40"
+		}
+
+		list = append(list, map[string]interface{}{
+			"uid":      uid,
+			"username": username,
+			"avatar":   avatar,
+			"orders":   cnt,
+			"total":    total,
+		})
+	}
+	if list == nil {
+		list = []map[string]interface{}{}
+	}
+	return list
+}
+
 func (s *AdminService) getTopUsers(days int) []map[string]interface{} {
 	rows, err := database.DB.Query(
 		"SELECT o.uid, COALESCE(u.user,''), COUNT(*), COALESCE(SUM(o.fees),0) FROM qingka_wangke_order o LEFT JOIN qingka_wangke_user u ON o.uid=u.uid WHERE o.addtime >= CURDATE() - INTERVAL ? DAY GROUP BY o.uid ORDER BY SUM(o.fees) DESC LIMIT 5",

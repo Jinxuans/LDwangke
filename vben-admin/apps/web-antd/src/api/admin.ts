@@ -57,6 +57,19 @@ export async function getDashboardStatsApi() {
   return requestClient.get<DashboardStats>('/admin/dashboard');
 }
 
+// ===== 消费排行榜 =====
+export interface TopConsumer {
+  uid: number;
+  username: string;
+  avatar: string;
+  orders: number;
+  total: number;
+}
+
+export async function getTopConsumersApi(period: string = 'day') {
+  return requestClient.get<TopConsumer[]>('/top-consumers', { params: { period } });
+}
+
 // ===== 用户管理 =====
 export interface UserItem {
   uid: number;
