@@ -598,7 +598,7 @@ func (s *AdminService) AnnouncementList(req model.AnnouncementListRequest) ([]mo
 	offset := (req.Page - 1) * req.Limit
 	args2 := append(args, req.Limit, offset)
 	rows, err := database.DB.Query(
-		fmt.Sprintf("SELECT id, COALESCE(title,''), COALESCE(content,''), COALESCE(time,''), COALESCE(uid,0), COALESCE(status,'1'), COALESCE(zhiding,'0'), COALESCE(author,'') FROM qingka_wangke_gonggao WHERE %s ORDER BY zhiding DESC, id DESC LIMIT ? OFFSET ?", where),
+		fmt.Sprintf("SELECT id, COALESCE(title,''), COALESCE(content,''), COALESCE(time,''), COALESCE(uid,0), COALESCE(status,'1'), COALESCE(zhiding,'0'), COALESCE(author,''), COALESCE(visibility,0) FROM qingka_wangke_gonggao WHERE %s ORDER BY zhiding DESC, id DESC LIMIT ? OFFSET ?", where),
 		args2...,
 	)
 	if err != nil {
@@ -609,7 +609,7 @@ func (s *AdminService) AnnouncementList(req model.AnnouncementListRequest) ([]mo
 	var list []model.Announcement
 	for rows.Next() {
 		var a model.Announcement
-		rows.Scan(&a.ID, &a.Title, &a.Content, &a.Time, &a.UID, &a.Status, &a.Zhiding, &a.Author)
+		rows.Scan(&a.ID, &a.Title, &a.Content, &a.Time, &a.UID, &a.Status, &a.Zhiding, &a.Author, &a.Visibility)
 		list = append(list, a)
 	}
 	if list == nil {
