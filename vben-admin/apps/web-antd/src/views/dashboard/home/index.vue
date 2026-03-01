@@ -485,36 +485,6 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
             </Row>
           </Card>
 
-          <!-- 移动端公告 (仅在 lg 尺寸以下显示) -->
-          <Card size="small" class="mt-3 lg:hidden">
-            <template #title>
-              <div class="flex items-center gap-2">
-                <NotificationOutlined style="color:#f59e0b" /><span>公告</span>
-              </div>
-            </template>
-            <List :data-source="announcements" size="small" v-if="announcements.length > 0">
-              <template #renderItem="{ item }">
-                <ListItem style="cursor:pointer" @click="showAnnouncement(item)">
-                  <ListItemMeta>
-                    <template #title>
-                      <div class="flex items-center gap-2">
-                        <Tag v-if="item.zhiding === '1'" color="red" class="text-xs">置顶</Tag>
-                        <span class="text-sm font-medium">{{ item.title }}</span>
-                      </div>
-                    </template>
-                    <template #description>
-                      <div class="text-xs text-gray-400 dark:text-gray-500">{{ item.time }}</div>
-                    </template>
-                  </ListItemMeta>
-                </ListItem>
-              </template>
-            </List>
-            <div v-else class="flex flex-col items-center py-8 text-gray-400 dark:text-gray-500">
-              <NotificationOutlined class="mb-2 text-2xl" />
-              <span>暂无公告</span>
-            </div>
-          </Card>
-
           <!-- 图表区域 (管理员可见) -->
           <Row :gutter="[12, 12]" class="mt-3" v-if="hasAdminRole">
             <Col :xs="24" :lg="14">
