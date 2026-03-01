@@ -54,6 +54,60 @@ func NewXMService() *XMService {
 	}
 }
 
+// EnsureTable 确保小米运动相关表存在
+func (s *XMService) EnsureTable() {
+	_, err := database.DB.Exec(`CREATE TABLE IF NOT EXISTS xm_project (
+		id BIGINT NOT NULL AUTO_INCREMENT,
+		name VARCHAR(255) NOT NULL COMMENT '项目名称',
+		p_id INT DEFAULT 0 COMMENT '源项目ID',
+		status TINYINT DEFAULT 0 COMMENT '0上架 1下架',
+		description TEXT NULL COMMENT '项目说明',
+		price DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '单价',
+		url VARCHAR(255) DEFAULT NULL COMMENT '对接URL',
+		` + "`key`" + ` VARCHAR(255) DEFAULT NULL COMMENT '对接密钥',
+		uid VARCHAR(255) DEFAULT NULL COMMENT '对接UID',
+		token VARCHAR(1024) DEFAULT NULL COMMENT '对接JWT token',
+		type VARCHAR(50) DEFAULT NULL COMMENT '项目类型',
+		` + "`query`" + ` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否支持查询',
+		password TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否需要密码',
+		is_deleted TINYINT DEFAULT 0 COMMENT '软删除标记',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		PRIMARY KEY (id)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小米运动对接项目表'`)
+	if err != nil {
+		fmt.Printf("[XM] 建 xm_project 表失败: %v\n", err)
+	}
+
+	_, err = database.DB.Exec(`CREATE TABLE IF NOT EXISTS xm_order (
+		id BIGINT NOT NULL AUTO_INCREMENT,
+		y_oid BIGINT DEFAULT NULL COMMENT '源订单ID',
+		user_id BIGINT NOT NULL COMMENT '用户ID',
+		school VARCHAR(255) NOT NULL COMMENT '学校名称',
+		account VARCHAR(255) NOT NULL COMMENT '账号',
+		password VARCHAR(255) NOT NULL COMMENT '密码',
+		type INT DEFAULT NULL COMMENT '跑步类型',
+		project_id BIGINT NOT NULL COMMENT '项目ID',
+		status VARCHAR(50) NOT NULL COMMENT '订单状态',
+		total_km INT NOT NULL COMMENT '下单总公里数',
+		run_km FLOAT DEFAULT NULL COMMENT '已跑公里',
+		run_date JSON NOT NULL COMMENT '跑步日期',
+		start_day DATE NOT NULL COMMENT '开始日期',
+		start_time VARCHAR(5) NOT NULL COMMENT '每日开始时间',
+		end_time VARCHAR(5) NOT NULL COMMENT '每日结束时间',
+		deduction DECIMAL(18,2) DEFAULT 0 COMMENT '扣费金额',
+		is_deleted TINYINT(1) DEFAULT 0 COMMENT '软删除标记',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		PRIMARY KEY (id),
+		KEY idx_user_id (user_id),
+		KEY idx_is_deleted (is_deleted)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小米运动跑步订单表'`)
+	if err != nil {
+		fmt.Printf("[XM] 建 xm_order 表失败: %v\n", err)
+	}
+}
+
 // ---------- HTTP 工具 ----------
 
 func (s *XMService) httpRequest(method, reqURL string, body interface{}, headers map[string]string) (map[string]interface{}, error) {

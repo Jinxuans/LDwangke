@@ -9,6 +9,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// XMEnsureTable 启动时建表
+func XMEnsureTable() {
+	svc := service.NewXMService()
+	svc.EnsureTable()
+}
+
 // ---------- 小米运动 项目列表 ----------
 
 func XMGetProjects(c *gin.Context) {

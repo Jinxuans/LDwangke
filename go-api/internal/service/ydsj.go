@@ -92,6 +92,29 @@ func (s *YDSJService) EnsureTable() {
 	if err != nil {
 		fmt.Printf("[YDSJ] 建表失败: %v\n", err)
 	}
+
+	// 补列：表可能由旧版 init_db.sql 创建，缺少以下列
+	patchCols := []struct{ name, ddl string }{
+		{"school", "ADD COLUMN `school` varchar(255) NOT NULL DEFAULT '' COMMENT '学校' AFTER `uid`"},
+		{"distance", "ADD COLUMN `distance` varchar(255) NOT NULL DEFAULT '' COMMENT '总公里数' AFTER `pass`"},
+		{"start_hour", "ADD COLUMN `start_hour` varchar(255) NOT NULL DEFAULT '' COMMENT '开始小时' AFTER `run_type`"},
+		{"start_minute", "ADD COLUMN `start_minute` varchar(255) NOT NULL DEFAULT '' COMMENT '开始分钟' AFTER `start_hour`"},
+		{"end_hour", "ADD COLUMN `end_hour` varchar(255) NOT NULL DEFAULT '' COMMENT '结束小时' AFTER `start_minute`"},
+		{"end_minute", "ADD COLUMN `end_minute` varchar(255) NOT NULL DEFAULT '' COMMENT '结束分钟' AFTER `end_hour`"},
+		{"run_week", "ADD COLUMN `run_week` varchar(255) NOT NULL DEFAULT '' COMMENT '跑步周期' AFTER `end_minute`"},
+	}
+	for _, col := range patchCols {
+		var cnt int
+		database.DB.QueryRow("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='qingka_wangke_hzw_ydsj' AND COLUMN_NAME=?", col.name).Scan(&cnt)
+		if cnt == 0 {
+			_, e := database.DB.Exec("ALTER TABLE `qingka_wangke_hzw_ydsj` " + col.ddl)
+			if e != nil {
+				fmt.Printf("[YDSJ] 补列 %s 失败: %v\n", col.name, e)
+			} else {
+				fmt.Printf("[YDSJ] 补列 %s 成功\n", col.name)
+			}
+		}
+	}
 }
 
 // ---------- 学校列表 ----------
