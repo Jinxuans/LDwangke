@@ -180,6 +180,10 @@ func main() {
 		push.GET("/puplogin", handler.PushPupLogin)
 	}
 
+	// ===== PHP兼容路由（下游系统无需改代码，直接用 ?act=xxx 调用） =====
+	r.Any("/api.php", handler.OpenAPICompat)
+	r.Any("/api/index.php", handler.OpenAPICompat)
+
 	// ===== 外部API（密钥认证，对应 PHP apisub.php 密钥调用） =====
 	openapi := r.Group("/api/v1/open", middleware.APIKeyAuth())
 	{
