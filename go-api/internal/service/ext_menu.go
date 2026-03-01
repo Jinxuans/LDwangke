@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"go-api/internal/database"
@@ -20,7 +21,8 @@ func (s *ExtMenuService) List() ([]model.ExtMenu, error) {
 	rows, err := database.DB.Query(
 		"SELECT id, title, icon, url, sort_order, visible, scope, COALESCE(created_at,'') FROM qingka_ext_menu ORDER BY sort_order, id")
 	if err != nil {
-		return []model.ExtMenu{}, nil
+		log.Printf("[ExtMenu] List查询失败: %v", err)
+		return []model.ExtMenu{}, err
 	}
 	defer rows.Close()
 	var list []model.ExtMenu
@@ -42,7 +44,8 @@ func (s *ExtMenuService) ListByScope(scope string) ([]model.ExtMenu, error) {
 	rows, err := database.DB.Query(
 		"SELECT id, title, icon, url, sort_order, visible, scope, COALESCE(created_at,'') FROM qingka_ext_menu WHERE scope=? AND visible=1 ORDER BY sort_order, id", scope)
 	if err != nil {
-		return []model.ExtMenu{}, nil
+		log.Printf("[ExtMenu] ListByScope查询失败: %v", err)
+		return []model.ExtMenu{}, err
 	}
 	defer rows.Close()
 	var list []model.ExtMenu

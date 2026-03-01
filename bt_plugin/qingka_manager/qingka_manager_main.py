@@ -1657,7 +1657,7 @@ WantedBy=multi-user.target
         'qingka_smtp_config', 'qingka_email_pool', 'qingka_email_template',
         'qingka_email_log', 'qingka_email_send_log',
         # 平台/模块/菜单
-        'qingka_platform_config', 'qingka_dynamic_module', 'menu_config',
+        'qingka_platform_config', 'qingka_dynamic_module', 'menu_config', 'qingka_ext_menu',
         # 商城/租户
         'qingka_mall_pay_order', 'qingka_tenant', 'qingka_tenant_product', 'qingka_c_user',
         # 辅助模块
@@ -1670,6 +1670,8 @@ WantedBy=multi-user.target
         # 图图强国/土拨鼠
         'tutuqg', 'qingka_wangke_dialogue',
         'points_product', 'points_product_code', 'points_exchange_record',
+        # 智文论文
+        'qingka_wangke_lunwen',
     ]
 
     def _verify_tables(self, db_user, db_pass, db_name):

@@ -1,0 +1,14 @@
+在index.php添加
+控制台：<li> <a class="multitabs" href="paper_config">论文配置</a> </li>
+主页
+              <li class="nav-item nav-item-has-subnav">
+                <a href="javascript:void(0)"><i class="mdi mdi-file-document-box"></i> <span>论文</span></a>
+                <ul class="nav nav-subnav">
+                  <li> <a class="multitabs" href="paper_order">论文下单</a> </li>
+                  <li> <a class="multitabs" href="paper_dedup">论文降重/AIGC</a> </li>
+                  <li> <a class="multitabs" href="paper_para_edit">段落修改</a> </li>
+                  <li> <a class="multitabs" href="paper_list">论文管理</a> </li>
+                </ul>
+              </li>
+
+php需要安装fileinfo扩展----软件商店找到安装的php，点击设置-安装扩展

@@ -31,6 +31,7 @@ export interface PlatformConfig {
   always_username: boolean;
   pause_act: string;
   pause_path: string;
+  pause_id_param: string;
   resume_act: string;
   resume_path: string;
   change_pass_act: string;

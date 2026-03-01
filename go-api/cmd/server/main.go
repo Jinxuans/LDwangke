@@ -48,6 +48,9 @@ func main() {
 	// 初始化永夜运动表
 	handler.YongyeEnsureTable()
 
+	// 初始化智文论文表
+	handler.PaperEnsureTable()
+
 	// 初始化对接并发队列（5并发，1000缓冲）
 	// checker: 查 DB dockstatus=1 判断对接是否成功，用于准确统计 completed/failed
 	dockChecker := func(oid int64) bool {
@@ -455,6 +458,28 @@ func main() {
 			tbs.GET("/orders", handler.TuboshuOrderList)
 		}
 
+		// 智文论文
+		paper := api.Group("/paper")
+		{
+			paper.GET("/prices", handler.PaperPriceInfo)
+			paper.POST("/generate-titles", handler.PaperGenerateTitles)
+			paper.POST("/generate-outline", handler.PaperGenerateOutline)
+			paper.GET("/outline-status", handler.PaperOutlineStatus)
+			paper.POST("/order", handler.PaperOrderSubmit)
+			paper.GET("/orders", handler.PaperOrderList)
+			paper.GET("/download", handler.PaperDownload)
+			paper.POST("/text-rewrite", handler.PaperTextRewrite)
+			paper.POST("/text-rewrite-aigc", handler.PaperTextRewriteAIGC)
+			paper.POST("/para-edit", handler.PaperParaEdit)
+			paper.POST("/file-dedup", handler.PaperFileDedupSubmit)
+			paper.POST("/count-words", handler.PaperCountWords)
+			paper.POST("/upload-cover", handler.PaperUploadCover)
+			paper.GET("/templates", handler.PaperGetTemplates)
+			paper.POST("/template", handler.PaperSaveTemplate)
+			paper.POST("/generate-task", handler.PaperGenerateTaskWithFee)
+			paper.POST("/generate-proposal", handler.PaperGenerateProposalWithFee)
+		}
+
 		// 动态模块（运动/实习/论文）
 		api.GET("/modules", handler.ModuleList)
 		api.GET("/module/:app_id/frame-url", handler.ModuleFrameURL)
@@ -627,6 +652,10 @@ func main() {
 			admin.GET("/tuboshu/config", handler.TuboshuConfigGet)
 			admin.POST("/tuboshu/config", handler.TuboshuConfigSave)
 			admin.POST("/tuboshu/price-config", handler.TuboshuSavePriceConfig)
+
+			// 智文论文配置
+			admin.GET("/paper/config", handler.PaperConfigGet)
+			admin.POST("/paper/config", handler.PaperConfigSave)
 
 			// YF打卡配置
 			admin.GET("/yfdk/config", handler.YFDKConfigGet)

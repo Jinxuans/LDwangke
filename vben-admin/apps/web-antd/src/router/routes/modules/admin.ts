@@ -202,6 +202,12 @@ const routes: RouteRecordRaw[] = [
             component: () => import('#/views/admin/sync-monitor.vue'),
             meta: { icon: 'mdi:sync-circle', order: 4, title: '商品同步监控' },
           },
+          {
+            name: 'AdminPaperConfig',
+            path: '/admin/paper-config',
+            component: () => import('#/views/admin/paper-config.vue'),
+            meta: { icon: 'mdi:file-document-box', order: 5, title: '智文论文配置' },
+          },
         ],
       },
 

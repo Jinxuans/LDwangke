@@ -85,6 +85,7 @@ function openAdd() {
     progress_no_yid: 'chadan',
     progress_method: 'POST',
     pause_act: 'zt',
+    pause_id_param: 'id',
     change_pass_act: 'gaimi',
     change_pass_param: 'newPwd',
     change_pass_id_param: 'id',
@@ -180,6 +181,7 @@ function applyPHPResult() {
     progress_method: r.progress_method || 'POST',
     pause_act: r.pause_act || 'zt',
     pause_path: r.pause_path || '',
+    pause_id_param: r.pause_id_param || 'id',
     change_pass_act: r.change_pass_act || 'gaimi',
     change_pass_path: r.change_pass_path || '',
     change_pass_param: r.change_pass_param || 'newPwd',
@@ -252,6 +254,7 @@ function applyDetectResult() {
     progress_method: cfg.progress_method || 'POST',
     pause_act: cfg.pause_act || '',
     pause_path: cfg.pause_path || '',
+    pause_id_param: cfg.pause_id_param || 'id',
     change_pass_act: cfg.change_pass_act || '',
     change_pass_path: cfg.change_pass_path || '',
     change_pass_param: 'newPwd',
@@ -516,6 +519,9 @@ onMounted(loadData);
               </FormItem>
             </div>
             <div class="grid grid-cols-2 gap-x-4">
+              <FormItem label="暂停ID参数">
+                <Input v-model:value="editForm.pause_id_param" placeholder="id" />
+              </FormItem>
               <FormItem label="恢复 act">
                 <Input v-model:value="editForm.resume_act" />
               </FormItem>

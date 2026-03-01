@@ -656,6 +656,7 @@ CREATE TABLE IF NOT EXISTS `qingka_platform_config` (
   `always_username` tinyint(4) NOT NULL DEFAULT 0 COMMENT '进度始终传username',
   `pause_act` varchar(50) NOT NULL DEFAULT 'zt' COMMENT '暂停act',
   `pause_path` varchar(200) NOT NULL DEFAULT '' COMMENT '非标准暂停路径',
+  `pause_id_param` varchar(50) NOT NULL DEFAULT 'id' COMMENT '暂停订单ID参数名',
   `resume_act` varchar(50) NOT NULL DEFAULT '' COMMENT '恢复act',
   `resume_path` varchar(200) NOT NULL DEFAULT '' COMMENT '非标准恢复路径',
   `change_pass_act` varchar(50) NOT NULL DEFAULT 'gaimi' COMMENT '改密act',
@@ -663,6 +664,7 @@ CREATE TABLE IF NOT EXISTS `qingka_platform_config` (
   `change_pass_param` varchar(50) NOT NULL DEFAULT 'newPwd' COMMENT '新密码参数名',
   `change_pass_id_param` varchar(50) NOT NULL DEFAULT 'id' COMMENT '改密订单ID参数名',
   `resubmit_path` varchar(200) NOT NULL DEFAULT '' COMMENT '非标准补单路径',
+  `resubmit_id_param` varchar(50) NOT NULL DEFAULT 'id' COMMENT '补单订单ID参数名',
   `log_act` varchar(50) NOT NULL DEFAULT 'xq' COMMENT '日志act',
   `log_path` varchar(200) NOT NULL DEFAULT '' COMMENT '非标准日志路径',
   `log_method` varchar(10) NOT NULL DEFAULT 'POST' COMMENT '日志请求方式',
@@ -983,6 +985,19 @@ CREATE TABLE IF NOT EXISTS `menu_config` (
   UNIQUE KEY `uk_menu_key` (`menu_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='菜单配置表';
 
+-- 42. 扩展菜单表
+CREATE TABLE IF NOT EXISTS `qingka_ext_menu` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `title` varchar(100) NOT NULL DEFAULT '' COMMENT '菜单标题',
+  `icon` varchar(100) DEFAULT '' COMMENT '图标',
+  `url` varchar(500) NOT NULL DEFAULT '' COMMENT '页面地址',
+  `sort_order` int(11) DEFAULT 0 COMMENT '排序',
+  `visible` int(11) DEFAULT 1 COMMENT '1=显示 0=隐藏',
+  `scope` varchar(20) DEFAULT 'backend' COMMENT 'frontend/backend',
+  `created_at` varchar(50) DEFAULT '' COMMENT '创建时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='扩展菜单表';
+
 -- =============================================
 -- 默认数据
 -- =============================================
@@ -1230,3 +1245,32 @@ CREATE TABLE IF NOT EXISTS `yy_ydsj_student` (
   KEY `idx_uid` (`uid`),
   KEY `idx_user` (`user`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='永夜运动学生表';
+
+-- 45. 智文论文订单表
+CREATE TABLE IF NOT EXISTS `qingka_wangke_lunwen` (
+  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `uid` int(11) UNSIGNED NOT NULL DEFAULT 0 COMMENT '用户ID',
+  `order_id` varchar(255) DEFAULT NULL COMMENT '上游订单ID',
+  `shopcode` varchar(100) DEFAULT NULL COMMENT '商品代码',
+  `title` varchar(255) DEFAULT NULL COMMENT '论文标题',
+  `price` decimal(10,2) UNSIGNED DEFAULT NULL COMMENT '扣费价格',
+  PRIMARY KEY (`id`),
+  KEY `idx_uid` (`uid`),
+  KEY `idx_order_id` (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智文论文订单表';
+
+-- 智文论文默认配置
+INSERT IGNORE INTO `qingka_wangke_config` (v, k) VALUES
+('lunwen_api_username',''),
+('lunwen_api_password',''),
+('lunwen_api_6000_price','30'),
+('lunwen_api_8000_price','40'),
+('lunwen_api_10000_price','50'),
+('lunwen_api_12000_price','60'),
+('lunwen_api_15000_price','75'),
+('lunwen_api_rws_price','10'),
+('lunwen_api_ktbg_price','10'),
+('lunwen_api_jdaigchj_price','10'),
+('lunwen_api_xgdl_price','3'),
+('lunwen_api_jcl_price','3'),
+('lunwen_api_jdaigcl_price','3');

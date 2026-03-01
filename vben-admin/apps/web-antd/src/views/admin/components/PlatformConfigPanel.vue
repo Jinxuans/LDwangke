@@ -74,7 +74,7 @@ function openAdd() {
     auth_type: 'uid_key', api_path_style: 'standard', success_codes: '0',
     query_act: 'get', order_act: 'add', progress_act: 'chadan2',
     progress_no_yid: 'chadan', progress_method: 'POST', pause_act: 'zt',
-    change_pass_act: 'gaimi', change_pass_param: 'newPwd', change_pass_id_param: 'id',
+    pause_id_param: 'id', change_pass_act: 'gaimi', change_pass_param: 'newPwd', change_pass_id_param: 'id',
     log_act: 'xq', log_method: 'POST', log_id_param: 'id',
     balance_act: 'getmoney', balance_money_field: 'money', balance_method: 'POST', balance_auth_type: '',
   };
@@ -134,7 +134,7 @@ function applyPHPResult() {
     order_act: r.order_act || 'add', order_path: r.order_path || '',
     progress_act: r.progress_act || 'chadan2', progress_path: r.progress_path || '',
     progress_method: r.progress_method || 'POST', pause_act: r.pause_act || 'zt',
-    pause_path: r.pause_path || '', change_pass_act: r.change_pass_act || 'gaimi',
+    pause_path: r.pause_path || '', pause_id_param: r.pause_id_param || 'id', change_pass_act: r.change_pass_act || 'gaimi',
     change_pass_path: r.change_pass_path || '', change_pass_param: r.change_pass_param || 'newPwd',
     change_pass_id_param: r.change_pass_id_param || 'id', log_act: r.log_act || 'xq',
     log_path: r.log_path || '', log_id_param: r.log_id_param || 'id',
@@ -177,7 +177,7 @@ function applyDetectResult() {
     progress_act: cfg.progress_act || '', progress_no_yid: cfg.progress_no_yid || '',
     progress_path: cfg.progress_path || '', progress_method: cfg.progress_method || 'POST',
     pause_act: cfg.pause_act || '', pause_path: cfg.pause_path || '',
-    change_pass_act: cfg.change_pass_act || '', change_pass_path: cfg.change_pass_path || '',
+    pause_id_param: cfg.pause_id_param || 'id', change_pass_act: cfg.change_pass_act || '', change_pass_path: cfg.change_pass_path || '',
     change_pass_param: 'newPwd', change_pass_id_param: 'id',
     resubmit_path: cfg.resubmit_path || '', resubmit_id_param: cfg.resubmit_id_param || 'id', refresh_path: cfg.refresh_path || '',
     log_act: cfg.log_act || '', log_path: cfg.log_path || '',
@@ -349,6 +349,7 @@ onMounted(loadData);
               <FormItem label="暂停路径"><Input v-model:value="editForm.pause_path" placeholder="如 /api/stop" /></FormItem>
             </div>
             <div class="grid grid-cols-2 gap-x-4">
+              <FormItem label="暂停ID参数"><Input v-model:value="editForm.pause_id_param" placeholder="id" /></FormItem>
               <FormItem label="恢复 act"><Input v-model:value="editForm.resume_act" /></FormItem>
               <FormItem label="恢复路径"><Input v-model:value="editForm.resume_path" /></FormItem>
             </div>

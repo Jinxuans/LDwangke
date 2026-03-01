@@ -360,13 +360,13 @@ onMounted(() => {
             <div
               v-for="(item, index) in frontendMenus"
               :key="item.menu_key"
-              class="group rounded-lg border bg-white p-3 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+              class="group rounded-lg border bg-white p-2 sm:p-3 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
               :class="[
-                item.level === 0 ? 'border-blue-200 dark:border-blue-800' : 'border-gray-200 ml-8',
+                item.level === 0 ? 'border-blue-200 dark:border-blue-800' : 'border-gray-200 ml-4 sm:ml-8',
                 item.visible === 0 ? 'opacity-50' : '',
               ]"
             >
-              <div class="flex items-center gap-3">
+              <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3">
                 <!-- 图标（点击编辑） -->
                 <Popover
                   :open="editingIconKey === item.menu_key"
@@ -375,7 +375,7 @@ onMounted(() => {
                   @openChange="(v: boolean) => { if (v) startEditIcon(item); else cancelEditIcon(); }"
                 >
                   <template #content>
-                    <div style="width: 320px">
+                    <div style="width: 280px; max-width: 100vw">
                       <div class="mb-2">
                         <div class="text-xs text-gray-400 mb-1">输入图标名称（如 mdi:home）</div>
                         <div class="flex items-center gap-2">
@@ -388,7 +388,7 @@ onMounted(() => {
                         <IconifyIcon :icon="editingIconValue" :style="{ fontSize: '20px' }" />
                       </div>
                       <div class="text-xs text-gray-400 mb-1">常用图标（点击选择）</div>
-                      <div class="grid grid-cols-8 gap-0.5 max-h-[180px] overflow-y-auto" style="scrollbar-width: thin">
+                      <div class="grid grid-cols-6 sm:grid-cols-8 gap-0.5 max-h-[180px] overflow-y-auto" style="scrollbar-width: thin">
                         <Tooltip v-for="ic in commonMdiIcons" :key="ic" :title="ic">
                           <div
                             class="flex items-center justify-center rounded cursor-pointer h-8 w-8 transition-colors"
@@ -403,66 +403,68 @@ onMounted(() => {
                   </template>
                   <Tooltip title="点击修改图标">
                     <div
-                      class="flex h-9 w-9 items-center justify-center rounded-lg text-lg cursor-pointer transition-all hover:ring-2 hover:ring-blue-300"
+                      class="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg text-lg cursor-pointer transition-all hover:ring-2 hover:ring-blue-300 flex-shrink-0"
                       :class="item.level === 0 ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-50 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
                     >
-                      <IconifyIcon v-if="item.icon" :icon="item.icon" :style="{ fontSize: '18px' }" />
+                      <IconifyIcon v-if="item.icon" :icon="item.icon" :style="{ fontSize: '16px' }" class="sm:text-[18px]" />
                       <span v-else class="text-sm">-</span>
                     </div>
                   </Tooltip>
                 </Popover>
 
                 <!-- 标题 + key -->
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-2">
-                    <Tag v-if="item.level === 0" color="blue" class="m-0" style="font-size:11px">顶级</Tag>
-                    <Tag v-else color="green" class="m-0" style="font-size:11px">子级</Tag>
+                <div class="min-w-0 flex-1 w-full sm:w-auto flex flex-col justify-center">
+                  <div class="flex items-center gap-1 sm:gap-2 flex-wrap">
+                    <Tag v-if="item.level === 0" color="blue" class="m-0" style="font-size:10px; line-height: 16px; padding: 0 4px;">顶级</Tag>
+                    <Tag v-else color="green" class="m-0" style="font-size:10px; line-height: 16px; padding: 0 4px;">子级</Tag>
                     <!-- 内联编辑标题 -->
                     <template v-if="editingKey === item.menu_key">
-                      <Input v-model:value="editingTitle" size="small" style="width:140px" @press-enter="confirmEditTitle(item)" />
-                      <Button type="link" size="small" @click="confirmEditTitle(item)"><CheckOutlined /></Button>
-                      <Button type="link" size="small" danger @click="cancelEditTitle">取消</Button>
+                      <Input v-model:value="editingTitle" size="small" class="w-24 sm:w-[140px]" @press-enter="confirmEditTitle(item)" />
+                      <Button type="link" size="small" class="px-1" @click="confirmEditTitle(item)"><CheckOutlined /></Button>
+                      <Button type="link" size="small" danger class="px-1" @click="cancelEditTitle">取消</Button>
                     </template>
                     <template v-else>
-                      <span class="font-medium text-sm text-gray-800 dark:text-gray-200">{{ item.title }}</span>
+                      <span class="font-medium text-xs sm:text-sm text-gray-800 dark:text-gray-200 truncate max-w-[120px] sm:max-w-none">{{ item.title }}</span>
                       <Tooltip title="编辑标题">
                         <EditOutlined class="cursor-pointer text-gray-300 hover:text-blue-500 transition-colors text-xs" @click="startEditTitle(item)" />
                       </Tooltip>
                     </template>
                   </div>
-                  <div class="text-xs text-gray-400 mt-0.5 font-mono">{{ item.menu_key }}</div>
+                  <div class="text-[10px] sm:text-xs text-gray-400 mt-0.5 font-mono truncate max-w-[160px] sm:max-w-none" :title="item.menu_key">{{ item.menu_key }}</div>
                 </div>
 
-                <!-- 排序 -->
-                <div class="flex items-center gap-1">
-                  <span class="text-xs text-gray-400 mr-1 hidden sm:inline">排序</span>
-                  <InputNumber v-model:value="item.sort_order" :min="-99" :max="999" size="small" style="width:70px" />
+                <div class="flex items-center gap-2 sm:gap-3 ml-auto w-full sm:w-auto justify-end border-t sm:border-t-0 pt-2 sm:pt-0 mt-1 sm:mt-0 border-gray-100 dark:border-gray-700">
+                  <!-- 排序 -->
+                  <div class="flex items-center gap-1">
+                    <span class="text-[10px] sm:text-xs text-gray-400 mr-1 hidden sm:inline">排序</span>
+                    <InputNumber v-model:value="item.sort_order" :min="-99" :max="999" size="small" class="w-14 sm:w-[70px]" />
+                  </div>
+
+                  <!-- 显示开关 -->
+                  <Tooltip :title="item.visible === 1 ? '点击隐藏' : '点击显示'">
+                    <Switch
+                      :checked="item.visible === 1"
+                      @change="(val: boolean) => (item.visible = val ? 1 : 0)"
+                      size="small"
+                      :checked-children="'显'"
+                      :un-checked-children="'隐'"
+                    />
+                  </Tooltip>
+
+                  <!-- 排序按钮 -->
+                  <Space size="small" :size="4">
+                    <Tooltip title="上移">
+                      <Button size="small" shape="circle" class="w-6 h-6 min-w-0" :disabled="index === 0" @click="moveUp(frontendMenus, index)">
+                        <template #icon><UpOutlined class="text-[10px]" /></template>
+                      </Button>
+                    </Tooltip>
+                    <Tooltip title="下移">
+                      <Button size="small" shape="circle" class="w-6 h-6 min-w-0" :disabled="index === frontendMenus.length - 1" @click="moveDown(frontendMenus, index)">
+                        <template #icon><DownOutlined class="text-[10px]" /></template>
+                      </Button>
+                    </Tooltip>
+                  </Space>
                 </div>
-
-                <!-- 显示开关 -->
-                <Tooltip :title="item.visible === 1 ? '点击隐藏' : '点击显示'">
-                  <Switch
-                    :checked="item.visible === 1"
-                    @change="(val: boolean) => (item.visible = val ? 1 : 0)"
-                    size="small"
-                    :checked-children="'显'"
-                    :un-checked-children="'隐'"
-                  />
-                </Tooltip>
-
-                <!-- 排序按钮 -->
-                <Space size="small">
-                  <Tooltip title="上移">
-                    <Button size="small" shape="circle" :disabled="index === 0" @click="moveUp(frontendMenus, index)">
-                      <template #icon><UpOutlined /></template>
-                    </Button>
-                  </Tooltip>
-                  <Tooltip title="下移">
-                    <Button size="small" shape="circle" :disabled="index === frontendMenus.length - 1" @click="moveDown(frontendMenus, index)">
-                      <template #icon><DownOutlined /></template>
-                    </Button>
-                  </Tooltip>
-                </Space>
               </div>
             </div>
           </div>
@@ -474,13 +476,13 @@ onMounted(() => {
             <div
               v-for="(item, index) in backendMenus"
               :key="item.menu_key"
-              class="group rounded-lg border bg-white p-3 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+              class="group rounded-lg border bg-white p-2 sm:p-3 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
               :class="[
-                item.level === 1 ? 'border-indigo-200 dark:border-indigo-800' : 'border-gray-200 ml-8',
+                item.level === 1 ? 'border-indigo-200 dark:border-indigo-800' : 'border-gray-200 ml-4 sm:ml-8',
                 item.visible === 0 ? 'opacity-50' : '',
               ]"
             >
-              <div class="flex items-center gap-3">
+              <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3">
                 <!-- 图标（点击编辑） -->
                 <Popover
                   :open="editingIconKey === item.menu_key"
@@ -489,7 +491,7 @@ onMounted(() => {
                   @openChange="(v: boolean) => { if (v) startEditIcon(item); else cancelEditIcon(); }"
                 >
                   <template #content>
-                    <div style="width: 320px">
+                    <div style="width: 280px; max-width: 100vw">
                       <div class="mb-2">
                         <div class="text-xs text-gray-400 mb-1">输入图标名称（如 mdi:home）</div>
                         <div class="flex items-center gap-2">
@@ -502,7 +504,7 @@ onMounted(() => {
                         <IconifyIcon :icon="editingIconValue" :style="{ fontSize: '20px' }" />
                       </div>
                       <div class="text-xs text-gray-400 mb-1">常用图标（点击选择）</div>
-                      <div class="grid grid-cols-8 gap-0.5 max-h-[180px] overflow-y-auto" style="scrollbar-width: thin">
+                      <div class="grid grid-cols-6 sm:grid-cols-8 gap-0.5 max-h-[180px] overflow-y-auto" style="scrollbar-width: thin">
                         <Tooltip v-for="ic in commonMdiIcons" :key="ic" :title="ic">
                           <div
                             class="flex items-center justify-center rounded cursor-pointer h-8 w-8 transition-colors"
@@ -517,65 +519,67 @@ onMounted(() => {
                   </template>
                   <Tooltip title="点击修改图标">
                     <div
-                      class="flex h-9 w-9 items-center justify-center rounded-lg text-lg cursor-pointer transition-all hover:ring-2 hover:ring-blue-300"
+                      class="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg text-lg cursor-pointer transition-all hover:ring-2 hover:ring-blue-300 flex-shrink-0"
                       :class="item.level === 1 ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-gray-50 text-gray-500 dark:bg-gray-700 dark:text-gray-400'"
                     >
-                      <IconifyIcon v-if="item.icon" :icon="item.icon" :style="{ fontSize: '18px' }" />
+                      <IconifyIcon v-if="item.icon" :icon="item.icon" :style="{ fontSize: '16px' }" class="sm:text-[18px]" />
                       <span v-else class="text-sm">-</span>
                     </div>
                   </Tooltip>
                 </Popover>
 
                 <!-- 标题 + key -->
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-2">
-                    <Tag v-if="item.level === 1" color="blue" class="m-0" style="font-size:11px">分组</Tag>
-                    <Tag v-else color="green" class="m-0" style="font-size:11px">子级</Tag>
+                <div class="min-w-0 flex-1 w-full sm:w-auto flex flex-col justify-center">
+                  <div class="flex items-center gap-1 sm:gap-2 flex-wrap">
+                    <Tag v-if="item.level === 1" color="blue" class="m-0" style="font-size:10px; line-height: 16px; padding: 0 4px;">分组</Tag>
+                    <Tag v-else color="green" class="m-0" style="font-size:10px; line-height: 16px; padding: 0 4px;">子级</Tag>
                     <template v-if="editingKey === item.menu_key">
-                      <Input v-model:value="editingTitle" size="small" style="width:140px" @press-enter="confirmEditTitle(item)" />
-                      <Button type="link" size="small" @click="confirmEditTitle(item)"><CheckOutlined /></Button>
-                      <Button type="link" size="small" danger @click="cancelEditTitle">取消</Button>
+                      <Input v-model:value="editingTitle" size="small" class="w-24 sm:w-[140px]" @press-enter="confirmEditTitle(item)" />
+                      <Button type="link" size="small" class="px-1" @click="confirmEditTitle(item)"><CheckOutlined /></Button>
+                      <Button type="link" size="small" danger class="px-1" @click="cancelEditTitle">取消</Button>
                     </template>
                     <template v-else>
-                      <span class="font-medium text-sm text-gray-800 dark:text-gray-200">{{ item.title }}</span>
+                      <span class="font-medium text-xs sm:text-sm text-gray-800 dark:text-gray-200 truncate max-w-[120px] sm:max-w-none">{{ item.title }}</span>
                       <Tooltip title="编辑标题">
                         <EditOutlined class="cursor-pointer text-gray-300 hover:text-blue-500 transition-colors text-xs" @click="startEditTitle(item)" />
                       </Tooltip>
                     </template>
                   </div>
-                  <div class="text-xs text-gray-400 mt-0.5 font-mono">{{ item.menu_key }}</div>
+                  <div class="text-[10px] sm:text-xs text-gray-400 mt-0.5 font-mono truncate max-w-[160px] sm:max-w-none" :title="item.menu_key">{{ item.menu_key }}</div>
                 </div>
 
-                <!-- 排序 -->
-                <div class="flex items-center gap-1">
-                  <span class="text-xs text-gray-400 mr-1 hidden sm:inline">排序</span>
-                  <InputNumber v-model:value="item.sort_order" :min="-99" :max="999" size="small" style="width:70px" />
+                <div class="flex items-center gap-2 sm:gap-3 ml-auto w-full sm:w-auto justify-end border-t sm:border-t-0 pt-2 sm:pt-0 mt-1 sm:mt-0 border-gray-100 dark:border-gray-700">
+                  <!-- 排序 -->
+                  <div class="flex items-center gap-1">
+                    <span class="text-[10px] sm:text-xs text-gray-400 mr-1 hidden sm:inline">排序</span>
+                    <InputNumber v-model:value="item.sort_order" :min="-99" :max="999" size="small" class="w-14 sm:w-[70px]" />
+                  </div>
+
+                  <!-- 显示开关 -->
+                  <Tooltip :title="item.visible === 1 ? '点击隐藏' : '点击显示'">
+                    <Switch
+                      :checked="item.visible === 1"
+                      @change="(val: boolean) => (item.visible = val ? 1 : 0)"
+                      size="small"
+                      :checked-children="'显'"
+                      :un-checked-children="'隐'"
+                    />
+                  </Tooltip>
+
+                  <!-- 排序按钮 -->
+                  <Space size="small" :size="4">
+                    <Tooltip title="上移">
+                      <Button size="small" shape="circle" class="w-6 h-6 min-w-0" :disabled="index === 0" @click="moveUp(backendMenus, index)">
+                        <template #icon><UpOutlined class="text-[10px]" /></template>
+                      </Button>
+                    </Tooltip>
+                    <Tooltip title="下移">
+                      <Button size="small" shape="circle" class="w-6 h-6 min-w-0" :disabled="index === backendMenus.length - 1" @click="moveDown(backendMenus, index)">
+                        <template #icon><DownOutlined class="text-[10px]" /></template>
+                      </Button>
+                    </Tooltip>
+                  </Space>
                 </div>
-
-                <!-- 显示开关 -->
-                <Tooltip :title="item.visible === 1 ? '点击隐藏' : '点击显示'">
-                  <Switch
-                    :checked="item.visible === 1"
-                    @change="(val: boolean) => (item.visible = val ? 1 : 0)"
-                    size="small"
-                    :checked-children="'显'"
-                    :un-checked-children="'隐'"
-                  />
-                </Tooltip>
-
-                <!-- 排序按钮 -->
-                <Space size="small">
-                  <Tooltip title="上移">
-                    <Button size="small" shape="circle" :disabled="index === 0" @click="moveUp(backendMenus, index)">
-                      <template #icon><UpOutlined /></template>
-                    </Button>
-                  </Tooltip>
-                  <Tooltip title="下移">
-                    <Button size="small" shape="circle" :disabled="index === backendMenus.length - 1" @click="moveDown(backendMenus, index)">
-                      <template #icon><DownOutlined /></template>
-                    </Button>
-                  </Tooltip>
-                </Space>
               </div>
             </div>
           </div>

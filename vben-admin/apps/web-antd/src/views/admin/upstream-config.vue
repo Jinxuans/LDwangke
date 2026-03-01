@@ -44,6 +44,10 @@ import {
   getYongyeConfig, saveYongyeConfig,
   type YongyeConfig,
 } from '#/api/yongye';
+import {
+  paperConfigGetApi, paperConfigSaveApi,
+  type PaperConfig,
+} from '#/api/paper';
 
 // ========== 状态 ==========
 const loading = ref(false);
@@ -132,6 +136,13 @@ const yongyeConfig = reactive<YongyeConfig>({
   tcgg: '',
 });
 const yongyeSaving = ref(false);
+
+// 智文论文
+const paperConfig = reactive<Partial<PaperConfig>>({
+  lunwen_api_username: '',
+  lunwen_api_password: '',
+});
+const paperSaving = ref(false);
 
 // 小米运动项目
 const xmProjects = ref<XMProjectItem[]>([]);
@@ -257,7 +268,7 @@ async function deleteWApp(id: number) {
 async function loadAll() {
   loading.value = true;
   try {
-    const [tutuqgRes, yfdkRes, sxdkRes, hzwRes, tuboshuRes, appuiRes, sdxyRes, ydsjRes, yongyeRes] = await Promise.allSettled([
+    const [tutuqgRes, yfdkRes, sxdkRes, hzwRes, tuboshuRes, appuiRes, sdxyRes, ydsjRes, yongyeRes, paperRes] = await Promise.allSettled([
       tutuqgUpstreamConfigGetApi(),
       yfdkConfigGetApi(),
       sxdkConfigGetApi(),
@@ -267,6 +278,7 @@ async function loadAll() {
       sdxyConfigGetApi(),
       ydsjConfigGetApi(),
       getYongyeConfig(),
+      paperConfigGetApi(),
     ]);
 
     if (tutuqgRes.status === 'fulfilled' && tutuqgRes.value) {
@@ -295,6 +307,9 @@ async function loadAll() {
     }
     if (yongyeRes.status === 'fulfilled' && yongyeRes.value) {
       Object.assign(yongyeConfig, yongyeRes.value);
+    }
+    if (paperRes.status === 'fulfilled' && paperRes.value) {
+      Object.assign(paperConfig, paperRes.value);
     }
   } catch (e) {
     console.error('加载对接配置失败:', e);
@@ -409,6 +424,18 @@ async function saveYongye() {
     message.error(e?.message || '保存失败');
   } finally {
     yongyeSaving.value = false;
+  }
+}
+
+async function savePaper() {
+  paperSaving.value = true;
+  try {
+    await paperConfigSaveApi({ ...paperConfig } as PaperConfig);
+    message.success('智文论文配置保存成功');
+  } catch (e: any) {
+    message.error(e?.message || '保存失败');
+  } finally {
+    paperSaving.value = false;
   }
 }
 
@@ -546,6 +573,29 @@ onMounted(() => {
                     </FormItem>
                   </Form>
                   <Alert message="Token 在货源中心配置，价格可在论文页面修改。" type="info" show-icon class="mt-2" />
+                </Card>
+              </Col>
+
+              <!-- 智文论文 -->
+              <Col :xs="24" :md="12" :xl="8">
+                <Card :bordered="false" class="cfg-card">
+                  <template #title>
+                    <span class="card-title">智文论文</span>
+                    <Tag v-if="isConfigured(paperConfig.lunwen_api_username || '')" color="success" class="ml-2">已配置</Tag>
+                    <Tag v-else color="default" class="ml-2">未配置</Tag>
+                  </template>
+                  <template #extra>
+                    <Button type="primary" size="small" :loading="paperSaving" @click="savePaper">保存</Button>
+                  </template>
+                  <Form layout="vertical" :colon="false">
+                    <FormItem label="API 账号">
+                      <Input v-model:value="paperConfig.lunwen_api_username" placeholder="请输入登录账号" />
+                    </FormItem>
+                    <FormItem label="API 密码">
+                      <Input.Password v-model:value="paperConfig.lunwen_api_password" placeholder="请输入登录密码" />
+                    </FormItem>
+                  </Form>
+                  <Alert message="价格配置请前往 后台管理 → 上游对接 → 智文论文配置 页面修改。" type="info" show-icon class="mt-2" />
                 </Card>
               </Col>
 
