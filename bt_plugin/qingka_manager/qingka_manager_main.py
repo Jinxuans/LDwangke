@@ -858,7 +858,7 @@ WantedBy=multi-user.target
         proxy_read_timeout 120s;
     }
 
-    # PHP 桥接代理（Go 反向代理到 PHP 后端）
+    # PHP API 反向代理（Go 反向代理到 PHP 后端）
     location /php-api/ {
         proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host $host;
