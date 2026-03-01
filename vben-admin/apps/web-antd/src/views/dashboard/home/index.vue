@@ -340,7 +340,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
       <Alert v-if="siteNotice" type="info" show-icon :message="siteNotice" class="mb-4" />
 
       <!-- 左右两栏布局 -->
-      <div class="flex gap-3" style="align-items: flex-start">
+      <div class="flex gap-3" style="align-items: stretch">
         <!-- 左侧：主内容区，占满剩余宽度 -->
         <div class="min-w-0 flex-1">
           <!-- 统计卡片 -->
@@ -580,6 +580,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
 
         <!-- 右侧：固定 300px 侧边栏 (公告 + 排行等) -->
         <div class="hidden lg:flex flex-col gap-3" style="width: 300px; flex-shrink: 0">
+          <!-- 公告卡片 -->
           <Card size="small" :body-style="{ padding: '8px 12px' }">
             <template #title>
               <div class="flex items-center gap-2">
@@ -610,7 +611,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
           </Card>
 
           <!-- 消费排行榜（所有用户可见） -->
-          <Card size="small" :body-style="{ padding: '8px 12px' }">
+          <Card size="small" :body-style="{ padding: '8px 12px' }" class="flex-1 flex flex-col" style="min-height: 400px;">
             <template #title>
               <div class="flex items-center gap-2">
                 <CrownOutlined style="color:#f59e0b" /><span>消费排行</span>
@@ -619,33 +620,33 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
             <template #extra>
               <Segmented v-model:value="rankPeriod" size="small" :options="rankPeriodOptions" />
             </template>
-            <Spin :spinning="rankLoading" size="small">
-              <div v-if="rankList.length > 0" class="space-y-1.5">
+            <Spin :spinning="rankLoading" size="small" class="flex-1">
+              <div v-if="rankList.length > 0" class="space-y-2 h-full">
                 <div
                   v-for="(u, idx) in rankList"
                   :key="u.uid"
-                  class="flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors"
+                  class="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors"
                   :class="idx < 3 ? 'bg-amber-50/60 dark:bg-amber-900/10' : 'hover:bg-gray-50 dark:hover:bg-gray-800'"
                 >
                   <div
                     class="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white flex-shrink-0"
                     :class="idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-gray-300'"
                   >{{ idx + 1 }}</div>
-                  <Avatar :src="u.avatar" :size="28" class="flex-shrink-0">
+                  <Avatar :src="u.avatar" :size="32" class="flex-shrink-0 shadow-sm border border-gray-100 dark:border-gray-700">
                     {{ u.username?.charAt(0) || '?' }}
                   </Avatar>
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-center justify-between">
-                      <span class="text-xs font-medium truncate text-gray-700 dark:text-gray-300">{{ u.username || `UID:${u.uid}` }}</span>
-                      <span class="text-xs text-orange-500 font-semibold flex-shrink-0 ml-1">¥{{ Number(u.total).toFixed(2) }}</span>
+                  <div class="min-w-0 flex-1 ml-1">
+                    <div class="flex items-center justify-between mb-0.5">
+                      <span class="text-[13px] font-medium truncate text-gray-700 dark:text-gray-300" :title="u.username">{{ u.username || `UID:${u.uid}` }}</span>
+                      <span class="text-xs text-orange-500 font-bold flex-shrink-0 ml-1">¥{{ Number(u.total).toFixed(2) }}</span>
                     </div>
-                    <div class="text-[10px] text-gray-400 leading-tight">UID:{{ u.uid }} · {{ u.orders }}单</div>
+                    <div class="text-[11px] text-gray-400 leading-tight">UID: {{ u.uid }} <span class="mx-1 opacity-50">|</span> {{ u.orders }} 单</div>
                   </div>
                 </div>
               </div>
-              <div v-else class="flex flex-col items-center py-6 text-gray-400 dark:text-gray-500">
-                <CrownOutlined class="mb-1.5 text-xl" />
-                <span class="text-xs">暂无排行数据</span>
+              <div v-else class="flex flex-col items-center justify-center h-full min-h-[200px] text-gray-400 dark:text-gray-500">
+                <CrownOutlined class="mb-2 text-3xl opacity-50" />
+                <span class="text-sm">暂无排行数据</span>
               </div>
             </Spin>
           </Card>
