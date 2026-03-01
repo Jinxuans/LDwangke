@@ -13,7 +13,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-ROOT="/www/wwwroot/29.colnt.com"
+ROOT="/www/wwwroot/QK"
 GO_DIR="$ROOT/go-api"
 VBEN_DIR="$ROOT/vben-admin"
 MALL_DIR="$ROOT/mall-h5"
