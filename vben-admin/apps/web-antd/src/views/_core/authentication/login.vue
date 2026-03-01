@@ -1,10 +1,12 @@
 <script lang="ts" setup>
 import type { VbenFormSchema } from '@vben/common-ui';
 
-import { computed, markRaw, onMounted, ref } from 'vue';
+import { computed, h, markRaw, onMounted, ref } from 'vue';
 
 import { AuthenticationLogin, SliderCaptcha, z } from '@vben/common-ui';
 import { $t } from '@vben/locales';
+
+import { Modal } from 'ant-design-vue';
 
 import { getSiteConfigApi } from '#/api/admin';
 import { useAuthStore } from '#/store';
@@ -19,6 +21,14 @@ onMounted(async () => {
     const cfg = await getSiteConfigApi();
     if (cfg?.login_slider_verify === '0') {
       sliderEnabled.value = false;
+    }
+    if (cfg?.notice) {
+      Modal.info({
+        title: '公告',
+        content: h('div', { innerHTML: cfg.notice }),
+        okText: '我知道了',
+        width: 'min(90vw, 520px)',
+      });
     }
   } catch { /* ignore */ }
 });

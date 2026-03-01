@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { ref, computed, h, onMounted, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { Page } from '@vben/common-ui';
 import { usePreferences } from '@vben/preferences';
@@ -78,7 +78,7 @@ async function loadDashboard() {
       // qd_notice_open: 渠道公告开关，关闭时不显示 notice
       siteNotice.value = (cfg?.qd_notice_open !== '0' && cfg?.notice) ? cfg.notice : '';
       if (cfg?.tcgonggao) {
-        Modal.info({ title: '系统公告', content: cfg.tcgonggao, okText: '我知道了', width: 'min(90vw, 400px)' });
+        Modal.info({ title: '系统公告', content: h('div', { innerHTML: cfg.tcgonggao }), okText: '我知道了', width: 'min(90vw, 400px)' });
       }
     } catch { /* ignore */ }
 
@@ -337,7 +337,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
     </template>
     <Spin :spinning="loading">
       <Alert v-if="maintenanceMode" type="warning" show-icon message="系统当前处于维护模式，仅管理员可正常使用。" class="mb-4" />
-      <Alert v-if="siteNotice" type="info" show-icon :message="siteNotice" class="mb-4" />
+      <Alert v-if="siteNotice" type="info" show-icon class="mb-4"><template #message><div v-html="siteNotice" /></template></Alert>
 
       <!-- 左右两栏布局 -->
       <div class="flex flex-col lg:flex-row gap-3 lg:items-stretch">
