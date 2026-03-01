@@ -18,6 +18,7 @@ mkdir "%OUT%\php-api"
 echo.
 echo [1/4] 编译 Go 后端...
 cd /d "%ROOT%\go-api"
+set CGO_ENABLED=0
 set GOOS=linux
 set GOARCH=amd64
 go build -o "%OUT%\go-api\go-api-linux" ./cmd/server/

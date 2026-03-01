@@ -641,6 +641,7 @@ CREATE TABLE `qingka_wangke_hzw_ydsj` (
   `user` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '用户账号',
   `pass` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '用户密码',
   `distance` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '总共里数',
+  `is_run` int(11) NOT NULL DEFAULT '1' COMMENT '跑步状态：0：关闭，1：开启',
   `run_type` int(11) NOT NULL COMMENT '跑步类型：0：运动世界晨跑，1：运动世界课外跑，2：小步点课外跑，3：小步点晨跑',
   `start_hour` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '开始小时',
   `start_minute` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '开始分钟',
@@ -1306,6 +1307,157 @@ LOCK TABLES `qingka_wangke_zhiya_records` WRITE;
 /*!40000 ALTER TABLE `qingka_wangke_zhiya_records` DISABLE KEYS */;
 /*!40000 ALTER TABLE `qingka_wangke_zhiya_records` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Table structure for table `qingka_c_user`
+--
+
+DROP TABLE IF EXISTS `qingka_c_user`;
+CREATE TABLE `qingka_c_user` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `tid` int(11) NOT NULL COMMENT '所属店铺ID',
+  `phone` varchar(50) DEFAULT '' COMMENT '手机号',
+  `account` varchar(100) NOT NULL DEFAULT '' COMMENT '账号',
+  `password` varchar(255) NOT NULL DEFAULT '' COMMENT '密码',
+  `nickname` varchar(100) DEFAULT '' COMMENT '昵称',
+  `openid` varchar(255) DEFAULT '' COMMENT '微信openid',
+  `token` varchar(255) DEFAULT '' COMMENT '登录token',
+  `addtime` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_tid` (`tid`),
+  KEY `idx_account` (`account`),
+  KEY `idx_token` (`token`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='C端用户表';
+
+--
+-- Table structure for table `qingka_smtp_config`
+--
+
+DROP TABLE IF EXISTS `qingka_smtp_config`;
+CREATE TABLE `qingka_smtp_config` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `host` varchar(255) NOT NULL DEFAULT '' COMMENT 'SMTP服务器',
+  `port` int(11) NOT NULL DEFAULT 465 COMMENT '端口',
+  `user` varchar(255) NOT NULL DEFAULT '' COMMENT 'SMTP账号',
+  `password` varchar(255) NOT NULL DEFAULT '' COMMENT 'SMTP密码/授权码',
+  `from_name` varchar(100) NOT NULL DEFAULT '' COMMENT '发件人名称',
+  `encryption` varchar(20) NOT NULL DEFAULT 'ssl' COMMENT '加密方式 ssl/starttls/none',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SMTP邮箱配置';
+
+--
+-- Table structure for table `xm_project`
+--
+
+DROP TABLE IF EXISTS `xm_project`;
+CREATE TABLE `xm_project` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL COMMENT '项目名称',
+  `p_id` INT DEFAULT 0 COMMENT '源项目ID',
+  `status` TINYINT DEFAULT 0 COMMENT '项目状态 (0=上架, 1=下架)',
+  `description` TEXT NULL COMMENT '项目说明',
+  `price` DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '单价',
+  `url` VARCHAR(255) DEFAULT NULL COMMENT '对接URL',
+  `key` VARCHAR(255) DEFAULT NULL COMMENT '对接密钥',
+  `uid` VARCHAR(255) DEFAULT NULL COMMENT '对接UID',
+  `token` VARCHAR(1024) DEFAULT NULL COMMENT '对接JWT token',
+  `type` VARCHAR(50) DEFAULT NULL COMMENT '项目类型',
+  `query` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否支持查询',
+  `password` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否需要密码',
+  `is_deleted` TINYINT DEFAULT 0 COMMENT '软删除标记',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_p_id` (`p_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_query` (`query`),
+  KEY `idx_password` (`password`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='XM对接项目表';
+
+--
+-- Table structure for table `xm_order`
+--
+
+DROP TABLE IF EXISTS `xm_order`;
+CREATE TABLE `xm_order` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `y_oid` BIGINT DEFAULT NULL COMMENT '源订单ID',
+  `user_id` BIGINT NOT NULL COMMENT '用户ID',
+  `school` VARCHAR(255) NOT NULL COMMENT '学校名称',
+  `account` VARCHAR(255) NOT NULL COMMENT '账号',
+  `password` VARCHAR(255) NOT NULL COMMENT '密码',
+  `type` INT DEFAULT NULL COMMENT '跑步类型',
+  `project_id` BIGINT NOT NULL COMMENT '项目ID',
+  `status` VARCHAR(50) NOT NULL COMMENT '订单状态',
+  `total_km` INT NOT NULL COMMENT '下单总公里数',
+  `run_km` FLOAT DEFAULT NULL COMMENT '已跑公里',
+  `run_date` JSON NOT NULL COMMENT '跑步日期',
+  `start_day` DATE NOT NULL COMMENT '开始日期',
+  `start_time` VARCHAR(5) NOT NULL COMMENT '每日开始时间',
+  `end_time` VARCHAR(5) NOT NULL COMMENT '每日结束时间',
+  `deduction` DECIMAL(18,2) DEFAULT 0 COMMENT '扣费金额',
+  `is_deleted` TINYINT(1) DEFAULT 0 COMMENT '软删除标记',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_y_oid` (`y_oid`),
+  KEY `idx_is_deleted` (`is_deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='XM跑步订单表';
+
+--
+-- Table structure for table `w_app`
+--
+
+DROP TABLE IF EXISTS `w_app`;
+CREATE TABLE `w_app` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL COMMENT '项目名称',
+  `code` VARCHAR(50) NOT NULL COMMENT '项目代码',
+  `org_app_id` VARCHAR(10) NOT NULL COMMENT '源项目ID',
+  `status` TINYINT DEFAULT 0 COMMENT '项目状态 (0=上架, 1=下架)',
+  `description` TEXT NULL COMMENT '项目说明',
+  `price` DECIMAL(18,2) NOT NULL DEFAULT 1 COMMENT '单价',
+  `cac_type` VARCHAR(2) NOT NULL COMMENT '按次TS,按公里KM',
+  `url` VARCHAR(255) NOT NULL COMMENT '对接URL',
+  `key` VARCHAR(255) DEFAULT NULL COMMENT '对接密钥',
+  `uid` VARCHAR(255) DEFAULT NULL COMMENT '对接UID',
+  `token` VARCHAR(1024) DEFAULT NULL COMMENT '源台对接token',
+  `type` VARCHAR(50) NOT NULL COMMENT '项目类型',
+  `deleted` TINYINT DEFAULT 0 COMMENT '软删除标记',
+  `created` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_org_app_id` (`org_app_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='W对接项目表';
+
+--
+-- Table structure for table `w_order`
+--
+
+DROP TABLE IF EXISTS `w_order`;
+CREATE TABLE `w_order` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `agg_order_id` VARCHAR(10) DEFAULT NULL UNIQUE COMMENT 'W源台订单ID',
+  `user_id` BIGINT NOT NULL COMMENT '用户ID',
+  `school` VARCHAR(255) DEFAULT NULL COMMENT '学校名称',
+  `account` VARCHAR(255) NOT NULL COMMENT '账号',
+  `password` VARCHAR(255) NOT NULL COMMENT '密码',
+  `app_id` BIGINT NOT NULL COMMENT '项目ID',
+  `status` VARCHAR(50) NOT NULL COMMENT '订单状态',
+  `num` INT NOT NULL COMMENT '次数',
+  `cost` DECIMAL(18,2) DEFAULT 0 COMMENT '金额',
+  `pause` TINYINT(1) DEFAULT 0 COMMENT '是否暂停',
+  `sub_order` JSON DEFAULT NULL COMMENT '子订单',
+  `deleted` TINYINT(1) DEFAULT 0 COMMENT '软删除标记',
+  `created` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_pause` (`pause`),
+  KEY `idx_deleted` (`deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='W跑步订单表';
 
 --
 -- Dumping events for database '7777'

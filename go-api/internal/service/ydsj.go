@@ -1,6 +1,7 @@
 package service
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -9,6 +10,9 @@ import (
 
 	"go-api/internal/database"
 )
+
+//go:embed ydsj_schools.json
+var ydsjSchoolsJSON []byte
 
 // ---------- 数据结构 ----------
 
@@ -53,6 +57,18 @@ type YDSJService struct {
 
 func NewYDSJService() *YDSJService {
 	return &YDSJService{client: &http.Client{Timeout: 30 * time.Second}}
+}
+
+// ---------- 学校列表 ----------
+
+func (s *YDSJService) GetSchools() ([]map[string]interface{}, error) {
+	var wrapper struct {
+		Data []map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(ydsjSchoolsJSON, &wrapper); err != nil {
+		return nil, err
+	}
+	return wrapper.Data, nil
 }
 
 // ---------- 配置 ----------
@@ -232,8 +248,8 @@ func (s *YDSJService) AddOrder(uid int, form map[string]interface{}) (string, er
 	var result map[string]interface{}
 	json.Unmarshal(resp, &result)
 
-	code := mapGetFloat(result, "code")
-	if code != 0 {
+	code := int(mapGetFloat(result, "code"))
+	if code != 0 && code != 1 {
 		msg := mapGetString(result, "msg")
 		if msg == "" {
 			msg = "上游下单失败"

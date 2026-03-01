@@ -692,339 +692,10 @@ CREATE TABLE IF NOT EXISTS `qingka_dynamic_module` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='动态功能模块';
 
 -- =============================================
--- 第八部分：打卡/运动业务模块
+-- 第八部分：租户/商城
 -- =============================================
 
--- 34. YF打卡订单表
-CREATE TABLE IF NOT EXISTS `qingka_wangke_yfdk` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `uid` int(11) NOT NULL COMMENT '用户ID',
-  `oid` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '远程订单ID',
-  `cid` int(11) NOT NULL COMMENT '平台ID',
-  `username` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '账号',
-  `password` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '密码',
-  `school` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '学校',
-  `name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '姓名',
-  `email` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '邮箱',
-  `offer` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '岗位',
-  `address` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '打卡地址',
-  `longitude` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '经度',
-  `latitude` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '纬度',
-  `week` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '打卡周期',
-  `worktime` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '上班时间',
-  `offwork` tinyint(1) NULL DEFAULT 0 COMMENT '是否下班打卡',
-  `offtime` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '下班时间',
-  `day` int(11) NOT NULL COMMENT '购买天数',
-  `daily_fee` decimal(10, 2) NOT NULL COMMENT '每日费用',
-  `total_fee` decimal(10, 2) NOT NULL COMMENT '总费用',
-  `day_report` tinyint(1) NULL DEFAULT 1 COMMENT '日报',
-  `week_report` tinyint(1) NULL DEFAULT 0 COMMENT '周报',
-  `week_date` tinyint(2) NULL DEFAULT 7 COMMENT '周报日期',
-  `month_report` tinyint(1) NULL DEFAULT 0 COMMENT '月报',
-  `month_date` tinyint(2) NULL DEFAULT 25 COMMENT '月报日期',
-  `skip_holidays` tinyint(1) NULL DEFAULT 0 COMMENT '跳过节假日',
-  `image` tinyint(1) NULL DEFAULT 0 COMMENT '打卡图片',
-  `status` tinyint(1) NULL DEFAULT 1 COMMENT '状态 0暂停 1正常',
-  `mark` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '最新日志',
-  `endtime` date NOT NULL COMMENT '到期时间',
-  `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `oid` (`oid`),
-  KEY `uid` (`uid`),
-  KEY `cid` (`cid`),
-  KEY `username` (`username`),
-  KEY `endtime` (`endtime`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='YF打卡订单表';
-
--- 35. Appui打卡订单表
-CREATE TABLE IF NOT EXISTS `qingka_wangke_appui` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '订单ID',
-  `uid` int(11) NOT NULL DEFAULT 1 COMMENT '用户UID',
-  `yid` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '源台订单ID',
-  `pid` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '项目ID',
-  `user` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '用户账号',
-  `pass` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '用户密码',
-  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '用户名称',
-  `address` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '打卡地址',
-  `residue_day` int(11) NOT NULL DEFAULT 0 COMMENT '剩余天数',
-  `total_day` int(11) NOT NULL DEFAULT 0 COMMENT '总天数',
-  `status` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '待处理' COMMENT '订单状态',
-  `week` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '打卡周期',
-  `report` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '报告',
-  `shangban_time` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '上班时间',
-  `xiaban_time` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '下班时间',
-  `addtime` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '下单时间',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='appui打卡订单表';
-
--- 36. 泰山打卡订单表
-CREATE TABLE IF NOT EXISTS `qingka_wangke_sxdk` (
-  `id` int(9) NOT NULL AUTO_INCREMENT,
-  `sxdkId` int(9) NOT NULL COMMENT '源台订单ID',
-  `uid` int(9) NOT NULL COMMENT '用户ID',
-  `platform` varchar(10) NOT NULL COMMENT '平台标识',
-  `phone` varchar(50) NOT NULL COMMENT '手机号/账号',
-  `password` varchar(50) NOT NULL COMMENT '密码',
-  `code` int(2) NOT NULL COMMENT '状态码',
-  `wxpush` varchar(255) DEFAULT NULL COMMENT '微信推送配置',
-  `name` varchar(10) DEFAULT NULL COMMENT '姓名',
-  `address` varchar(255) NOT NULL COMMENT '打卡地址',
-  `up_check_time` varchar(50) NOT NULL COMMENT '上班打卡时间',
-  `down_check_time` varchar(50) DEFAULT NULL COMMENT '下班打卡时间',
-  `check_week` varchar(50) NOT NULL COMMENT '打卡周期',
-  `end_time` varchar(50) NOT NULL COMMENT '到期时间',
-  `day_paper` int(2) NOT NULL COMMENT '日报',
-  `week_paper` int(2) NOT NULL COMMENT '周报',
-  `month_paper` int(2) NOT NULL COMMENT '月报',
-  `createTime` varchar(50) NOT NULL COMMENT '创建时间',
-  `updateTime` varchar(50) DEFAULT NULL COMMENT '更新时间',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='泰山打卡订单表';
-
--- 37. 闪电运动订单表
-CREATE TABLE IF NOT EXISTS `qingka_wangke_hzw_sdxy` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '订单ID',
-  `yid` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '原台订单ID',
-  `uid` int(11) NOT NULL DEFAULT 1 COMMENT '用户UID',
-  `user` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '用户账号',
-  `pass` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '用户密码',
-  `school` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '学校',
-  `distance` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '日公里数',
-  `day` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '跑步天数',
-  `start_date` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '开始日期',
-  `start_hour` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '开始小时',
-  `start_minute` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '开始分钟',
-  `end_hour` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '结束小时',
-  `end_minute` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '结束分钟',
-  `run_week` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '跑步周期',
-  `status` int(11) NOT NULL DEFAULT 1 COMMENT '订单状态：1等待处理 2处理成功 3退款成功',
-  `remarks` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '备注',
-  `fees` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '订单金额',
-  `addtime` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '下单时间',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='闪电运动订单表';
-
--- 38. 运动世界订单表
-CREATE TABLE IF NOT EXISTS `qingka_wangke_hzw_ydsj` (
-  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '订单ID',
-  `uid` int(11) NOT NULL DEFAULT 1 COMMENT '用户UID',
-  `school` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '学校',
-  `user` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '用户账号',
-  `pass` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '用户密码',
-  `distance` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '总共里数',
-  `is_run` tinyint(1) NOT NULL DEFAULT 1 COMMENT '是否启用跑步',
-  `run_type` int(11) NOT NULL COMMENT '跑步类型：0运动世界晨跑 1运动世界课外跑 2小步点课外跑 3小步点晨跑',
-  `start_hour` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '开始小时',
-  `start_minute` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '开始分钟',
-  `end_hour` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '结束小时',
-  `end_minute` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '结束分钟',
-  `run_week` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '跑步周期',
-  `status` int(11) NOT NULL DEFAULT 1 COMMENT '订单状态：1等待处理 2处理成功 3处理失败 4退款成功',
-  `remarks` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '备注',
-  `fees` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '订单预扣金额',
-  `real_fees` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '订单实际金额',
-  `addtime` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '下单时间',
-  `yid` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '原台订单ID',
-  `info` text COLLATE utf8mb4_bin COMMENT '订单信息',
-  `tmp_info` text COLLATE utf8mb4_bin COMMENT '操作信息',
-  `refund_money` varchar(255) COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '退款金额',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='运动世界订单表';
-
--- 39. 小米运动项目表
-CREATE TABLE IF NOT EXISTS `xm_project` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL COMMENT '项目名称',
-  `p_id` int(11) DEFAULT 0 COMMENT '源项目ID',
-  `status` tinyint(4) DEFAULT 0 COMMENT '项目状态 (0=上架, 1=下架)',
-  `description` text NULL COMMENT '项目说明',
-  `price` decimal(18,2) NOT NULL DEFAULT 0 COMMENT '单价',
-  `url` varchar(255) DEFAULT NULL COMMENT '对接URL',
-  `key` varchar(255) DEFAULT NULL COMMENT '对接密钥',
-  `uid` varchar(255) DEFAULT NULL COMMENT '对接UID',
-  `token` varchar(1024) DEFAULT NULL COMMENT '对接JWT token',
-  `type` varchar(50) DEFAULT NULL COMMENT '项目类型',
-  `query` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否支持查询',
-  `password` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否需要密码',
-  `is_deleted` tinyint(4) DEFAULT 0 COMMENT '软删除标记',
-  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_p_id` (`p_id`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小米运动对接项目表';
-
--- 40. 小米运动订单表
-CREATE TABLE IF NOT EXISTS `xm_order` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `y_oid` bigint(20) DEFAULT NULL COMMENT '源订单ID',
-  `user_id` bigint(20) NOT NULL COMMENT '用户ID',
-  `school` varchar(255) NOT NULL COMMENT '学校名称',
-  `account` varchar(255) NOT NULL COMMENT '账号',
-  `password` varchar(255) NOT NULL COMMENT '密码',
-  `type` int(11) DEFAULT NULL COMMENT '跑步类型',
-  `project_id` bigint(20) NOT NULL COMMENT '项目ID',
-  `status` varchar(50) NOT NULL COMMENT '订单状态',
-  `total_km` int(11) NOT NULL COMMENT '下单总公里数',
-  `run_km` float DEFAULT NULL COMMENT '已跑公里',
-  `run_date` json NOT NULL COMMENT '跑步日期（1~7的数组）',
-  `start_day` date NOT NULL COMMENT '开始日期',
-  `start_time` varchar(5) NOT NULL COMMENT '每日开始时间',
-  `end_time` varchar(5) NOT NULL COMMENT '每日结束时间',
-  `deduction` decimal(18,2) DEFAULT 0 COMMENT '扣费金额',
-  `is_deleted` tinyint(1) DEFAULT 0 COMMENT '软删除标记',
-  `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  KEY `idx_user_id` (`user_id`),
-  KEY `idx_y_oid` (`y_oid`),
-  KEY `idx_is_deleted` (`is_deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小米运动跑步订单表';
-
--- =============================================
--- 第九部分：鲸鱼运动模块 (W)
--- =============================================
-
--- 41. 鲸鱼运动项目表
-CREATE TABLE IF NOT EXISTS `w_app` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL DEFAULT '' COMMENT '项目名称',
-  `code` varchar(100) NOT NULL DEFAULT '' COMMENT '项目代号',
-  `org_app_id` varchar(100) DEFAULT '' COMMENT '源平台项目ID',
-  `status` int(11) NOT NULL DEFAULT 0 COMMENT '状态 0=上架 1=下架',
-  `description` text COMMENT '项目说明',
-  `price` decimal(18,2) NOT NULL DEFAULT 0 COMMENT '单价',
-  `cac_type` varchar(50) DEFAULT '' COMMENT '计价类型',
-  `url` varchar(500) DEFAULT '' COMMENT '对接URL',
-  `key` varchar(255) DEFAULT '' COMMENT '对接密钥',
-  `uid` varchar(255) DEFAULT '' COMMENT '对接UID',
-  `token` varchar(1024) DEFAULT '' COMMENT '对接JWT token',
-  `type` varchar(50) DEFAULT '' COMMENT '项目类型',
-  `deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '软删除',
-  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='鲸鱼运动项目表';
-
--- 42. 鲸鱼运动订单表
-CREATE TABLE IF NOT EXISTS `w_order` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `agg_order_id` varchar(100) DEFAULT NULL COMMENT '聚合订单ID',
-  `user_id` bigint(20) NOT NULL COMMENT '用户ID',
-  `school` varchar(255) NOT NULL DEFAULT '' COMMENT '学校',
-  `account` varchar(255) NOT NULL DEFAULT '' COMMENT '账号',
-  `password` varchar(255) NOT NULL DEFAULT '' COMMENT '密码',
-  `app_id` bigint(20) NOT NULL COMMENT '项目ID',
-  `status` varchar(50) NOT NULL DEFAULT 'ADDING' COMMENT '订单状态',
-  `num` int(11) NOT NULL DEFAULT 0 COMMENT '数量',
-  `cost` decimal(18,2) NOT NULL DEFAULT 0 COMMENT '费用',
-  `pause` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否暂停',
-  `sub_order` text COMMENT '子订单JSON',
-  `deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '软删除',
-  `created` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  KEY `idx_user_id` (`user_id`),
-  KEY `idx_app_id` (`app_id`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='鲸鱼运动订单表';
-
--- =============================================
--- 第十部分：土拨鼠论文 & 图图强国
--- =============================================
-
--- 43. 土拨鼠论文订单表
-CREATE TABLE IF NOT EXISTS `qingka_wangke_dialogue` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `uid` int(11) NOT NULL,
-  `title` varchar(255) NOT NULL DEFAULT '',
-  `state` varchar(255) NOT NULL DEFAULT 'PENDING',
-  `download_url` varchar(255) NOT NULL DEFAULT '',
-  `addtime` varchar(255) NOT NULL DEFAULT '',
-  `ip` varchar(255) NOT NULL DEFAULT '',
-  `source_id` bigint(17) NOT NULL DEFAULT 0,
-  `dialogue_id` varchar(32) NOT NULL DEFAULT '0',
-  `point` decimal(11,2) NOT NULL DEFAULT 0.00,
-  `type` varchar(32) NOT NULL DEFAULT '',
-  PRIMARY KEY (`id`),
-  KEY `idx_uid` (`uid`),
-  KEY `idx_state` (`state`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='土拨鼠论文订单表';
-
--- 44. 点数兑换商品表
-CREATE TABLE IF NOT EXISTS `points_product` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL COMMENT '商品名称',
-  `description` text COMMENT '商品描述',
-  `image_url` varchar(500) COMMENT '商品图片URL',
-  `price` decimal(10,2) NOT NULL COMMENT '兑换所需点数',
-  `status` enum('ENABLED','DISABLED') NOT NULL DEFAULT 'ENABLED' COMMENT '商品状态',
-  `sort_order` int(11) NOT NULL DEFAULT 0 COMMENT '排序权重',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_status` (`status`),
-  KEY `idx_sort_order` (`sort_order`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='点数兑换商品表';
-
--- 45. 点数兑换码表
-CREATE TABLE IF NOT EXISTS `points_product_code` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `product_id` int(11) NOT NULL COMMENT '关联商品ID',
-  `code` varchar(500) NOT NULL COMMENT '兑换码内容',
-  `status` enum('AVAILABLE','EXCHANGED') NOT NULL DEFAULT 'AVAILABLE' COMMENT '兑换码状态',
-  `exchanged_by` int(11) COMMENT '兑换用户ID',
-  `exchanged_at` datetime COMMENT '兑换时间',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_product_id` (`product_id`),
-  KEY `idx_status` (`status`),
-  KEY `idx_product_status` (`product_id`, `status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='点数兑换码表';
-
--- 46. 点数兑换记录表
-CREATE TABLE IF NOT EXISTS `points_exchange_record` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `uid` int(11) NOT NULL COMMENT '用户ID',
-  `product_id` int(11) NOT NULL COMMENT '商品ID',
-  `product_name` varchar(255) NOT NULL COMMENT '商品名称',
-  `code_id` int(11) NOT NULL COMMENT '兑换码ID',
-  `code` varchar(500) NOT NULL COMMENT '兑换码内容',
-  `points_cost` decimal(10,2) NOT NULL COMMENT '消耗点数',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_uid` (`uid`),
-  KEY `idx_product_id` (`product_id`),
-  KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='点数兑换记录表';
-
--- 47. 图图强国订单表
-CREATE TABLE IF NOT EXISTS `tutuqg` (
-  `oid` int(11) NOT NULL AUTO_INCREMENT,
-  `uid` int(11) NOT NULL,
-  `user` varchar(255) NOT NULL,
-  `pass` varchar(255) NOT NULL,
-  `kcname` varchar(255) NOT NULL,
-  `days` varchar(255) NOT NULL,
-  `ptname` varchar(255) NOT NULL,
-  `fees` varchar(255) NOT NULL,
-  `addtime` varchar(255) NOT NULL,
-  `IP` varchar(255) DEFAULT NULL,
-  `status` varchar(255) DEFAULT NULL,
-  `remarks` varchar(255) DEFAULT NULL,
-  `guid` varchar(255) DEFAULT NULL,
-  `score` varchar(255) NOT NULL,
-  `scores` varchar(255) DEFAULT NULL,
-  `zdxf` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`oid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图图强国订单表';
-
--- =============================================
--- 第十一部分：租户/商城
--- =============================================
-
--- 48. 租户/店铺表
+-- 34. 租户/店铺表
 CREATE TABLE IF NOT EXISTS `qingka_tenant` (
   `tid` int(11) NOT NULL AUTO_INCREMENT,
   `uid` int(11) NOT NULL,
@@ -1040,7 +711,7 @@ CREATE TABLE IF NOT EXISTS `qingka_tenant` (
   KEY `idx_domain` (`domain`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 49. 租户商品表
+-- 35. 租户商品表
 CREATE TABLE IF NOT EXISTS `qingka_tenant_product` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `tid` int(11) NOT NULL,
@@ -1053,7 +724,7 @@ CREATE TABLE IF NOT EXISTS `qingka_tenant_product` (
   KEY `idx_tid` (`tid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 50. 商城C端支付订单表
+-- 36. 商城C端支付订单表
 CREATE TABLE IF NOT EXISTS `qingka_mall_pay_order` (
   `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
   `out_trade_no` varchar(64) NOT NULL DEFAULT '' COMMENT '商户订单号',
@@ -1081,10 +752,10 @@ CREATE TABLE IF NOT EXISTS `qingka_mall_pay_order` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商城C端支付订单';
 
 -- =============================================
--- 第十二部分：网签模块
+-- 第九部分：网签模块
 -- =============================================
 
--- 51. 网签公司列表表
+-- 37. 网签公司列表表
 CREATE TABLE IF NOT EXISTS `mlsx_gslb` (
   `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
   `qymc` varchar(100) NOT NULL COMMENT '企业名称',
@@ -1094,7 +765,7 @@ CREATE TABLE IF NOT EXISTS `mlsx_gslb` (
   KEY `qymc` (`qymc`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='网签公司列表表';
 
--- 52. 网签文件表
+-- 38. 网签文件表
 CREATE TABLE IF NOT EXISTS `mlsx_wj_wq` (
   `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
   `wjid` varchar(50) NOT NULL COMMENT '文件ID，关联订单',
@@ -1107,10 +778,43 @@ CREATE TABLE IF NOT EXISTS `mlsx_wj_wq` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='网签文件表';
 
 -- =============================================
--- 第十三部分：菜单配置
+-- 第十部分：C端用户 & SMTP配置
 -- =============================================
 
--- 53. 菜单配置表
+-- 39. C端用户表
+CREATE TABLE IF NOT EXISTS `qingka_c_user` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `tid` int(11) NOT NULL COMMENT '所属店铺ID',
+  `phone` varchar(50) DEFAULT '' COMMENT '手机号',
+  `account` varchar(100) NOT NULL DEFAULT '' COMMENT '账号',
+  `password` varchar(255) NOT NULL DEFAULT '' COMMENT '密码',
+  `nickname` varchar(100) DEFAULT '' COMMENT '昵称',
+  `openid` varchar(255) DEFAULT '' COMMENT '微信openid',
+  `token` varchar(255) DEFAULT '' COMMENT '登录token',
+  `addtime` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_tid` (`tid`),
+  KEY `idx_account` (`account`),
+  KEY `idx_token` (`token`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='C端用户表';
+
+-- 40. SMTP邮箱配置表
+CREATE TABLE IF NOT EXISTS `qingka_smtp_config` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `host` varchar(255) NOT NULL DEFAULT '' COMMENT 'SMTP服务器',
+  `port` int(11) NOT NULL DEFAULT 465 COMMENT '端口',
+  `user` varchar(255) NOT NULL DEFAULT '' COMMENT 'SMTP账号',
+  `password` varchar(255) NOT NULL DEFAULT '' COMMENT 'SMTP密码/授权码',
+  `from_name` varchar(100) NOT NULL DEFAULT '' COMMENT '发件人名称',
+  `encryption` varchar(20) NOT NULL DEFAULT 'ssl' COMMENT '加密方式 ssl/starttls/none',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SMTP邮箱配置';
+
+-- =============================================
+-- 第十一部分：菜单配置
+-- =============================================
+
+-- 41. 菜单配置表
 CREATE TABLE IF NOT EXISTS `menu_config` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `menu_key` varchar(100) NOT NULL COMMENT '菜单唯一标识',
@@ -1151,19 +855,3 @@ INSERT IGNORE INTO `qingka_email_template` (`code`, `name`, `subject`, `content`
 ('system_notify', '系统通知', '{site_name} - {notify_title}',
  '<p style=\"color:#555;line-height:1.8;\">{notify_content}</p>',
  'site_name,notify_title,notify_content,username,email,time', 1, NOW());
-
--- 预置运动模块
-INSERT INTO `qingka_dynamic_module` (`app_id`, `type`, `name`, `icon`, `api_base`, `view_url`, `status`, `sort`, `config`) VALUES
-('yyd',    'sport',  '云运动',       'lucide:cloud-sun',       '/jingyu/api.php', '', 1, 1,  '{"type":"sport","fields":["school","account","password","zone","distance","schedule"]}'),
-('ydsj',   'sport',  '运动世界',     'lucide:globe',           '/jingyu/api.php', '', 1, 2,  '{"type":"sport","fields":["run_type","account","password","school","distance","time_range","week"]}'),
-('pgyyd',  'sport',  '跑步鸽云运动', 'lucide:bird',            '/jingyu/api.php', '', 1, 3,  '{"type":"sport","fields":["school","account","password","zone","distance","schedule"]}'),
-('pgydsj', 'sport',  '跑步鸽运动世界','lucide:footprints',     '/jingyu/api.php', '', 1, 4,  '{"type":"sport","fields":["run_type","account","password","school","distance","time_range","week"]}'),
-('keep',   'sport',  'Keep运动',     'lucide:heart-pulse',     '/jingyu/api.php', '', 1, 5,  '{"type":"sport","fields":["account","password","distance"]}'),
-('bdlp',   'sport',  '步道乐跑',     'lucide:map-pin',         '/jingyu/api.php', '', 1, 6,  '{"type":"sport","fields":["account","password","school","distance"]}'),
-('ymty',   'sport',  '悦跑体育',     'lucide:trophy',          '/jingyu/api.php', '', 1, 7,  '{"type":"sport","fields":["account","password","school","distance"]}'),
-('yfdk',   'intern', 'YF打卡',       'lucide:clipboard-check', '/api/v1/yfdk',    '', 1, 20, '{}'),
-('appui',  'intern', 'Appui打卡',    'lucide:calendar-check',  '/appui/api.php',  '/index/appui.php', 1, 21, '{}'),
-('xm',     'sport',  '小米运动',     'lucide:smartphone',      '/api/v1/xm',      '', 1, 22, '{}'),
-('sxdk',   'intern', '泰山打卡',     'lucide:mountain',        '/api/v1/sxdk',    '', 1, 23, '{}'),
-('sdxy',   'sport',  '闪电运动',     'lucide:zap',             '/sdxy/api.php',   '/index/sdxy.php', 1, 24, '{}')
-ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `icon`=VALUES(`icon`), `api_base`=VALUES(`api_base`);

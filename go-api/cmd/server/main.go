@@ -70,6 +70,15 @@ func main() {
 	// 启动 HZW 实时进度 Socket 客户端
 	go service.StartHZWSocket()
 
+	// 启动运动世界后台同步任务
+	go service.StartYDSJCron()
+
+	// 启动鲸鱼运动后台批量同步任务
+	go service.StartWCron()
+
+	// 启动小米运动后台批量同步任务
+	go service.StartXMCron()
+
 	// 自动商品同步定时任务（间隔从 sync_config 读取，默认30分钟）
 	go func() {
 		// 启动5分钟后先执行一次

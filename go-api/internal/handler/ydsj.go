@@ -59,8 +59,13 @@ func YDSJGetPrice(c *gin.Context) {
 // ---------- 学校列表 ----------
 
 func YDSJGetSchools(c *gin.Context) {
-	// 返回静态学校列表，后续可改为从数据库读取
-	response.Success(c, []interface{}{})
+	svc := service.NewYDSJService()
+	schools, err := svc.GetSchools()
+	if err != nil {
+		response.ServerError(c, "获取学校列表失败")
+		return
+	}
+	response.Success(c, schools)
 }
 
 // ---------- 订单列表 ----------

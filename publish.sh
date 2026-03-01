@@ -49,7 +49,7 @@ mkdir -p "$UPDATE_DIR"
 # ========== 1. 编译 Go 后端 ==========
 echo -e "${YELLOW}[1/6] 编译 Go 后端...${NC}"
 cd "$GO_DIR"
-GOOS=linux GOARCH=amd64 go build -o "$TMP_DIR/backend/server" ./cmd/server/
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o "$TMP_DIR/backend/server" ./cmd/server/
 cp -r config "$TMP_DIR/backend/" && rm -f "$TMP_DIR/backend/config/config.yaml"
 cp -r migrations "$TMP_DIR/backend/" 2>/dev/null || true
 # 打入建表和初始化 SQL

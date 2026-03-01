@@ -34,10 +34,6 @@ function makeModuleRoute(
   };
 }
 
-const routes: RouteRecordRaw[] = [
-  makeModuleRoute('Sport', '/sport', 'mdi:run', 6, '运动跑步', '运动详情'),
-  makeModuleRoute('Intern', '/intern', 'mdi:briefcase-clock-outline', 7, '实习打卡', '实习详情'),
-  makeModuleRoute('Paper', '/paper', 'mdi:file-document-edit-outline', 8, '论文撰写', '论文详情'),
-];
+const routes: RouteRecordRaw[] = [];
 
 export default routes;
