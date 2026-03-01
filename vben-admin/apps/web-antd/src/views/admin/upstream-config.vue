@@ -189,6 +189,7 @@ const wColumns = [
   { title: '源台ID', dataIndex: 'org_app_id', width: 80 },
   { title: '价格', dataIndex: 'price', width: 70 },
   { title: '计费', key: 'cac_type', width: 70 },
+  { title: '类型', key: 'w_type', width: 90 },
   { title: '状态', key: 'w_status', width: 70 },
   { title: '操作', key: 'w_action', width: 120 },
 ];
@@ -677,6 +678,9 @@ onMounted(() => {
                   <template v-if="column.key === 'cac_type'">
                     <Tag :color="record.cac_type === 'TS' ? 'orange' : 'cyan'">{{ record.cac_type === 'TS' ? '按次' : '按KM' }}</Tag>
                   </template>
+                  <template v-else-if="column.key === 'w_type'">
+                    <Tag :color="record.type === '2' ? 'purple' : record.type === '1' ? 'blue' : 'default'">{{ record.type === '2' ? '鲸鱼' : record.type === '1' ? 'Token' : 'Key' }}</Tag>
+                  </template>
                   <template v-else-if="column.key === 'w_status'">
                     <Tag :color="record.status === 0 ? 'green' : 'red'">{{ record.status === 0 ? '上架' : '下架' }}</Tag>
                   </template>
@@ -823,6 +827,7 @@ onMounted(() => {
               <Select v-model:value="wForm.type" class="w-full">
                 <SelectOption value="0">Key+UID</SelectOption>
                 <SelectOption value="1">Token (X-WTK)</SelectOption>
+                <SelectOption value="2">鲸鱼(Jingyu)格式</SelectOption>
               </Select>
             </FormItem>
           </Col>
