@@ -294,6 +294,15 @@ async function doCheckin() {
   }
 }
 
+function showAnnouncement(item: AnnouncementItem) {
+  Modal.info({
+    title: item.title,
+    content: item.content,
+    okText: '知道了',
+    width: 'min(90vw, 500px)',
+  });
+}
+
 onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
 </script>
 
@@ -313,223 +322,231 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
     <Spin :spinning="loading">
       <Alert v-if="maintenanceMode" type="warning" show-icon message="系统当前处于维护模式，仅管理员可正常使用。" class="mb-4" />
       <Alert v-if="siteNotice" type="info" show-icon :message="siteNotice" class="mb-4" />
-      <!-- 统计卡片 -->
-      <Row :gutter="[12, 12]">
-        <Col :xs="12" :lg="6">
-          <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
-            <div class="flex items-center gap-2.5 mb-2">
-              <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
-                <WalletOutlined />
+
+      <!-- 左右两栏布局 -->
+      <div class="flex gap-3" style="align-items: flex-start">
+        <!-- 左侧：主内容区，占满剩余宽度 -->
+        <div class="min-w-0 flex-1">
+          <!-- 统计卡片 -->
+          <Row :gutter="[12, 12]">
+            <Col :xs="12" :lg="6">
+              <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
+                <div class="flex items-center gap-2.5 mb-2">
+                  <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+                    <WalletOutlined />
+                  </div>
+                  <span class="text-xs text-gray-500">账户余额</span>
+                </div>
+                <div class="text-xl font-bold text-gray-800 dark:text-gray-100">
+                  <span class="text-sm mr-0.5">¥</span>{{ (profile?.money || 0).toFixed(2) }}
+                </div>
+                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800">
+                  总充值 <span class="font-medium text-gray-500">¥{{ (profile?.zcz || 0).toFixed(2) }}</span>
+                </div>
               </div>
-              <span class="text-xs text-gray-500">账户余额</span>
-            </div>
-            <div class="text-xl font-bold text-gray-800 dark:text-gray-100">
-              <span class="text-sm mr-0.5">¥</span>{{ (profile?.money || 0).toFixed(2) }}
-            </div>
-            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800">
-              总充值 <span class="font-medium text-gray-500">¥{{ (profile?.zcz || 0).toFixed(2) }}</span>
-            </div>
-          </div>
-        </Col>
+            </Col>
 
-        <Col :xs="12" :lg="6">
-          <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
-            <div class="flex items-center gap-2.5 mb-2">
-              <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400">
-                <ShoppingCartOutlined />
+            <Col :xs="12" :lg="6">
+              <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
+                <div class="flex items-center gap-2.5 mb-2">
+                  <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400">
+                    <ShoppingCartOutlined />
+                  </div>
+                  <span class="text-xs text-gray-500">今日订单</span>
+                </div>
+                <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ profile?.today_orders || dashStats?.today_orders || 0 }}</div>
+                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800">
+                  总订单 <span class="font-medium text-gray-500">{{ profile?.order_total || dashStats?.total_orders || 0 }}</span>
+                </div>
               </div>
-              <span class="text-xs text-gray-500">今日订单</span>
-            </div>
-            <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ profile?.today_orders || dashStats?.today_orders || 0 }}</div>
-            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800">
-              总订单 <span class="font-medium text-gray-500">{{ profile?.order_total || dashStats?.total_orders || 0 }}</span>
-            </div>
-          </div>
-        </Col>
+            </Col>
 
-        <Col :xs="12" :lg="6">
-          <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
-            <div class="flex items-center gap-2.5 mb-2">
-              <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
-                <DollarOutlined />
+            <Col :xs="12" :lg="6">
+              <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
+                <div class="flex items-center gap-2.5 mb-2">
+                  <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
+                    <DollarOutlined />
+                  </div>
+                  <span class="text-xs text-gray-500">{{ hasAdminRole ? '今日收入' : '今日消费' }}</span>
+                </div>
+                <div class="text-xl font-bold text-gray-800 dark:text-gray-100">
+                  <span class="text-sm mr-0.5">¥</span>{{ (hasAdminRole ? (dashStats?.today_income || 0) : (profile?.today_spend || 0)).toFixed(2) }}
+                </div>
+                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-if="hasAdminRole">
+                  <span class="flex items-center gap-1"><SyncOutlined /> 进行中 <span class="font-medium text-gray-500">{{ dashStats?.processing_orders || 0 }} 单</span></span>
+                </div>
+                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-else>
+                  <span>&nbsp;</span>
+                </div>
               </div>
-              <span class="text-xs text-gray-500">{{ hasAdminRole ? '今日收入' : '今日消费' }}</span>
-            </div>
-            <div class="text-xl font-bold text-gray-800 dark:text-gray-100">
-              <span class="text-sm mr-0.5">¥</span>{{ (hasAdminRole ? (dashStats?.today_income || 0) : (profile?.today_spend || 0)).toFixed(2) }}
-            </div>
-            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-if="hasAdminRole">
-              <span class="flex items-center gap-1"><SyncOutlined /> 进行中 <span class="font-medium text-gray-500">{{ dashStats?.processing_orders || 0 }} 单</span></span>
-            </div>
-            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-else>
-              <span>&nbsp;</span>
-            </div>
-          </div>
-        </Col>
+            </Col>
 
-        <Col :xs="12" :lg="6">
-          <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
-            <div class="flex items-center gap-2.5 mb-2">
-              <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400">
-                <TeamOutlined />
+            <Col :xs="12" :lg="6">
+              <div class="relative overflow-hidden rounded-xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-[#141414]">
+                <div class="flex items-center gap-2.5 mb-2">
+                  <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400">
+                    <TeamOutlined />
+                  </div>
+                  <span class="text-xs text-gray-500">{{ hasAdminRole ? '注册用户' : '我的代理' }}</span>
+                </div>
+                <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ hasAdminRole ? (dashStats?.user_count || 0) : (profile?.dailitongji?.dlzs || 0) }}</div>
+                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-if="hasAdminRole">
+                  平台余额 <span class="font-medium text-gray-500">¥{{ (dashStats?.total_balance || 0).toFixed(2) }}</span>
+                </div>
+                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-else-if="profile?.dailitongji">
+                  今日交单 <span class="font-medium text-gray-500">{{ profile.dailitongji.jrjd || 0 }}</span>
+                </div>
+                <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-else>
+                  <span>&nbsp;</span>
+                </div>
               </div>
-              <span class="text-xs text-gray-500">{{ hasAdminRole ? '注册用户' : '我的代理' }}</span>
-            </div>
-            <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ hasAdminRole ? (dashStats?.user_count || 0) : (profile?.dailitongji?.dlzs || 0) }}</div>
-            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-if="hasAdminRole">
-              平台余额 <span class="font-medium text-gray-500">¥{{ (dashStats?.total_balance || 0).toFixed(2) }}</span>
-            </div>
-            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-else-if="profile?.dailitongji">
-              今日交单 <span class="font-medium text-gray-500">{{ profile.dailitongji.jrjd || 0 }}</span>
-            </div>
-            <div class="mt-1.5 text-xs text-gray-400 border-t border-gray-50 pt-1.5 dark:border-gray-800" v-else>
-              <span>&nbsp;</span>
-            </div>
-          </div>
-        </Col>
-      </Row>
+            </Col>
+          </Row>
 
-      <!-- 快捷操作 -->
-      <Row :gutter="[16, 16]" class="mt-4">
-        <Col v-for="act in quickActions" :key="act.path" :xs="12" :md="6">
-          <Card hoverable size="small" style="cursor:pointer" @click="router.push(act.path)">
-            <div class="flex items-center gap-3">
-              <component :is="act.icon" :style="{ color: act.color, fontSize: '20px' }" />
-              <span class="font-medium">{{ act.label }}</span>
-            </div>
-          </Card>
-        </Col>
-      </Row>
+          <!-- 快捷操作 -->
+          <Row :gutter="[16, 16]" class="mt-4">
+            <Col v-for="act in quickActions" :key="act.path" :xs="12" :md="6">
+              <Card hoverable size="small" style="cursor:pointer" @click="router.push(act.path)">
+                <div class="flex items-center gap-3">
+                  <component :is="act.icon" :style="{ color: act.color, fontSize: '20px' }" />
+                  <span class="font-medium">{{ act.label }}</span>
+                </div>
+              </Card>
+            </Col>
+          </Row>
 
-      <!-- 对接队列状态 (管理员可见) -->
-      <Card class="mt-3" v-if="hasAdminRole && queueStats" size="small">
-        <template #title>
-          <div class="flex items-center gap-2">
-            <ThunderboltOutlined style="color:#3b82f6" />
-            <span>对接队列</span>
-            <Button type="link" size="small" @click="refreshQueue"><SyncOutlined /> 刷新</Button>
-          </div>
-        </template>
-        <template #extra>
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">并发:</span>
-            <template v-if="editingConcurrency">
-              <input type="number" v-model.number="newConcurrency" min="1" max="100" class="w-14 rounded border px-2 py-0.5 text-sm" />
-              <Button size="small" type="primary" @click="handleSetConcurrency">确定</Button>
-              <Button size="small" @click="editingConcurrency = false">取消</Button>
-            </template>
-            <template v-else>
-              <Tag color="blue">{{ queueStats.max_workers }}</Tag>
-              <Button type="link" size="small" @click="editingConcurrency = true; newConcurrency = queueStats.max_workers">调整</Button>
-            </template>
-          </div>
-        </template>
-        <Row :gutter="16">
-          <Col :span="4" class="text-center"><Statistic :value="queueStats.active" :value-style="{color:'#3b82f6'}" /><div class="text-xs text-gray-400 dark:text-gray-500">活跃</div></Col>
-          <Col :span="4" class="text-center"><Statistic :value="queueStats.pending" :value-style="{color:'#f59e0b'}" /><div class="text-xs text-gray-400 dark:text-gray-500">排队</div></Col>
-          <Col :span="4" class="text-center"><Statistic :value="queueStats.processing" :value-style="{color:'#06b6d4'}" /><div class="text-xs text-gray-400 dark:text-gray-500">处理</div></Col>
-          <Col :span="4" class="text-center"><Statistic :value="queueStats.completed" :value-style="{color:'#10b981'}" /><div class="text-xs text-gray-400 dark:text-gray-500">完成</div></Col>
-          <Col :span="4" class="text-center"><Statistic :value="queueStats.failed" :value-style="{color:'#ef4444'}" /><div class="text-xs text-gray-400 dark:text-gray-500">失败</div></Col>
-          <Col :span="4" class="text-center"><Statistic :value="`${queueStats.queue_size}/${queueStats.queue_cap}`" :value-style="{color:'#6b7280'}" /><div class="text-xs text-gray-400 dark:text-gray-500">容量</div></Col>
-        </Row>
-      </Card>
-
-      <!-- 图表区域 (管理员可见) -->
-      <Row :gutter="[12, 12]" class="mt-3" v-if="hasAdminRole">
-        <Col :xs="24" :lg="16">
-          <Card size="small">
+          <!-- 对接队列状态 (管理员可见) -->
+          <Card class="mt-3" v-if="hasAdminRole && queueStats" size="small">
             <template #title>
               <div class="flex items-center gap-2">
-                <RiseOutlined style="color:#6366f1" /><span>近7日趋势</span>
-              </div>
-            </template>
-            <div style="height:260px"><EchartsUI ref="trendChartRef" /></div>
-          </Card>
-        </Col>
-        <Col :xs="24" :lg="8">
-          <Card size="small">
-            <template #title>
-              <div class="flex items-center gap-2">
-                <ThunderboltOutlined style="color:#f59e0b" /><span>状态分布</span>
-              </div>
-            </template>
-            <div style="height:260px"><EchartsUI ref="pieChartRef" /></div>
-          </Card>
-        </Col>
-      </Row>
-
-      <Row :gutter="[12, 12]" class="mt-3">
-        <!-- 最近订单 -->
-        <Col :xs="24" :lg="hasAdminRole ? 16 : 14">
-          <Card size="small">
-            <template #title>
-              <div class="flex items-center gap-2">
-                <UnorderedListOutlined style="color:#3b82f6" /><span>最近订单</span>
+                <ThunderboltOutlined style="color:#3b82f6" />
+                <span>对接队列</span>
+                <Button type="link" size="small" @click="refreshQueue"><SyncOutlined /> 刷新</Button>
               </div>
             </template>
             <template #extra>
-              <Button type="link" size="small" @click="router.push('/order/list')">全部 →</Button>
-            </template>
-            <Table
-              v-if="hasAdminRole"
-              :data-source="dashStats?.recent_orders || []"
-              :columns="recentOrderColumns"
-              :pagination="false"
-              row-key="oid"
-              size="small"
-              :scroll="{ x: 600 }"
-            >
-              <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'status'">
-                  <Tag :color="statusTagColor[record.status] || 'default'">{{ record.status || '待处理' }}</Tag>
-                </template>
-                <template v-if="column.key === 'fees'">
-                  <span class="font-medium text-orange-500">¥{{ Number(record.fees || 0).toFixed(2) }}</span>
-                </template>
-              </template>
-            </Table>
-            <div v-if="!hasAdminRole || (dashStats?.recent_orders || []).length === 0" class="flex flex-col items-center py-8 text-gray-400 dark:text-gray-500">
-              <UnorderedListOutlined class="mb-2 text-2xl" />
-              <span>暂无订单数据</span>
-            </div>
-          </Card>
-        </Col>
-
-        <!-- 右侧面板 -->
-        <Col :xs="24" :lg="hasAdminRole ? 8 : 10">
-          <!-- 用户排行 (管理员) -->
-          <Card class="mb-3" size="small" v-if="hasAdminRole && topUsers.length > 0">
-            <template #title>
               <div class="flex items-center gap-2">
-                <CrownOutlined style="color:#f59e0b" /><span>消费排行</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">并发:</span>
+                <template v-if="editingConcurrency">
+                  <input type="number" v-model.number="newConcurrency" min="1" max="100" class="w-14 rounded border px-2 py-0.5 text-sm" />
+                  <Button size="small" type="primary" @click="handleSetConcurrency">确定</Button>
+                  <Button size="small" @click="editingConcurrency = false">取消</Button>
+                </template>
+                <template v-else>
+                  <Tag color="blue">{{ queueStats.max_workers }}</Tag>
+                  <Button type="link" size="small" @click="editingConcurrency = true; newConcurrency = queueStats.max_workers">调整</Button>
+                </template>
               </div>
             </template>
-            <div class="space-y-3">
-              <div v-for="(u, idx) in topUsers" :key="u.uid" class="flex items-center gap-3">
-                <div
-                  class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white"
-                  :class="idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-gray-300'"
-                >{{ idx + 1 }}</div>
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center justify-between text-sm">
-                    <span class="truncate font-medium">{{ u.username || `UID:${u.uid}` }}</span>
-                    <span class="text-orange-500 font-medium">¥{{ Number(u.total).toFixed(2) }}</span>
-                  </div>
-                  <Progress
-                    :percent="topUsers[0] ? Math.round((u.total / topUsers[0].total) * 100) : 0"
-                    :show-info="false"
-                    :stroke-color="idx === 0 ? '#f59e0b' : idx === 1 ? '#9ca3af' : '#d97706'"
-                    size="small"
-                    class="mt-1"
-                  />
-                </div>
-                <span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{{ u.orders }}单</span>
-              </div>
-            </div>
+            <Row :gutter="16">
+              <Col :span="4" class="text-center"><Statistic :value="queueStats.active" :value-style="{color:'#3b82f6'}" /><div class="text-xs text-gray-400 dark:text-gray-500">活跃</div></Col>
+              <Col :span="4" class="text-center"><Statistic :value="queueStats.pending" :value-style="{color:'#f59e0b'}" /><div class="text-xs text-gray-400 dark:text-gray-500">排队</div></Col>
+              <Col :span="4" class="text-center"><Statistic :value="queueStats.processing" :value-style="{color:'#06b6d4'}" /><div class="text-xs text-gray-400 dark:text-gray-500">处理</div></Col>
+              <Col :span="4" class="text-center"><Statistic :value="queueStats.completed" :value-style="{color:'#10b981'}" /><div class="text-xs text-gray-400 dark:text-gray-500">完成</div></Col>
+              <Col :span="4" class="text-center"><Statistic :value="queueStats.failed" :value-style="{color:'#ef4444'}" /><div class="text-xs text-gray-400 dark:text-gray-500">失败</div></Col>
+              <Col :span="4" class="text-center"><Statistic :value="`${queueStats.queue_size}/${queueStats.queue_cap}`" :value-style="{color:'#6b7280'}" /><div class="text-xs text-gray-400 dark:text-gray-500">容量</div></Col>
+            </Row>
           </Card>
 
-          <!-- 公告 -->
-          <Card size="small" class="hidden md:block">
+          <!-- 图表区域 (管理员可见) -->
+          <Row :gutter="[12, 12]" class="mt-3" v-if="hasAdminRole">
+            <Col :xs="24" :lg="14">
+              <Card size="small">
+                <template #title>
+                  <div class="flex items-center gap-2">
+                    <RiseOutlined style="color:#6366f1" /><span>近7日趋势</span>
+                  </div>
+                </template>
+                <div style="height:260px"><EchartsUI ref="trendChartRef" /></div>
+              </Card>
+            </Col>
+            <Col :xs="24" :lg="10">
+              <Card size="small">
+                <template #title>
+                  <div class="flex items-center gap-2">
+                    <ThunderboltOutlined style="color:#f59e0b" /><span>状态分布</span>
+                  </div>
+                </template>
+                <div style="height:260px"><EchartsUI ref="pieChartRef" /></div>
+              </Card>
+            </Col>
+          </Row>
+
+          <!-- 最近订单 + 消费排行 -->
+          <Row :gutter="[12, 12]" class="mt-3">
+            <Col :xs="24" :lg="hasAdminRole && topUsers.length > 0 ? 16 : 24">
+              <Card size="small">
+                <template #title>
+                  <div class="flex items-center gap-2">
+                    <UnorderedListOutlined style="color:#3b82f6" /><span>最近订单</span>
+                  </div>
+                </template>
+                <template #extra>
+                  <Button type="link" size="small" @click="router.push('/order/list')">全部 →</Button>
+                </template>
+                <Table
+                  v-if="hasAdminRole"
+                  :data-source="dashStats?.recent_orders || []"
+                  :columns="recentOrderColumns"
+                  :pagination="false"
+                  row-key="oid"
+                  size="small"
+                  :scroll="{ x: 600 }"
+                >
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.key === 'status'">
+                      <Tag :color="statusTagColor[record.status] || 'default'">{{ record.status || '待处理' }}</Tag>
+                    </template>
+                    <template v-if="column.key === 'fees'">
+                      <span class="font-medium text-orange-500">¥{{ Number(record.fees || 0).toFixed(2) }}</span>
+                    </template>
+                  </template>
+                </Table>
+                <div v-if="!hasAdminRole || (dashStats?.recent_orders || []).length === 0" class="flex flex-col items-center py-8 text-gray-400 dark:text-gray-500">
+                  <UnorderedListOutlined class="mb-2 text-2xl" />
+                  <span>暂无订单数据</span>
+                </div>
+              </Card>
+            </Col>
+
+            <!-- 用户排行 (管理员) -->
+            <Col :xs="24" :lg="8" v-if="hasAdminRole && topUsers.length > 0">
+              <Card size="small">
+                <template #title>
+                  <div class="flex items-center gap-2">
+                    <CrownOutlined style="color:#f59e0b" /><span>消费排行</span>
+                  </div>
+                </template>
+                <div class="space-y-3">
+                  <div v-for="(u, idx) in topUsers" :key="u.uid" class="flex items-center gap-3">
+                    <div
+                      class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white"
+                      :class="idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-gray-300'"
+                    >{{ idx + 1 }}</div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center justify-between text-sm">
+                        <span class="truncate font-medium">{{ u.username || `UID:${u.uid}` }}</span>
+                        <span class="text-orange-500 font-medium">¥{{ Number(u.total).toFixed(2) }}</span>
+                      </div>
+                      <Progress
+                        :percent="topUsers[0] ? Math.round((u.total / topUsers[0].total) * 100) : 0"
+                        :show-info="false"
+                        :stroke-color="idx === 0 ? '#f59e0b' : idx === 1 ? '#9ca3af' : '#d97706'"
+                        size="small"
+                        class="mt-1"
+                      />
+                    </div>
+                    <span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{{ u.orders }}单</span>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+          </Row>
+        </div>
+
+        <!-- 右侧：固定 300px 公告栏 -->
+        <div class="hidden lg:block" style="width: 300px; flex-shrink: 0">
+          <Card size="small" style="position: sticky; top: 16px">
             <template #title>
               <div class="flex items-center gap-2">
                 <NotificationOutlined style="color:#f59e0b" /><span>公告</span>
@@ -537,7 +554,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
             </template>
             <List :data-source="announcements" size="small" v-if="announcements.length > 0">
               <template #renderItem="{ item }">
-                <ListItem>
+                <ListItem style="cursor:pointer" @click="showAnnouncement(item)">
                   <ListItemMeta>
                     <template #title>
                       <div class="flex items-center gap-2">
@@ -557,8 +574,8 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
               <span>暂无公告</span>
             </div>
           </Card>
-        </Col>
-      </Row>
+        </div>
+      </div>
     </Spin>
   </Page>
 </template>
