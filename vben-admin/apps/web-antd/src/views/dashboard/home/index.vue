@@ -523,9 +523,9 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
             </Col>
           </Row>
 
-          <!-- 最近订单 + 消费排行 -->
+          <!-- 最近订单 -->
           <Row :gutter="[12, 12]" class="mt-3">
-            <Col :xs="24" :lg="hasAdminRole && topUsers.length > 0 ? 16 : 24">
+            <Col :xs="24" :lg="24">
               <Card size="small">
                 <template #title>
                   <div class="flex items-center gap-2">
@@ -559,45 +559,12 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
                 </div>
               </Card>
             </Col>
-
-            <!-- 用户排行 (管理员) -->
-            <Col :xs="24" :lg="8" v-if="hasAdminRole && topUsers.length > 0">
-              <Card size="small">
-                <template #title>
-                  <div class="flex items-center gap-2">
-                    <CrownOutlined style="color:#f59e0b" /><span>消费排行</span>
-                  </div>
-                </template>
-                <div class="space-y-3">
-                  <div v-for="(u, idx) in topUsers" :key="u.uid" class="flex items-center gap-3">
-                    <div
-                      class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white"
-                      :class="idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-gray-300'"
-                    >{{ idx + 1 }}</div>
-                    <div class="min-w-0 flex-1">
-                      <div class="flex items-center justify-between text-sm">
-                        <span class="truncate font-medium">{{ u.username || `UID:${u.uid}` }}</span>
-                        <span class="text-orange-500 font-medium">¥{{ Number(u.total).toFixed(2) }}</span>
-                      </div>
-                      <Progress
-                        :percent="topUsers[0] ? Math.round((u.total / topUsers[0].total) * 100) : 0"
-                        :show-info="false"
-                        :stroke-color="idx === 0 ? '#f59e0b' : idx === 1 ? '#9ca3af' : '#d97706'"
-                        size="small"
-                        class="mt-1"
-                      />
-                    </div>
-                    <span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{{ u.orders }}单</span>
-                  </div>
-                </div>
-              </Card>
-            </Col>
           </Row>
         </div>
 
-        <!-- 右侧：固定 300px 公告栏 -->
-        <div class="hidden lg:block" style="width: 300px; flex-shrink: 0">
-          <Card size="small" style="position: sticky; top: 16px" :body-style="{ padding: '8px 12px' }">
+        <!-- 右侧：固定 300px 侧边栏 (公告 + 排行等) -->
+        <div class="hidden lg:flex flex-col gap-3" style="width: 300px; flex-shrink: 0">
+          <Card size="small" :body-style="{ padding: '8px 12px' }">
             <template #title>
               <div class="flex items-center gap-2">
                 <NotificationOutlined style="color:#f59e0b" /><span>公告</span>
@@ -623,6 +590,37 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
             <div v-else class="flex flex-col items-center py-8 text-gray-400 dark:text-gray-500">
               <NotificationOutlined class="mb-2 text-2xl" />
               <span>暂无公告</span>
+            </div>
+          </Card>
+
+          <!-- 用户排行 (管理员) 移到右侧 -->
+          <Card size="small" v-if="hasAdminRole && topUsers.length > 0">
+            <template #title>
+              <div class="flex items-center gap-2">
+                <CrownOutlined style="color:#f59e0b" /><span>消费排行</span>
+              </div>
+            </template>
+            <div class="space-y-3">
+              <div v-for="(u, idx) in topUsers" :key="u.uid" class="flex items-center gap-3">
+                <div
+                  class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white"
+                  :class="idx === 0 ? 'bg-amber-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-gray-300'"
+                >{{ idx + 1 }}</div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center justify-between text-sm">
+                    <span class="truncate font-medium">{{ u.username || `UID:${u.uid}` }}</span>
+                    <span class="text-orange-500 font-medium">¥{{ Number(u.total).toFixed(2) }}</span>
+                  </div>
+                  <Progress
+                    :percent="topUsers[0] ? Math.round((u.total / topUsers[0].total) * 100) : 0"
+                    :show-info="false"
+                    :stroke-color="idx === 0 ? '#f59e0b' : idx === 1 ? '#9ca3af' : '#d97706'"
+                    size="small"
+                    class="mt-1"
+                  />
+                </div>
+                <span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{{ u.orders }}单</span>
+              </div>
             </div>
           </Card>
         </div>
