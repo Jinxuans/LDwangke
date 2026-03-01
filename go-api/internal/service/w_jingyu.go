@@ -117,6 +117,25 @@ func (s *WService) jingyuRequestRaw(app map[string]interface{}, act string, para
 	return httpPostForm(reqURL, params, 60)
 }
 
+// ========== 价格计算 ==========
+
+// GetPrice 获取本地用户价格 (base_price × addprice), 对应 PHP get_price
+func (s *WService) GetPrice(appID int64, uid int) ([]byte, error) {
+	app, err := s.getAppRow(appID)
+	if err != nil {
+		return nil, err
+	}
+	appPrice := 0.0
+	if p, ok := app["price"].(string); ok {
+		fmt.Sscanf(p, "%f", &appPrice)
+	}
+	var addprice float64
+	database.DB.QueryRow("SELECT addprice FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&addprice)
+	price := math.Round(appPrice*addprice*100) / 100
+	resp, _ := json.Marshal(map[string]interface{}{"code": 1, "data": price})
+	return resp, nil
+}
+
 // ========== 通用代理 ==========
 
 // ProxyAction 通用代理：将请求转发到上游 (支持 type 0/1/2)
@@ -127,6 +146,15 @@ func (s *WService) ProxyAction(appID int64, act string, data map[string]interfac
 	}
 
 	pType := fmt.Sprintf("%v", app["type"])
+
+	// get_price 本地计算，不转发上游
+	if act == "get_price" && pType == "2" {
+		uid := 0
+		if v, ok := data["login_uid"]; ok {
+			fmt.Sscanf(fmt.Sprintf("%v", v), "%d", &uid)
+		}
+		return s.GetPrice(appID, uid)
+	}
 
 	if pType == "2" {
 		// Jingyu 格式: form-urlencoded
@@ -324,9 +352,9 @@ func (s *WService) jingyuAddOrder(uid int, data map[string]interface{}, app map[
 					yid, string(subJSON), orderID)
 
 				return map[string]interface{}{
-					"id":           int(orderID),
-					"cost":         orderMoney,
-					appOrderIDKey:  appOrderID,
+					"id":          int(orderID),
+					"cost":        orderMoney,
+					appOrderIDKey: appOrderID,
 				}, nil
 			}
 			database.DB.Exec("UPDATE w_order SET status = 'NORMAL' WHERE id = ? LIMIT 1", orderID)

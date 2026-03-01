@@ -195,6 +195,11 @@ func WProxyAction(c *gin.Context) {
 		response.BadRequest(c, "缺少 app_id 或 act")
 		return
 	}
+	// 注入当前用户uid，供 get_price 等本地计算使用
+	if body.Data == nil {
+		body.Data = map[string]interface{}{}
+	}
+	body.Data["login_uid"] = c.GetInt("uid")
 	resp, err := wService.ProxyAction(body.AppID, body.Act, body.Data)
 	if err != nil {
 		response.BusinessError(c, -1, err.Error())
