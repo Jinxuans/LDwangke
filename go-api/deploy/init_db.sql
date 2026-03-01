@@ -163,9 +163,12 @@ CREATE TABLE IF NOT EXISTS `qingka_wangke_class` (
 
 -- 4. 系统配置表
 CREATE TABLE IF NOT EXISTS `qingka_wangke_config` (
-  `v` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
+  `v` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   `k` text COLLATE utf8_unicode_ci NOT NULL,
-  UNIQUE KEY `v` (`v`)
+  `skey` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
+  `svalue` mediumtext COLLATE utf8_unicode_ci,
+  UNIQUE KEY `v` (`v`),
+  UNIQUE KEY `uk_skey` (`skey`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 -- 5. 分类表
@@ -282,6 +285,8 @@ CREATE TABLE IF NOT EXISTS `qingka_wangke_moneylog` (
   `money` decimal(10,4) NOT NULL DEFAULT 0 COMMENT '金额（正为入账，负为扣除）',
   `balance` decimal(10,4) NOT NULL DEFAULT 0 COMMENT '变动后余额',
   `remark` varchar(500) NOT NULL DEFAULT '' COMMENT '备注',
+  `mark` varchar(500) NOT NULL DEFAULT '' COMMENT '备注(别名)',
+  `remarks` varchar(500) NOT NULL DEFAULT '' COMMENT '备注(别名2)',
   `addtime` datetime NOT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_moneylog_uid` (`uid`),
@@ -714,6 +719,116 @@ CREATE TABLE IF NOT EXISTS `qingka_wangke_flash_sdxy` (
   KEY `idx_user` (`user`),
   KEY `idx_uid` (`uid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='闪电闪动校园订单表';
+
+-- 33c. 运动世界订单表
+CREATE TABLE IF NOT EXISTS `qingka_wangke_hzw_ydsj` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `uid` int NOT NULL COMMENT '本站用户ID',
+  `yid` varchar(255) NOT NULL DEFAULT '' COMMENT '上游订单ID',
+  `user` varchar(255) NOT NULL DEFAULT '' COMMENT '用户账号',
+  `pass` varchar(255) NOT NULL DEFAULT '' COMMENT '用户密码',
+  `fees` varchar(255) NOT NULL DEFAULT '0' COMMENT '扣费',
+  `real_fees` varchar(255) NOT NULL DEFAULT '0' COMMENT '实际费用',
+  `refund_money` varchar(255) NOT NULL DEFAULT '0' COMMENT '退款金额',
+  `run_type` int NOT NULL DEFAULT 0 COMMENT '跑步类型',
+  `status` int NOT NULL DEFAULT 1 COMMENT '1:进行中 2:完成 3:异常 4:已退款 5:待确认',
+  `remarks` varchar(500) NOT NULL DEFAULT '' COMMENT '备注',
+  `is_run` int NOT NULL DEFAULT 0 COMMENT '是否在跑',
+  `info` text COMMENT '详情',
+  `tmp_info` text COMMENT '临时详情',
+  `addtime` varchar(255) NOT NULL DEFAULT '' COMMENT '下单时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_uid` (`uid`),
+  KEY `idx_status` (`status`),
+  KEY `idx_user` (`user`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='运动世界订单表';
+
+-- 33d. Appui打卡订单表
+CREATE TABLE IF NOT EXISTS `qingka_wangke_appui` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `uid` int NOT NULL COMMENT '本站用户ID',
+  `yid` varchar(255) NOT NULL DEFAULT '' COMMENT '上游订单ID',
+  `pid` varchar(255) NOT NULL DEFAULT '' COMMENT '平台ID',
+  `user` varchar(255) NOT NULL DEFAULT '' COMMENT '用户账号',
+  `pass` varchar(255) NOT NULL DEFAULT '' COMMENT '用户密码',
+  `name` varchar(255) NOT NULL DEFAULT '' COMMENT '姓名',
+  `address` varchar(500) NOT NULL DEFAULT '' COMMENT '地址',
+  `residue_day` int NOT NULL DEFAULT 0 COMMENT '剩余天数',
+  `total_day` int NOT NULL DEFAULT 0 COMMENT '总天数',
+  `status` varchar(50) NOT NULL DEFAULT '待处理' COMMENT '状态',
+  `week` varchar(50) NOT NULL DEFAULT '' COMMENT '打卡星期',
+  `report` int NOT NULL DEFAULT 0 COMMENT '日报',
+  `shangban_time` varchar(50) NOT NULL DEFAULT '' COMMENT '上班时间',
+  `xiaban_time` varchar(50) NOT NULL DEFAULT '' COMMENT '下班时间',
+  `addtime` varchar(255) NOT NULL DEFAULT '' COMMENT '下单时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_uid` (`uid`),
+  KEY `idx_user` (`user`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Appui打卡订单表';
+
+-- 33e. YF打卡订单表
+CREATE TABLE IF NOT EXISTS `qingka_wangke_yfdk` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `uid` int NOT NULL COMMENT '本站用户ID',
+  `oid` varchar(255) NOT NULL DEFAULT '' COMMENT '上游订单ID',
+  `cid` varchar(255) NOT NULL DEFAULT '' COMMENT '配置ID',
+  `username` varchar(255) NOT NULL DEFAULT '' COMMENT '用户账号',
+  `password` varchar(255) NOT NULL DEFAULT '' COMMENT '用户密码',
+  `school` varchar(255) NOT NULL DEFAULT '' COMMENT '学校',
+  `name` varchar(255) NOT NULL DEFAULT '' COMMENT '姓名',
+  `email` varchar(255) NOT NULL DEFAULT '' COMMENT '邮箱',
+  `offer` varchar(255) NOT NULL DEFAULT '' COMMENT '岗位',
+  `address` varchar(500) NOT NULL DEFAULT '' COMMENT '地址',
+  `longitude` varchar(50) NOT NULL DEFAULT '' COMMENT '经度',
+  `latitude` varchar(50) NOT NULL DEFAULT '' COMMENT '纬度',
+  `week` varchar(50) NOT NULL DEFAULT '' COMMENT '打卡星期',
+  `worktime` varchar(50) NOT NULL DEFAULT '' COMMENT '上班时间',
+  `offwork` varchar(50) NOT NULL DEFAULT '' COMMENT '下班时间',
+  `offtime` varchar(50) NOT NULL DEFAULT '' COMMENT '下班打卡时间',
+  `day` int NOT NULL DEFAULT 0 COMMENT '天数',
+  `daily_fee` decimal(10,2) NOT NULL DEFAULT 0 COMMENT '每日费用',
+  `total_fee` decimal(10,2) NOT NULL DEFAULT 0 COMMENT '总费用',
+  `day_report` int NOT NULL DEFAULT 0 COMMENT '日报',
+  `week_report` int NOT NULL DEFAULT 0 COMMENT '周报',
+  `week_date` varchar(50) NOT NULL DEFAULT '' COMMENT '周报日期',
+  `month_report` int NOT NULL DEFAULT 0 COMMENT '月报',
+  `month_date` varchar(50) NOT NULL DEFAULT '' COMMENT '月报日期',
+  `skip_holidays` int NOT NULL DEFAULT 0 COMMENT '跳过节假日',
+  `status` int NOT NULL DEFAULT 1 COMMENT '状态',
+  `mark` varchar(255) NOT NULL DEFAULT '' COMMENT '标记',
+  `endtime` varchar(255) NOT NULL DEFAULT '' COMMENT '结束时间',
+  `real_fees` varchar(255) NOT NULL DEFAULT '0' COMMENT '实际费用',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_uid` (`uid`),
+  KEY `idx_username` (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='YF打卡订单表';
+
+-- 33f. 泰山打卡订单表
+CREATE TABLE IF NOT EXISTS `qingka_wangke_sxdk` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `sxdkId` int NOT NULL DEFAULT 0 COMMENT '上游订单ID',
+  `uid` int NOT NULL COMMENT '本站用户ID',
+  `platform` varchar(50) NOT NULL DEFAULT '' COMMENT '平台',
+  `phone` varchar(50) NOT NULL DEFAULT '' COMMENT '手机号',
+  `password` varchar(255) NOT NULL DEFAULT '' COMMENT '密码',
+  `code` int NOT NULL DEFAULT 1 COMMENT '状态码',
+  `wxpush` text COMMENT '微信推送配置JSON',
+  `name` varchar(255) NOT NULL DEFAULT '' COMMENT '姓名',
+  `address` varchar(500) NOT NULL DEFAULT '' COMMENT '地址',
+  `up_check_time` varchar(50) NOT NULL DEFAULT '' COMMENT '上班打卡时间',
+  `down_check_time` varchar(50) NOT NULL DEFAULT '' COMMENT '下班打卡时间',
+  `check_week` varchar(50) NOT NULL DEFAULT '' COMMENT '打卡星期',
+  `end_time` varchar(50) NOT NULL DEFAULT '' COMMENT '结束时间',
+  `day_paper` int NOT NULL DEFAULT 0 COMMENT '日报',
+  `week_paper` int NOT NULL DEFAULT 0 COMMENT '周报',
+  `month_paper` int NOT NULL DEFAULT 0 COMMENT '月报',
+  `createTime` varchar(255) NOT NULL DEFAULT '' COMMENT '创建时间',
+  `updateTime` varchar(255) NOT NULL DEFAULT '' COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_uid` (`uid`),
+  KEY `idx_phone` (`phone`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='泰山打卡订单表';
 
 -- =============================================
 -- 第八部分：租户/商城

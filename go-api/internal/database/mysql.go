@@ -60,6 +60,22 @@ func autoMigrate(db *sql.DB) {
 			log.Println("[AutoMigrate] 已自动添加 pass2 列")
 		}
 	}
+	// 确保 config 表有 skey/svalue 列（新模块用）
+	var hasSkey int
+	db.QueryRow("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='qingka_wangke_config' AND COLUMN_NAME='skey'").Scan(&hasSkey)
+	if hasSkey == 0 {
+		db.Exec("ALTER TABLE `qingka_wangke_config` ADD COLUMN `skey` VARCHAR(255) NOT NULL DEFAULT '' AFTER `k`, ADD COLUMN `svalue` MEDIUMTEXT AFTER `skey`, ADD UNIQUE KEY `uk_skey` (`skey`)")
+		log.Println("[AutoMigrate] 已添加 config.skey/svalue 列")
+	}
+
+	// 确保 moneylog 表有 mark/remarks 列（部分模块用）
+	var hasMark int
+	db.QueryRow("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='qingka_wangke_moneylog' AND COLUMN_NAME='mark'").Scan(&hasMark)
+	if hasMark == 0 {
+		db.Exec("ALTER TABLE `qingka_wangke_moneylog` ADD COLUMN `mark` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '备注(别名)' AFTER `remark`, ADD COLUMN `remarks` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '备注(别名2)' AFTER `mark`")
+		log.Println("[AutoMigrate] 已添加 moneylog.mark/remarks 列")
+	}
+
 	// 确保管理员账号存在
 	var adminCount int
 	db.QueryRow("SELECT COUNT(*) FROM qingka_wangke_user WHERE grade='3'").Scan(&adminCount)
