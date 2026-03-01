@@ -40,6 +40,10 @@ import {
   wAppListApi, wAppSaveApi, wAppDeleteApi,
   type WAppItem,
 } from '#/api/w-app';
+import {
+  getYongyeConfig, saveYongyeConfig,
+  type YongyeConfig,
+} from '#/api/yongye';
 
 // ========== 状态 ==========
 const loading = ref(false);
@@ -113,6 +117,21 @@ const ydsjConfig = reactive<YDSJConfig>({
   real_cost_multiple: 1,
 });
 const ydsjSaving = ref(false);
+
+// 永夜运动
+const yongyeConfig = reactive<YongyeConfig>({
+  api_url: '',
+  token: '',
+  dj: 0,
+  zs: 1.25,
+  beis: 1.3,
+  xzdj: 0,
+  xzmo: 100,
+  tk: 0.01,
+  content: '',
+  tcgg: '',
+});
+const yongyeSaving = ref(false);
 
 // 小米运动项目
 const xmProjects = ref<XMProjectItem[]>([]);
@@ -238,7 +257,7 @@ async function deleteWApp(id: number) {
 async function loadAll() {
   loading.value = true;
   try {
-    const [tutuqgRes, yfdkRes, sxdkRes, hzwRes, tuboshuRes, appuiRes, sdxyRes, ydsjRes] = await Promise.allSettled([
+    const [tutuqgRes, yfdkRes, sxdkRes, hzwRes, tuboshuRes, appuiRes, sdxyRes, ydsjRes, yongyeRes] = await Promise.allSettled([
       tutuqgUpstreamConfigGetApi(),
       yfdkConfigGetApi(),
       sxdkConfigGetApi(),
@@ -247,6 +266,7 @@ async function loadAll() {
       appuiConfigGetApi(),
       sdxyConfigGetApi(),
       ydsjConfigGetApi(),
+      getYongyeConfig(),
     ]);
 
     if (tutuqgRes.status === 'fulfilled' && tutuqgRes.value) {
@@ -272,6 +292,9 @@ async function loadAll() {
     }
     if (ydsjRes.status === 'fulfilled' && ydsjRes.value) {
       Object.assign(ydsjConfig, ydsjRes.value);
+    }
+    if (yongyeRes.status === 'fulfilled' && yongyeRes.value) {
+      Object.assign(yongyeConfig, yongyeRes.value);
     }
   } catch (e) {
     console.error('加载对接配置失败:', e);
@@ -374,6 +397,18 @@ async function saveYdsj() {
     message.error(e?.message || '保存失败');
   } finally {
     ydsjSaving.value = false;
+  }
+}
+
+async function saveYongye() {
+  yongyeSaving.value = true;
+  try {
+    await saveYongyeConfig({ ...yongyeConfig });
+    message.success('永夜运动配置保存成功');
+  } catch (e: any) {
+    message.error(e?.message || '保存失败');
+  } finally {
+    yongyeSaving.value = false;
   }
 }
 
@@ -566,6 +601,62 @@ onMounted(() => {
                     <FormItem label="每公里价格">
                       <InputNumber v-model:value="sdxyModuleConfig.price_per_km" :min="0" :step="0.5" :precision="2" class="w-full" />
                     </FormItem>
+                  </Form>
+                </Card>
+              </Col>
+
+              <!-- 永夜运动 -->
+              <Col :xs="24" :md="12" :xl="8">
+                <Card :bordered="false" class="cfg-card">
+                  <template #title>
+                    <span class="card-title">永夜运动</span>
+                    <Tag v-if="isConfigured(yongyeConfig.api_url)" color="success" class="ml-2">已对接</Tag>
+                    <Tag v-else color="default" class="ml-2">未配置</Tag>
+                  </template>
+                  <template #extra>
+                    <Button type="primary" size="small" :loading="yongyeSaving" @click="saveYongye">保存</Button>
+                  </template>
+                  <Form layout="vertical" :colon="false">
+                    <FormItem label="API 地址">
+                      <Input v-model:value="yongyeConfig.api_url" placeholder="https://yy.rgrg.cc/api" />
+                    </FormItem>
+                    <FormItem label="Token">
+                      <Input.Password v-model:value="yongyeConfig.token" placeholder="请输入上游 Token" />
+                    </FormItem>
+                    <Row :gutter="12">
+                      <Col :span="8">
+                        <FormItem label="赠送倍率">
+                          <InputNumber v-model:value="yongyeConfig.zs" :min="0" :step="0.05" :precision="2" class="w-full" />
+                        </FormItem>
+                      </Col>
+                      <Col :span="8">
+                        <FormItem label="价格倍数">
+                          <InputNumber v-model:value="yongyeConfig.beis" :min="0" :step="0.1" :precision="2" class="w-full" />
+                        </FormItem>
+                      </Col>
+                      <Col :span="8">
+                        <FormItem label="退款费率">
+                          <InputNumber v-model:value="yongyeConfig.tk" :min="0" :max="1" :step="0.01" :precision="2" class="w-full" />
+                        </FormItem>
+                      </Col>
+                    </Row>
+                    <Row :gutter="12">
+                      <Col :span="8">
+                        <FormItem label="等级(dj)">
+                          <InputNumber v-model:value="yongyeConfig.dj" :min="0" :step="0.1" :precision="2" class="w-full" />
+                        </FormItem>
+                      </Col>
+                      <Col :span="8">
+                        <FormItem label="限制等级">
+                          <InputNumber v-model:value="yongyeConfig.xzdj" :min="0" :step="0.1" :precision="2" class="w-full" />
+                        </FormItem>
+                      </Col>
+                      <Col :span="8">
+                        <FormItem label="限制余额">
+                          <InputNumber v-model:value="yongyeConfig.xzmo" :min="0" :step="10" class="w-full" />
+                        </FormItem>
+                      </Col>
+                    </Row>
                   </Form>
                 </Card>
               </Col>

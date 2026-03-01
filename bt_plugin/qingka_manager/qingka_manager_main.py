@@ -1666,6 +1666,7 @@ WantedBy=multi-user.target
         'qingka_wangke_appui', 'qingka_wangke_yfdk', 'qingka_wangke_sxdk',
         'qingka_wangke_hzw_ydsj', 'xm_project', 'xm_order',
         'w_app', 'w_order',
+        'yy_ydsj_dd', 'yy_ydsj_student',
         # 图图强国/土拨鼠
         'tutuqg', 'qingka_wangke_dialogue',
         'points_product', 'points_product_code', 'points_exchange_record',

@@ -45,6 +45,9 @@ func main() {
 	// 初始化小米运动表
 	handler.XMEnsureTable()
 
+	// 初始化永夜运动表
+	handler.YongyeEnsureTable()
+
 	// 初始化对接并发队列（5并发，1000缓冲）
 	// checker: 查 DB dockstatus=1 判断对接是否成功，用于准确统计 completed/failed
 	dockChecker := func(oid int64) bool {
@@ -87,6 +90,9 @@ func main() {
 
 	// 启动小米运动后台批量同步任务
 	go service.StartXMCron()
+
+	// 启动永夜运动后台同步任务
+	go service.StartYongyeCron()
 
 	// 启动闪电运动(闪动校园)订单状态同步
 	go service.StartSDXYCron()
@@ -384,6 +390,21 @@ func main() {
 			ydsj.POST("/add", handler.YDSJAddOrder)
 			ydsj.POST("/refund", handler.YDSJRefundOrder)
 			ydsj.POST("/toggle-run", handler.YDSJToggleRun)
+		}
+
+		// 永夜运动
+		yongye := api.Group("/yongye")
+		{
+			yongye.GET("/config", handler.YongyeConfigGet)
+			yongye.POST("/config", handler.YongyeConfigSave)
+			yongye.GET("/schools", handler.YongyeGetSchools)
+			yongye.GET("/orders", handler.YongyeOrderList)
+			yongye.GET("/students", handler.YongyeStudentList)
+			yongye.POST("/add", handler.YongyeAddOrder)
+			yongye.POST("/refund", handler.YongyeLocalRefund)
+			yongye.POST("/refund-student", handler.YongyeRefundStudent)
+			yongye.POST("/update-student", handler.YongyeUpdateStudent)
+			yongye.POST("/toggle-polling", handler.YongyeTogglePolling)
 		}
 
 		// 聊天

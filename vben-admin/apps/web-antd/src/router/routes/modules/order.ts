@@ -139,6 +139,15 @@ const routes: RouteRecordRaw[] = [
           title: '鲸鱼运动',
         },
       },
+      {
+        name: 'YongyeIndex',
+        path: '/yongye/index',
+        component: () => import('#/views/order/yongye.vue'),
+        meta: {
+          icon: 'lucide:moon',
+          title: '永夜运动',
+        },
+      },
     ],
   },
   {
