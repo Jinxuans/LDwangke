@@ -79,6 +79,9 @@ func main() {
 	// 启动小米运动后台批量同步任务
 	go service.StartXMCron()
 
+	// 启动闪电运动(闪动校园)订单状态同步
+	go service.StartSDXYCron()
+
 	// 自动商品同步定时任务（间隔从 sync_config 读取，默认30分钟）
 	go func() {
 		// 启动5分钟后先执行一次
@@ -321,7 +324,7 @@ func main() {
 			appui.POST("/delete", handler.AppuiDeleteOrder)
 		}
 
-		// 闪电运动
+		// 闪电运动(闪动校园)
 		sdxy := api.Group("/sdxy")
 		{
 			sdxy.GET("/config", handler.SDXYConfigGet)
@@ -330,6 +333,15 @@ func main() {
 			sdxy.GET("/orders", handler.SDXYOrderList)
 			sdxy.POST("/add", handler.SDXYAddOrder)
 			sdxy.POST("/delete", handler.SDXYDeleteOrder)
+			sdxy.POST("/refund", handler.SDXYRefundOrder)
+			sdxy.POST("/pause", handler.SDXYPauseOrder)
+			sdxy.POST("/get-user-info", handler.SDXYGetUserInfo)
+			sdxy.POST("/send-code", handler.SDXYSendCode)
+			sdxy.POST("/get-user-info-by-code", handler.SDXYGetUserInfoByCode)
+			sdxy.POST("/update-run-rule", handler.SDXYUpdateRunRule)
+			sdxy.POST("/log", handler.SDXYGetRunTask)
+			sdxy.POST("/change-task-time", handler.SDXYChangeTaskTime)
+			sdxy.POST("/delay-task", handler.SDXYDelayTask)
 		}
 
 		// 运动世界

@@ -97,25 +97,226 @@ func SDXYAddOrder(c *gin.Context) {
 	response.SuccessMsg(c, msg)
 }
 
-// ---------- 删除/退款 ----------
+// ---------- 退款 ----------
 
-func SDXYDeleteOrder(c *gin.Context) {
+func SDXYRefundOrder(c *gin.Context) {
 	uid := c.GetInt("uid")
 	role, _ := c.Get("role")
 	isAdmin := role == "super" || role == "admin"
 
 	var req struct {
-		ID int `json:"id" binding:"required"`
+		AggOrderID string `json:"agg_order_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误")
 		return
 	}
 	svc := service.NewSDXYService()
-	msg, err := svc.DeleteOrder(uid, req.ID, isAdmin)
+	msg, err := svc.RefundOrder(uid, req.AggOrderID, isAdmin)
 	if err != nil {
 		response.BusinessError(c, -1, err.Error())
 		return
 	}
 	response.SuccessMsg(c, msg)
+}
+
+// SDXYDeleteOrder 兼容旧接口，等同退款
+func SDXYDeleteOrder(c *gin.Context) {
+	SDXYRefundOrder(c)
+}
+
+// ---------- 暂停/恢复 ----------
+
+func SDXYPauseOrder(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "super" || role == "admin"
+
+	var req struct {
+		AggOrderID string `json:"agg_order_id" binding:"required"`
+		Pause      int    `json:"pause"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	svc := service.NewSDXYService()
+	msg, err := svc.PauseOrder(uid, req.AggOrderID, req.Pause, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.SuccessMsg(c, msg)
+}
+
+// ---------- 代理: 获取学生信息(密码) ----------
+
+func SDXYGetUserInfo(c *gin.Context) {
+	var req struct {
+		Form map[string]interface{} `json:"form"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Form == nil {
+		response.BadRequest(c, "参数不完整")
+		return
+	}
+	if phone, _ := req.Form["phone"].(string); phone == "" {
+		response.BusinessError(c, -1, "手机号不能为空")
+		return
+	}
+	svc := service.NewSDXYService()
+	data, err := svc.ProxyGetUserInfo(req.Form)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	c.Data(200, "application/json; charset=utf-8", data)
+}
+
+// ---------- 代理: 发送验证码 ----------
+
+func SDXYSendCode(c *gin.Context) {
+	var req struct {
+		Form map[string]interface{} `json:"form"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Form == nil {
+		response.BadRequest(c, "参数不完整")
+		return
+	}
+	if phone, _ := req.Form["phone"].(string); phone == "" {
+		response.BusinessError(c, -1, "手机号不能为空")
+		return
+	}
+	svc := service.NewSDXYService()
+	data, err := svc.ProxySendCode(req.Form)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	c.Data(200, "application/json; charset=utf-8", data)
+}
+
+// ---------- 代理: 获取学生信息(验证码) ----------
+
+func SDXYGetUserInfoByCode(c *gin.Context) {
+	var req struct {
+		Form map[string]interface{} `json:"form"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Form == nil {
+		response.BadRequest(c, "参数不完整")
+		return
+	}
+	if phone, _ := req.Form["phone"].(string); phone == "" {
+		response.BusinessError(c, -1, "手机号不能为空")
+		return
+	}
+	if code, _ := req.Form["code"].(string); code == "" {
+		response.BusinessError(c, -1, "验证码不能为空")
+		return
+	}
+	svc := service.NewSDXYService()
+	data, err := svc.ProxyGetUserInfoByCode(req.Form)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	c.Data(200, "application/json; charset=utf-8", data)
+}
+
+// ---------- 代理: 更新运行规则 ----------
+
+func SDXYUpdateRunRule(c *gin.Context) {
+	var req struct {
+		StudentID string `json:"student_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "学生ID不能为空")
+		return
+	}
+	svc := service.NewSDXYService()
+	data, err := svc.ProxyUpdateRunRule(req.StudentID)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	c.Data(200, "application/json; charset=utf-8", data)
+}
+
+// ---------- 代理: 获取运行任务日志 ----------
+
+func SDXYGetRunTask(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "super" || role == "admin"
+
+	var req struct {
+		SDXYOrderID string `json:"sdxy_order_id" binding:"required"`
+		PageNum     int    `json:"page_num"`
+		PageSize    int    `json:"page_size"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "子订单ID不能为空")
+		return
+	}
+	if req.PageNum <= 0 {
+		req.PageNum = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 10
+	}
+	svc := service.NewSDXYService()
+	data, err := svc.ProxyGetRunTask(uid, req.SDXYOrderID, req.PageNum, req.PageSize, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	c.Data(200, "application/json; charset=utf-8", data)
+}
+
+// ---------- 代理: 修改任务时间 ----------
+
+func SDXYChangeTaskTime(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "super" || role == "admin"
+
+	var req struct {
+		SDXYOrderID string `json:"sdxy_order_id" binding:"required"`
+		RunTaskID   string `json:"run_task_id" binding:"required"`
+		StartTime   string `json:"start_time" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数不完整")
+		return
+	}
+	svc := service.NewSDXYService()
+	data, err := svc.ProxyChangeTaskTime(uid, req.SDXYOrderID, req.RunTaskID, req.StartTime, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	c.Data(200, "application/json; charset=utf-8", data)
+}
+
+// ---------- 代理: 延迟任务 ----------
+
+func SDXYDelayTask(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "super" || role == "admin"
+
+	var req struct {
+		AggOrderID string `json:"agg_order_id" binding:"required"`
+		RunTaskID  string `json:"run_task_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数不完整")
+		return
+	}
+	svc := service.NewSDXYService()
+	data, err := svc.ProxyDelayTask(uid, req.AggOrderID, req.RunTaskID, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	c.Data(200, "application/json; charset=utf-8", data)
 }
