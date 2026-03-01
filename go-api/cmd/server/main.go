@@ -178,6 +178,7 @@ func main() {
 
 	// ===== 公开路由（无需认证） =====
 	r.GET("/api/v1/site/config", handler.SiteConfigGet)
+	r.GET("/api/v1/ext-menus", handler.ExtMenuPublicList)
 	r.GET("/api/v1/query", handler.CheckOrderPublic)
 	r.POST("/api/v1/query", handler.CheckOrderPublic)
 
@@ -723,6 +724,11 @@ func main() {
 			// 菜单管理
 			admin.GET("/menus", handler.AdminMenuList)
 			admin.POST("/menus", handler.AdminMenuSave)
+
+			// 扩展菜单管理
+			admin.GET("/ext-menus", handler.AdminExtMenuList)
+			admin.POST("/ext-menu/save", handler.AdminExtMenuSave)
+			admin.DELETE("/ext-menu/:id", handler.AdminExtMenuDelete)
 
 			// 演示模式
 			admin.GET("/demo-mode", handler.AdminGetDemoMode)

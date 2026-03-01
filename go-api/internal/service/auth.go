@@ -146,7 +146,6 @@ func (s *AuthService) SendRegisterCode(email string) error {
 	}
 	subject, htmlBody, tplErr := ts.RenderByCode("register", vars)
 	if tplErr != nil {
-		// fallback 硬编码模板
 		subject = siteName + " - 注册验证码"
 		htmlBody = TemplateVerifyCode(siteName, code, 10)
 	}

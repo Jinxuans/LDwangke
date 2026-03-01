@@ -15,12 +15,16 @@ defineOptions({ name: 'Login' });
 
 const authStore = useAuthStore();
 const sliderEnabled = ref(true);
+const forgetPwdEnabled = ref(false);
 
 onMounted(async () => {
   try {
     const cfg = await getSiteConfigApi();
     if (cfg?.login_slider_verify === '0') {
       sliderEnabled.value = false;
+    }
+    if (cfg?.login_forget_pwd === '1') {
+      forgetPwdEnabled.value = true;
     }
     if (cfg?.notice) {
       Modal.info({
@@ -74,7 +78,7 @@ const formSchema = computed((): VbenFormSchema[] => {
     :show-code-login="false"
     :show-qrcode-login="false"
     :show-third-party-login="false"
-    :show-forget-password="false"
+    :show-forget-password="forgetPwdEnabled"
     sub-title=" "
     @submit="authStore.authLogin"
   />

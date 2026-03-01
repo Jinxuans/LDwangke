@@ -16,6 +16,7 @@ import {
   type EmailLog,
   type SMTPConfig,
 } from '#/api/mail';
+import { getEmailTemplatesApi, type EmailTemplate } from '#/api/email-template';
 
 // 群发表单
 const targetType = ref<'all' | 'direct' | 'indirect' | 'grade' | 'uids'>('all');
@@ -26,6 +27,30 @@ const content = ref('');
 const sending = ref(false);
 const previewCount = ref(0);
 const previewing = ref(false);
+
+// 模板
+const emailTemplates = ref<EmailTemplate[]>([]);
+const selectedTemplateId = ref<number | null>(null);
+
+async function loadTemplates() {
+  try {
+    const raw = await getEmailTemplatesApi();
+    emailTemplates.value = Array.isArray(raw) ? raw.filter((t: EmailTemplate) => t.status === 1) : [];
+  } catch (e) { /* ignore */ }
+}
+
+function onTemplateSelect(tplId: number | null) {
+  if (!tplId) {
+    subject.value = '';
+    content.value = '';
+    return;
+  }
+  const tpl = emailTemplates.value.find((t) => t.id === tplId);
+  if (tpl) {
+    subject.value = tpl.subject;
+    content.value = tpl.content;
+  }
+}
 
 // SMTP 配置
 const smtpForm = reactive<SMTPConfig>({
@@ -204,6 +229,7 @@ onMounted(() => {
   loadSMTPConfig();
   loadLogs(1);
   loadPreview();
+  loadTemplates();
 });
 </script>
 
@@ -293,6 +319,20 @@ onMounted(() => {
             </Button>
             <Tag v-if="previewCount > 0" color="blue">{{ previewCount }} 人</Tag>
           </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">使用模板（可选）</label>
+          <Select
+            v-model:value="selectedTemplateId"
+            placeholder="选择模板自动填充标题和内容"
+            allow-clear
+            style="width: 100%"
+            @change="onTemplateSelect"
+          >
+            <Select.Option v-for="tpl in emailTemplates" :key="tpl.id" :value="tpl.id">
+              {{ tpl.name }}（{{ tpl.code }}）
+            </Select.Option>
+          </Select>
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">邮件标题</label>

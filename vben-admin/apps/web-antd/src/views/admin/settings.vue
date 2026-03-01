@@ -699,6 +699,15 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                     <Switch :checked="getVal('pass2_kg', '1') === '1'" @change="(v: any) => setVal('pass2_kg', v ? '1' : '0')" />
                   </div>
                 </Col>
+                <Col :xs="24" :lg="8">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">忘记密码</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后登录页面显示「忘记密码」入口，用户可通过邮箱重置密码</div>
+                    </div>
+                    <Switch :checked="getVal('login_forget_pwd', '0') === '1'" @change="(v: any) => setVal('login_forget_pwd', v ? '1' : '0')" />
+                  </div>
+                </Col>
               </Row>
             </div>
           </TabPane>

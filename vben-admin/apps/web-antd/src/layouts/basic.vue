@@ -21,6 +21,7 @@ import { $t } from '#/locales';
 import { useAuthStore } from '#/store';
 import { getSiteConfigApi } from '#/api/admin';
 import { getMenuConfigs } from '#/api/menu-config';
+import { getExtMenusPublicApi } from '#/api/ext-menu';
 import { migrateSuperiorApi } from '#/api/user-center';
 import { getAccessCodesApi, getUserInfoApi } from '#/api';
 import { getChatSessionsApi, markChatReadApi } from '#/api/chat';
@@ -342,6 +343,32 @@ onMounted(async () => {
         applySort(fullMenusBackup.value);
         swapMenusForRoute(route.path);
       }
+    }
+  } catch { /* ignore */ }
+
+  // 加载扩展菜单并注入侧边栏
+  try {
+    const extMenus = await getExtMenusPublicApi();
+    if (extMenus?.length && fullMenusBackup.value.length) {
+      for (const ext of extMenus) {
+        const routePath = `/admin/ext/${ext.id}`;
+        const menuItem = {
+          name: ext.title,
+          path: routePath,
+          icon: ext.icon || 'mdi:puzzle-outline',
+          order: 900 + ext.sort_order,
+          show: true,
+          children: [],
+        };
+        const adminMenu = fullMenusBackup.value.find((m: any) => m.path === '/admin');
+        if (adminMenu?.children) {
+          if (!adminMenu.children.find((c: any) => c.path === routePath)) {
+            adminMenu.children.push(menuItem);
+            adminMenu.children.sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+          }
+        }
+      }
+      swapMenusForRoute(route.path);
     }
   } catch { /* ignore */ }
 

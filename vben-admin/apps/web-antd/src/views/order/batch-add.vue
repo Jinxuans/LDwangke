@@ -1,22 +1,25 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+
 import { Page } from '@vben/common-ui';
+
 import {
-  Card, Button, Input, Switch, Table, Tag, Space, message,
-  Spin, Alert, Statistic, Row, Col, Tooltip,
-} from 'ant-design-vue';
-import {
-  UploadOutlined, DeleteOutlined, SendOutlined, HeartFilled,
+  DeleteOutlined, HeartFilled, SendOutlined, UploadOutlined,
 } from '@ant-design/icons-vue';
-import { useVbenForm } from '#/adapter/form';
 import {
-  getClassListApi,
-  getClassCategoriesApi,
-  addOrderApi,
-  type ClassItem,
-  type ClassCategory,
-} from '#/api/class';
+  Alert, Button, Card, Col, Input, message, Row, Space,
+  Spin, Statistic, Switch, Table, Tag, Tooltip,
+} from 'ant-design-vue';
+
+import { useVbenForm } from '#/adapter/form';
 import { getSiteConfigApi } from '#/api/admin';
+import {
+  addOrderApi,
+  type ClassCategory,
+  type ClassItem,
+  getClassCategoriesApi,
+  getClassListApi,
+} from '#/api/class';
 import { getFavoritesApi } from '#/api/user-center';
 import { aiReviseMultiline } from '#/utils/ai-revise';
 
@@ -130,8 +133,8 @@ async function loadClassData() {
       const favs = await getFavoritesApi();
       favoriteCourses.value = (Array.isArray(favs) ? favs : []).map(String);
     } catch { /* ignore */ }
-  } catch (e) {
-    console.error('加载课程失败:', e);
+  } catch (error) {
+    console.error('加载课程失败:', error);
   } finally {
     classLoading.value = false;
   }
@@ -155,7 +158,7 @@ function handleParse() {
   }
 
   const lines = rawText.value
-    .replace(/\r\n/g, '\n')
+    .replaceAll('\r\n', '\n')
     .split('\n')
     .map((l: string) => l.trim())
     .filter(Boolean);
@@ -204,8 +207,8 @@ async function handleSubmit() {
     });
     message.success(`批量提交成功，共 ${validLines.length} 条`);
     clearAll();
-  } catch (e: any) {
-    message.error(e?.message || '批量提交失败');
+  } catch (error: any) {
+    message.error(error?.message || '批量提交失败');
   } finally {
     submitLoading.value = false;
   }
@@ -224,7 +227,7 @@ const tableColumns = [
 </script>
 
 <template>
-  <Page title="批量交单" content-class="p-4">
+  <Page content-class="p-4" title="批量交单">
     <Spin :spinning="classLoading">
       <Card class="mb-4">
         <!-- 顶部开关栏 -->
@@ -249,11 +252,13 @@ const tableColumns = [
                 :type="activeCateId === '' ? 'primary' : 'default'"
                 size="small"
                 @click="activeCateId = ''"
-              >全部课程</Button>
+              >
+全部课程
+</Button>
               <Button
+                :style="{ borderColor: '#eb2f96', color: activeCateId === 'collect' ? '' : '#eb2f96' }"
                 :type="activeCateId === 'collect' ? 'primary' : 'default'"
                 size="small"
-                :style="{ borderColor: '#eb2f96', color: activeCateId === 'collect' ? '' : '#eb2f96' }"
                 @click="activeCateId = activeCateId === 'collect' ? '' : 'collect'"
               >
                 <template #icon><HeartFilled /></template>
@@ -262,11 +267,13 @@ const tableColumns = [
               <Button
                 v-for="cat in categoryList"
                 :key="cat.id"
+                :style="cat.recommend ? { borderColor: '#722ed1', color: activeCateId === String(cat.id) ? '' : '#722ed1', fontWeight: '600' } : {}"
                 :type="activeCateId === String(cat.id) ? 'primary' : 'default'"
                 size="small"
-                :style="cat.recommend ? { borderColor: '#722ed1', color: activeCateId === String(cat.id) ? '' : '#722ed1', fontWeight: '600' } : {}"
                 @click="activeCateId = String(cat.id)"
-              >{{ cat.name }}</Button>
+              >
+{{ cat.name }}
+</Button>
             </div>
           </div>
         </template>
@@ -276,15 +283,21 @@ const tableColumns = [
 
         <Alert
           v-if="selectedClass"
-          type="info"
-          show-icon
-          class="my-3"
           :message="`单价: ¥${selectedClass.price}（实际价格以服务器计算为准）`"
+          class="my-3"
+          show-icon
+          type="info"
         />
 
         <!-- 批量下单信息 -->
         <div class="mb-4">
-          <label class="block text-sm text-gray-500 mb-1">批量下单信息</label>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm font-medium text-gray-700">批量下单信息</label>
+            <div class="flex items-center gap-1.5 cursor-help" title="开启后自动修正输入格式（如符号和多余空格）">
+              <Switch v-model:checked="aiFlag" size="small" />
+              <span class="text-xs text-gray-500">AI纠错</span>
+            </div>
+          </div>
           <Input.TextArea
             v-model:value="rawText"
             :rows="8"
@@ -293,17 +306,17 @@ const tableColumns = [
           />
         </div>
 
-        <Space>
-          <Button type="primary" @click="handleParse">
+        <div class="flex gap-2 items-center">
+          <Button class="bg-blue-600 hover:bg-blue-500 flex-1" size="large" type="primary" @click="handleParse">
             <template #icon><UploadOutlined /></template>
             解析数据
           </Button>
-          <Button @click="clearAll" v-if="parsedLines.length > 0">清空</Button>
-        </Space>
+          <Button v-if="parsedLines.length > 0" size="large" @click="clearAll">清空</Button>
+        </div>
       </Card>
 
       <!-- 解析结果预览 -->
-      <Card v-if="parsedLines.length > 0" class="mb-4">
+      <Card v-if="parsedLines.length > 0" class="shadow-sm mb-4" size="small">
         <template #title>
           <Space>
             <span>数据预览</span>
@@ -315,13 +328,13 @@ const tableColumns = [
         </template>
 
         <Table
-          :data-source="parsedLines"
           :columns="tableColumns"
+          :data-source="parsedLines"
           :pagination="false"
+          :scroll="{ y: 400 }"
+          bordered
           row-key="key"
           size="small"
-          bordered
-          :scroll="{ y: 400 }"
         >
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'index'">{{ index + 1 }}</template>
@@ -331,7 +344,7 @@ const tableColumns = [
               </Tag>
             </template>
             <template v-if="column.key === 'action'">
-              <Button type="link" danger size="small" @click="removeLine(record.key)">
+              <Button danger size="small" type="link" @click="removeLine(record.key)">
                 <template #icon><DeleteOutlined /></template>
               </Button>
             </template>
@@ -341,20 +354,20 @@ const tableColumns = [
         <div class="mt-4 flex items-center justify-between">
           <Row :gutter="24">
             <Col>
-              <Statistic title="有效条数" :value="validCount" class="mr-8" />
+              <Statistic :value="validCount" class="mr-8" title="有效条数" />
             </Col>
             <Col v-if="selectedClass">
-              <Statistic title="预估费用" :value="totalCost" :precision="2" prefix="¥" />
+              <Statistic :precision="2" :value="totalCost" prefix="¥" title="预估费用" />
             </Col>
           </Row>
 
           <Button
-            type="primary"
-            size="large"
+            :disabled="validCount === 0 || !selectedClassId"
             :loading="submitLoading"
-            :disabled="validCount === 0 || !selectedClassId"  
-            @click="handleSubmit"
             class="bg-green-600 border-green-600 hover:bg-green-500"
+            size="large"  
+            type="primary"
+            @click="handleSubmit"
           >
             <template #icon><SendOutlined /></template>
             确认批量提交（{{ validCount }} 条）

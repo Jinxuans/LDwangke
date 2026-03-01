@@ -228,6 +228,36 @@ func (s *DBCompatService) getExpectedSchema() []TableDef {
 				{Name: "visibility", Type: "INT", NotNull: true, Default: "0"},
 			},
 		},
+		// ===== 扩展菜单表 =====
+		{
+			Name: "qingka_ext_menu", PrimaryKey: "id", AutoInc: true,
+			Columns: []ColumnDef{
+				{Name: "id", Type: "INT(11)", NotNull: true},
+				{Name: "title", Type: "VARCHAR(100)", NotNull: true, Default: "''"},
+				{Name: "icon", Type: "VARCHAR(100)", NotNull: false, Default: "''"},
+				{Name: "url", Type: "VARCHAR(500)", NotNull: true, Default: "''"},
+				{Name: "sort_order", Type: "INT(11)", NotNull: false, Default: "0"},
+				{Name: "visible", Type: "INT(11)", NotNull: false, Default: "1"},
+				{Name: "scope", Type: "VARCHAR(20)", NotNull: false, Default: "'backend'"},
+				{Name: "created_at", Type: "VARCHAR(50)", NotNull: false, Default: "''"},
+			},
+		},
+		// ===== 邮件模板表 =====
+		{
+			Name: "qingka_email_template", PrimaryKey: "id", AutoInc: true,
+			Columns: []ColumnDef{
+				{Name: "id", Type: "INT(11)", NotNull: true},
+				{Name: "code", Type: "VARCHAR(50)", NotNull: true, Default: "''"},
+				{Name: "name", Type: "VARCHAR(100)", NotNull: true, Default: "''"},
+				{Name: "subject", Type: "VARCHAR(255)", NotNull: true, Default: "''"},
+				{Name: "content", Type: "TEXT", NotNull: false},
+				{Name: "variables", Type: "VARCHAR(500)", NotNull: false, Default: "''"},
+				{Name: "status", Type: "INT(11)", NotNull: false, Default: "1"},
+				{Name: "updated_at", Type: "VARCHAR(50)", NotNull: false, Default: "''"},
+				{Name: "created_at", Type: "VARCHAR(50)", NotNull: false, Default: "''"},
+			},
+			UniqueKeys: []string{"code"},
+		},
 	}
 }
 
@@ -353,6 +383,9 @@ func (s *DBCompatService) Fix() (*CompatFixResult, error) {
 		}
 	}
 
+	// 确保邮件模板默认数据存在
+	s.seedEmailTemplates(result)
+
 	// 确保管理员账号存在
 	var adminCount int
 	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_user WHERE grade='3'").Scan(&adminCount)
@@ -454,6 +487,65 @@ func (s *DBCompatService) addColumn(tableName string, col ColumnDef) error {
 	sql := fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN %s%s", tableName, colDef, afterClause)
 	_, err := database.DB.Exec(sql)
 	return err
+}
+
+// seedEmailTemplates 确保三个默认邮件模板存在
+func (s *DBCompatService) seedEmailTemplates(result *CompatFixResult) {
+	now := time.Now().Format("2006-01-02 15:04:05")
+
+	templates := []struct {
+		Code      string
+		Name      string
+		Subject   string
+		Content   string
+		Variables string
+	}{
+		{
+			Code:    "register",
+			Name:    "注册验证码",
+			Subject: "{site_name} - 注册验证码",
+			Content: `<p style="color:#555;line-height:1.8;">您正在注册账号，请使用以下验证码完成注册：</p>
+<div style="text-align:center;margin:24px 0;">
+  <span style="display:inline-block;padding:12px 32px;background:#f0f5ff;border:2px dashed #1890ff;border-radius:8px;font-size:28px;font-weight:bold;letter-spacing:8px;color:#1890ff;">{code}</span>
+</div>
+<p style="color:#999;font-size:13px;">验证码 {expire_minutes} 分钟内有效，请勿将验证码泄露给他人。</p>`,
+			Variables: "site_name,code,expire_minutes,email,time",
+		},
+		{
+			Code:    "reset_password",
+			Name:    "重置密码",
+			Subject: "{site_name} - 重置密码验证码",
+			Content: `<p style="color:#555;line-height:1.8;">您正在重置登录密码，请使用以下验证码：</p>
+<div style="text-align:center;margin:24px 0;">
+  <span style="display:inline-block;padding:12px 32px;background:#fff7e6;border:2px dashed #fa8c16;border-radius:8px;font-size:28px;font-weight:bold;letter-spacing:8px;color:#fa8c16;">{code}</span>
+</div>
+<p style="color:#999;font-size:13px;">验证码 {expire_minutes} 分钟内有效。如非本人操作，请忽略此邮件。</p>`,
+			Variables: "site_name,code,expire_minutes,email,time",
+		},
+		{
+			Code:      "system_notify",
+			Name:      "系统通知",
+			Subject:   "{site_name} - {notify_title}",
+			Content:   `<p style="color:#555;line-height:1.8;">{notify_content}</p>`,
+			Variables: "site_name,notify_title,notify_content,username,time",
+		},
+	}
+
+	for _, tpl := range templates {
+		var count int
+		database.DB.QueryRow("SELECT COUNT(*) FROM qingka_email_template WHERE code = ?", tpl.Code).Scan(&count)
+		if count > 0 {
+			continue
+		}
+		_, err := database.DB.Exec(
+			"INSERT INTO qingka_email_template (code, name, subject, content, variables, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
+			tpl.Code, tpl.Name, tpl.Subject, tpl.Content, tpl.Variables, now, now)
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("插入邮件模板 %s 失败: %v", tpl.Code, err))
+		} else {
+			log.Printf("[DBCompat] 已创建邮件模板: %s (%s)", tpl.Name, tpl.Code)
+		}
+	}
 }
 
 // columnSQL 生成单个列的 SQL 定义

@@ -440,6 +440,7 @@ var publicConfigKeys = map[string]bool{
 	"recharge_bonus_rules": true,
 	"pass2_kg":             true,
 	"recommend_channels":   true,
+	"login_forget_pwd":     true,
 }
 
 func (s *AdminService) GetPublicConfig() (map[string]string, error) {

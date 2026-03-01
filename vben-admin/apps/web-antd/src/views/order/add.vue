@@ -478,7 +478,9 @@ onMounted(loadClassData);
 
             <!-- 下单信息（单行 / 多行） -->
             <div class="mb-4">
-              <label class="block text-sm text-gray-500 mb-1">下单信息</label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-sm font-medium text-gray-700">下单信息</label>
+              </div>
               <Input.TextArea
                 v-if="isMultiline"
                 v-model:value="userInfo"
@@ -496,13 +498,19 @@ onMounted(loadClassData);
             </div>
 
             <!-- 操作按钮 -->
-            <Space>
-              <Button type="primary" :loading="queryLoading" @click="handleQuery">
+            <div class="flex gap-2 items-center">
+              <Button
+                type="primary"
+                class="flex-1 bg-blue-600 hover:bg-blue-500"
+                size="large"
+                :loading="queryLoading"
+                @click="handleQuery"
+              >
                 <template #icon><SearchOutlined /></template>
-                立即查询
+                一键查课
               </Button>
               <Tag v-if="xdsmopen" color="blue">扫码下单已开启</Tag>
-            </Space>
+            </div>
           </Card>
         </Spin>
       </div>

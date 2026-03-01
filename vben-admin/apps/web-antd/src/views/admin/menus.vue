@@ -2,13 +2,14 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  InputNumber, Switch, Button, Tabs, TabPane, Tag, Space, message, Spin, Input, Tooltip, Popover,
+  InputNumber, Switch, Button, Tabs, TabPane, Tag, Space, message, Spin, Input, Tooltip, Popover, Modal, Select,
 } from 'ant-design-vue';
-import { ReloadOutlined, SaveOutlined, UpOutlined, DownOutlined, EditOutlined, CheckOutlined } from '@ant-design/icons-vue';
+import { ReloadOutlined, SaveOutlined, UpOutlined, DownOutlined, EditOutlined, CheckOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue';
 import { Page } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { getMenuConfigs, saveMenuConfigs } from '#/api/menu-config';
 import type { MenuConfigItem } from '#/api/menu-config';
+import { getExtMenusApi, saveExtMenuApi, deleteExtMenuApi, type ExtMenuItem } from '#/api/ext-menu';
 
 const loading = ref(false);
 const saving = ref(false);
@@ -273,7 +274,67 @@ const commonMdiIcons = [
   'mdi:lock-outline', 'mdi:key-outline', 'mdi:email-outline', 'mdi:phone-outline',
 ];
 
-onMounted(loadData);
+// ===== 扩展菜单管理 =====
+const extMenus = ref<ExtMenuItem[]>([]);
+const extLoading = ref(false);
+const extEditVisible = ref(false);
+const extSaving = ref(false);
+const extForm = ref<Partial<ExtMenuItem>>({
+  id: 0, title: '', icon: 'mdi:puzzle-outline', url: '', sort_order: 0, visible: 1, scope: 'backend',
+});
+
+async function loadExtMenus() {
+  extLoading.value = true;
+  try {
+    const raw = await getExtMenusApi();
+    extMenus.value = Array.isArray(raw) ? raw : [];
+  } catch { extMenus.value = []; }
+  finally { extLoading.value = false; }
+}
+
+function openExtAdd() {
+  extForm.value = { id: 0, title: '', icon: 'mdi:puzzle-outline', url: '', sort_order: 0, visible: 1, scope: 'backend' };
+  extEditVisible.value = true;
+}
+
+function openExtEdit(item: ExtMenuItem) {
+  extForm.value = { ...item };
+  extEditVisible.value = true;
+}
+
+async function handleExtSave() {
+  if (!extForm.value.title || !extForm.value.url) {
+    message.warning('请填写标题和URL');
+    return;
+  }
+  extSaving.value = true;
+  try {
+    await saveExtMenuApi(extForm.value);
+    message.success('保存成功');
+    extEditVisible.value = false;
+    loadExtMenus();
+  } catch { message.error('保存失败'); }
+  finally { extSaving.value = false; }
+}
+
+function handleExtDelete(item: ExtMenuItem) {
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定删除扩展菜单「${item.title}」？`,
+    onOk: async () => {
+      try {
+        await deleteExtMenuApi(item.id);
+        message.success('已删除');
+        loadExtMenus();
+      } catch { message.error('删除失败'); }
+    },
+  });
+}
+
+onMounted(() => {
+  loadData();
+  loadExtMenus();
+});
 </script>
 
 <template>
@@ -519,7 +580,127 @@ onMounted(loadData);
             </div>
           </div>
         </TabPane>
+        <!-- ===== 扩展菜单 ===== -->
+        <TabPane key="ext" tab="扩展菜单">
+          <Spin :spinning="extLoading">
+            <div class="mb-3 flex items-center justify-between">
+              <span class="text-gray-500 text-sm">添加 PHP 单页等外部页面到侧边栏菜单（iframe 嵌入显示）</span>
+              <Button type="primary" size="small" @click="openExtAdd">
+                <template #icon><PlusOutlined /></template>
+                添加扩展菜单
+              </Button>
+            </div>
+            <div class="space-y-2">
+              <div
+                v-for="item in extMenus"
+                :key="item.id"
+                class="group rounded-lg border bg-white p-3 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                :class="item.visible === 0 ? 'opacity-50 border-gray-200' : 'border-purple-200 dark:border-purple-800'"
+              >
+                <div class="flex items-center gap-3">
+                  <div
+                    class="flex h-9 w-9 items-center justify-center rounded-lg text-lg bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+                  >
+                    <IconifyIcon v-if="item.icon" :icon="item.icon" :style="{ fontSize: '18px' }" />
+                    <span v-else class="text-sm">-</span>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                      <Tag color="purple" class="m-0" style="font-size:11px">扩展</Tag>
+                      <Tag :color="item.scope === 'frontend' ? 'blue' : 'orange'" class="m-0" style="font-size:11px">
+                        {{ item.scope === 'frontend' ? '前台' : '后台' }}
+                      </Tag>
+                      <span class="font-medium text-sm text-gray-800 dark:text-gray-200">{{ item.title }}</span>
+                    </div>
+                    <div class="text-xs text-gray-400 mt-0.5 font-mono truncate max-w-md">{{ item.url }}</div>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <span class="text-xs text-gray-400 mr-1 hidden sm:inline">排序</span>
+                    <Tag>{{ item.sort_order }}</Tag>
+                  </div>
+                  <Switch
+                    :checked="item.visible === 1"
+                    size="small"
+                    :checked-children="'显'"
+                    :un-checked-children="'隐'"
+                    disabled
+                  />
+                  <Space size="small">
+                    <Tooltip title="编辑">
+                      <Button size="small" @click="openExtEdit(item)">
+                        <template #icon><EditOutlined /></template>
+                      </Button>
+                    </Tooltip>
+                    <Tooltip title="删除">
+                      <Button size="small" danger @click="handleExtDelete(item)">
+                        <template #icon><DeleteOutlined /></template>
+                      </Button>
+                    </Tooltip>
+                  </Space>
+                </div>
+              </div>
+              <div v-if="extMenus.length === 0" class="py-8 text-center text-gray-400">
+                暂无扩展菜单，点击上方按钮添加
+              </div>
+            </div>
+          </Spin>
+        </TabPane>
       </Tabs>
     </Spin>
+
+    <!-- 扩展菜单编辑弹窗 -->
+    <Modal
+      v-model:open="extEditVisible"
+      :title="extForm.id ? '编辑扩展菜单' : '添加扩展菜单'"
+      @ok="handleExtSave"
+      :confirm-loading="extSaving"
+      width="520px"
+    >
+      <div class="space-y-4 py-2">
+        <div>
+          <label class="block text-sm font-medium mb-1">菜单标题 <span class="text-red-500">*</span></label>
+          <Input v-model:value="extForm.title" placeholder="如：旧版管理面板" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">页面地址 <span class="text-red-500">*</span></label>
+          <Input v-model:value="extForm.url" placeholder="如：/php-api/ext/index.php 或完整URL" />
+          <div class="text-xs text-gray-400 mt-1">
+            PHP 文件放在 php-api/public/ 目录下，填写 /php-api/ext/xxx.php 即可通过反向代理访问
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">图标</label>
+            <Input v-model:value="extForm.icon" placeholder="mdi:puzzle-outline" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">位置</label>
+            <Select v-model:value="extForm.scope" style="width: 100%">
+              <Select.Option value="frontend">前台菜单</Select.Option>
+              <Select.Option value="backend">后台菜单</Select.Option>
+            </Select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">排序</label>
+            <InputNumber v-model:value="extForm.sort_order" :min="-99" :max="999" style="width: 100%" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">可见性</label>
+            <Switch
+              :checked="extForm.visible === 1"
+              @change="(v: any) => (extForm.visible = v ? 1 : 0)"
+              checked-children="显示"
+              un-checked-children="隐藏"
+            />
+          </div>
+        </div>
+        <div v-if="extForm.icon" class="flex items-center gap-2 p-2 bg-gray-50 rounded dark:bg-gray-800">
+          <span class="text-xs text-gray-400">图标预览：</span>
+          <IconifyIcon :icon="extForm.icon" :style="{ fontSize: '22px' }" />
+        </div>
+      </div>
+    </Modal>
   </Page>
 </template>

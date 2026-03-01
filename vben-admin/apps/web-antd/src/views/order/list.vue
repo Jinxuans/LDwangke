@@ -510,32 +510,32 @@ async function handlePupLogin(oid: number) {
 // 表格列
 const columns = computed(() => {
   const cols: any[] = [
-    { title: '订单ID', dataIndex: 'oid', key: 'oid', width: 80, fixed: 'left' },
-    { title: '平台名称', dataIndex: 'ptname', key: 'ptname', width: 160, ellipsis: true },
+    { title: '订单ID', dataIndex: 'oid', key: 'oid', width: 65, fixed: 'left', align: 'center' },
+    { title: '平台', dataIndex: 'ptname', key: 'ptname', width: 90, ellipsis: true },
     { title: '学校', dataIndex: 'school', key: 'school', width: 100, ellipsis: true },
-    { title: '账号', dataIndex: 'user', key: 'user', width: 120, ellipsis: true },
-    { title: '密码', dataIndex: 'pass', key: 'pass', width: 100, ellipsis: true },
-    { title: '课程名称', dataIndex: 'kcname', key: 'kcname', width: 180, ellipsis: true },
+    { title: '账号', dataIndex: 'user', key: 'user', width: 110, ellipsis: true },
+    { title: '密码', dataIndex: 'pass', key: 'pass', width: 90, ellipsis: true },
+    { title: '课程名称', dataIndex: 'kcname', key: 'kcname', width: 150, ellipsis: true },
     {
-      title: '任务状态', dataIndex: 'status', key: 'status', width: 100,
+      title: '状态', dataIndex: 'status', key: 'status', width: 85, align: 'center',
       customRender: ({ text }: { text: string }) => text,
     },
     { title: '进度', dataIndex: 'process', key: 'process', width: 120 },
-    { title: '推送', key: 'push', width: 80 },
-    { title: '详情', dataIndex: 'remarks', key: 'remarks', width: 160, ellipsis: true },
-    { title: '金额', dataIndex: 'fees', key: 'fees', width: 80 },
-    { title: '提交时间', dataIndex: 'addtime', key: 'addtime', width: 160 },
+    { title: '推送', key: 'push', width: 70, align: 'center' },
+    { title: '备注', dataIndex: 'remarks', key: 'remarks', width: 130, ellipsis: true },
+    { title: '金额', dataIndex: 'fees', key: 'fees', width: 70, align: 'right' },
+    { title: '时间', dataIndex: 'addtime', key: 'addtime', width: 130 },
   ];
 
   if (isAdmin.value) {
     cols.push(
-      { title: '处理状态', dataIndex: 'dockstatus', key: 'dockstatus', width: 100 },
-      { title: 'UID', dataIndex: 'uid', key: 'uid', width: 70 },
+      { title: '处理', dataIndex: 'dockstatus', key: 'dockstatus', width: 75, align: 'center' },
+      { title: 'UID', dataIndex: 'uid', key: 'uid', width: 60, align: 'center' },
     );
   }
 
   cols.push({
-    title: '操作', key: 'action', width: 130, fixed: 'right',
+    title: '操作', key: 'action', width: 100, fixed: 'right', align: 'center',
   });
 
   return cols;
@@ -548,70 +548,70 @@ onMounted(() => {
 </script>
 
 <template>
-  <Page title="订单汇总" content-class="p-4">
+  <Page title="订单汇总" content-class="p-2 sm:p-4">
     <!-- 统计卡片 -->
     <Row :gutter="[8, 8]" class="mb-3">
       <Col :xs="12" :sm="6">
-        <Card :body-style="{ padding: '12px 16px' }">
-          <Statistic title="总订单" :value="stats.total" :value-style="{ fontSize: '20px' }" />
+        <Card size="small" :body-style="{ padding: '8px 12px' }">
+          <Statistic title="总订单" :value="stats.total" :value-style="{ fontSize: '18px' }" />
         </Card>
       </Col>
       <Col :xs="12" :sm="6">
-        <Card :body-style="{ padding: '12px 16px' }">
-          <Statistic title="进行中" :value="stats.processing" :value-style="{ color: '#1890ff', fontSize: '20px' }" />
+        <Card size="small" :body-style="{ padding: '8px 12px' }">
+          <Statistic title="进行中" :value="stats.processing" :value-style="{ color: '#1890ff', fontSize: '18px' }" />
         </Card>
       </Col>
       <Col :xs="12" :sm="6">
-        <Card :body-style="{ padding: '12px 16px' }">
-          <Statistic title="已完成" :value="stats.completed" :value-style="{ color: '#52c41a', fontSize: '20px' }" />
+        <Card size="small" :body-style="{ padding: '8px 12px' }">
+          <Statistic title="已完成" :value="stats.completed" :value-style="{ color: '#52c41a', fontSize: '18px' }" />
         </Card>
       </Col>
       <Col :xs="12" :sm="6">
-        <Card :body-style="{ padding: '12px 16px' }">
-          <Statistic title="总金额" :value="stats.total_fees" :precision="2" prefix="¥" :value-style="{ fontSize: '20px' }" />
+        <Card size="small" :body-style="{ padding: '8px 12px' }">
+          <Statistic title="总金额" :value="stats.total_fees" :precision="2" prefix="¥" :value-style="{ fontSize: '18px' }" />
         </Card>
       </Col>
     </Row>
 
     <!-- 快捷搜索 + 折叠筛选 -->
-    <Card class="mb-4" :body-style="{ padding: '12px 16px' }">
-      <div class="flex flex-wrap items-center gap-3 mb-0">
-        <Input v-model:value="search.search" placeholder="搜索账号/学校/课程/订单ID" allow-clear style="max-width: 280px; min-width: 140px; flex: 1" @pressEnter="handleSearch" />
-        <Select v-model:value="search.status_text" placeholder="任务状态" allow-clear style="max-width: 140px; min-width: 100px">
+    <Card class="mb-3" size="small" :body-style="{ padding: '8px 12px' }">
+      <div class="flex flex-wrap items-center gap-2 mb-0">
+        <Input v-model:value="search.search" placeholder="搜索账号/学校/课程/订单ID" allow-clear size="small" style="max-width: 280px; min-width: 140px; flex: 1" @pressEnter="handleSearch" />
+        <Select v-model:value="search.status_text" placeholder="任务状态" allow-clear size="small" style="max-width: 120px; min-width: 90px">
           <SelectOption v-for="s in statusOptions" :key="s" :value="s">{{ s }}</SelectOption>
         </Select>
-        <Button type="primary" @click="handleSearch">
+        <Button type="primary" size="small" @click="handleSearch">
           <template #icon><SearchOutlined /></template>
           搜索
         </Button>
-        <Button @click="handleReset">
+        <Button size="small" @click="handleReset">
           <template #icon><ReloadOutlined /></template>
         </Button>
-        <Button @click="searchExpanded = searchExpanded.length ? [] : ['filter']">
+        <Button size="small" @click="searchExpanded = searchExpanded.length ? [] : ['filter']">
           <template #icon><FilterOutlined /></template>
           筛选
         </Button>
       </div>
-      <Collapse v-model:activeKey="searchExpanded" :bordered="false" ghost class="mt-2" style="margin: 0 -16px">
-        <CollapsePanel key="filter" :show-arrow="false" style="border: none">
-          <Row :gutter="[12, 12]">
+      <Collapse v-model:activeKey="searchExpanded" :bordered="false" ghost class="mt-2" style="margin: 0 -12px">
+        <CollapsePanel key="filter" :show-arrow="false" style="border: none; padding-bottom: 0">
+          <Row :gutter="[8, 8]" class="px-3">
             <Col :xs="12" :sm="8" :md="6">
-              <Input v-model:value="search.user" placeholder="账号" allow-clear @pressEnter="handleSearch" />
+              <Input v-model:value="search.user" placeholder="账号" allow-clear size="small" @pressEnter="handleSearch" />
             </Col>
             <Col :xs="12" :sm="8" :md="6">
-              <Input v-model:value="search.school" placeholder="学校" allow-clear @pressEnter="handleSearch" />
+              <Input v-model:value="search.school" placeholder="学校" allow-clear size="small" @pressEnter="handleSearch" />
             </Col>
             <Col :xs="12" :sm="8" :md="6">
-              <Input v-model:value="search.kcname" placeholder="课程名称" allow-clear @pressEnter="handleSearch" />
+              <Input v-model:value="search.kcname" placeholder="课程名称" allow-clear size="small" @pressEnter="handleSearch" />
             </Col>
             <Col :xs="12" :sm="8" :md="6">
-              <Input v-model:value="search.oid" placeholder="订单ID" allow-clear @pressEnter="handleSearch" />
+              <Input v-model:value="search.oid" placeholder="订单ID" allow-clear size="small" @pressEnter="handleSearch" />
             </Col>
             <Col :xs="12" :sm="8" :md="6">
-              <Input v-model:value="search.cid" placeholder="CID" allow-clear @pressEnter="handleSearch" />
+              <Input v-model:value="search.cid" placeholder="CID" allow-clear size="small" @pressEnter="handleSearch" />
             </Col>
             <Col :xs="12" :sm="8" :md="6" v-if="isAdmin">
-              <Select v-model:value="search.dock" placeholder="处理状态" allow-clear style="width: 100%">
+              <Select v-model:value="search.dock" placeholder="处理状态" allow-clear size="small" style="width: 100%">
                 <SelectOption value="0">待处理</SelectOption>
                 <SelectOption value="1">已完成</SelectOption>
                 <SelectOption value="2">处理失败</SelectOption>
@@ -620,7 +620,7 @@ onMounted(() => {
               </Select>
             </Col>
             <Col :xs="12" :sm="8" :md="6" v-if="isAdmin">
-              <Input v-model:value="search.uid" placeholder="用户UID" allow-clear @pressEnter="handleSearch" />
+              <Input v-model:value="search.uid" placeholder="用户UID" allow-clear size="small" @pressEnter="handleSearch" />
             </Col>
           </Row>
         </CollapsePanel>
@@ -628,12 +628,12 @@ onMounted(() => {
     </Card>
 
     <!-- 批量操作 -->
-    <Card class="mb-4" v-if="selectedRowKeys.length > 0">
-      <Space>
-        <span>已选 {{ selectedRowKeys.length }} 项</span>
+    <Card class="mb-3" size="small" :body-style="{ padding: '8px 12px' }" v-if="selectedRowKeys.length > 0">
+      <Space wrap size="small">
+        <span class="text-sm font-medium">已选 <span class="text-blue-600">{{ selectedRowKeys.length }}</span> 项</span>
 
         <Dropdown v-if="isAdmin">
-          <Button>任务状态 <DownOutlined /></Button>
+          <Button size="small">任务状态 <DownOutlined /></Button>
           <template #overlay>
             <Menu @click="({ key }: any) => batchChangeStatus(key)">
               <MenuItem key="待处理">待处理</MenuItem>
@@ -646,7 +646,7 @@ onMounted(() => {
         </Dropdown>
 
         <Dropdown v-if="isAdmin">
-          <Button>处理状态 <DownOutlined /></Button>
+          <Button size="small">处理状态 <DownOutlined /></Button>
           <template #overlay>
             <Menu @click="({ key }: any) => batchChangeDock(Number(key))">
               <MenuItem key="0">待处理</MenuItem>
@@ -660,29 +660,29 @@ onMounted(() => {
         </Dropdown>
 
         <Popconfirm v-if="isAdmin" title="确定对接上游？" @confirm="handleDock">
-          <Button type="primary" class="bg-cyan-600 border-cyan-600">对接上游</Button>
+          <Button type="primary" size="small" class="bg-cyan-600 border-cyan-600">对接上游</Button>
         </Popconfirm>
 
-        <Button v-if="isAdmin" @click="handleSync">同步进度</Button>
+        <Button v-if="isAdmin" size="small" @click="handleSync">同步进度</Button>
 
         <Popconfirm v-if="isAdmin" title="确定批量同步进度？" @confirm="handleBatchSync">
-          <Button>批量同步</Button>
+          <Button size="small">批量同步</Button>
         </Popconfirm>
 
         <Popconfirm v-if="isAdmin" title="确定批量补单？" @confirm="handleBatchResend">
-          <Button type="primary" class="bg-orange-500 border-orange-500">批量补单</Button>
+          <Button type="primary" size="small" class="bg-orange-500 border-orange-500">批量补单</Button>
         </Popconfirm>
 
-        <Button v-if="isAdmin" @click="openRemarksModal">修改备注</Button>
+        <Button v-if="isAdmin" size="small" @click="openRemarksModal">修改备注</Button>
 
         <Popconfirm v-if="isAdmin" title="确定要退款吗？" @confirm="handleRefund">
-          <Button danger>退款</Button>
+          <Button danger size="small">退款</Button>
         </Popconfirm>
       </Space>
     </Card>
 
     <!-- 订单表格 -->
-    <Card>
+    <Card size="small" :body-style="{ padding: '0' }">
       <Table
         :columns="columns"
         :data-source="tableData"
@@ -695,33 +695,56 @@ onMounted(() => {
         bordered
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <Tag :color="statusColor(record.status)">{{ record.status || '待处理' }}</Tag>
+          <template v-if="column.key === 'oid'">
+            <span class="text-xs text-gray-500">{{ record.oid }}</span>
+          </template>
+          <template v-else-if="column.key === 'ptname'">
+            <span class="text-sm">{{ record.ptname }}</span>
+          </template>
+          <template v-else-if="column.key === 'school'">
+            <span class="text-sm">{{ record.school }}</span>
+          </template>
+          <template v-else-if="column.key === 'user'">
+            <span class="text-sm font-medium">{{ record.user }}</span>
+          </template>
+          <template v-else-if="column.key === 'pass'">
+            <span class="text-xs text-gray-500">{{ record.pass }}</span>
+          </template>
+          <template v-else-if="column.key === 'kcname'">
+            <span class="text-sm" :title="record.kcname">{{ record.kcname }}</span>
+          </template>
+          <template v-else-if="column.key === 'status'">
+            <Tag :color="statusColor(record.status)" class="!mr-0 text-xs">{{ record.status || '待处理' }}</Tag>
           </template>
           <template v-else-if="column.key === 'process'">
-            <Progress :percent="progressPercent(record.process)" size="small" :show-info="true" />
+            <Progress :percent="progressPercent(record.process)" size="small" :show-info="true" class="text-xs" />
           </template>
           <template v-else-if="column.key === 'dockstatus'">
-            <Tag :color="dockStatusMap[record.dockstatus]?.color || 'default'">
+            <Tag :color="dockStatusMap[record.dockstatus]?.color || 'default'" class="!mr-0 text-xs">
               {{ dockStatusMap[record.dockstatus]?.text || '未知' }}
             </Tag>
           </template>
+          <template v-else-if="column.key === 'remarks'">
+            <span class="text-xs text-gray-500 line-clamp-2" :title="record.remarks">{{ record.remarks || '-' }}</span>
+          </template>
+          <template v-else-if="column.key === 'addtime'">
+            <span class="text-xs text-gray-400">{{ record.addtime }}</span>
+          </template>
           <template v-else-if="column.key === 'fees'">
-            <span class="font-semibold text-green-600">¥{{ record.fees }}</span>
+            <span class="font-semibold text-green-600 text-sm">¥{{ record.fees }}</span>
           </template>
           <template v-else-if="column.key === 'push'">
-            <Space :size="2" direction="vertical">
-              <Tag v-if="record.pushUid" :color="record.pushStatus === '成功' ? 'green' : record.pushStatus === '失败' ? 'red' : 'blue'" class="text-xs">微信{{ record.pushStatus || '已绑' }}</Tag>
-              <Tag v-if="record.pushEmail" :color="record.pushEmailStatus === '成功' ? 'green' : record.pushEmailStatus === '失败' ? 'red' : 'blue'" class="text-xs">邮箱{{ record.pushEmailStatus || '已绑' }}</Tag>
-              <Tag v-if="record.showdoc_push_url" :color="record.pushShowdocStatus === '成功' ? 'green' : record.pushShowdocStatus === '失败' ? 'red' : 'blue'" class="text-xs">ShowDoc{{ record.pushShowdocStatus || '已绑' }}</Tag>
-              <span v-if="!record.pushUid && !record.pushEmail && !record.showdoc_push_url" class="text-xs text-gray-400">-</span>
+            <Space :size="2" direction="vertical" class="w-full text-center">
+              <Tag v-if="record.pushUid" :color="record.pushStatus === '成功' ? 'green' : record.pushStatus === '失败' ? 'red' : 'blue'" class="!mr-0 text-[10px] leading-tight px-1 py-0">微{{ record.pushStatus === '成功' ? '成' : '绑' }}</Tag>
+              <Tag v-if="record.pushEmail" :color="record.pushEmailStatus === '成功' ? 'green' : record.pushEmailStatus === '失败' ? 'red' : 'blue'" class="!mr-0 text-[10px] leading-tight px-1 py-0">邮{{ record.pushEmailStatus === '成功' ? '成' : '绑' }}</Tag>
+              <Tag v-if="record.showdoc_push_url" :color="record.pushShowdocStatus === '成功' ? 'green' : record.pushShowdocStatus === '失败' ? 'red' : 'blue'" class="!mr-0 text-[10px] leading-tight px-1 py-0">SD</Tag>
+              <span v-if="!record.pushUid && !record.pushEmail && !record.showdoc_push_url" class="text-[10px] text-gray-400">-</span>
             </Space>
           </template>
           <template v-else-if="column.key === 'action'">
-            <Space :size="4">
-              <Button type="link" size="small" @click="showDetail(record)">详情</Button>
-              <Button v-if="record.yid" type="link" size="small" @click="handlePupLogin(record.oid)" class="text-purple-600">
-                <template #icon><LoginOutlined /></template>
+            <Space :size="2">
+              <Button type="link" size="small" class="text-xs px-1" @click="showDetail(record)">详情</Button>
+              <Button v-if="record.yid" type="link" size="small" class="text-purple-600 text-xs px-1" @click="handlePupLogin(record.oid)">
                 登录
               </Button>
             </Space>
@@ -729,12 +752,13 @@ onMounted(() => {
         </template>
       </Table>
 
-      <div class="flex justify-center mt-4">
+      <div class="p-3 bg-white border-t border-gray-100 flex justify-center">
         <Pagination
           v-model:current="pagination.page"
           :total="pagination.total"
           :page-size="pagination.limit"
           :page-size-options="['20', '50', '100', '500']"
+          size="small"
           show-size-changer
           :show-total="(total: number) => `共 ${total} 条`"
           @change="handlePageChange"

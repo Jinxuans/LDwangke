@@ -182,6 +182,13 @@ CREATE TABLE IF NOT EXISTS `qingka_wangke_fenlei` (
   `zk` varchar(20) NOT NULL DEFAULT '',
   `zkl` varchar(20) NOT NULL DEFAULT '',
   `zkj` varchar(20) NOT NULL DEFAULT '',
+  `recommend` tinyint(4) NOT NULL DEFAULT '0',
+  `log` tinyint(4) NOT NULL DEFAULT '0',
+  `ticket` tinyint(4) NOT NULL DEFAULT '0',
+  `changepass` tinyint(4) NOT NULL DEFAULT '1',
+  `allowpause` tinyint(4) NOT NULL DEFAULT '0',
+  `supplier_report` tinyint(4) NOT NULL DEFAULT '0',
+  `supplier_report_hid` int(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
