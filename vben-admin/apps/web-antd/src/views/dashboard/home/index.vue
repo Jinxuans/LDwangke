@@ -331,95 +331,95 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
           <Row :gutter="[8, 8]">
             <!-- 卡片 1: 账户余额 -->
             <Col :xs="12" :sm="12" :lg="6">
-              <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 p-3 sm:p-5 shadow transition-transform hover:-translate-y-1">
+              <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 p-2 sm:p-4 shadow transition-transform hover:-translate-y-1">
                 <div class="relative z-10 text-white">
-                  <div class="mb-1 sm:mb-4 flex items-center gap-2 opacity-80">
+                  <div class="mb-1 sm:mb-2 flex items-center gap-2 opacity-80">
                     <span class="text-[10px] sm:text-sm font-medium tracking-wide">账户余额</span>
                   </div>
-                  <div class="mb-2 sm:mb-6 flex items-baseline">
-                    <span class="text-xs sm:text-lg font-medium mr-0.5 opacity-90">¥</span>
-                    <span class="text-base sm:text-3xl font-bold tracking-tight">{{ (profile?.money || 0).toFixed(2) }}</span>
+                  <div class="mb-1.5 sm:mb-3 flex items-baseline">
+                    <span class="text-xs sm:text-base font-medium mr-0.5 opacity-90">¥</span>
+                    <span class="text-lg sm:text-2xl font-bold tracking-tight">{{ (profile?.money || 0).toFixed(2) }}</span>
                   </div>
-                  <div class="flex items-center justify-between border-t border-blue-400/30 pt-1.5 sm:pt-3 text-[10px] sm:text-sm opacity-90">
+                  <div class="flex items-center justify-between border-t border-blue-400/30 pt-1 sm:pt-2 text-[10px] sm:text-xs opacity-90">
                     <span>总充值</span>
                     <span class="font-semibold">¥{{ (profile?.zcz || 0).toFixed(2) }}</span>
                   </div>
                 </div>
                 <!-- 装饰图标 -->
-                <WalletOutlined class="absolute -bottom-2 -right-2 sm:-bottom-4 sm:-right-4 text-3xl sm:text-7xl opacity-20 text-white" />
+                <WalletOutlined class="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 text-3xl sm:text-6xl opacity-20 text-white" />
               </div>
             </Col>
 
             <!-- 卡片 2: 今日订单 -->
             <Col :xs="12" :sm="12" :lg="6">
-              <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 p-3 sm:p-5 shadow transition-transform hover:-translate-y-1">
+              <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 p-2 sm:p-4 shadow transition-transform hover:-translate-y-1">
                 <div class="relative z-10 text-white">
-                  <div class="mb-1 sm:mb-4 flex items-center gap-2 opacity-80">
+                  <div class="mb-1 sm:mb-2 flex items-center gap-2 opacity-80">
                     <span class="text-[10px] sm:text-sm font-medium tracking-wide">今日订单</span>
                   </div>
-                  <div class="mb-2 sm:mb-6 flex items-baseline">
-                    <span class="text-base sm:text-3xl font-bold tracking-tight">{{ profile?.today_orders || dashStats?.today_orders || 0 }}</span>
-                    <span class="text-[10px] sm:text-sm ml-0.5 opacity-90">单</span>
+                  <div class="mb-1.5 sm:mb-3 flex items-baseline">
+                    <span class="text-lg sm:text-2xl font-bold tracking-tight">{{ profile?.today_orders || dashStats?.today_orders || 0 }}</span>
+                    <span class="text-[10px] sm:text-xs ml-0.5 opacity-90">单</span>
                   </div>
-                  <div class="flex items-center justify-between border-t border-emerald-300/30 pt-1.5 sm:pt-3 text-[10px] sm:text-sm opacity-90">
+                  <div class="flex items-center justify-between border-t border-emerald-300/30 pt-1 sm:pt-2 text-[10px] sm:text-xs opacity-90">
                     <span>总订单</span>
                     <span class="font-semibold">{{ profile?.order_total || dashStats?.total_orders || 0 }} 单</span>
                   </div>
                 </div>
                 <!-- 装饰图标 -->
-                <ShoppingCartOutlined class="absolute -bottom-2 -right-2 sm:-bottom-4 sm:-right-4 text-3xl sm:text-7xl opacity-20 text-white" />
+                <ShoppingCartOutlined class="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 text-3xl sm:text-6xl opacity-20 text-white" />
               </div>
             </Col>
 
             <!-- 卡片 3: 收入/消费 -->
             <Col :xs="12" :sm="12" :lg="6">
-              <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 p-3 sm:p-5 shadow transition-transform hover:-translate-y-1">
+              <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 p-2 sm:p-4 shadow transition-transform hover:-translate-y-1">
                 <div class="relative z-10 text-white">
-                  <div class="mb-1 sm:mb-4 flex items-center gap-2 opacity-80">
+                  <div class="mb-1 sm:mb-2 flex items-center gap-2 opacity-80">
                     <span class="text-[10px] sm:text-sm font-medium tracking-wide">{{ hasAdminRole ? '今日收入' : '今日消费' }}</span>
                   </div>
-                  <div class="mb-2 sm:mb-6 flex items-baseline">
-                    <span class="text-xs sm:text-lg font-medium mr-0.5 opacity-90">¥</span>
-                    <span class="text-base sm:text-3xl font-bold tracking-tight">{{ (hasAdminRole ? (dashStats?.today_income || 0) : (profile?.today_spend || 0)).toFixed(2) }}</span>
+                  <div class="mb-1.5 sm:mb-3 flex items-baseline">
+                    <span class="text-xs sm:text-base font-medium mr-0.5 opacity-90">¥</span>
+                    <span class="text-lg sm:text-2xl font-bold tracking-tight">{{ (hasAdminRole ? (dashStats?.today_income || 0) : (profile?.today_spend || 0)).toFixed(2) }}</span>
                   </div>
-                  <div class="flex items-center justify-between border-t border-amber-300/30 pt-1.5 sm:pt-3 text-[10px] sm:text-sm opacity-90" v-if="hasAdminRole">
+                  <div class="flex items-center justify-between border-t border-amber-300/30 pt-1 sm:pt-2 text-[10px] sm:text-xs opacity-90" v-if="hasAdminRole">
                     <span class="flex items-center gap-0.5"><SyncOutlined /> 进行中</span>
                     <span class="font-semibold">{{ dashStats?.processing_orders || 0 }} 单</span>
                   </div>
-                  <div class="flex items-center justify-between border-t border-amber-300/30 pt-1.5 sm:pt-3 text-[10px] sm:text-sm opacity-90" v-else>
+                  <div class="flex items-center justify-between border-t border-amber-300/30 pt-1 sm:pt-2 text-[10px] sm:text-xs opacity-90" v-else>
                     <span>&nbsp;</span>
                   </div>
                 </div>
                 <!-- 装饰图标 -->
-                <DollarOutlined class="absolute -bottom-2 -right-2 sm:-bottom-4 sm:-right-4 text-3xl sm:text-7xl opacity-20 text-white" />
+                <DollarOutlined class="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 text-3xl sm:text-6xl opacity-20 text-white" />
               </div>
             </Col>
 
             <!-- 卡片 4: 用户/代理 -->
             <Col :xs="12" :sm="12" :lg="6">
-              <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 p-3 sm:p-5 shadow transition-transform hover:-translate-y-1">
+              <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 p-2 sm:p-4 shadow transition-transform hover:-translate-y-1">
                 <div class="relative z-10 text-white">
-                  <div class="mb-1 sm:mb-4 flex items-center gap-2 opacity-80">
+                  <div class="mb-1 sm:mb-2 flex items-center gap-2 opacity-80">
                     <span class="text-[10px] sm:text-sm font-medium tracking-wide">{{ hasAdminRole ? '注册用户' : '我的代理' }}</span>
                   </div>
-                  <div class="mb-2 sm:mb-6 flex items-baseline">
-                    <span class="text-base sm:text-3xl font-bold tracking-tight">{{ hasAdminRole ? (dashStats?.user_count || 0) : (profile?.dailitongji?.dlzs || 0) }}</span>
-                    <span class="text-[10px] sm:text-sm ml-0.5 opacity-90">人</span>
+                  <div class="mb-1.5 sm:mb-3 flex items-baseline">
+                    <span class="text-lg sm:text-2xl font-bold tracking-tight">{{ hasAdminRole ? (dashStats?.user_count || 0) : (profile?.dailitongji?.dlzs || 0) }}</span>
+                    <span class="text-[10px] sm:text-xs ml-0.5 opacity-90">人</span>
                   </div>
-                  <div class="flex items-center justify-between border-t border-indigo-400/30 pt-1.5 sm:pt-3 text-[10px] sm:text-sm opacity-90" v-if="hasAdminRole">
+                  <div class="flex items-center justify-between border-t border-indigo-400/30 pt-1 sm:pt-2 text-[10px] sm:text-xs opacity-90" v-if="hasAdminRole">
                     <span>平台余额</span>
                     <span class="font-semibold">¥{{ (dashStats?.total_balance || 0).toFixed(2) }}</span>
                   </div>
-                  <div class="flex items-center justify-between border-t border-indigo-400/30 pt-1.5 sm:pt-3 text-[10px] sm:text-sm opacity-90" v-else-if="profile?.dailitongji">
+                  <div class="flex items-center justify-between border-t border-indigo-400/30 pt-1 sm:pt-2 text-[10px] sm:text-xs opacity-90" v-else-if="profile?.dailitongji">
                     <span>今日交单</span>
                     <span class="font-semibold">{{ profile.dailitongji.jrjd || 0 }} 单</span>
                   </div>
-                  <div class="flex items-center justify-between border-t border-indigo-400/30 pt-1.5 sm:pt-3 text-[10px] sm:text-sm opacity-90" v-else>
+                  <div class="flex items-center justify-between border-t border-indigo-400/30 pt-1 sm:pt-2 text-[10px] sm:text-xs opacity-90" v-else>
                     <span>&nbsp;</span>
                   </div>
                 </div>
                 <!-- 装饰图标 -->
-                <TeamOutlined class="absolute -bottom-2 -right-2 sm:-bottom-4 sm:-right-4 text-3xl sm:text-7xl opacity-20 text-white" />
+                <TeamOutlined class="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 text-3xl sm:text-6xl opacity-20 text-white" />
               </div>
             </Col>
           </Row>
