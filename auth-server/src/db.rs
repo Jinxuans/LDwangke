@@ -707,6 +707,33 @@ pub fn batch_renew(db: &DbPool, ids: &[i64], expire_days: i32) -> Result<Vec<(i6
     Ok(results)
 }
 
+pub fn batch_delete(db: &DbPool, ids: &[i64]) -> Vec<String> {
+    let c = conn(db);
+    let mut keys = Vec::new();
+    for &id in ids {
+        if let Ok(key) = c.query_row("SELECT license_key FROM license WHERE id=?1", params![id], |r| r.get::<_, String>(0)) {
+            keys.push(key);
+        }
+        c.execute("DELETE FROM license WHERE id=?1", params![id]).ok();
+    }
+    keys
+}
+
+pub fn batch_unbind(db: &DbPool, ids: &[i64]) -> Vec<String> {
+    let c = conn(db);
+    let mut keys = Vec::new();
+    for &id in ids {
+        if let Ok(key) = c.query_row("SELECT license_key FROM license WHERE id=?1", params![id], |r| r.get::<_, String>(0)) {
+            keys.push(key);
+        }
+        c.execute(
+            "UPDATE license SET machine_id=NULL, bind_count=0, updated_at=datetime('now','localtime') WHERE id=?1",
+            params![id],
+        ).ok();
+    }
+    keys
+}
+
 // ===== 试用授权 =====
 
 pub fn check_trial_exists(db: &DbPool, machine_id: &str) -> bool {
