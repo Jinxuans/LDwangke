@@ -93,14 +93,15 @@ type SystemConfig struct {
 
 // 公告
 type Announcement struct {
-	ID      int    `json:"id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
-	Time    string `json:"time"`
-	UID     int    `json:"uid"`
-	Status  string `json:"status"`
-	Zhiding string `json:"zhiding"`
-	Author  string `json:"author"`
+	ID         int    `json:"id"`
+	Title      string `json:"title"`
+	Content    string `json:"content"`
+	Time       string `json:"time"`
+	UID        int    `json:"uid"`
+	Status     string `json:"status"`
+	Zhiding    string `json:"zhiding"`
+	Author     string `json:"author"`
+	Visibility int    `json:"visibility" db:"visibility"` // 0: 全体可见, 1: 直属代理可见
 }
 
 type AnnouncementListRequest struct {
@@ -110,11 +111,12 @@ type AnnouncementListRequest struct {
 }
 
 type AnnouncementSaveRequest struct {
-	ID      int    `json:"id"`
-	Title   string `json:"title" binding:"required"`
-	Content string `json:"content" binding:"required"`
-	Status  string `json:"status"`
-	Zhiding string `json:"zhiding"`
+	ID         int    `json:"id"`
+	Title      string `json:"title" binding:"required"`
+	Content    string `json:"content" binding:"required"`
+	Status     string `json:"status"`
+	Zhiding    string `json:"zhiding"`
+	Visibility int    `json:"visibility"`
 }
 
 // ===== 等级管理 =====

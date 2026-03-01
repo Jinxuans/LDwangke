@@ -258,6 +258,7 @@ export interface AnnouncementItem {
   status: string;
   zhiding: string;
   author: string;
+  visibility: number;
 }
 
 export interface AnnouncementListResult {

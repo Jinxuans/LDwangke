@@ -626,19 +626,15 @@ func (s *AdminService) AnnouncementSave(uid int, username string, req model.Anno
 	if req.Zhiding == "" {
 		req.Zhiding = "0"
 	}
+	// req.Visibility is int, no need to check for empty string
 
 	if req.ID > 0 {
-		_, err := database.DB.Exec(
-			"UPDATE qingka_wangke_gonggao SET title = ?, content = ?, status = ?, zhiding = ?, uptime = ? WHERE id = ?",
-			req.Title, req.Content, req.Status, req.Zhiding, now, req.ID,
-		)
+		query := `UPDATE qingka_wangke_gonggao SET title=?, content=?, status=?, zhiding=?, visibility=?, uptime=? WHERE id=?`
+		_, err := database.DB.Exec(query, req.Title, req.Content, req.Status, req.Zhiding, req.Visibility, now, req.ID)
 		return err
 	}
-
-	_, err := database.DB.Exec(
-		"INSERT INTO qingka_wangke_gonggao (title, content, time, uid, status, zhiding, uptime, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		req.Title, req.Content, now, uid, req.Status, req.Zhiding, now, username,
-	)
+	query := `INSERT INTO qingka_wangke_gonggao (title, content, time, uid, status, zhiding, visibility, uptime, author) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := database.DB.Exec(query, req.Title, req.Content, now, uid, req.Status, req.Zhiding, req.Visibility, now, username)
 	return err
 }
 
@@ -648,7 +644,7 @@ func (s *AdminService) AnnouncementDelete(id int) error {
 }
 
 // AnnouncementListPublic 获取已发布的公告（用户端）
-func (s *AdminService) AnnouncementListPublic(page, limit int) ([]model.Announcement, int64, error) {
+func (s *AdminService) AnnouncementListPublic(uid int, page, limit int) ([]model.Announcement, int64, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -657,12 +653,25 @@ func (s *AdminService) AnnouncementListPublic(page, limit int) ([]model.Announce
 	}
 
 	var total int64
-	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_gonggao WHERE status = '1'").Scan(&total)
+	// 获取当前用户的上级ID
+	var parentID int
+	if uid > 0 {
+		database.DB.QueryRow("SELECT COALESCE(uuid, 0) FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&parentID)
+	}
+
+	// 可见范围过滤：
+	// 1. visibility = 0 (全体可见)
+	// 2. visibility = 1 (直属代理可见) -> 必须满足公告发布者(uid) == 当前用户的上级(parentID)
+	// （由于目前后台发公告 uid 都记的是管理员uid，如果站长发公告 uid=1，当前用户上级是1就能看到；
+	// 如果是主站长发布的全体公告 visibility=0，则所有人都能看）
+	where := "status = '1' AND (visibility = 0 OR (visibility = 1 AND uid = ?))"
+
+	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_gonggao WHERE "+where, parentID).Scan(&total)
 
 	offset := (page - 1) * limit
 	rows, err := database.DB.Query(
-		"SELECT id, COALESCE(title,''), COALESCE(content,''), COALESCE(time,''), COALESCE(uid,0), COALESCE(status,'1'), COALESCE(zhiding,'0'), COALESCE(author,'') FROM qingka_wangke_gonggao WHERE status = '1' ORDER BY zhiding DESC, id DESC LIMIT ? OFFSET ?",
-		limit, offset,
+		"SELECT id, COALESCE(title,''), COALESCE(content,''), COALESCE(time,''), COALESCE(uid,0), COALESCE(status,'1'), COALESCE(zhiding,'0'), COALESCE(author,''), COALESCE(visibility,0) FROM qingka_wangke_gonggao WHERE "+where+" ORDER BY zhiding DESC, id DESC LIMIT ? OFFSET ?",
+		parentID, limit, offset,
 	)
 	if err != nil {
 		return nil, 0, err
@@ -672,7 +681,7 @@ func (s *AdminService) AnnouncementListPublic(page, limit int) ([]model.Announce
 	var list []model.Announcement
 	for rows.Next() {
 		var a model.Announcement
-		rows.Scan(&a.ID, &a.Title, &a.Content, &a.Time, &a.UID, &a.Status, &a.Zhiding, &a.Author)
+		rows.Scan(&a.ID, &a.Title, &a.Content, &a.Time, &a.UID, &a.Status, &a.Zhiding, &a.Author, &a.Visibility)
 		list = append(list, a)
 	}
 	if list == nil {

@@ -3,7 +3,7 @@ import { ref, reactive, onMounted } from 'vue';
 import { Page } from '@vben/common-ui';
 import {
   Card, Table, Button, Tag, Space, Input, Modal, Switch, message,
-  Pagination, Popconfirm,
+  Pagination, Popconfirm, Select, SelectOption,
 } from 'ant-design-vue';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons-vue';
 import {
@@ -27,12 +27,14 @@ const editForm = reactive({
   content: '',
   status: '1',
   zhiding: '0',
+  visibility: 0,
 });
 
 const columns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
   { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true },
   { title: '作者', dataIndex: 'author', key: 'author', width: 100 },
+  { title: '范围', key: 'visibility', width: 100, align: 'center' as const },
   { title: '状态', key: 'status', width: 80, align: 'center' as const },
   { title: '置顶', key: 'zhiding', width: 80, align: 'center' as const },
   { title: '时间', dataIndex: 'time', key: 'time', width: 170 },
@@ -59,7 +61,7 @@ async function loadData(page = 1) {
 }
 
 function openAdd() {
-  Object.assign(editForm, { id: 0, title: '', content: '', status: '1', zhiding: '0' });
+  Object.assign(editForm, { id: 0, title: '', content: '', status: '1', zhiding: '0', visibility: 0 });
   modalVisible.value = true;
 }
 
@@ -70,6 +72,7 @@ function openEdit(record: AnnouncementItem) {
     content: record.content,
     status: record.status,
     zhiding: record.zhiding,
+    visibility: record.visibility || 0,
   });
   modalVisible.value = true;
 }
@@ -137,6 +140,11 @@ onMounted(() => loadData(1));
         :scroll="{ x: 700 }"
       >
         <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'visibility'">
+            <Tag :color="record.visibility === 1 ? 'blue' : 'purple'">
+              {{ record.visibility === 1 ? '直属下级' : '全体用户' }}
+            </Tag>
+          </template>
           <template v-if="column.key === 'status'">
             <Tag :color="record.status === '1' ? 'green' : 'default'">
               {{ record.status === '1' ? '已发布' : '草稿' }}
@@ -190,7 +198,14 @@ onMounted(() => loadData(1));
           <div class="font-medium mb-1">内容</div>
           <Input.TextArea v-model:value="editForm.content" :rows="6" placeholder="公告内容" />
         </div>
-        <div class="flex gap-6">
+        <div class="flex gap-6 flex-wrap">
+          <div class="flex items-center gap-2">
+            <span class="text-sm">可见范围：</span>
+            <Select v-model:value="editForm.visibility" style="width: 140px" size="small">
+              <SelectOption :value="0">全体用户可见</SelectOption>
+              <SelectOption :value="1">仅直属下级可见</SelectOption>
+            </Select>
+          </div>
           <div class="flex items-center gap-2">
             <span class="text-sm">发布状态：</span>
             <Switch

@@ -455,16 +455,17 @@ func UserLogList(c *gin.Context) {
 
 // 公告列表（用户端）
 func AnnouncementListPublic(c *gin.Context) {
+	uid := c.GetInt("uid")
 	page, _ := strconv.Atoi(c.Query("page"))
 	limit, _ := strconv.Atoi(c.Query("limit"))
-	list, total, err := adminService.AnnouncementListPublic(page, limit)
+	list, total, err := adminService.AnnouncementListPublic(uid, page, limit)
 	if err != nil {
 		response.ServerError(c, "查询公告失败")
 		return
 	}
 	response.Success(c, gin.H{
-		"list":       list,
-		"pagination": gin.H{"page": page, "limit": limit, "total": total},
+		"list":  list,
+		"total": total,
 	})
 }
 
