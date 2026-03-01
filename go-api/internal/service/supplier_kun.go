@@ -66,9 +66,21 @@ func kunCallQuery(sup *model.SupplierFull, platform, school, user, pass string) 
 	}
 
 	var items []model.CourseItem
-	if dataRaw, ok := raw["data"]; ok && dataRaw != nil {
-		dataBytes, _ := json.Marshal(dataRaw)
-		json.Unmarshal(dataBytes, &items)
+	if dataArr, ok := raw["data"].([]interface{}); ok {
+		for _, item := range dataArr {
+			if m, ok := item.(map[string]interface{}); ok {
+				items = append(items, model.CourseItem{
+					ID:             toString(m["id"]),
+					Name:           toString(m["name"]),
+					KCJS:           toString(m["kcjs"]),
+					StudyStartTime: toString(m["studyStartTime"]),
+					StudyEndTime:   toString(m["studyEndTime"]),
+					ExamStartTime:  toString(m["examStartTime"]),
+					ExamEndTime:    toString(m["examEndTime"]),
+					Complete:       toString(m["complete"]),
+				})
+			}
+		}
 	}
 
 	msg := "查询成功"

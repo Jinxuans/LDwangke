@@ -1321,11 +1321,26 @@ func (s *SupplierService) QueryOrderProgress(sup *model.SupplierFull, yid string
 		return nil, fmt.Errorf("%s", msg)
 	}
 
-	// 提取 data 数组
+	// 提取 data 数组（手动转换，兼容上游返回 string/number 混合类型）
 	var items []model.SupplierProgressItem
-	if dataRaw, ok := raw["data"]; ok && dataRaw != nil {
-		dataBytes, _ := json.Marshal(dataRaw)
-		json.Unmarshal(dataBytes, &items)
+	if dataArr, ok := raw["data"].([]interface{}); ok {
+		for _, item := range dataArr {
+			if m, ok := item.(map[string]interface{}); ok {
+				items = append(items, model.SupplierProgressItem{
+					YID:             toString(m["id"]),
+					KCName:          toString(m["kcname"]),
+					User:            toString(m["user"]),
+					Status:          toString(m["status"]),
+					StatusText:      toString(m["status_text"]),
+					Process:         toString(m["process"]),
+					Remarks:         toString(m["remarks"]),
+					CourseStartTime: toString(m["courseStartTime"]),
+					CourseEndTime:   toString(m["courseEndTime"]),
+					ExamStartTime:   toString(m["examStartTime"]),
+					ExamEndTime:     toString(m["examEndTime"]),
+				})
+			}
+		}
 	}
 
 	return items, nil
