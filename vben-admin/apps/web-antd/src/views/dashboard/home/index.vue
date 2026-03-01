@@ -597,24 +597,24 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
 
         <!-- 右侧：固定 300px 公告栏 -->
         <div class="hidden lg:block" style="width: 300px; flex-shrink: 0">
-          <Card size="small" style="position: sticky; top: 16px">
+          <Card size="small" style="position: sticky; top: 16px" :body-style="{ padding: '8px 12px' }">
             <template #title>
               <div class="flex items-center gap-2">
                 <NotificationOutlined style="color:#f59e0b" /><span>公告</span>
               </div>
             </template>
-            <List :data-source="announcements" size="small" v-if="announcements.length > 0">
+            <List :data-source="announcements" size="small" v-if="announcements.length > 0" :split="false">
               <template #renderItem="{ item }">
-                <ListItem style="cursor:pointer" @click="showAnnouncement(item)">
+                <ListItem style="cursor:pointer; padding: 6px 0;" @click="showAnnouncement(item)">
                   <ListItemMeta>
                     <template #title>
-                      <div class="flex items-center gap-2">
-                        <Tag v-if="item.zhiding === '1'" color="red" class="text-xs">置顶</Tag>
-                        <span class="text-sm font-medium">{{ item.title }}</span>
+                      <div class="flex items-center gap-1.5 mb-0.5">
+                        <Tag v-if="item.zhiding === '1'" color="red" class="text-[10px] px-1 py-0 border-0 leading-tight m-0">置顶</Tag>
+                        <span class="text-sm font-medium leading-tight truncate" :title="item.title">{{ item.title }}</span>
                       </div>
                     </template>
                     <template #description>
-                      <div class="text-xs text-gray-400 dark:text-gray-500">{{ item.time }}</div>
+                      <div class="text-[11px] text-gray-400 dark:text-gray-500 leading-none">{{ item.time }}</div>
                     </template>
                   </ListItemMeta>
                 </ListItem>
