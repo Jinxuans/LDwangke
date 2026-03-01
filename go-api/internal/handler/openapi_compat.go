@@ -45,6 +45,18 @@ func OpenAPICompat(c *gin.Context) {
 		compatBindPushEmail(c)
 	case "bindshowdocpush":
 		compatBindShowDocPush(c)
+	case "gaimi":
+		compatGaimi(c)
+	case "stop":
+		compatStop(c)
+	case "getclass":
+		compatGetClass(c)
+	case "getcate":
+		compatGetCate(c)
+	case "orders":
+		compatOrders(c)
+	case "cha_logwk":
+		compatChaLogWk(c)
 	default:
 		c.JSON(200, gin.H{"code": -1, "msg": "未知的act参数: " + act})
 	}
@@ -496,4 +508,309 @@ func compatBindShowDocPush(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"code": 1, "msg": "操作成功"})
+}
+
+// compatGaimi act=gaimi 改密
+func compatGaimi(c *gin.Context) {
+	_, _, _, ok := compatAuth(c)
+	if !ok {
+		return
+	}
+
+	oidStr := getParam(c, "id")
+	if oidStr == "" {
+		oidStr = getParam(c, "oid")
+	}
+	newPwd := getParam(c, "newPwd")
+	if newPwd == "" {
+		newPwd = getParam(c, "newpwd")
+	}
+	oid, _ := strconv.Atoi(oidStr)
+	if oid <= 0 || newPwd == "" {
+		c.JSON(200, gin.H{"code": 0, "msg": "参数不全"})
+		return
+	}
+
+	var hid int
+	var yid, status string
+	err := database.DB.QueryRow(
+		"SELECT hid, COALESCE(yid,''), COALESCE(status,'') FROM qingka_wangke_order WHERE oid=?", oid,
+	).Scan(&hid, &yid, &status)
+	if err != nil {
+		c.JSON(200, gin.H{"code": -1, "msg": "订单不存在"})
+		return
+	}
+	if yid == "" || yid == "0" {
+		c.JSON(200, gin.H{"code": -1, "msg": "订单未对接，无法改密"})
+		return
+	}
+
+	supSvc := service.NewSupplierService()
+	sup, err := supSvc.GetSupplierByHID(hid)
+	if err != nil {
+		c.JSON(200, gin.H{"code": -1, "msg": "未找到货源信息"})
+		return
+	}
+
+	code, msg, err := supSvc.ChangePassword(sup, yid, newPwd)
+	if err != nil {
+		c.JSON(200, gin.H{"code": -1, "msg": err.Error()})
+		return
+	}
+	if code == 1 || code == 0 {
+		database.DB.Exec("UPDATE qingka_wangke_order SET pass=? WHERE oid=?", newPwd, oid)
+		c.JSON(200, gin.H{"code": 1, "msg": msg})
+	} else {
+		c.JSON(200, gin.H{"code": -1, "msg": msg})
+	}
+}
+
+// compatStop act=stop 暂停订单
+func compatStop(c *gin.Context) {
+	_, _, _, ok := compatAuth(c)
+	if !ok {
+		return
+	}
+
+	oidStr := getParam(c, "id")
+	if oidStr == "" {
+		oidStr = getParam(c, "oid")
+	}
+	oid, _ := strconv.Atoi(oidStr)
+	if oid <= 0 {
+		c.JSON(200, gin.H{"code": 0, "msg": "参数不全"})
+		return
+	}
+
+	var hid int
+	var yid string
+	err := database.DB.QueryRow(
+		"SELECT hid, COALESCE(yid,'') FROM qingka_wangke_order WHERE oid=?", oid,
+	).Scan(&hid, &yid)
+	if err != nil {
+		c.JSON(200, gin.H{"code": -1, "msg": "订单不存在"})
+		return
+	}
+	if yid == "" || yid == "0" {
+		c.JSON(200, gin.H{"code": -1, "msg": "订单未对接，无法暂停"})
+		return
+	}
+
+	supSvc := service.NewSupplierService()
+	sup, err := supSvc.GetSupplierByHID(hid)
+	if err != nil {
+		c.JSON(200, gin.H{"code": -1, "msg": "未找到货源信息"})
+		return
+	}
+
+	code, msg, err := supSvc.PauseOrder(sup, yid)
+	if err != nil {
+		c.JSON(200, gin.H{"code": -1, "msg": err.Error()})
+		return
+	}
+	if code == 1 || code == 0 {
+		c.JSON(200, gin.H{"code": 1, "msg": msg})
+	} else {
+		c.JSON(200, gin.H{"code": -1, "msg": msg})
+	}
+}
+
+// compatGetClass act=getclass 获取课程列表（含价格）
+func compatGetClass(c *gin.Context) {
+	uid, _, addprice, ok := compatAuth(c)
+	if !ok {
+		return
+	}
+
+	fenlei := getParam(c, "fenlei")
+
+	query := "SELECT cid, COALESCE(name,''), COALESCE(price,'0'), COALESCE(yunsuan,'*'), COALESCE(fenlei,''), COALESCE(status,0) FROM qingka_wangke_class WHERE status = 1"
+	var args []interface{}
+	if fenlei != "" {
+		query += " AND fenlei = ?"
+		args = append(args, fenlei)
+	}
+	query += " ORDER BY sort ASC, cid DESC"
+
+	rows, err := database.DB.Query(query, args...)
+	if err != nil {
+		c.JSON(200, gin.H{"code": -1, "msg": "查询失败"})
+		return
+	}
+	defer rows.Close()
+
+	var data []gin.H
+	for rows.Next() {
+		var cid, status int
+		var name, priceStr, yunsuan, fl string
+		rows.Scan(&cid, &name, &priceStr, &yunsuan, &fl, &status)
+
+		basePrice, _ := strconv.ParseFloat(priceStr, 64)
+		var userPrice float64
+		if yunsuan == "+" {
+			userPrice = math.Round((basePrice+addprice)*100) / 100
+		} else {
+			userPrice = math.Round((basePrice*addprice)*100) / 100
+		}
+
+		// 密价
+		var mijia sql.NullFloat64
+		database.DB.QueryRow("SELECT price FROM qingka_wangke_mijia WHERE uid=? AND cid=?", uid, cid).Scan(&mijia)
+		if mijia.Valid {
+			userPrice = mijia.Float64
+		}
+
+		data = append(data, gin.H{
+			"cid":    cid,
+			"name":   name,
+			"price":  fmt.Sprintf("%.2f", userPrice),
+			"fenlei": fl,
+		})
+	}
+	if data == nil {
+		data = []gin.H{}
+	}
+	c.JSON(200, gin.H{"code": 1, "data": data})
+}
+
+// compatGetCate act=getcate 获取分类列表
+func compatGetCate(c *gin.Context) {
+	_, _, _, ok := compatAuth(c)
+	if !ok {
+		return
+	}
+
+	rows, err := database.DB.Query("SELECT id, COALESCE(name,'') FROM qingka_wangke_fenlei ORDER BY sort ASC, id ASC")
+	if err != nil {
+		c.JSON(200, gin.H{"code": -1, "msg": "查询失败"})
+		return
+	}
+	defer rows.Close()
+
+	var data []gin.H
+	for rows.Next() {
+		var id int
+		var name string
+		rows.Scan(&id, &name)
+		data = append(data, gin.H{"id": id, "name": name})
+	}
+	if data == nil {
+		data = []gin.H{}
+	}
+	c.JSON(200, gin.H{"code": 1, "data": data})
+}
+
+// compatOrders act=orders 获取订单列表
+func compatOrders(c *gin.Context) {
+	uid, _, _, ok := compatAuth(c)
+	if !ok {
+		return
+	}
+
+	pageStr := getParam(c, "page")
+	limitStr := getParam(c, "limit")
+	if pageStr == "" {
+		pageStr = "1"
+	}
+	if limitStr == "" {
+		limitStr = "100"
+	}
+	page, _ := strconv.Atoi(pageStr)
+	limit, _ := strconv.Atoi(limitStr)
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 500 {
+		limit = 100
+	}
+	offset := (page - 1) * limit
+
+	var total int
+	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_order WHERE uid=?", uid).Scan(&total)
+
+	rows, err := database.DB.Query(
+		fmt.Sprintf(`SELECT oid, COALESCE(cid,0), COALESCE(ptname,''), COALESCE(school,''), COALESCE(user,''), COALESCE(pass,''),
+			COALESCE(kcid,''), COALESCE(kcname,''), COALESCE(fees,0), COALESCE(status,''), COALESCE(process,''),
+			COALESCE(remarks,''), COALESCE(addtime,'')
+			FROM qingka_wangke_order WHERE uid=? ORDER BY oid DESC LIMIT %d OFFSET %d`, limit, offset), uid)
+	if err != nil {
+		c.JSON(200, gin.H{"code": -1, "msg": "查询失败"})
+		return
+	}
+	defer rows.Close()
+
+	var data []gin.H
+	for rows.Next() {
+		var oid, cid int
+		var ptname, school, user, pass, kcid, kcname, status, process, remarks, addtime string
+		var fees float64
+		rows.Scan(&oid, &cid, &ptname, &school, &user, &pass, &kcid, &kcname, &fees, &status, &process, &remarks, &addtime)
+		data = append(data, gin.H{
+			"oid":     oid,
+			"cid":     cid,
+			"ptname":  ptname,
+			"school":  school,
+			"user":    user,
+			"pass":    pass,
+			"kcid":    kcid,
+			"kcname":  kcname,
+			"fees":    fees,
+			"status":  status,
+			"process": process,
+			"remarks": remarks,
+			"addtime": addtime,
+		})
+	}
+	if data == nil {
+		data = []gin.H{}
+	}
+	c.JSON(200, gin.H{"code": 1, "data": data, "total": total, "page": page, "limit": limit})
+}
+
+// compatChaLogWk act=cha_logwk 查询订单日志
+func compatChaLogWk(c *gin.Context) {
+	_, _, _, ok := compatAuth(c)
+	if !ok {
+		return
+	}
+
+	oidStr := getParam(c, "id")
+	if oidStr == "" {
+		oidStr = getParam(c, "oid")
+	}
+	oid, _ := strconv.Atoi(oidStr)
+	if oid <= 0 {
+		c.JSON(200, gin.H{"code": 0, "msg": "参数不全"})
+		return
+	}
+
+	// 查询订单信息用于向上游获取日志
+	var hid int
+	var yid string
+	err := database.DB.QueryRow(
+		"SELECT hid, COALESCE(yid,'') FROM qingka_wangke_order WHERE oid=?", oid,
+	).Scan(&hid, &yid)
+	if err != nil {
+		c.JSON(200, gin.H{"code": -1, "msg": "订单不存在"})
+		return
+	}
+	if yid == "" || yid == "0" {
+		c.JSON(200, gin.H{"code": -1, "msg": "订单未对接，无法查询日志"})
+		return
+	}
+
+	supSvc := service.NewSupplierService()
+	sup, err := supSvc.GetSupplierByHID(hid)
+	if err != nil {
+		c.JSON(200, gin.H{"code": -1, "msg": "未找到货源信息"})
+		return
+	}
+
+	logs, err := supSvc.QueryOrderLogs(sup, yid)
+	if err != nil {
+		c.JSON(200, gin.H{"code": -1, "msg": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"code": 1, "data": logs})
 }
