@@ -308,6 +308,14 @@ func main() {
 			w.POST("/refund", handler.WRefundOrder)
 			w.GET("/sync", handler.WSyncOrder)
 			w.GET("/resume", handler.WResumeOrder)
+			w.POST("/proxy", handler.WProxyAction)
+			w.POST("/edit-order", handler.WEditOrder)
+			w.POST("/change-status", handler.WChangeRunStatus)
+			w.POST("/remain-count", handler.WGetRemainCount)
+			w.POST("/task-data", handler.WGetTaskData)
+			w.POST("/edit-task", handler.WEditTask)
+			w.POST("/delay-task", handler.WDelayTask)
+			w.POST("/fast-delay", handler.WFastDelayTask)
 		}
 
 		// Appui打卡

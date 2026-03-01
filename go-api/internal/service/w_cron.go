@@ -98,6 +98,16 @@ func wCronBatchSync() {
 					continue
 				}
 
+				// Jingyu 格式 (type=2) 走单独的同步逻辑
+				if app.Type == "2" {
+					appRow := map[string]interface{}{
+						"url": app.URL, "code": app.Code, "key": app.Key, "uid": app.UID,
+					}
+					jingyuCronSync(svc, appRow, appID)
+					log.Printf("[W-cron-sync] [%s] jingyu同步完成", app.Name)
+					continue
+				}
+
 				// 每50个一批
 				batchSize := 50
 				for i := 0; i < len(orderIDs); i += batchSize {

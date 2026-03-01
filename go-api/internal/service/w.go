@@ -295,6 +295,11 @@ func (s *WService) AddOrder(uid int, data map[string]interface{}) (map[string]in
 		return nil, fmt.Errorf("项目不存在或已下架")
 	}
 
+	// Jingyu 格式 (type=2) 走单独的下单逻辑
+	if fmt.Sprintf("%v", app["type"]) == "2" {
+		return s.jingyuAddOrder(uid, data, app, appID)
+	}
+
 	appPrice := 0.0
 	if p, ok := app["price"].(string); ok {
 		fmt.Sscanf(p, "%f", &appPrice)
@@ -493,6 +498,11 @@ func (s *WService) RefundOrder(uid int, wOrderID int, isAdmin bool) (map[string]
 	app, err := s.getAppRow(appID)
 	if err != nil {
 		return nil, fmt.Errorf("项目不存在")
+	}
+
+	// Jingyu 格式 (type=2) 走单独的退款逻辑
+	if fmt.Sprintf("%v", app["type"]) == "2" {
+		return s.jingyuRefundOrder(uid, wOrderID, isAdmin, order, app)
 	}
 
 	orderUserID := 0

@@ -177,3 +177,217 @@ func WAdminDeleteApp(c *gin.Context) {
 	}
 	response.SuccessMsg(c, "删除成功")
 }
+
+// ========== 代理/Jingyu 接口 ==========
+
+// WProxyAction 通用代理转发
+func WProxyAction(c *gin.Context) {
+	var body struct {
+		AppID int64                  `json:"app_id"`
+		Act   string                 `json:"act"`
+		Data  map[string]interface{} `json:"data"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	if body.AppID <= 0 || body.Act == "" {
+		response.BadRequest(c, "缺少 app_id 或 act")
+		return
+	}
+	resp, err := wService.ProxyAction(body.AppID, body.Act, body.Data)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	c.Data(200, "application/json; charset=utf-8", resp)
+}
+
+// WEditOrder 编辑订单
+func WEditOrder(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "admin" || role == "super"
+
+	var body struct {
+		OrderID int                    `json:"order_id"`
+		Form    map[string]interface{} `json:"form"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	if body.OrderID <= 0 {
+		response.BadRequest(c, "缺少订单ID")
+		return
+	}
+
+	msg, err := wService.EditOrder(uid, body.OrderID, body.Form, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.SuccessMsg(c, msg)
+}
+
+// WChangeRunStatus 修改运行状态 (暂停/启动)
+func WChangeRunStatus(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "admin" || role == "super"
+
+	var body struct {
+		OrderID int                    `json:"order_id"`
+		Status  int                    `json:"status"`
+		Form    map[string]interface{} `json:"form"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	if body.OrderID <= 0 {
+		response.BadRequest(c, "缺少订单ID")
+		return
+	}
+
+	msg, err := wService.ChangeRunStatus(uid, body.OrderID, body.Status, body.Form, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.SuccessMsg(c, msg)
+}
+
+// WGetRemainCount 获取剩余次数
+func WGetRemainCount(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "admin" || role == "super"
+
+	orderID, _ := strconv.Atoi(c.Query("order_id"))
+	if orderID <= 0 {
+		var body struct {
+			OrderID int `json:"order_id"`
+		}
+		c.ShouldBindJSON(&body)
+		orderID = body.OrderID
+	}
+	if orderID <= 0 {
+		response.BadRequest(c, "缺少订单ID")
+		return
+	}
+
+	resp, err := wService.GetRemainCount(uid, orderID, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	c.Data(200, "application/json; charset=utf-8", resp)
+}
+
+// WGetTaskData 获取任务数据
+func WGetTaskData(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "admin" || role == "super"
+
+	orderID, _ := strconv.Atoi(c.Query("order_id"))
+	if orderID <= 0 {
+		var body struct {
+			OrderID int `json:"order_id"`
+		}
+		c.ShouldBindJSON(&body)
+		orderID = body.OrderID
+	}
+	if orderID <= 0 {
+		response.BadRequest(c, "缺少订单ID")
+		return
+	}
+
+	resp, err := wService.GetTaskData(uid, orderID, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	c.Data(200, "application/json; charset=utf-8", resp)
+}
+
+// WEditTask 编辑任务
+func WEditTask(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "admin" || role == "super"
+
+	var body struct {
+		OrderID int                    `json:"order_id"`
+		Form    map[string]interface{} `json:"form"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	if body.OrderID <= 0 {
+		response.BadRequest(c, "缺少订单ID")
+		return
+	}
+
+	msg, err := wService.EditTask(uid, body.OrderID, body.Form, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.SuccessMsg(c, msg)
+}
+
+// WDelayTask 延时任务
+func WDelayTask(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "admin" || role == "super"
+
+	var body struct {
+		OrderID   int    `json:"order_id"`
+		RunTaskID string `json:"run_task_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	if body.OrderID <= 0 {
+		response.BadRequest(c, "缺少订单ID")
+		return
+	}
+
+	msg, err := wService.DelayTask(uid, body.OrderID, body.RunTaskID, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.SuccessMsg(c, msg)
+}
+
+// WFastDelayTask 快速延时
+func WFastDelayTask(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "admin" || role == "super"
+
+	var body struct {
+		OrderID int `json:"order_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	if body.OrderID <= 0 {
+		response.BadRequest(c, "缺少订单ID")
+		return
+	}
+
+	msg, err := wService.FastDelayTask(uid, body.OrderID, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.SuccessMsg(c, msg)
+}
