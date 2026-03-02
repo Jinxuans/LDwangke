@@ -382,3 +382,72 @@ func YFDKCalculatePatchCost(c *gin.Context) {
 	}
 	response.Success(c, data)
 }
+
+// ========== YF打卡项目管理（管理端） ==========
+
+// YFDKAdminProjectList 获取项目列表
+func YFDKAdminProjectList(c *gin.Context) {
+	svc := service.NewYFDKService()
+	projects, err := svc.GetAdminProjects()
+	if err != nil {
+		response.ServerError(c, "获取项目列表失败")
+		return
+	}
+	response.Success(c, projects)
+}
+
+// YFDKAdminProjectSync 从上游同步项目
+func YFDKAdminProjectSync(c *gin.Context) {
+	svc := service.NewYFDKService()
+	count, err := svc.SyncProjectsFromUpstream()
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"count": count, "msg": fmt.Sprintf("成功同步 %d 个项目", count)})
+}
+
+// YFDKAdminProjectUpdate 更新项目
+func YFDKAdminProjectUpdate(c *gin.Context) {
+	var req struct {
+		ID        int     `json:"id" binding:"required"`
+		SellPrice float64 `json:"sell_price" binding:"required"`
+		Enabled   int     `json:"enabled" binding:"required"`
+		Sort      int     `json:"sort" binding:"required"`
+		Content   string  `json:"content"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+
+	svc := service.NewYFDKService()
+	if err := svc.UpdateProject(req.ID, req.SellPrice, req.Enabled, req.Sort, req.Content); err != nil {
+		response.ServerError(c, "更新项目失败")
+		return
+	}
+	response.SuccessMsg(c, "更新成功")
+}
+
+// YFDKAdminProjectDelete 删除项目
+func YFDKAdminProjectDelete(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+
+	svc := service.NewYFDKService()
+	if err := svc.DeleteProject(id); err != nil {
+		response.ServerError(c, "删除项目失败")
+		return
+	}
+	response.SuccessMsg(c, "删除成功")
+}
+
+// YFDKEnsureTable 供 main.go 调用
+func YFDKEnsureTable() {
+	svc := service.NewYFDKService()
+	svc.EnsureTable()
+}

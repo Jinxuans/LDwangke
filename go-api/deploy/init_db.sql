@@ -1018,6 +1018,16 @@ INSERT INTO `qingka_dynamic_module` (`app_id`, `type`, `name`, `icon`, `api_base
 VALUES ('flash_sdxy', 'sport', '闪动校园', 'lucide:zap', '/api/v1/sdxy', 1, 10, '{}')
 ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `icon`=VALUES(`icon`), `api_base`=VALUES(`api_base`);
 
+-- 注册鲸鱼运动模块
+INSERT INTO `qingka_dynamic_module` (`app_id`, `type`, `name`, `icon`, `api_base`, `status`, `sort`, `config`)
+VALUES ('jingyu', 'sport', '鲸鱼运动', 'lucide:fish', '/api/v1/w', 1, 20, '{}')
+ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `icon`=VALUES(`icon`), `api_base`=VALUES(`api_base`);
+
+-- 注册YF打卡模块
+INSERT INTO `qingka_dynamic_module` (`app_id`, `type`, `name`, `icon`, `api_base`, `status`, `sort`, `config`)
+VALUES ('yfdk', 'checkin', 'YF打卡', 'lucide:calendar-check', '/api/v1/yfdk', 1, 25, '{}')
+ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `icon`=VALUES(`icon`), `api_base`=VALUES(`api_base`);
+
 -- 默认邮件模板
 INSERT IGNORE INTO `qingka_email_template` (`code`, `name`, `subject`, `content`, `variables`, `status`, `created_at`) VALUES
 ('register', '注册验证码', '{site_name} - 注册验证码',
@@ -1139,7 +1149,7 @@ CREATE TABLE IF NOT EXISTS `w_app` (
 -- 36. 鲸鱼运动订单表
 CREATE TABLE IF NOT EXISTS `w_order` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
-  `agg_order_id` VARCHAR(10) DEFAULT NULL UNIQUE COMMENT 'W源台订单ID',
+  `agg_order_id` VARCHAR(255) DEFAULT NULL UNIQUE COMMENT 'W源台订单ID(或jingyu yid)',
   `user_id` BIGINT NOT NULL COMMENT '用户ID',
   `school` VARCHAR(255) DEFAULT NULL COMMENT '学校名称',
   `account` VARCHAR(255) NOT NULL COMMENT '账号',
@@ -1157,6 +1167,22 @@ CREATE TABLE IF NOT EXISTS `w_order` (
   KEY `idx_user_id` (`user_id`),
   KEY `idx_deleted` (`deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='W跑步订单表';
+
+-- 37. YF打卡项目表
+CREATE TABLE IF NOT EXISTS `qingka_wangke_yfdk_projects` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `cid` VARCHAR(10) NOT NULL COMMENT '上游项目CID',
+  `name` VARCHAR(100) NOT NULL COMMENT '项目名称',
+  `content` VARCHAR(255) DEFAULT '' COMMENT '说明',
+  `cost_price` DECIMAL(10,2) DEFAULT 0 COMMENT '成本价（上游）',
+  `sell_price` DECIMAL(10,2) DEFAULT 0.10 COMMENT '售价',
+  `enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用 1启用 0禁用',
+  `sort` INT(11) DEFAULT 10 COMMENT '排序',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_cid` (`cid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='YF打卡项目表';
 
 -- 40. 积分商品表
 CREATE TABLE IF NOT EXISTS `points_product` (

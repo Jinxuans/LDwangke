@@ -48,6 +48,10 @@ import {
   paperConfigGetApi, paperConfigSaveApi,
   type PaperConfig,
 } from '#/api/paper';
+import {
+  getYFDKProjectsApi, syncYFDKProjectsApi, updateYFDKProjectApi, deleteYFDKProjectApi,
+  type YFDKAdminProject,
+} from '#/api/admin';
 
 // ========== 状态 ==========
 const loading = ref(false);
@@ -213,6 +217,26 @@ const wForm = reactive<Partial<WAppItem>>({
   cac_type: 'KM', url: '', key: '', uid: '', token: '', type: '1',
 });
 
+// YF打卡项目
+const yfdkProjects = ref<YFDKAdminProject[]>([]);
+const yfdkLoading = ref(false);
+const yfdkEditVisible = ref(false);
+const yfdkEditForm = reactive({
+  id: 0, sell_price: 0, enabled: 1, sort: 10, content: '',
+});
+
+const yfdkColumns = [
+  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: 'CID', dataIndex: 'cid', width: 80 },
+  { title: '项目名称', dataIndex: 'name', ellipsis: true },
+  { title: '说明', dataIndex: 'content', width: 200, ellipsis: true },
+  { title: '成本价', key: 'cost_price', width: 90 },
+  { title: '售价', key: 'sell_price', width: 90 },
+  { title: '排序', dataIndex: 'sort', width: 70 },
+  { title: '状态', key: 'enabled', width: 90 },
+  { title: '操作', key: 'action', width: 150 },
+];
+
 const wColumns = [
   { title: 'ID', dataIndex: 'id', width: 50 },
   { title: '名称', dataIndex: 'name', ellipsis: true },
@@ -262,6 +286,57 @@ async function deleteWApp(id: number) {
     message.success('删除成功');
     loadWApps();
   } catch (e: any) { message.error(e?.message || '删除失败'); }
+}
+
+// YF打卡项目操作
+async function loadYFDKProjects() {
+  yfdkLoading.value = true;
+  try {
+    const res = await getYFDKProjectsApi();
+    yfdkProjects.value = res || [];
+  } catch (e: any) {
+    message.error(e?.message || '加载项目列表失败');
+    console.error(e);
+  } finally {
+    yfdkLoading.value = false;
+  }
+}
+
+async function syncYFDKProjects() {
+  try {
+    const res = await syncYFDKProjectsApi();
+    message.success(res?.msg || '同步成功');
+    loadYFDKProjects();
+  } catch (e: any) {
+    message.error(e?.message || '同步失败');
+  }
+}
+
+function openYFDKEdit(record: YFDKAdminProject) {
+  Object.assign(yfdkEditForm, {
+    id: record.id, sell_price: record.sell_price, enabled: record.enabled, sort: record.sort, content: record.content });
+  yfdkEditVisible.value = true;
+}
+
+async function submitYFDKEdit() {
+  try {
+    await updateYFDKProjectApi({ ...yfdkEditForm });
+    message.success('保存成功');
+    yfdkEditVisible.value = false;
+    loadYFDKProjects();
+  } catch (e: any) {
+    message.error(e?.message || '保存失败');
+  }
+}
+
+async function deleteYFDKProject(id: number) {
+  try {
+    await deleteYFDKProjectApi(id);
+    message.success('删除成功');
+    loadYFDKProjects();
+  } catch (e: any) {
+    message.error(e?.message || '删除失败');
+  }
 }
 
 // ========== 加载 ==========
@@ -447,6 +522,7 @@ onMounted(() => {
   loadAll();
   loadXmProjects();
   loadWApps();
+  loadYFDKProjects();
 });
 </script>
 
@@ -490,7 +566,7 @@ onMounted(() => {
               </Col>
 
               <!-- YF打卡 -->
-              <Col :xs="24" :md="12" :xl="8">
+              <Col :xs="24">
                 <Card :bordered="false" class="cfg-card">
                   <template #title>
                     <span class="card-title">YF打卡</span>
@@ -498,16 +574,53 @@ onMounted(() => {
                     <Tag v-else color="default" class="ml-2">未配置</Tag>
                   </template>
                   <template #extra>
-                    <Button type="primary" size="small" :loading="yfdkSaving" @click="saveYfdk">保存</Button>
+                    <Button type="primary" size="small" :loading="yfdkSaving" @click="saveYfdk">保存配置</Button>
                   </template>
-                  <Form layout="vertical" :colon="false">
-                    <FormItem label="API 地址">
-                      <Input v-model:value="yfdkConfig.base_url" placeholder="https://dk.blwl.fun/api/" />
-                    </FormItem>
-                    <FormItem label="Token">
-                      <Input.Password v-model:value="yfdkConfig.token" placeholder="请输入 Token" />
-                    </FormItem>
-                  </Form>
+                  <Row :gutter="[16, 16]">
+                    <Col :xs="24" :md="12">
+                      <Form layout="vertical" :colon="false">
+                        <FormItem label="API 地址">
+                          <Input v-model:value="yfdkConfig.base_url" placeholder="https://dk.blwl.fun/api/" />
+                        </FormItem>
+                        <FormItem label="Token">
+                          <Input.Password v-model:value="yfdkConfig.token" placeholder="请输入 Token" />
+                        </FormItem>
+                      </Form>
+                    </Col>
+                    <Col :xs="24" :md="12">
+                      <div class="mb-3">
+                        <Space class="mb-2">
+                          <Button type="primary" size="small" @click="syncYFDKProjects">
+                            <template #icon><ReloadOutlined /></template>
+                            从上游同步
+                          </Button>
+                          <Button size="small" @click="loadYFDKProjects" :loading="yfdkLoading">刷新</Button>
+                        </Space>
+                        <Tag color="processing">{{ yfdkProjects.length }} 个项目</Tag>
+                      </div>
+                      <Table :columns="yfdkColumns" :data-source="yfdkProjects" :loading="yfdkLoading" :pagination="false" row-key="id" size="small" bordered>
+                        <template #bodyCell="{ column, record }">
+                          <template v-if="column.key === 'cost_price'">
+                            ¥{{ Number(record.cost_price).toFixed(2) }}
+                          </template>
+                          <template v-else-if="column.key === 'sell_price'">
+                            <span class="font-semibold">¥{{ Number(record.sell_price).toFixed(2) }}</span>
+                          </template>
+                          <template v-else-if="column.key === 'enabled'">
+                            <Tag :color="record.enabled === 1 ? 'green' : 'red'">{{ record.enabled === 1 ? '启用' : '禁用' }}</Tag>
+                          </template>
+                          <template v-else-if="column.key === 'action'">
+                            <Space :size="0">
+                              <Button type="link" size="small" @click="openYFDKEdit(record)">编辑</Button>
+                              <Popconfirm title="确定删除？" @confirm="deleteYFDKProject(record.id)">
+                                <Button type="link" danger size="small">删除</Button>
+                              </Popconfirm>
+                            </Space>
+                          </template>
+                        </template>
+                      </Table>
+                    </Col>
+                  </Row>
                 </Card>
               </Col>
 
@@ -996,6 +1109,33 @@ onMounted(() => {
             </FormItem>
           </Col>
         </Row>
+      </Form>
+    </Modal>
+
+    <!-- YF打卡编辑弹窗 -->
+    <Modal v-model:open="yfdkEditVisible" title="编辑项目" @ok="submitYFDKEdit" ok-text="保存" width="480px">
+      <Form layout="vertical" :colon="false" class="mt-3">
+        <FormItem label="说明">
+          <Input.TextArea v-model:value="yfdkEditForm.content" :rows="2" placeholder="项目描述" />
+        </FormItem>
+        <Row :gutter="16">
+          <Col :span="12">
+            <FormItem label="售价">
+              <InputNumber v-model:value="yfdkEditForm.sell_price" :min="0" :step="0.01" :precision="2" class="w-full" />
+            </FormItem>
+          </Col>
+          <Col :span="12">
+            <FormItem label="排序">
+              <InputNumber v-model:value="yfdkEditForm.sort" :min="0" :step="1" class="w-full" />
+            </FormItem>
+          </Col>
+        </Row>
+        <FormItem label="状态">
+          <Select v-model:value="yfdkEditForm.enabled" class="w-full">
+            <SelectOption :value="1">启用</SelectOption>
+            <SelectOption :value="0">禁用</SelectOption>
+          </Select>
+        </FormItem>
       </Form>
     </Modal>
   </Page>

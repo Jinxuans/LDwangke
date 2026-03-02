@@ -253,9 +253,9 @@ func (s *AdminService) CategoryUpdateSort(items []struct{ ID, Sort int }) error 
 	}
 
 	// 使用事务批量更新
-	tx := database.DB.Begin()
-	if tx.Error != nil {
-		return tx.Error
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return err
 	}
 
 	defer func() {
@@ -265,13 +265,14 @@ func (s *AdminService) CategoryUpdateSort(items []struct{ ID, Sort int }) error 
 	}()
 
 	for _, item := range items {
-		if err := tx.Exec("UPDATE qingka_wangke_fenlei SET sort = ? WHERE id = ?", item.Sort, item.ID).Error; err != nil {
+		_, err := tx.Exec("UPDATE qingka_wangke_fenlei SET sort = ? WHERE id = ?", item.Sort, item.ID)
+		if err != nil {
 			tx.Rollback()
 			return err
 		}
 	}
 
-	return tx.Commit().Error
+	return tx.Commit()
 }
 
 // ===== 课程管理 =====

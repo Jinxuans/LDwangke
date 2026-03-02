@@ -19,6 +19,20 @@ type YFDKConfig struct {
 	Token   string `json:"token"`    // 上游API Token
 }
 
+// YFDKProject YF打卡项目
+type YFDKProject struct {
+	ID         int     `json:"id"`
+	CID        string  `json:"cid"`
+	Name       string  `json:"name"`
+	Content    string  `json:"content"`
+	CostPrice  float64 `json:"cost_price"`
+	SellPrice  float64 `json:"sell_price"`
+	Enabled    int     `json:"enabled"`
+	Sort       int     `json:"sort"`
+	CreateTime string  `json:"create_time"`
+	UpdateTime string  `json:"update_time"`
+}
+
 // YFDKOrder YF打卡订单
 type YFDKOrder struct {
 	ID           int     `json:"id"`
@@ -63,6 +77,30 @@ type YFDKService struct {
 func NewYFDKService() *YFDKService {
 	return &YFDKService{
 		client: &http.Client{Timeout: 25 * time.Second},
+	}
+}
+
+// EnsureTable 确保 yfdk projects 表存在
+func (s *YFDKService) EnsureTable() {
+	log.Println("[YFDK] 开始检查/创建项目表")
+	_, err := database.DB.Exec(`CREATE TABLE IF NOT EXISTS qingka_wangke_yfdk_projects (
+		id INT(11) NOT NULL AUTO_INCREMENT,
+		cid VARCHAR(10) NOT NULL COMMENT '上游项目CID',
+		name VARCHAR(100) NOT NULL COMMENT '项目名称',
+		content VARCHAR(255) DEFAULT '' COMMENT '说明',
+		cost_price DECIMAL(10,2) DEFAULT 0 COMMENT '成本价（上游）',
+		sell_price DECIMAL(10,2) DEFAULT 0.10 COMMENT '售价',
+		enabled TINYINT(1) DEFAULT 1 COMMENT '是否启用 1启用 0禁用',
+		sort INT(11) DEFAULT 10 COMMENT '排序',
+		create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+		update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		PRIMARY KEY (id),
+		UNIQUE KEY uk_cid (cid)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='YF打卡项目表'`)
+	if err != nil {
+		log.Printf("[YFDK] 创建表失败: %v", err)
+	} else {
+		log.Println("[YFDK] 项目表检查/创建完成")
 	}
 }
 
@@ -935,4 +973,106 @@ func (s *YFDKService) CalculatePatchCost(uid int, id int, startDate, endDate, re
 		return nil, fmt.Errorf("%s", msg)
 	}
 	return result["data"], nil
+}
+
+// ========== YF打卡项目管理 ==========
+
+// GetAdminProjects 获取项目列表（管理端）
+func (s *YFDKService) GetAdminProjects() ([]YFDKProject, error) {
+	rows, err := database.DB.Query("SELECT id, cid, name, content, cost_price, sell_price, enabled, sort, create_time, update_time FROM qingka_wangke_yfdk_projects ORDER BY sort ASC, id ASC")
+	if err != nil {
+		log.Printf("[YFDK] 查询项目列表失败: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var projects []YFDKProject
+	for rows.Next() {
+		var p YFDKProject
+		var createTime, updateTime []uint8
+		err := rows.Scan(&p.ID, &p.CID, &p.Name, &p.Content, &p.CostPrice, &p.SellPrice, &p.Enabled, &p.Sort, &createTime, &updateTime)
+		if err != nil {
+			log.Printf("[YFDK] 扫描项目行失败: %v", err)
+			continue
+		}
+		p.CreateTime = string(createTime)
+		p.UpdateTime = string(updateTime)
+		projects = append(projects, p)
+	}
+	if projects == nil {
+		projects = []YFDKProject{}
+	}
+	return projects, nil
+}
+
+// SyncProjectsFromUpstream 从上游同步项目
+func (s *YFDKService) SyncProjectsFromUpstream() (int, error) {
+	cfg, err := s.GetConfig()
+	if err != nil || cfg.BaseURL == "" {
+		return 0, fmt.Errorf("YF打卡未配置")
+	}
+
+	result, err := s.upstreamRequest("GET", strings.TrimRight(cfg.BaseURL, "/")+"/projects", nil, cfg.Token)
+	if err != nil {
+		return 0, err
+	}
+	code, _ := result["code"].(float64)
+	if int(code) != 200 {
+		return 0, fmt.Errorf("获取上游项目列表失败")
+	}
+
+	data, _ := result["data"].(map[string]interface{})
+	projects, _ := data["projects"].([]interface{})
+	if projects == nil {
+		return 0, nil
+	}
+
+	count := 0
+	for _, p := range projects {
+		proj, ok := p.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		cid := fmt.Sprintf("%v", proj["cid"])
+		name := fmt.Sprintf("%v", proj["name"])
+		content := fmt.Sprintf("%v", proj["content"])
+		costPrice := 0.0
+		if cp, ok := proj["cost_price"].(float64); ok {
+			costPrice = cp
+		}
+		sellPrice := 0.10
+		if sp, ok := proj["sell_price"].(float64); ok {
+			sellPrice = sp
+		}
+
+		var existCount int
+		database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_yfdk_projects WHERE cid = ?", cid).Scan(&existCount)
+		if existCount > 0 {
+			continue
+		}
+
+		_, err := database.DB.Exec(
+			"INSERT INTO qingka_wangke_yfdk_projects (cid, name, content, cost_price, sell_price, enabled, sort) VALUES (?, ?, ?, ?, ?, 1, 10)",
+			cid, name, content, costPrice, sellPrice,
+		)
+		if err == nil {
+			count++
+		}
+	}
+	return count, nil
+}
+
+// UpdateProject 更新项目
+func (s *YFDKService) UpdateProject(id int, sellPrice float64, enabled int, sort int, content string) error {
+	_, err := database.DB.Exec(
+		"UPDATE qingka_wangke_yfdk_projects SET sell_price = ?, enabled = ?, sort = ?, content = ? WHERE id = ?",
+		sellPrice, enabled, sort, content, id,
+	)
+	return err
+}
+
+// DeleteProject 删除项目
+func (s *YFDKService) DeleteProject(id int) error {
+	_, err := database.DB.Exec("DELETE FROM qingka_wangke_yfdk_projects WHERE id = ?", id)
+	return err
 }

@@ -1,0 +1,15 @@
+-- YF打卡项目管理表
+CREATE TABLE IF NOT EXISTS `qingka_wangke_yfdk_projects` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `cid` VARCHAR(10) NOT NULL COMMENT '上游项目CID',
+  `name` VARCHAR(100) NOT NULL COMMENT '项目名称',
+  `content` VARCHAR(255) DEFAULT '' COMMENT '说明',
+  `cost_price` DECIMAL(10,2) DEFAULT 0 COMMENT '成本价（上游）',
+  `sell_price` DECIMAL(10,2) DEFAULT 0.10 COMMENT '售价',
+  `enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用 1启用 0禁用',
+  `sort` INT(11) DEFAULT 10 COMMENT '排序',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_cid` (`cid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='YF打卡项目表';

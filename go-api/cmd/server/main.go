@@ -51,6 +51,9 @@ func main() {
 	// 初始化智文论文表
 	handler.PaperEnsureTable()
 
+	// 初始化YF打卡项目表
+	handler.YFDKEnsureTable()
+
 	// 初始化对接并发队列（5并发，1000缓冲）
 	// checker: 查 DB dockstatus=1 判断对接是否成功，用于准确统计 completed/failed
 	dockChecker := func(oid int64) bool {
@@ -663,6 +666,12 @@ func main() {
 			// YF打卡配置
 			admin.GET("/yfdk/config", handler.YFDKConfigGet)
 			admin.POST("/yfdk/config", handler.YFDKConfigSave)
+
+			// YF打卡项目管理
+			admin.GET("/yfdk/projects", handler.YFDKAdminProjectList)
+			admin.POST("/yfdk/projects/sync", handler.YFDKAdminProjectSync)
+			admin.PUT("/yfdk/projects", handler.YFDKAdminProjectUpdate)
+			admin.DELETE("/yfdk/projects/:id", handler.YFDKAdminProjectDelete)
 
 			// 泰山打卡配置
 			admin.GET("/sxdk/config", handler.SXDKConfigGet)

@@ -189,7 +189,12 @@ func AdminCategoryUpdateSort(c *gin.Context) {
 		response.BadRequest(c, "没有要更新的分类")
 		return
 	}
-	if err := adminService.CategoryUpdateSort(body.Items); err != nil {
+	// 直接创建符合service期望类型的切片
+	var items []struct{ ID, Sort int }
+	for _, item := range body.Items {
+		items = append(items, struct{ ID, Sort int }{ID: item.ID, Sort: item.Sort})
+	}
+	if err := adminService.CategoryUpdateSort(items); err != nil {
 		response.ServerError(c, "排序更新失败")
 		return
 	}

@@ -765,3 +765,33 @@ export async function dbSyncTestApi(data: SyncRequest) {
 export async function dbSyncExecuteApi(data: SyncRequest) {
   return requestClient.post<SyncResult>('/admin/db-sync/execute', data);
 }
+
+// ===== YF打卡项目管理 =====
+export interface YFDKAdminProject {
+  id: number;
+  cid: string;
+  name: string;
+  content: string;
+  cost_price: number;
+  sell_price: number;
+  enabled: number;
+  sort: number;
+  create_time: string;
+  update_time: string;
+}
+
+export async function getYFDKProjectsApi() {
+  return requestClient.get<YFDKAdminProject[]>('/admin/yfdk/projects');
+}
+
+export async function syncYFDKProjectsApi() {
+  return requestClient.post<{ count: number; msg: string }>('/admin/yfdk/projects/sync');
+}
+
+export async function updateYFDKProjectApi(data: { id: number; sell_price: number; enabled: number; sort: number; content: string }) {
+  return requestClient.put('/admin/yfdk/projects', data);
+}
+
+export async function deleteYFDKProjectApi(id: number) {
+  return requestClient.delete(`/admin/yfdk/projects/${id}`);
+}
