@@ -548,6 +548,7 @@ func main() {
 			admin.POST("/category/save", handler.AdminCategorySave)
 			admin.DELETE("/category/:id", handler.AdminCategoryDelete)
 			admin.POST("/category/quick-modify", handler.AdminCategoryQuickModify)
+			admin.POST("/category/update-sort", handler.AdminCategoryUpdateSort)
 			admin.GET("/classes", handler.AdminClassList)
 			admin.POST("/class/save", handler.AdminClassSave)
 			admin.POST("/class/toggle", handler.AdminClassToggle)

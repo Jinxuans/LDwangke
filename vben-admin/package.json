@@ -120,6 +120,7 @@
     ]
   },
   "dependencies": {
-    "cssnano": "^7.1.2"
+    "cssnano": "^7.1.2",
+    "vuedraggable": "^2.24.3"
   }
 }

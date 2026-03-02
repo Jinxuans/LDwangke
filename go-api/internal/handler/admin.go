@@ -174,6 +174,28 @@ func AdminCategoryQuickModify(c *gin.Context) {
 	})
 }
 
+func AdminCategoryUpdateSort(c *gin.Context) {
+	var body struct {
+		Items []struct {
+			ID   int `json:"id" binding:"required"`
+			Sort int `json:"sort" binding:"required"`
+		} `json:"items" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	if len(body.Items) == 0 {
+		response.BadRequest(c, "没有要更新的分类")
+		return
+	}
+	if err := adminService.CategoryUpdateSort(body.Items); err != nil {
+		response.ServerError(c, "排序更新失败")
+		return
+	}
+	response.Success(c, gin.H{"msg": "排序更新成功"})
+}
+
 // ===== 课程管理 =====
 
 func AdminClassList(c *gin.Context) {

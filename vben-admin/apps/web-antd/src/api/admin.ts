@@ -147,6 +147,10 @@ export async function categoryQuickModifyApi(keyword: string, category_id: numbe
   return requestClient.post<{ affected: number; msg: string }>('/admin/category/quick-modify', { keyword, category_id });
 }
 
+export async function updateCategorySortApi(items: { id: number; sort: number }[]) {
+  return requestClient.post('/admin/category/update-sort', { items });
+}
+
 // ===== 课程管理 =====
 export interface ClassItem {
   cid: number;

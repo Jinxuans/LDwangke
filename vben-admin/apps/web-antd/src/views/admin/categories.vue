@@ -10,14 +10,16 @@ import {
 } from '@ant-design/icons-vue';
 import {
   getCategoryListPagedApi, saveCategoryApi, deleteCategoryApi, categoryQuickModifyApi,
-  getSupplierListApi, type CategoryItem, type SupplierItem,
+  getSupplierListApi, updateCategorySortApi, type CategoryItem, type SupplierItem,
 } from '#/api/admin';
+import draggable from 'vuedraggable';
 
 const loading = ref(false);
 const list = ref<CategoryItem[]>([]);
 const pagination = reactive({ page: 1, limit: 20, total: 0 });
 const search = reactive({ keyword: '', status: '' });
 const suppliers = ref<SupplierItem[]>([]);
+let isDragging = false;
 
 async function loadSuppliers() {
   try {
@@ -126,6 +128,24 @@ function confirmDelete(id: number) {
   });
 }
 
+// ===== 拖拽排序 =====
+async function onDragEnd() {
+  if (!isDragging) return;
+  isDragging = false;
+  
+  try {
+    const items = list.value.map((item, index) => ({
+      id: item.id,
+      sort: index + 1,
+    }));
+    await updateCategorySortApi(items);
+    message.success('排序更新成功');
+  } catch (e: any) {
+    message.error(e?.message || '排序更新失败');
+    loadData(pagination.page);
+  }
+}
+
 // ===== 快速修改弹窗 =====
 const quickVisible = ref(false);
 const quickForm = reactive({ keyword: '', cid: '' });
@@ -163,9 +183,14 @@ async function toggleStatus(item: CategoryItem) {
   });
 }
 
+// ===== 拖拽开始 =====
+function onDragStart() {
+  isDragging = true;
+}
+
 const columns = [
+  { title: '排序', key: 'sort', width: 50, align: 'center' as const },
   { title: 'ID', dataIndex: 'id', key: 'id', width: 70, align: 'center' as const },
-  { title: '排序', dataIndex: 'sort', key: 'sort', width: 80, align: 'center' as const },
   { title: '分类名称', dataIndex: 'name', key: 'name', width: 200 },
   { title: '状态', key: 'status', width: 100, align: 'center' as const },
   { title: '开关', key: 'switches', width: 280 },
@@ -227,36 +252,63 @@ onMounted(() => { loadData(1); loadSuppliers(); });
 
     <!-- 分类列表 -->
     <Card title="分类列表">
-      <Table
-        :columns="columns" :data-source="list" :loading="loading"
-        :pagination="false" row-key="id" size="small" bordered
-        :scroll="{ x: 1050 }"
+      <draggable
+        v-model="list"
+        item-key="id"
+        handle=".drag-handle"
+        @start="onDragStart"
+        @end="onDragEnd"
+        class="draggable-list"
+        :animation="150"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <Tag :color="statusColor(String(record.status))" style="cursor: pointer" @click="toggleStatus(record)">
-              {{ statusMap[String(record.status)] || `状态${record.status}` }}
-            </Tag>
-          </template>
-          <template v-else-if="column.key === 'switches'">
-            <Space :size="4" wrap>
-              <Tag v-if="record.recommend" color="purple">推荐</Tag>
-              <Tag v-if="record.log" color="blue">日志</Tag>
-              <Tag v-if="record.ticket" color="orange">工单</Tag>
-              <Tag v-if="record.changepass" color="cyan">改密</Tag>
-              <Tag v-if="record.allowpause" color="green">暂停</Tag>
-              <Tag v-if="record.supplier_report" color="red">上游反馈{{ record.supplier_report_hid ? `(HID:${record.supplier_report_hid})` : '' }}</Tag>
-              <span v-if="!record.recommend && !record.log && !record.ticket && !record.changepass && !record.allowpause && !record.supplier_report" class="text-gray-400 text-xs">-</span>
-            </Space>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <Space size="small">
-              <Button type="primary" size="small" @click="openEdit(record)">编辑</Button>
-              <Button danger size="small" @click="confirmDelete(record.id)">删除</Button>
-            </Space>
-          </template>
+        <template #item="{ element }">
+          <div class="draggable-item">
+            <Table
+              :columns="columns" :data-source="[element]" :loading="false"
+              :pagination="false" row-key="id" size="small" bordered
+              :scroll="{ x: 1050 }"
+              class="draggable-table"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'status'">
+                  <Tag :color="statusColor(String(record.status))" style="cursor: pointer" @click="toggleStatus(record)">
+                    {{ statusMap[String(record.status)] || `状态${record.status}` }}
+                  </Tag>
+                </template>
+                <template v-else-if="column.key === 'switches'">
+                  <Space :size="4" wrap>
+                    <Tag v-if="record.recommend" color="purple">推荐</Tag>
+                    <Tag v-if="record.log" color="blue">日志</Tag>
+                    <Tag v-if="record.ticket" color="orange">工单</Tag>
+                    <Tag v-if="record.changepass" color="cyan">改密</Tag>
+                    <Tag v-if="record.allowpause" color="green">暂停</Tag>
+                    <Tag v-if="record.supplier_report" color="red">上游反馈{{ record.supplier_report_hid ? `(HID:${record.supplier_report_hid})` : '' }}</Tag>
+                    <span v-if="!record.recommend && !record.log && !record.ticket && !record.changepass && !record.allowpause && !record.supplier_report" class="text-gray-400 text-xs">-</span>
+                  </Space>
+                </template>
+                <template v-else-if="column.key === 'action'">
+                  <Space size="small">
+                    <Button type="primary" size="small" @click="openEdit(record)">编辑</Button>
+                    <Button danger size="small" @click="confirmDelete(record.id)">删除</Button>
+                  </Space>
+                </template>
+                <template v-else-if="column.key === 'sort'">
+                  <div class="drag-handle cursor-move text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="8" y1="6" x2="21" y2="6"></line>
+                      <line x1="8" y1="12" x2="21" y2="12"></line>
+                      <line x1="8" y1="18" x2="21" y2="18"></line>
+                      <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                      <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                      <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                  </div>
+                </template>
+              </template>
+            </Table>
+          </div>
         </template>
-      </Table>
+      </draggable>
 
       <div class="flex justify-center mt-4" v-if="pagination.total > 0">
         <Pagination
@@ -376,3 +428,33 @@ onMounted(() => { loadData(1); loadSuppliers(); });
 
   </Page>
 </template>
+
+<style scoped>
+.draggable-list {
+  @apply space-y-2;
+}
+
+.draggable-item {
+  @apply transition-all duration-200;
+}
+
+.draggable-item:deep(.ant-table-wrapper) {
+  @apply shadow-sm;
+}
+
+.draggable-item:deep(.ant-table-small) {
+  @apply border;
+}
+
+.draggable-item:deep(.ant-table-body) {
+  margin: 0;
+}
+
+.drag-handle {
+  cursor: grab;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+</style>
