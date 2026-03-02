@@ -324,11 +324,11 @@ export async function autoSyncApi(data: CloneConfig) {
 
 // ===== 站点配置 =====
 export async function getConfigApi() {
-  return requestClient.get<Record<string, string>>('/admin/config');
+  return requestClient.get<Record<string, string>>('/admin/config', { timeout: 60000 });
 }
 
 export async function saveConfigApi(data: Record<string, string>) {
-  return requestClient.post('/admin/config', data);
+  return requestClient.post('/admin/config', data, { timeout: 60000 });
 }
 
 // ===== 支付配置 (paydata) =====

@@ -415,19 +415,40 @@ func (s *DBCompatService) Fix() (*CompatFixResult, error) {
 	// 确保邮件模板默认数据存在
 	s.seedEmailTemplates(result)
 
-	// 确保管理员账号存在
-	var adminCount int
-	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_user WHERE grade='3'").Scan(&adminCount)
-	if adminCount == 0 {
-		_, err := database.DB.Exec(
-			"INSERT INTO qingka_wangke_user (uuid, user, pass, name, grade, active, addprice, addtime) VALUES (1, 'admin', 'admin123', 'Admin', '3', '1', 1, NOW())",
-		)
-		if err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("创建管理员失败: %v", err))
+	// 确保管理员账号存在（uid=1, uuid=1）
+	var adminUID int
+	var adminUUID int
+	err := database.DB.QueryRow("SELECT COALESCE(uid, 0), COALESCE(uuid, 0) FROM qingka_wangke_user WHERE grade='3' LIMIT 1").Scan(&adminUID, &adminUUID)
+	if err != nil || adminUID != 1 || adminUUID != 1 {
+		// 检查是否已有 uid=1 的记录
+		var existingUID int
+		database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_user WHERE uid=1").Scan(&existingUID)
+
+		if existingUID > 0 {
+			// 更新现有 uid=1 的记录为管理员
+			_, err = database.DB.Exec(
+				"UPDATE qingka_wangke_user SET uuid=1, grade='3', active='1', addprice=1, addtime=NOW() WHERE uid=1",
+			)
+			if err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("更新管理员账号失败: %v", err))
+			} else {
+				result.AdminCreated = true
+				log.Println("[DBCompat] 已将 uid=1 的用户升级为管理员账号")
+			}
 		} else {
-			result.AdminCreated = true
-			log.Println("[DBCompat] 已自动创建管理员账号 admin/admin123")
+			// 插入新的管理员账号
+			_, err = database.DB.Exec(
+				"INSERT INTO qingka_wangke_user (uid, uuid, user, pass, name, grade, active, addprice, addtime) VALUES (1, 1, 'admin', 'admin123', 'Admin', '3', '1', 1, NOW())",
+			)
+			if err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("创建管理员失败: %v", err))
+			} else {
+				result.AdminCreated = true
+				log.Println("[DBCompat] 已自动创建管理员账号 admin/admin123 (uid=1, uuid=1)")
+			}
 		}
+	} else {
+		log.Println("[DBCompat] 管理员账号已存在 (uid=1, uuid=1)")
 	}
 
 	if result.TablesCreated == nil {

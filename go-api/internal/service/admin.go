@@ -477,16 +477,25 @@ func (s *AdminService) GetConfig() (map[string]string, error) {
 }
 
 func (s *AdminService) SaveConfig(configs map[string]string) error {
-	for k, v := range configs {
-		_, err := database.DB.Exec(
-			"INSERT INTO qingka_wangke_config (`v`, `k`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `k` = ?",
-			k, v, v,
-		)
-		if err != nil {
-			return err
-		}
+	if len(configs) == 0 {
+		return nil
 	}
-	return nil
+
+	// 使用 REPLACE INTO 批量插入（更高效）
+	stmt := "REPLACE INTO qingka_wangke_config (`v`, `k`) VALUES "
+	placeholders := make([]string, 0, len(configs))
+	params := make([]interface{}, 0, len(configs)*2)
+
+	idx := 0
+	for k, v := range configs {
+		placeholders = append(placeholders, "(?, ?)")
+		params = append(params, k, v)
+		idx++
+	}
+	stmt += strings.Join(placeholders, ", ")
+
+	_, err := database.DB.Exec(stmt, params...)
+	return err
 }
 
 // ===== 管理员支付配置 (paydata) =====
