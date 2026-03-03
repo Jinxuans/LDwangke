@@ -847,6 +847,17 @@ WantedBy=multi-user.target
         try_files $uri $uri/ /mall/index.html;
     }
 
+    # PHP兼容API代理（下游系统通过 /api.php?act=xxx 调用）
+    location = /api.php {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_read_timeout 120s;
+    }
+
     # API 反向代理
     location /api/ {
         proxy_pass http://127.0.0.1:8080;
@@ -1663,10 +1674,12 @@ WantedBy=multi-user.target
         # 辅助模块
         'mlsx_gslb', 'mlsx_wj_wq', 'qingka_wangke_flash_sdxy',
         # 打卡/运动
-        'qingka_wangke_appui', 'qingka_wangke_yfdk', 'qingka_wangke_sxdk',
+        'qingka_wangke_appui', 'qingka_wangke_yfdk', 'qingka_wangke_yfdk_projects', 'qingka_wangke_sxdk',
         'qingka_wangke_hzw_ydsj', 'xm_project', 'xm_order',
         'w_app', 'w_order',
         'yy_ydsj_dd', 'yy_ydsj_student',
+        # 凸知打卡
+        'qingka_wangke_dakaaz', 'qingka_wangke_daka_query_record',
         # 图图强国/土拨鼠
         'tutuqg', 'qingka_wangke_dialogue',
         'points_product', 'points_product_code', 'points_exchange_record',

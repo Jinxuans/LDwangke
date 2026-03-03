@@ -160,7 +160,19 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # API 反向代理
+    # PHP兼容路由代理（下游系统通过 /api.php?act=xxx 调用）
+    # 必须用 = 精确匹配，优先级高于宝塔默认的 ~ \.php$ 规则
+    location = /api.php {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_read_timeout 120s;
+    }
+
+    # API 反向代理（含 /api/index.php 兼容路由）
     location /api/ {
         proxy_pass http://127.0.0.1:8080;
         proxy_set_header Host $host;

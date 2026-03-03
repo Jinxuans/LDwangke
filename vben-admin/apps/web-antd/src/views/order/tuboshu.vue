@@ -92,7 +92,7 @@ function buildIframeHTML(priceConfig: any, priceRatio: number) {
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <link href="https://unpkg.com/quasar@2.10.1/dist/quasar.prod.css" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/@afyercu/tuboshu-components@0.0.28/dist/lib/tuboshu-components.css">
-<script type="importmap">{"imports":{"vue":"https://unpkg.com/vue@3/dist/vue.esm-browser.js","tuboshu-components":"https://unpkg.com/@afyercu/tuboshu-components@0.0.28/dist/lib/index.es.js"}}<\/script>
+<script type="importmap">{"imports":{"vue":"https://unpkg.com/vue@3.5.13/dist/vue.esm-browser.prod.js","tuboshu-components":"https://unpkg.com/@afyercu/tuboshu-components@0.0.28/dist/lib/index.es.js"}}<\/script>
 <style>body{margin:0;background:transparent}.container{max-width:1200px;margin:0 auto;padding:20px}p{padding:0;margin:0}@media(max-width:768px){.container{padding:0}.tabs-container{padding:10px;width:100%;overflow-x:auto}}</style>
 </head><body>
 <div id="app" style="display:none">

@@ -1272,7 +1272,65 @@ CREATE TABLE IF NOT EXISTS `yy_ydsj_student` (
   KEY `idx_user` (`user`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='永夜运动学生表';
 
--- 45. 智文论文订单表
+-- 45. 凸知打卡订单表
+CREATE TABLE IF NOT EXISTS `qingka_wangke_dakaaz` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `api_id` int(11) DEFAULT NULL COMMENT '上游订单ID',
+  `user_id` int(11) NOT NULL COMMENT '用户ID',
+  `goods_id` int(11) NOT NULL DEFAULT 0 COMMENT '所属商品ID',
+  `username` varchar(40) NOT NULL COMMENT '账号',
+  `password` varchar(30) NOT NULL COMMENT '密码',
+  `nickname` varchar(20) DEFAULT NULL COMMENT '姓名',
+  `school` varchar(100) DEFAULT NULL COMMENT '学校名称',
+  `postname` varchar(50) DEFAULT NULL COMMENT '岗位名称',
+  `address` varchar(100) DEFAULT NULL COMMENT '地址',
+  `address_lat` varchar(50) DEFAULT NULL COMMENT '纬度',
+  `address_lng` varchar(50) DEFAULT NULL COMMENT '经度',
+  `work_time` varchar(100) DEFAULT NULL COMMENT '上班打卡时间',
+  `off_time` varchar(100) DEFAULT NULL COMMENT '下班打卡时间',
+  `work_days` varchar(100) DEFAULT NULL COMMENT '打卡周期',
+  `work_days_num` bigint(20) DEFAULT NULL COMMENT '打卡天数',
+  `work_days_ok_num` bigint(20) NOT NULL DEFAULT 0 COMMENT '已打卡天数',
+  `daily_report` int(11) DEFAULT 0 COMMENT '日报',
+  `weekly_report` int(11) DEFAULT 0 COMMENT '周报',
+  `monthly_report` int(10) UNSIGNED DEFAULT 0 COMMENT '月报',
+  `weekly_report_time` bigint(20) DEFAULT NULL COMMENT '周报时间',
+  `monthly_report_time` bigint(20) DEFAULT NULL COMMENT '月报时间',
+  `holiday_status` int(10) UNSIGNED NOT NULL DEFAULT 0 COMMENT '法定节假日 0=不跳过 1=跳过',
+  `token` varchar(255) DEFAULT NULL,
+  `uuid` varchar(255) DEFAULT NULL,
+  `user_school_id` varchar(255) DEFAULT NULL,
+  `random_phone` varchar(255) DEFAULT NULL,
+  `price` decimal(10,2) UNSIGNED NOT NULL DEFAULT 0.00 COMMENT '扣除金额',
+  `images` text COMMENT '图片',
+  `create_time` bigint(20) DEFAULT NULL COMMENT '创建时间',
+  `update_time` bigint(20) DEFAULT NULL COMMENT '更新时间',
+  `delete_time` bigint(20) DEFAULT NULL COMMENT '删除时间',
+  `remark` varchar(100) DEFAULT '' COMMENT '备注',
+  `status` int(1) UNSIGNED NOT NULL DEFAULT 0 COMMENT '状态 0正常 1打卡中 2关闭 3已完成',
+  `is_status` int(1) DEFAULT 1 COMMENT '打卡状态 0失败 1正常',
+  `work_deadline` varchar(100) DEFAULT NULL COMMENT '截至打卡日期',
+  `billing_method` tinyint(1) UNSIGNED DEFAULT 1 COMMENT '扣费方式（1按日，2按月）',
+  `billing_months` tinyint(3) UNSIGNED DEFAULT 0 COMMENT '收费月数',
+  `is_off_time` tinyint(1) UNSIGNED DEFAULT 1 COMMENT '是否开启下班打卡 1是0否',
+  `xz_push_url` text COMMENT '息知推送地址',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='凸知打卡订单表';
+
+-- 46. 凸知打卡查询扣费记录
+CREATE TABLE IF NOT EXISTS `qingka_wangke_daka_query_record` (
+  `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `username` varchar(255) DEFAULT NULL,
+  `password` varchar(255) DEFAULT NULL,
+  `create_time` bigint(20) DEFAULT NULL COMMENT '创建时间',
+  `user_id` int(11) DEFAULT NULL,
+  `is_success` tinyint(1) UNSIGNED DEFAULT 0 COMMENT '是否成功',
+  `price` decimal(10,2) UNSIGNED NOT NULL DEFAULT 0.00 COMMENT '扣除金额',
+  `goods_id` int(11) NOT NULL DEFAULT 0 COMMENT '所属商品ID',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='凸知打卡查询扣费记录';
+
+-- 47. 智文论文订单表
 CREATE TABLE IF NOT EXISTS `qingka_wangke_lunwen` (
   `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
   `uid` int(11) UNSIGNED NOT NULL DEFAULT 0 COMMENT '用户ID',
