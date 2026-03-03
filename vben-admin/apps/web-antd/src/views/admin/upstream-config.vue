@@ -52,6 +52,11 @@ import {
   getYFDKProjectsApi, syncYFDKProjectsApi, updateYFDKProjectApi, deleteYFDKProjectApi,
   type YFDKAdminProject,
 } from '#/api/admin';
+import {
+  tuzhiConfigGetApi, tuzhiConfigSaveApi,
+  tuzhiAdminGetGoodsApi, tuzhiGoodsOverridesGetApi, tuzhiGoodsOverridesSaveApi,
+  type TuZhiConfig, type TuZhiGoodsOverride,
+} from '#/api/tuzhi';
 
 // ========== 状态 ==========
 const loading = ref(false);
@@ -107,9 +112,11 @@ const appuiSaving = ref(false);
 // 闪电运动
 const sdxyModuleConfig = reactive<SDXYModuleConfig>({
   base_url: '',
+  endpoint: '/flash/api.php',
   uid: '',
   key: '',
-  price_per_km: 10,
+  timeout: 30,
+  price: 10,
 });
 const sdxySaving = ref(false);
 
@@ -145,8 +152,50 @@ const yongyeSaving = ref(false);
 const paperConfig = reactive<Partial<PaperConfig>>({
   lunwen_api_username: '',
   lunwen_api_password: '',
+  lunwen_api_6000_price: '30',
+  lunwen_api_8000_price: '40',
+  lunwen_api_10000_price: '50',
+  lunwen_api_12000_price: '60',
+  lunwen_api_15000_price: '75',
+  lunwen_api_rws_price: '10',
+  lunwen_api_ktbg_price: '10',
+  lunwen_api_jdaigchj_price: '10',
+  lunwen_api_xgdl_price: '3',
+  lunwen_api_jcl_price: '3',
+  lunwen_api_jdaigcl_price: '3',
 });
 const paperSaving = ref(false);
+
+// 土拨鼠页面显示选项
+const tuboshuPageOptions = [
+  { key: 'ComponentStagePage', label: '分步对话' },
+  { key: 'ChatPage', label: 'AI对话' },
+  { key: 'ChartPage', label: '图表生成' },
+  { key: 'TemplatePage', label: '模板中心' },
+  { key: 'ReductionPage', label: '论文降重' },
+  { key: 'AccountTable', label: '账户管理' },
+  { key: 'TicketPage', label: '工单系统' },
+];
+
+// 凸知打卡
+const tuzhiConfig = reactive<TuZhiConfig>({
+  daka_api_username: '',
+  daka_api_password: '',
+});
+const tuzhiSaving = ref(false);
+const tuzhiGoods = ref<any[]>([]);
+const tuzhiOverrides = ref<TuZhiGoodsOverride[]>([]);
+const tuzhiGoodsLoading = ref(false);
+const tuzhiOverridesSaving = ref(false);
+
+const tuzhiGoodsColumns = [
+  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: '商品名称', dataIndex: 'name', ellipsis: true },
+  { title: '上游价格', key: 'upstream_price', width: 90 },
+  { title: '计费方式', key: 'billing', width: 90 },
+  { title: '覆盖售价', key: 'override_price', width: 110 },
+  { title: '上架', key: 'enabled', width: 80 },
+];
 
 // 小米运动项目
 const xmProjects = ref<XMProjectItem[]>([]);
@@ -343,7 +392,7 @@ async function deleteYFDKProject(id: number) {
 async function loadAll() {
   loading.value = true;
   try {
-    const [tutuqgRes, yfdkRes, sxdkRes, hzwRes, tuboshuRes, appuiRes, sdxyRes, ydsjRes, yongyeRes, paperRes] = await Promise.allSettled([
+    const [tutuqgRes, yfdkRes, sxdkRes, hzwRes, tuboshuRes, appuiRes, sdxyRes, ydsjRes, yongyeRes, paperRes, tuzhiRes] = await Promise.allSettled([
       tutuqgUpstreamConfigGetApi(),
       yfdkConfigGetApi(),
       sxdkConfigGetApi(),
@@ -354,6 +403,7 @@ async function loadAll() {
       ydsjConfigGetApi(),
       getYongyeConfig(),
       paperConfigGetApi(),
+      tuzhiConfigGetApi(),
     ]);
 
     if (tutuqgRes.status === 'fulfilled' && tutuqgRes.value) {
@@ -385,6 +435,9 @@ async function loadAll() {
     }
     if (paperRes.status === 'fulfilled' && paperRes.value) {
       Object.assign(paperConfig, paperRes.value);
+    }
+    if (tuzhiRes.status === 'fulfilled' && tuzhiRes.value) {
+      Object.assign(tuzhiConfig, tuzhiRes.value);
     }
   } catch (e) {
     console.error('加载对接配置失败:', e);
@@ -514,6 +567,62 @@ async function savePaper() {
   }
 }
 
+async function saveTuzhi() {
+  tuzhiSaving.value = true;
+  try {
+    await tuzhiConfigSaveApi({ ...tuzhiConfig });
+    message.success('凸知打卡配置保存成功');
+  } catch (e: any) {
+    message.error(e?.message || '保存失败');
+  } finally {
+    tuzhiSaving.value = false;
+  }
+}
+
+async function loadTuzhiGoods() {
+  tuzhiGoodsLoading.value = true;
+  try {
+    const [goodsRes, ovRes] = await Promise.all([
+      tuzhiAdminGetGoodsApi(),
+      tuzhiGoodsOverridesGetApi(),
+    ]);
+    tuzhiGoods.value = goodsRes || [];
+    tuzhiOverrides.value = ovRes || [];
+  } catch (e: any) {
+    message.error(e?.message || '加载商品失败');
+  } finally {
+    tuzhiGoodsLoading.value = false;
+  }
+}
+
+function getTuzhiOverride(goodsId: number): TuZhiGoodsOverride {
+  const found = tuzhiOverrides.value.find(o => o.goods_id === goodsId);
+  return found || { goods_id: goodsId, price: 0, enabled: 1 };
+}
+
+function setTuzhiOverrideField(goodsId: number, field: 'price' | 'enabled', val: any) {
+  const idx = tuzhiOverrides.value.findIndex(o => o.goods_id === goodsId);
+  if (idx >= 0) {
+    (tuzhiOverrides.value[idx] as any)[field] = val;
+  } else {
+    const ov: TuZhiGoodsOverride = { goods_id: goodsId, price: 0, enabled: 1 };
+    (ov as any)[field] = val;
+    tuzhiOverrides.value.push(ov);
+  }
+}
+
+async function saveTuzhiOverrides() {
+  tuzhiOverridesSaving.value = true;
+  try {
+    await tuzhiGoodsOverridesSaveApi(tuzhiOverrides.value);
+    message.success('商品配置保存成功');
+  } catch (e: any) {
+    message.error(e?.message || '保存失败');
+  } finally {
+    tuzhiOverridesSaving.value = false;
+  }
+}
+
 function isConfigured(url: string) {
   return url !== undefined && url !== null && url.trim() !== '';
 }
@@ -624,6 +733,68 @@ onMounted(() => {
                 </Card>
               </Col>
 
+              <!-- 凸知打卡 -->
+              <Col :xs="24">
+                <Card :bordered="false" class="cfg-card">
+                  <template #title>
+                    <span class="card-title">凸知打卡</span>
+                    <Tag v-if="isConfigured(tuzhiConfig.daka_api_username)" color="success" class="ml-2">已对接</Tag>
+                    <Tag v-else color="default" class="ml-2">未配置</Tag>
+                  </template>
+                  <template #extra>
+                    <Button type="primary" size="small" :loading="tuzhiSaving" @click="saveTuzhi">保存配置</Button>
+                  </template>
+                  <Row :gutter="[16, 16]">
+                    <Col :xs="24" :md="12">
+                      <Form layout="vertical" :colon="false">
+                        <FormItem label="上游账号">
+                          <Input v-model:value="tuzhiConfig.daka_api_username" placeholder="请输入上游账号" />
+                        </FormItem>
+                        <FormItem label="上游密码">
+                          <Input.Password v-model:value="tuzhiConfig.daka_api_password" placeholder="请输入上游密码" />
+                        </FormItem>
+                      </Form>
+                    </Col>
+                    <Col :xs="24" :md="12">
+                      <div class="mb-3">
+                        <Space class="mb-2">
+                          <Button type="primary" size="small" @click="loadTuzhiGoods" :loading="tuzhiGoodsLoading">
+                            <template #icon><ReloadOutlined /></template>
+                            拉取商品
+                          </Button>
+                          <Button size="small" :loading="tuzhiOverridesSaving" @click="saveTuzhiOverrides" type="primary" ghost>保存商品配置</Button>
+                        </Space>
+                        <Tag color="processing">{{ tuzhiGoods.length }} 个商品</Tag>
+                      </div>
+                      <Table :columns="tuzhiGoodsColumns" :data-source="tuzhiGoods" :loading="tuzhiGoodsLoading"
+                             :pagination="false" row-key="id" size="small" bordered>
+                        <template #bodyCell="{ column, record }">
+                          <template v-if="column.key === 'upstream_price'">
+                            ¥{{ Number(record.price).toFixed(2) }}
+                          </template>
+                          <template v-else-if="column.key === 'billing'">
+                            <Tag :color="record.billing_method === 2 ? 'orange' : 'blue'">
+                              {{ record.billing_method === 2 ? '按月' : '按日' }}
+                            </Tag>
+                          </template>
+                          <template v-else-if="column.key === 'override_price'">
+                            <InputNumber :value="getTuzhiOverride(record.id).price" :min="0" :step="0.01" :precision="2" size="small" style="width:90px"
+                              @change="(v: any) => setTuzhiOverrideField(record.id, 'price', v || 0)" />
+                          </template>
+                          <template v-else-if="column.key === 'enabled'">
+                            <Select :value="getTuzhiOverride(record.id).enabled" size="small" style="width:70px"
+                              @change="(v: any) => setTuzhiOverrideField(record.id, 'enabled', v)">
+                              <SelectOption :value="1">上架</SelectOption>
+                              <SelectOption :value="0">下架</SelectOption>
+                            </Select>
+                          </template>
+                        </template>
+                      </Table>
+                    </Col>
+                  </Row>
+                </Card>
+              </Col>
+
               <!-- 泰山打卡 -->
               <Col :xs="24" :md="12" :xl="8">
                 <Card :bordered="false" class="cfg-card">
@@ -684,8 +855,17 @@ onMounted(() => {
                     <FormItem label="价格倍率">
                       <InputNumber v-model:value="tuboshuConfig.price_ratio" :min="0.1" :step="0.5" :precision="1" class="w-full" />
                     </FormItem>
+                    <FormItem label="页面显示控制">
+                      <div class="grid grid-cols-2 gap-2">
+                        <label v-for="opt in tuboshuPageOptions" :key="opt.key" class="flex items-center gap-1 text-sm">
+                          <input type="checkbox" :checked="tuboshuConfig.page_visibility?.[opt.key] !== false"
+                            @change="(e: Event) => { if (!tuboshuConfig.page_visibility) tuboshuConfig.page_visibility = {}; tuboshuConfig.page_visibility[opt.key] = (e.target as HTMLInputElement).checked; }" />
+                          {{ opt.label }}
+                        </label>
+                      </div>
+                    </FormItem>
                   </Form>
-                  <Alert message="Token 在货源中心配置，价格可在论文页面修改。" type="info" show-icon class="mt-2" />
+                  <Alert message="Token 在货源中心配置，详细价格可在论文页面管理。" type="info" show-icon class="mt-2" />
                 </Card>
               </Col>
 
@@ -707,8 +887,27 @@ onMounted(() => {
                     <FormItem label="API 密码">
                       <Input.Password v-model:value="paperConfig.lunwen_api_password" placeholder="请输入登录密码" />
                     </FormItem>
+                    <div class="text-sm font-medium mb-2 mt-1">论文价格配置（元）</div>
+                    <Row :gutter="12">
+                      <Col :span="8"><FormItem label="6000字"><Input v-model:value="paperConfig.lunwen_api_6000_price" /></FormItem></Col>
+                      <Col :span="8"><FormItem label="8000字"><Input v-model:value="paperConfig.lunwen_api_8000_price" /></FormItem></Col>
+                      <Col :span="8"><FormItem label="10000字"><Input v-model:value="paperConfig.lunwen_api_10000_price" /></FormItem></Col>
+                    </Row>
+                    <Row :gutter="12">
+                      <Col :span="8"><FormItem label="12000字"><Input v-model:value="paperConfig.lunwen_api_12000_price" /></FormItem></Col>
+                      <Col :span="8"><FormItem label="15000字"><Input v-model:value="paperConfig.lunwen_api_15000_price" /></FormItem></Col>
+                      <Col :span="8"><FormItem label="任务书"><Input v-model:value="paperConfig.lunwen_api_rws_price" /></FormItem></Col>
+                    </Row>
+                    <Row :gutter="12">
+                      <Col :span="8"><FormItem label="开题报告"><Input v-model:value="paperConfig.lunwen_api_ktbg_price" /></FormItem></Col>
+                      <Col :span="8"><FormItem label="降AIGC+查重"><Input v-model:value="paperConfig.lunwen_api_jdaigchj_price" /></FormItem></Col>
+                      <Col :span="8"><FormItem label="段落修改"><Input v-model:value="paperConfig.lunwen_api_xgdl_price" /></FormItem></Col>
+                    </Row>
+                    <Row :gutter="12">
+                      <Col :span="8"><FormItem label="文本降重"><Input v-model:value="paperConfig.lunwen_api_jcl_price" /></FormItem></Col>
+                      <Col :span="8"><FormItem label="降AIGC率"><Input v-model:value="paperConfig.lunwen_api_jdaigcl_price" /></FormItem></Col>
+                    </Row>
                   </Form>
-                  <Alert message="价格配置请前往 后台管理 → 上游对接 → 智文论文配置 页面修改。" type="info" show-icon class="mt-2" />
                 </Card>
               </Col>
 
@@ -755,15 +954,27 @@ onMounted(() => {
                     <FormItem label="API 地址">
                       <Input v-model:value="sdxyModuleConfig.base_url" placeholder="https://..." />
                     </FormItem>
+                    <FormItem label="API 路径">
+                      <Input v-model:value="sdxyModuleConfig.endpoint" placeholder="/flash/api.php" />
+                    </FormItem>
                     <FormItem label="上游 UID">
                       <Input v-model:value="sdxyModuleConfig.uid" placeholder="请输入 UID" />
                     </FormItem>
                     <FormItem label="密钥">
                       <Input.Password v-model:value="sdxyModuleConfig.key" placeholder="请输入密钥" />
                     </FormItem>
-                    <FormItem label="每公里价格">
-                      <InputNumber v-model:value="sdxyModuleConfig.price_per_km" :min="0" :step="0.5" :precision="2" class="w-full" />
-                    </FormItem>
+                    <Row :gutter="12">
+                      <Col :span="12">
+                        <FormItem label="每次价格">
+                          <InputNumber v-model:value="sdxyModuleConfig.price" :min="0" :step="0.5" :precision="2" class="w-full" />
+                        </FormItem>
+                      </Col>
+                      <Col :span="12">
+                        <FormItem label="超时(秒)">
+                          <InputNumber v-model:value="sdxyModuleConfig.timeout" :min="5" :max="120" :step="5" class="w-full" />
+                        </FormItem>
+                      </Col>
+                    </Row>
                   </Form>
                 </Card>
               </Col>
@@ -837,10 +1048,13 @@ onMounted(() => {
                   </template>
                   <Form layout="vertical" :colon="false">
                     <FormItem label="API 地址">
-                      <Input v-model:value="ydsjConfig.base_url" placeholder="http://103.149.27.248:5000" />
+                      <Input v-model:value="ydsjConfig.base_url" placeholder="http://xxx.xxx.xxx:7799/LearnExp" />
                     </FormItem>
-                    <FormItem label="Bearer Token">
-                      <Input.Password v-model:value="ydsjConfig.token" placeholder="请输入上游 Bearer Token" />
+                    <FormItem label="上游 UID">
+                      <Input v-model:value="ydsjConfig.uid" placeholder="对接站用户UID" />
+                    </FormItem>
+                    <FormItem label="密钥">
+                      <Input.Password v-model:value="ydsjConfig.key" placeholder="对接站密钥" />
                     </FormItem>
                     <Row :gutter="12">
                       <Col :span="12">

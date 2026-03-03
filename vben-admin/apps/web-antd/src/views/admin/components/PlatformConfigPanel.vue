@@ -12,7 +12,7 @@ import {
 } from '@ant-design/icons-vue';
 import {
   getPlatformConfigsApi, savePlatformConfigApi,
-  deletePlatformConfigApi, parsePHPCodeApi, detectPlatformApi,
+  deletePlatformConfigApi, parsePHPCodeApi, detectPlatformApi, autoDetectSaveApi,
   type PlatformConfig, type ParsedPHPResult, type DetectResult,
 } from '#/api/platform-config';
 
@@ -32,7 +32,8 @@ const phpResult = ref<ParsedPHPResult | null>(null);
 
 const detectVisible = ref(false);
 const detectLoading = ref(false);
-const detectForm = ref({ url: '', uid: '', key: '', token: '', cookie: '' });
+const detectSaveLoading = ref(false);
+const detectForm = ref({ url: '', uid: '', key: '', token: '', cookie: '', pt: '', name: '' });
 const detectResult = ref<DetectResult | null>(null);
 
 const filteredData = computed(() => {
@@ -148,7 +149,7 @@ function applyPHPResult() {
 }
 
 function openDetect() {
-  detectForm.value = { url: '', uid: '', key: '', token: '', cookie: '' };
+  detectForm.value = { url: '', uid: '', key: '', token: '', cookie: '', pt: '', name: '' };
   detectResult.value = null; detectVisible.value = true;
 }
 
@@ -165,12 +166,33 @@ async function runDetect() {
   finally { detectLoading.value = false; }
 }
 
+async function autoDetectSave() {
+  if (!detectForm.value.url) { message.warning('请填写平台 URL'); return; }
+  if (!detectForm.value.pt) { message.warning('请填写平台标识'); return; }
+  detectSaveLoading.value = true;
+  try {
+    const res = await autoDetectSaveApi({
+      url: detectForm.value.url, uid: detectForm.value.uid, key: detectForm.value.key,
+      token: detectForm.value.token, cookie: detectForm.value.cookie,
+      pt: detectForm.value.pt, name: detectForm.value.name,
+    });
+    detectResult.value = res.detect;
+    if (res.success) {
+      message.success(res.msg);
+      loadData();
+    } else {
+      message.warning(res.msg);
+    }
+  } catch (e: any) { message.error('操作失败: ' + (e?.message || '未知错误')); }
+  finally { detectSaveLoading.value = false; }
+}
+
 function applyDetectResult() {
   if (!detectResult.value) return;
   const r = detectResult.value;
   const cfg = r.config || {};
   editForm.value = {
-    pt: '', name: r.suggested_name || '', auth_type: cfg.auth_type || 'uid_key',
+    pt: detectForm.value.pt || '', name: detectForm.value.name || r.suggested_name || '', auth_type: cfg.auth_type || 'uid_key',
     api_path_style: cfg.api_path_style || 'standard', success_codes: cfg.success_codes || '0',
     use_json: cfg.use_json === 'true', query_act: cfg.query_act || '', query_path: cfg.query_path || '',
     order_act: cfg.order_act || '', order_path: cfg.order_path || '',
@@ -189,7 +211,7 @@ function applyDetectResult() {
     report_param_style: cfg.report_param_style || '', report_auth_type: cfg.report_auth_type || '',
   };
   isEdit.value = false; detectVisible.value = false; editVisible.value = true;
-  message.info('已填充检测结果，请设置平台标识后保存');
+  message.info('已填充检测结果，请核对后保存');
 }
 
 const statusColor: Record<string, string> = {
@@ -493,11 +515,21 @@ onMounted(loadData);
           <FormItem label="Token"><Input v-model:value="detectForm.token" placeholder="Bearer Token（可选）" /></FormItem>
           <FormItem label="Cookie"><Input v-model:value="detectForm.cookie" placeholder="Cookie（可选）" /></FormItem>
         </div>
+        <div class="grid grid-cols-2 gap-x-4">
+          <FormItem label="平台标识"><Input v-model:value="detectForm.pt" placeholder="如 newplat（一键保存时必填）" /></FormItem>
+          <FormItem label="平台名称"><Input v-model:value="detectForm.name" placeholder="如 新平台（留空自动生成）" /></FormItem>
+        </div>
         <FormItem :wrapper-col="{ offset: 4 }">
-          <Button type="primary" :loading="detectLoading" @click="runDetect">
-            <template #icon><SearchOutlined /></template>
-            开始检测
-          </Button>
+          <Space>
+            <Button type="primary" :loading="detectLoading" @click="runDetect">
+              <template #icon><SearchOutlined /></template>
+              仅检测
+            </Button>
+            <Button type="primary" :loading="detectSaveLoading" @click="autoDetectSave" style="background: #52c41a; border-color: #52c41a">
+              <template #icon><ThunderboltOutlined /></template>
+              一键检测并保存
+            </Button>
+          </Space>
         </FormItem>
       </Form>
       <template v-if="detectResult">

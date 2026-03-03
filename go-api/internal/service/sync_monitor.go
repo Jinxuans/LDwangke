@@ -173,6 +173,19 @@ func SyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, error) 
 		return nil, fmt.Errorf("拉取上游商品失败: %v", err)
 	}
 
+	// 预处理：对没有 Fenlei 但有 CategoryName 的商品（如 yyy 平台），尝试按名称查找本地分类
+	for i, up := range upstreamClasses {
+		if (up.Fenlei == "" || up.Fenlei == "0" || up.Fenlei == "<nil>") && up.CategoryName != "" {
+			var catID int
+			err := database.DB.QueryRow(
+				"SELECT id FROM qingka_wangke_fenlei WHERE name = ? AND status != 3 ORDER BY id DESC LIMIT 1",
+				up.CategoryName).Scan(&catID)
+			if err == nil {
+				upstreamClasses[i].Fenlei = strconv.Itoa(catID)
+			}
+		}
+	}
+
 	// 构建跳过分类集合
 	skipSet := map[string]bool{}
 	for _, id := range cfg.SkipCategories {
@@ -443,6 +456,7 @@ func SyncExecute(hid int, customCfg ...*SyncConfig) (*SyncExecuteResult, error) 
 	applied := 0
 	failed := 0
 	summary := map[string]int{}
+	createdCategories := map[string]int{} // 记录本次自动创建的分类 name→ID
 
 	for _, diff := range preview.Diffs {
 		var execErr error
@@ -456,6 +470,25 @@ func SyncExecute(hid int, customCfg ...*SyncConfig) (*SyncExecuteResult, error) 
 					_, execErr = database.DB.Exec(
 						"INSERT INTO qingka_wangke_fenlei (id, sort, name, status, time) VALUES (?, 0, ?, 1, NOW())",
 						fenleiID, diff.Name)
+				}
+			} else if diff.Name != "" {
+				// 无上游分类ID（如 yyy 平台），按名称查找或自动创建分类
+				var catID int
+				err := database.DB.QueryRow(
+					"SELECT id FROM qingka_wangke_fenlei WHERE name = ? AND status != 3 ORDER BY id DESC LIMIT 1",
+					diff.Name).Scan(&catID)
+				if err != nil {
+					result, e := database.DB.Exec(
+						"INSERT INTO qingka_wangke_fenlei (sort, name, status, time) VALUES (10, ?, 1, NOW())", diff.Name)
+					if e == nil {
+						id, _ := result.LastInsertId()
+						catID = int(id)
+					} else {
+						execErr = e
+					}
+				}
+				if catID > 0 {
+					createdCategories[diff.Name] = catID
 				}
 			}
 		case "更新价格":
@@ -492,6 +525,19 @@ func SyncExecute(hid int, customCfg ...*SyncConfig) (*SyncExecuteResult, error) 
 			fenlei := 0
 			if diff.UpstreamFenlei != "" {
 				fenlei, _ = strconv.Atoi(diff.UpstreamFenlei)
+			}
+			// 如果 fenlei 仍为 0，尝试按分类名称查找（支持 yyy 等无原生分类的平台）
+			if fenlei == 0 && diff.Category != "" {
+				if id, ok := createdCategories[diff.Category]; ok {
+					fenlei = id
+				} else {
+					var catID int
+					if database.DB.QueryRow(
+						"SELECT id FROM qingka_wangke_fenlei WHERE name = ? AND status != 3 LIMIT 1",
+						diff.Category).Scan(&catID) == nil {
+						fenlei = catID
+					}
+				}
 			}
 			content := diff.FullNewValue
 			if diff.SecretPrice > 0 {

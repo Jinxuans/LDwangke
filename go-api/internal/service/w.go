@@ -347,6 +347,28 @@ func (s *WService) AddOrder(uid int, data map[string]interface{}) (map[string]in
 
 	// Jingyu 格式 (type=2) 走单独的下单逻辑
 	if fmt.Sprintf("%v", app["type"]) == "2" {
+		// 如果前端没传 form，自动从扁平字段构造
+		if _, hasForm := data["form"]; !hasForm {
+			code := fmt.Sprintf("%v", app["code"])
+			form := map[string]interface{}{
+				"dis":       dis,
+				"task_list": num,
+			}
+			switch code {
+			case "bdlp":
+				form["uid"] = account
+				form["school_name"] = school
+			case "yyd":
+				form["number"] = account
+				form["password"] = password
+				form["school_name"] = school
+			default:
+				form["phone"] = account
+				form["password"] = password
+				form["zone_name"] = school
+			}
+			data["form"] = form
+		}
 		return s.jingyuAddOrder(uid, data, app, appID)
 	}
 

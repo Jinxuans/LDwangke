@@ -90,6 +90,24 @@ const routes: RouteRecordRaw[] = [
           title: 'Appui打卡',
         },
       },
+      {
+        name: 'TuZhiIndex',
+        path: '/tuzhi/index',
+        component: () => import('#/views/order/tuzhi.vue'),
+        meta: {
+          icon: 'lucide:map-pin-check',
+          title: '凸知打卡',
+        },
+      },
+      {
+        name: 'SXZSIndex',
+        path: '/sxzs/index',
+        component: () => import('#/views/order/sxzs.vue'),
+        meta: {
+          icon: 'lucide:briefcase',
+          title: '实习助手',
+        },
+      },
     ],
   },
   {

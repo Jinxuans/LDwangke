@@ -64,8 +64,32 @@ func autoMigrate(db *sql.DB) {
 	var hasSkey int
 	db.QueryRow("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='qingka_wangke_config' AND COLUMN_NAME='skey'").Scan(&hasSkey)
 	if hasSkey == 0 {
-		db.Exec("ALTER TABLE `qingka_wangke_config` ADD COLUMN `skey` VARCHAR(255) NOT NULL DEFAULT '' AFTER `k`, ADD COLUMN `svalue` MEDIUMTEXT AFTER `skey`, ADD UNIQUE KEY `uk_skey` (`skey`)")
-		log.Println("[AutoMigrate] 已添加 config.skey/svalue 列")
+		// 分步添加：先加列（NULL 默认值，避免与已有行冲突），再加唯一索引
+		_, err := db.Exec("ALTER TABLE `qingka_wangke_config` ADD COLUMN `skey` VARCHAR(255) DEFAULT NULL AFTER `k`, ADD COLUMN `svalue` MEDIUMTEXT AFTER `skey`")
+		if err != nil {
+			log.Printf("[AutoMigrate] 添加 config.skey/svalue 列失败: %v", err)
+		} else {
+			log.Println("[AutoMigrate] 已添加 config.skey/svalue 列")
+			// 再单独添加唯一索引（NULL 值不冲突）
+			_, err = db.Exec("ALTER TABLE `qingka_wangke_config` ADD UNIQUE KEY `uk_skey` (`skey`)")
+			if err != nil {
+				log.Printf("[AutoMigrate] 添加 config.uk_skey 索引失败(可能已存在): %v", err)
+			}
+		}
+	} else {
+		// 列已存在，确保唯一索引也存在
+		var hasUK int
+		db.QueryRow("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='qingka_wangke_config' AND INDEX_NAME='uk_skey'").Scan(&hasUK)
+		if hasUK == 0 {
+			// 先把旧的空字符串 skey 改为 NULL，避免唯一索引冲突
+			db.Exec("UPDATE `qingka_wangke_config` SET `skey` = NULL WHERE `skey` = ''")
+			_, err := db.Exec("ALTER TABLE `qingka_wangke_config` ADD UNIQUE KEY `uk_skey` (`skey`)")
+			if err != nil {
+				log.Printf("[AutoMigrate] 补建 config.uk_skey 索引失败: %v", err)
+			} else {
+				log.Println("[AutoMigrate] 已补建 config.uk_skey 索引")
+			}
+		}
 	}
 
 	// 确保 moneylog 表有 mark/remarks 列（部分模块用）

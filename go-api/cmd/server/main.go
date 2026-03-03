@@ -54,6 +54,9 @@ func main() {
 	// 初始化YF打卡项目表
 	handler.YFDKEnsureTable()
 
+	// 初始化凸知打卡表
+	handler.TuZhiEnsureTable()
+
 	// 初始化对接并发队列（5并发，1000缓冲）
 	// checker: 查 DB dockstatus=1 判断对接是否成功，用于准确统计 completed/failed
 	dockChecker := func(oid int64) bool {
@@ -105,6 +108,9 @@ func main() {
 
 	// 启动龙龙内置同步&监听（替代 long sync / long listen 命令行工具）
 	go service.StartLonglongDaemon()
+
+	// 启动至强(simple)平台 Thread 批量同步
+	go service.StartSimpleThreadSync()
 
 	// 自动商品同步定时任务（间隔从 sync_config 读取，默认30分钟）
 	go func() {
@@ -325,6 +331,7 @@ func main() {
 		{
 			xm.GET("/projects", handler.XMGetProjects)
 			xm.POST("/add-order", handler.XMAddOrder)
+			xm.POST("/add-order-km", handler.XMAddOrderKM)
 			xm.GET("/orders", handler.XMGetOrders)
 			xm.POST("/query-run", handler.XMQueryRun)
 			xm.GET("/refund", handler.XMRefundOrder)
@@ -350,6 +357,22 @@ func main() {
 			w.POST("/edit-task", handler.WEditTask)
 			w.POST("/delay-task", handler.WDelayTask)
 			w.POST("/fast-delay", handler.WFastDelayTask)
+		}
+
+		// 凸知打卡
+		tuzhi := api.Group("/tuzhi")
+		{
+			tuzhi.GET("/goods", handler.TuZhiGetGoods)
+			tuzhi.POST("/schools", handler.TuZhiGetSchools)
+			tuzhi.POST("/sign-info", handler.TuZhiGetSignInfo)
+			tuzhi.POST("/calculate-days", handler.TuZhiCalculateDays)
+			tuzhi.GET("/orders", handler.TuZhiOrderList)
+			tuzhi.POST("/add", handler.TuZhiAddOrder)
+			tuzhi.POST("/edit", handler.TuZhiEditOrder)
+			tuzhi.POST("/delete", handler.TuZhiDeleteOrder)
+			tuzhi.POST("/checkin-work", handler.TuZhiCheckInWork)
+			tuzhi.POST("/checkout-work", handler.TuZhiCheckOutWork)
+			tuzhi.POST("/sync", handler.TuZhiSyncOrders)
 		}
 
 		// Appui打卡
@@ -396,6 +419,8 @@ func main() {
 			ydsj.GET("/orders", handler.YDSJOrderList)
 			ydsj.POST("/add", handler.YDSJAddOrder)
 			ydsj.POST("/refund", handler.YDSJRefundOrder)
+			ydsj.POST("/edit-remarks", handler.YDSJEditRemarks)
+			ydsj.POST("/sync-order", handler.YDSJSyncOrder)
 			ydsj.POST("/toggle-run", handler.YDSJToggleRun)
 		}
 
@@ -558,6 +583,8 @@ func main() {
 			admin.POST("/class/batch-delete", handler.AdminClassBatchDelete)
 			admin.POST("/class/batch-category", handler.AdminClassBatchCategory)
 			admin.POST("/class/batch-price", handler.AdminClassBatchPrice)
+			admin.POST("/class/batch-replace-keyword", handler.AdminClassBatchReplaceKeyword)
+			admin.POST("/class/batch-add-prefix", handler.AdminClassBatchAddPrefix)
 			admin.GET("/suppliers", handler.AdminSupplierList)
 			admin.POST("/supplier/save", handler.AdminSupplierSave)
 			admin.POST("/supplier/delete", handler.AdminSupplierDelete)
@@ -633,6 +660,7 @@ func main() {
 			admin.DELETE("/platform-config/:pt", handler.AdminPlatformConfigDelete)
 			admin.POST("/platform-config/parse-php", handler.AdminParsePHPCode)
 			admin.POST("/platform-config/detect", handler.AdminDetectPlatform)
+			admin.POST("/platform-config/auto-detect-save", handler.AdminAutoDetectSave)
 			// 商品同步监控
 			admin.GET("/sync/config", handler.SyncGetConfig)
 			admin.POST("/sync/config", handler.SyncSaveConfig)
@@ -672,6 +700,13 @@ func main() {
 			admin.POST("/yfdk/projects/sync", handler.YFDKAdminProjectSync)
 			admin.PUT("/yfdk/projects", handler.YFDKAdminProjectUpdate)
 			admin.DELETE("/yfdk/projects/:id", handler.YFDKAdminProjectDelete)
+
+			// 凸知打卡配置
+			admin.GET("/tuzhi/config", handler.TuZhiConfigGet)
+			admin.POST("/tuzhi/config", handler.TuZhiConfigSave)
+			admin.GET("/tuzhi/goods", handler.TuZhiAdminGetGoods)
+			admin.GET("/tuzhi/goods-overrides", handler.TuZhiGoodsOverridesGet)
+			admin.POST("/tuzhi/goods-overrides", handler.TuZhiGoodsOverridesSave)
 
 			// 泰山打卡配置
 			admin.GET("/sxdk/config", handler.SXDKConfigGet)
@@ -769,6 +804,7 @@ func main() {
 			// 扩展菜单管理
 			admin.GET("/ext-menus", handler.AdminExtMenuList)
 			admin.POST("/ext-menu/save", handler.AdminExtMenuSave)
+			admin.POST("/ext-menu/reorder", handler.AdminExtMenuReorder)
 			admin.DELETE("/ext-menu/:id", handler.AdminExtMenuDelete)
 
 			// 演示模式

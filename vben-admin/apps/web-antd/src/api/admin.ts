@@ -194,6 +194,16 @@ export async function batchPriceClassApi(cids: number[], rate: number, yunsuan: 
   return requestClient.post('/admin/class/batch-price', { cids, rate, yunsuan });
 }
 
+/** 批量替换课程名称关键词 */
+export async function batchReplaceKeywordApi(search: string, replace: string, scope: string, scopeId: string) {
+  return requestClient.post('/admin/class/batch-replace-keyword', { search, replace, scope, scope_id: scopeId });
+}
+
+/** 批量为课程名称添加前缀 */
+export async function batchAddPrefixApi(prefix: string, scope: string, scopeId: string) {
+  return requestClient.post('/admin/class/batch-add-prefix', { prefix, scope, scope_id: scopeId });
+}
+
 // ===== 货源管理 =====
 export interface SupplierItem {
   hid: number;

@@ -179,7 +179,7 @@ func (s *TuboshuService) EnsureTable() {
 			},
 		}
 		data, _ := json.Marshal(defaultCfg)
-		database.DB.Exec("INSERT INTO qingka_wangke_config (skey, svalue) VALUES ('tuboshu_config', ?)", string(data))
+		database.DB.Exec("INSERT INTO qingka_wangke_config (v, k, skey, svalue) VALUES ('tuboshu_config', '', 'tuboshu_config', ?)", string(data))
 	}
 }
 
@@ -262,7 +262,7 @@ func (s *TuboshuService) SaveConfig(cfg *TuboshuConfig) error {
 		_, err := database.DB.Exec("UPDATE qingka_wangke_config SET svalue = ? WHERE skey = 'tuboshu_config'", string(data))
 		return err
 	}
-	_, err := database.DB.Exec("INSERT INTO qingka_wangke_config (skey, svalue) VALUES ('tuboshu_config', ?)", string(data))
+	_, err := database.DB.Exec("INSERT INTO qingka_wangke_config (v, k, skey, svalue) VALUES ('tuboshu_config', '', 'tuboshu_config', ?)", string(data))
 	return err
 }
 

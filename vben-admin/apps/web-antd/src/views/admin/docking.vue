@@ -8,10 +8,12 @@ import {
 import {
   SearchOutlined, ReloadOutlined, CloudDownloadOutlined,
   PlusOutlined, WarningOutlined, ThunderboltOutlined, UploadOutlined,
+  SwapOutlined, TagOutlined,
 } from '@ant-design/icons-vue';
 import {
   getSupplierListApi, getSupplierProductsApi, addClassApi,
-  importSupplierApi, syncSupplierStatusApi, getCategoryListApi,
+  importSupplierApi, syncSupplierStatusApi, getCategoryListApi, saveCategoryApi,
+  batchReplaceKeywordApi, batchAddPrefixApi,
   type SupplierItem, type SupplierProductItem, type CategoryItem,
 } from '#/api/admin';
 
@@ -251,6 +253,59 @@ async function submitBatch() {
   selectedKeys.value = [];
   message.success(`批量上架完成：成功 ${ok} 个，失败 ${fail} 个`);
   if (fail === 0) batchVisible.value = false;
+}
+
+// ===== 新建分类 =====
+const newCatName = ref('');
+const newCatLoading = ref(false);
+
+async function quickCreateCategory() {
+  const name = newCatName.value.trim();
+  if (!name) { message.warning('请输入分类名称'); return; }
+  newCatLoading.value = true;
+  try {
+    await saveCategoryApi({ name, status: '1', sort: 0 });
+    message.success(`分类「${name}」创建成功`);
+    newCatName.value = '';
+    // 重新加载分类并自动选中新建的
+    const [, cRaw] = await Promise.all([Promise.resolve(), getCategoryListApi()]);
+    categories.value = cRaw;
+    if (!Array.isArray(categories.value)) categories.value = [];
+    const created = categories.value.find(c => c.name === name);
+    if (created) {
+      batchForm.fenlei = String(created.id);
+      addForm.fenlei = String(created.id);
+    }
+  } catch (e: any) { message.error(e?.message || '创建失败'); }
+  finally { newCatLoading.value = false; }
+}
+
+// ===== 批量替换关键词 =====
+const replaceForm = reactive({ search: '', replace: '', scope: 'all', scopeId: '' });
+const replaceLoading = ref(false);
+
+async function submitReplace() {
+  if (!replaceForm.search.trim()) { message.warning('请输入要替换的关键词'); return; }
+  replaceLoading.value = true;
+  try {
+    const res = await batchReplaceKeywordApi(replaceForm.search, replaceForm.replace, replaceForm.scope, replaceForm.scopeId);
+    message.success((res as any).msg || '替换成功');
+  } catch (e: any) { message.error(e?.message || '替换失败'); }
+  finally { replaceLoading.value = false; }
+}
+
+// ===== 批量添加前缀 =====
+const prefixForm = reactive({ prefix: '', scope: 'all', scopeId: '' });
+const prefixLoading = ref(false);
+
+async function submitPrefix() {
+  if (!prefixForm.prefix.trim()) { message.warning('请输入要添加的前缀'); return; }
+  prefixLoading.value = true;
+  try {
+    const res = await batchAddPrefixApi(prefixForm.prefix, prefixForm.scope, prefixForm.scopeId);
+    message.success((res as any).msg || '添加前缀成功');
+  } catch (e: any) { message.error(e?.message || '添加前缀失败'); }
+  finally { prefixLoading.value = false; }
 }
 
 // 全选所有结果
@@ -531,6 +586,80 @@ onMounted(loadBase);
       </div>
     </Modal>
 
+    <!-- 批量替换关键词 -->
+    <Card class="mb-4">
+      <template #title>
+        <Space><SwapOutlined /> 批量对关键词进行替换</Space>
+      </template>
+      <div class="flex flex-wrap gap-3 items-end">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">要替换的关键词</label>
+          <Input v-model:value="replaceForm.search" placeholder="请输入要替换的关键词" style="width: 180px" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">替换后的关键词</label>
+          <Input v-model:value="replaceForm.replace" placeholder="留空则删除关键词" style="width: 180px" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">范围</label>
+          <Select v-model:value="replaceForm.scope" style="width: 150px" @change="replaceForm.scopeId = ''">
+            <SelectOption value="all">对所有范围执行</SelectOption>
+            <SelectOption value="cate">按分类</SelectOption>
+            <SelectOption value="docking">按对接平台ID</SelectOption>
+          </Select>
+        </div>
+        <div v-if="replaceForm.scope === 'cate'">
+          <label class="block text-xs text-gray-500 mb-1">分类</label>
+          <Select v-model:value="replaceForm.scopeId" placeholder="选择分类" allow-clear show-search option-filter-prop="label" style="width: 160px">
+            <SelectOption v-for="c in categories" :key="c.id" :value="String(c.id)" :label="c.name">{{ c.name }}</SelectOption>
+          </Select>
+        </div>
+        <div v-if="replaceForm.scope === 'docking'">
+          <label class="block text-xs text-gray-500 mb-1">对接平台ID</label>
+          <Input v-model:value="replaceForm.scopeId" placeholder="请输入ID" style="width: 150px" />
+        </div>
+        <Button type="primary" :loading="replaceLoading" @click="submitReplace" style="background: #722ed1; border-color: #722ed1">
+          <template #icon><SwapOutlined /></template>
+          更新关键词
+        </Button>
+      </div>
+    </Card>
+
+    <!-- 批量添加前缀 -->
+    <Card class="mb-4">
+      <template #title>
+        <Space><TagOutlined /> 批量对商品添加前缀</Space>
+      </template>
+      <div class="flex flex-wrap gap-3 items-end">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">要新增的前缀</label>
+          <Input v-model:value="prefixForm.prefix" placeholder="请输入要新增的前缀" style="width: 180px" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">范围</label>
+          <Select v-model:value="prefixForm.scope" style="width: 150px" @change="prefixForm.scopeId = ''">
+            <SelectOption value="all">对所有范围执行</SelectOption>
+            <SelectOption value="cate">按分类</SelectOption>
+            <SelectOption value="docking">按对接平台ID</SelectOption>
+          </Select>
+        </div>
+        <div v-if="prefixForm.scope === 'cate'">
+          <label class="block text-xs text-gray-500 mb-1">分类</label>
+          <Select v-model:value="prefixForm.scopeId" placeholder="选择分类" allow-clear show-search option-filter-prop="label" style="width: 160px">
+            <SelectOption v-for="c in categories" :key="c.id" :value="String(c.id)" :label="c.name">{{ c.name }}</SelectOption>
+          </Select>
+        </div>
+        <div v-if="prefixForm.scope === 'docking'">
+          <label class="block text-xs text-gray-500 mb-1">对接平台ID</label>
+          <Input v-model:value="prefixForm.scopeId" placeholder="请输入ID" style="width: 150px" />
+        </div>
+        <Button type="primary" :loading="prefixLoading" @click="submitPrefix" style="background: #13c2c2; border-color: #13c2c2">
+          <template #icon><TagOutlined /></template>
+          添加前缀
+        </Button>
+      </div>
+    </Card>
+
     <!-- 批量上架弹窗 -->
     <Modal v-model:open="batchVisible" title="批量上架" :closable="!batchRunning" :maskClosable="!batchRunning" :footer="null" width="560px">
       <div class="mb-3 text-sm text-gray-500">
@@ -551,19 +680,26 @@ onMounted(loadBase);
           </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
-          <div>
+          <div class="col-span-2">
             <label class="block text-sm font-medium mb-1">分类</label>
-            <Select
-              v-model:value="batchForm.fenlei"
-              placeholder="选择分类"
-              allow-clear
-              show-search
-              option-filter-prop="label"
-              style="width: 100%"
-            >
-              <SelectOption value="" label="无">无</SelectOption>
-              <SelectOption v-for="c in categories" :key="c.id" :value="String(c.id)" :label="c.name">{{ c.name }}</SelectOption>
-            </Select>
+            <div class="flex gap-2">
+              <Select
+                v-model:value="batchForm.fenlei"
+                placeholder="选择分类"
+                allow-clear
+                show-search
+                option-filter-prop="label"
+                style="flex: 1"
+              >
+                <SelectOption value="" label="无">无</SelectOption>
+                <SelectOption v-for="c in categories" :key="c.id" :value="String(c.id)" :label="c.name">{{ c.name }}</SelectOption>
+              </Select>
+              <Input v-model:value="newCatName" placeholder="新分类名称" style="width: 120px" />
+              <Button type="primary" :loading="newCatLoading" @click="quickCreateCategory">
+                <template #icon><PlusOutlined /></template>
+                新建
+              </Button>
+            </div>
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">跳过已添加</label>

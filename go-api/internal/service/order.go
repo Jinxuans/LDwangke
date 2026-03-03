@@ -289,6 +289,18 @@ func (s *OrderService) AddOrders(uid int, req model.OrderAddRequest) (*model.Ord
 		}
 	}
 
+	// 应用质押折扣：查用户是否有该课程分类的生效质押
+	var pledgeDiscount float64
+	err = database.DB.QueryRow(`
+		SELECT c.discount_rate FROM qingka_wangke_zhiya_records r
+		JOIN qingka_wangke_zhiya_config c ON r.config_id = c.id
+		JOIN qingka_wangke_class cl ON cl.cid = ?
+		WHERE r.uid = ? AND r.status = 1 AND c.status = 1 AND c.category_id = cl.fenlei
+		ORDER BY c.discount_rate ASC LIMIT 1`, req.CID, uid).Scan(&pledgeDiscount)
+	if err == nil && pledgeDiscount > 0 && pledgeDiscount < 1 {
+		unitPrice = math.Round(unitPrice*pledgeDiscount*10000) / 10000
+	}
+
 	if unitPrice == 0 || addprice < 0.1 {
 		return nil, errors.New("价格异常，请联系管理员")
 	}
@@ -969,6 +981,18 @@ func (s *OrderService) AddOrdersForMall(bUID, tid, cUID int, retailPrice float64
 	}
 	if supplyPrice <= 0 {
 		return nil, errors.New("供货价异常，请联系平台")
+	}
+
+	// 应用质押折扣：查B端用户是否有该课程分类的生效质押
+	var pledgeDiscount float64
+	err = database.DB.QueryRow(`
+		SELECT c.discount_rate FROM qingka_wangke_zhiya_records r
+		JOIN qingka_wangke_zhiya_config c ON r.config_id = c.id
+		JOIN qingka_wangke_class cl ON cl.cid = ?
+		WHERE r.uid = ? AND r.status = 1 AND c.status = 1 AND c.category_id = cl.fenlei
+		ORDER BY c.discount_rate ASC LIMIT 1`, req.CID, bUID).Scan(&pledgeDiscount)
+	if err == nil && pledgeDiscount > 0 && pledgeDiscount < 1 {
+		supplyPrice = math.Round(supplyPrice*pledgeDiscount*10000) / 10000
 	}
 
 	tx, err := database.DB.Begin()

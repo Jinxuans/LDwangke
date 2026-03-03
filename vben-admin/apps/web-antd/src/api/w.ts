@@ -65,3 +65,8 @@ export async function wSyncOrderApi(wOrderId: number) {
 export async function wResumeOrderApi(wOrderId: number) {
   return requestClient.get(`/w/resume?w_order_id=${wOrderId}`);
 }
+
+// 通用代理（转发到上游，如查询跑区等）
+export async function wProxyActionApi(appId: number, act: string, data?: Record<string, any>) {
+  return requestClient.post('/w/proxy', { app_id: appId, act, data: data || {} });
+}

@@ -21,24 +21,25 @@ func StartYDSJCron() {
 	go ydsjCronOrderRefund() // cron_order_refund.php — 同步退款状态
 }
 
-// ydsjUpstreamQuery 调用上游查询订单接口（新API: POST /order/getOrderInfo）
+// ydsjUpstreamQuery 调用上游查询订单接口（LearnExp: POST /ydsj/api.php?act=orders）
 func ydsjUpstreamQuery(cfg *YDSJConfig, user string, runType int) ([]map[string]interface{}, error) {
 	svc := NewYDSJService()
-	body := map[string]interface{}{
-		"page":    1,
-		"size":    10,
-		"xh":      user,
-		"runType": runType,
-		"status":  "",
-		"school":  "",
+	params := map[string]string{
+		"type":     "2",
+		"keywords": user,
+		"run_type": fmt.Sprintf("%d", runType),
 	}
-	respBody, err := svc.ydsjRequestWithCfg(cfg, "POST", "/order/getOrderInfo", body)
+	respBody, err := svc.ydsjRequestWithCfg(cfg, "orders", params)
 	if err != nil {
 		return nil, err
 	}
 	var result map[string]interface{}
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, err
+	}
+	code := mapGetFloat(result, "code")
+	if code != 1 {
+		return nil, fmt.Errorf("上游返回错误: %s", mapGetString(result, "msg"))
 	}
 	dataRaw, ok := result["data"].([]interface{})
 	if !ok || len(dataRaw) == 0 {
@@ -89,11 +90,11 @@ func ydsjCronOrderStatus() {
 
 			svc := NewYDSJService()
 			cfg, err := svc.GetConfig()
-			if err != nil || cfg.BaseURL == "" || cfg.Token == "" {
+			if err != nil || !ydsjIsConfigured(cfg) {
 				return
 			}
 
-			rows, err := database.DB.Query("SELECT id, uid, user, pass, fees, run_type, yid FROM qingka_wangke_hzw_ydsj WHERE status = 1 ORDER BY id ASC")
+			rows, err := database.DB.Query("SELECT id, uid, `user`, pass, fees, run_type, yid FROM qingka_wangke_hzw_ydsj WHERE status = 1 ORDER BY id ASC")
 			if err != nil {
 				log.Printf("[YDSJ-cron-status] 查询失败: %v", err)
 				return
@@ -205,11 +206,11 @@ func ydsjCronOrderYID() {
 
 			svc := NewYDSJService()
 			cfg, err := svc.GetConfig()
-			if err != nil || cfg.BaseURL == "" || cfg.Token == "" {
+			if err != nil || !ydsjIsConfigured(cfg) {
 				return
 			}
 
-			rows, err := database.DB.Query("SELECT id, user, run_type FROM qingka_wangke_hzw_ydsj WHERE yid = ''")
+			rows, err := database.DB.Query("SELECT id, `user`, run_type FROM qingka_wangke_hzw_ydsj WHERE yid = ''")
 			if err != nil {
 				return
 			}
@@ -266,7 +267,7 @@ func ydsjCronOrderInfo() {
 
 			svc := NewYDSJService()
 			cfg, err := svc.GetConfig()
-			if err != nil || cfg.BaseURL == "" || cfg.Token == "" {
+			if err != nil || !ydsjIsConfigured(cfg) {
 				time.Sleep(time.Minute)
 				return
 			}
@@ -280,7 +281,7 @@ func ydsjCronOrderInfo() {
 			var id int
 			var yid, user string
 			var runType int
-			err = database.DB.QueryRow("SELECT id, yid, user, run_type FROM qingka_wangke_hzw_ydsj WHERE yid = ? LIMIT 1", orderID).
+			err = database.DB.QueryRow("SELECT id, yid, `user`, run_type FROM qingka_wangke_hzw_ydsj WHERE yid = ? LIMIT 1", orderID).
 				Scan(&id, &yid, &user, &runType)
 			if err != nil || user == "" || yid == "" {
 				time.Sleep(time.Second)
@@ -335,11 +336,11 @@ func ydsjCronOrderRefund() {
 
 			svc := NewYDSJService()
 			cfg, err := svc.GetConfig()
-			if err != nil || cfg.BaseURL == "" || cfg.Token == "" {
+			if err != nil || !ydsjIsConfigured(cfg) {
 				return
 			}
 
-			rows, err := database.DB.Query("SELECT id, uid, yid, user, run_type, fees FROM qingka_wangke_hzw_ydsj WHERE status = 5")
+			rows, err := database.DB.Query("SELECT id, uid, yid, `user`, run_type, fees FROM qingka_wangke_hzw_ydsj WHERE status = 5")
 			if err != nil {
 				return
 			}

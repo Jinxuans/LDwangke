@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bytes"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -21,10 +21,10 @@ var ydsjSchoolsJSON []byte
 // ---------- 数据结构 ----------
 
 type YDSJConfig struct {
-	BaseURL          string  `json:"base_url"`           // 上游API地址 如 http://103.149.27.248:5000
-	Token            string  `json:"token"`              // 上游 Bearer Token
-	UID              string  `json:"uid"`                // (旧字段，保留兼容)
-	Key              string  `json:"key"`                // (旧字段，保留兼容)
+	BaseURL          string  `json:"base_url"`           // 上游API地址 如 http://103.236.75.71:7799/LearnExp
+	UID              string  `json:"uid"`                // 对接站用户UID
+	Key              string  `json:"key"`                // 对接站密钥
+	Token            string  `json:"token"`              // (旧字段，保留兼容)
 	PriceMultiple    float64 `json:"price_multiple"`     // 运动世界价格倍率
 	XbdMorningPrice  float64 `json:"xbd_morning_price"`  // 小步点晨跑价格
 	XbdExercisePrice float64 `json:"xbd_exercise_price"` // 小步点课外跑价格
@@ -124,32 +124,39 @@ func (s *YDSJService) EnsureTable() {
 
 // ---------- 上游 HTTP 工具 ----------
 
-// ydsjRequest 向上游发起带 Bearer Token 的请求
-func (s *YDSJService) ydsjRequest(method, urlPath string, body interface{}) ([]byte, error) {
-	cfg, err := s.GetConfig()
-	if err != nil || cfg.BaseURL == "" || cfg.Token == "" {
-		return nil, fmt.Errorf("运动世界未配置上游接口或Token")
-	}
-	return s.ydsjRequestWithCfg(cfg, method, urlPath, body)
+// ydsjIsConfigured 检查上游是否已配置
+func ydsjIsConfigured(cfg *YDSJConfig) bool {
+	return cfg.BaseURL != "" && cfg.UID != "" && cfg.Key != ""
 }
 
-func (s *YDSJService) ydsjRequestWithCfg(cfg *YDSJConfig, method, urlPath string, body interface{}) ([]byte, error) {
-	var reqBody io.Reader
-	if body != nil {
-		data, _ := json.Marshal(body)
-		reqBody = bytes.NewReader(data)
+// ydsjRequest 向上游发起带 uid/key 认证的表单请求
+func (s *YDSJService) ydsjRequest(act string, params map[string]string) ([]byte, error) {
+	cfg, err := s.GetConfig()
+	if err != nil || !ydsjIsConfigured(cfg) {
+		return nil, fmt.Errorf("运动世界未配置上游接口")
+	}
+	return s.ydsjRequestWithCfg(cfg, act, params)
+}
+
+func (s *YDSJService) ydsjRequestWithCfg(cfg *YDSJConfig, act string, params map[string]string) ([]byte, error) {
+	if params == nil {
+		params = map[string]string{}
+	}
+	params["login_uid"] = cfg.UID
+	params["login_key"] = cfg.Key
+
+	apiURL := strings.TrimRight(cfg.BaseURL, "/") + "/ydsj/api.php?act=" + url.QueryEscape(act)
+
+	form := url.Values{}
+	for k, v := range params {
+		form.Set(k, v)
 	}
 
-	fullURL := strings.TrimRight(cfg.BaseURL, "/") + urlPath
-	req, err := http.NewRequest(method, fullURL, reqBody)
+	req, err := http.NewRequest("POST", apiURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -168,12 +175,22 @@ func (s *YDSJService) GetSchools() ([]map[string]interface{}, error) {
 	}
 
 	// 优先从上游 API 获取
-	if cfg.BaseURL != "" && cfg.Token != "" {
-		respBody, err := s.ydsjRequestWithCfg(cfg, "GET", "/user/getSchool", nil)
+	if ydsjIsConfigured(cfg) {
+		respBody, err := s.ydsjRequestWithCfg(cfg, "get_school", nil)
 		if err == nil {
-			var schools []map[string]interface{}
-			if json.Unmarshal(respBody, &schools) == nil && len(schools) > 0 {
-				return schools, nil
+			var result map[string]interface{}
+			if json.Unmarshal(respBody, &result) == nil {
+				if dataRaw, ok := result["data"].([]interface{}); ok && len(dataRaw) > 0 {
+					var schools []map[string]interface{}
+					for _, d := range dataRaw {
+						if m, ok := d.(map[string]interface{}); ok {
+							schools = append(schools, m)
+						}
+					}
+					if len(schools) > 0 {
+						return schools, nil
+					}
+				}
 			}
 		} else {
 			log.Printf("[YDSJ] 上游学校列表请求失败: %v，回退本地", err)
@@ -206,7 +223,7 @@ func (s *YDSJService) GetConfig() (*YDSJConfig, error) {
 func (s *YDSJService) SaveConfig(cfg *YDSJConfig) error {
 	data, _ := json.Marshal(cfg)
 	_, err := database.DB.Exec(
-		"INSERT INTO qingka_wangke_config (skey, svalue) VALUES ('ydsj_config', ?) ON DUPLICATE KEY UPDATE svalue = ?",
+		"INSERT INTO qingka_wangke_config (v, k, skey, svalue) VALUES ('ydsj_config', '', 'ydsj_config', ?) ON DUPLICATE KEY UPDATE svalue = ?",
 		string(data), string(data),
 	)
 	return err
@@ -221,7 +238,7 @@ func (s *YDSJService) GetPrice(uid int, runType int, distance float64) (float64,
 		return 0, err
 	}
 	var rate float64 = 1.0
-	database.DB.QueryRow("SELECT rate FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&rate)
+	database.DB.QueryRow("SELECT addprice FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&rate)
 	if rate <= 0 {
 		rate = 1.0
 	}
@@ -259,7 +276,7 @@ func (s *YDSJService) ListOrders(uid int, isAdmin bool, page, limit int, searchT
 			where += " AND id = ?"
 			args = append(args, keyword)
 		case "2":
-			where += " AND user LIKE ?"
+			where += " AND `user` LIKE ?"
 			args = append(args, "%"+keyword+"%")
 		case "3":
 			where += " AND pass LIKE ?"
@@ -281,11 +298,12 @@ func (s *YDSJService) ListOrders(uid int, isAdmin bool, page, limit int, searchT
 	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_hzw_ydsj "+where, args...).Scan(&total)
 
 	offset := (page - 1) * limit
-	query := "SELECT id, yid, uid, school, user, pass, distance, is_run, run_type, start_hour, start_minute, end_hour, end_minute, run_week, status, remarks, COALESCE(info,''), COALESCE(tmp_info,''), fees, COALESCE(real_fees,''), COALESCE(refund_money,''), addtime FROM qingka_wangke_hzw_ydsj " + where + " ORDER BY id DESC LIMIT ? OFFSET ?"
+	query := "SELECT id, yid, uid, school, `user`, pass, distance, is_run, run_type, start_hour, start_minute, end_hour, end_minute, run_week, status, remarks, COALESCE(info,''), COALESCE(tmp_info,''), fees, COALESCE(real_fees,''), COALESCE(refund_money,''), addtime FROM qingka_wangke_hzw_ydsj " + where + " ORDER BY id DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
 
 	rows, err := database.DB.Query(query, args...)
 	if err != nil {
+		log.Printf("[YDSJ] ListOrders 查询失败: %v | SQL: %s | args: %v", err, query, args)
 		return nil, 0, err
 	}
 	defer rows.Close()
@@ -325,8 +343,8 @@ func weekNumToNames(runWeek string) []string {
 
 func (s *YDSJService) AddOrder(uid int, form map[string]interface{}) (string, error) {
 	cfg, err := s.GetConfig()
-	if err != nil || cfg.BaseURL == "" || cfg.Token == "" {
-		return "", fmt.Errorf("运动世界未配置上游接口或Token")
+	if err != nil || !ydsjIsConfigured(cfg) {
+		return "", fmt.Errorf("运动世界未配置上游接口")
 	}
 
 	school := mapGetString(form, "school")
@@ -362,23 +380,22 @@ func (s *YDSJService) AddOrder(uid int, form map[string]interface{}) (string, er
 		school = "自动识别"
 	}
 
-	// 上游下单（新API格式）
-	upstreamBody := map[string]interface{}{
-		"xh":          user,
-		"password":    pass,
-		"schoolName":  school,
-		"when":        weekNumToNames(runWeek),
-		"km":          distance,
-		"startHour":   startHour,
-		"startMinute": startMinute,
-		"endHour":     endHour,
-		"endMinute":   endMinute,
-		"bz":          "",
-		"runType":     runType,
-		"reservation": 0,
+	// 上游下单（LearnExp uid/key 格式）
+	upstreamParams := map[string]string{
+		"school":       school,
+		"user":         user,
+		"pass":         pass,
+		"distance":     distance,
+		"run_type":     fmt.Sprintf("%d", runType),
+		"start_hour":   startHour,
+		"start_minute": startMinute,
+		"end_hour":     endHour,
+		"end_minute":   endMinute,
+		"run_week":     runWeek,
+		"remarks":      "",
 	}
 
-	respBody, err := s.ydsjRequestWithCfg(cfg, "POST", "/order/submitOrder", upstreamBody)
+	respBody, err := s.ydsjRequestWithCfg(cfg, "add_order", upstreamParams)
 	if err != nil {
 		return "", fmt.Errorf("上游请求失败: %v", err)
 	}
@@ -386,9 +403,9 @@ func (s *YDSJService) AddOrder(uid int, form map[string]interface{}) (string, er
 	var result map[string]interface{}
 	json.Unmarshal(respBody, &result)
 
-	success, _ := result["success"].(bool)
+	code := mapGetFloat(result, "code")
 	msg := mapGetString(result, "msg")
-	if !success {
+	if code != 1 {
 		if msg == "" {
 			msg = "上游下单失败"
 		}
@@ -398,7 +415,7 @@ func (s *YDSJService) AddOrder(uid int, form map[string]interface{}) (string, er
 	// 从上游响应中提取订单ID
 	yid := ""
 	if data, ok := result["data"].(map[string]interface{}); ok {
-		if oid, ok := data["orderid"]; ok {
+		if oid, ok := data["yid"]; ok {
 			yid = fmt.Sprintf("%v", oid)
 		}
 	}
@@ -409,7 +426,7 @@ func (s *YDSJService) AddOrder(uid int, form map[string]interface{}) (string, er
 	// 插入订单
 	now := time.Now().Format("2006-01-02 15:04:05")
 	_, err = database.DB.Exec(
-		"INSERT INTO qingka_wangke_hzw_ydsj (yid, uid, school, user, pass, distance, is_run, run_type, start_hour, start_minute, end_hour, end_minute, run_week, status, remarks, info, tmp_info, fees, real_fees, refund_money, addtime) VALUES (?,?,?,?,?,?,1,?,?,?,?,?,?,1,'','','',?,'','',?)",
+		"INSERT INTO qingka_wangke_hzw_ydsj (yid, uid, school, `user`, pass, distance, is_run, run_type, start_hour, start_minute, end_hour, end_minute, run_week, status, remarks, info, tmp_info, fees, real_fees, refund_money, addtime) VALUES (?,?,?,?,?,?,1,?,?,?,?,?,?,1,'','','',?,'','',?)",
 		yid, uid, school, user, pass, distance, runType, startHour, startMinute, endHour, endMinute, runWeek, fmt.Sprintf("%.2f", totalFee), now,
 	)
 	if err != nil {
@@ -428,7 +445,7 @@ func (s *YDSJService) AddOrder(uid int, form map[string]interface{}) (string, er
 
 func (s *YDSJService) RefundOrder(uid, id int, isAdmin bool) (string, error) {
 	var order YDSJOrder
-	err := database.DB.QueryRow("SELECT id, uid, user, fees, status FROM qingka_wangke_hzw_ydsj WHERE id = ?", id).
+	err := database.DB.QueryRow("SELECT id, uid, `user`, fees, status FROM qingka_wangke_hzw_ydsj WHERE id = ?", id).
 		Scan(&order.ID, &order.UID, &order.User, &order.Fees, &order.Status)
 	if err != nil {
 		return "", fmt.Errorf("订单不存在")
@@ -456,11 +473,85 @@ func (s *YDSJService) RefundOrder(uid, id int, isAdmin bool) (string, error) {
 	return fmt.Sprintf("退款成功，退还 %.2f 元", refund), nil
 }
 
+// ---------- 修改备注 ----------
+
+func (s *YDSJService) EditRemarks(uid, id int, remarks string, isAdmin bool) (string, error) {
+	var orderUID int
+	err := database.DB.QueryRow("SELECT uid FROM qingka_wangke_hzw_ydsj WHERE id = ?", id).Scan(&orderUID)
+	if err != nil {
+		return "", fmt.Errorf("订单不存在")
+	}
+	if !isAdmin && orderUID != uid {
+		return "", fmt.Errorf("无权操作")
+	}
+	_, err = database.DB.Exec("UPDATE qingka_wangke_hzw_ydsj SET remarks = ? WHERE id = ?", remarks, id)
+	if err != nil {
+		return "", fmt.Errorf("修改失败")
+	}
+	return "备注修改成功", nil
+}
+
+// ---------- 手动同步单个订单 ----------
+
+func (s *YDSJService) SyncOrder(uid, id int, isAdmin bool) (map[string]interface{}, error) {
+	var orderUID int
+	var yid, user string
+	var runType, status int
+	err := database.DB.QueryRow("SELECT uid, yid, `user`, run_type, status FROM qingka_wangke_hzw_ydsj WHERE id = ?", id).
+		Scan(&orderUID, &yid, &user, &runType, &status)
+	if err != nil {
+		return nil, fmt.Errorf("订单不存在")
+	}
+	if !isAdmin && orderUID != uid {
+		return nil, fmt.Errorf("无权操作")
+	}
+	if yid == "" {
+		return nil, fmt.Errorf("该订单尚未提交到上游，无法同步")
+	}
+
+	cfg, err := s.GetConfig()
+	if err != nil || !ydsjIsConfigured(cfg) {
+		return nil, fmt.Errorf("运动世界未配置上游接口")
+	}
+
+	items, err := ydsjUpstreamQuery(cfg, user, runType)
+	if err != nil || len(items) == 0 {
+		return nil, fmt.Errorf("上游查询失败或无数据")
+	}
+
+	// 通过 orderid 匹配 yid
+	var matched map[string]interface{}
+	for _, item := range items {
+		oid := fmt.Sprintf("%v", item["orderid"])
+		if oid == yid {
+			matched = item
+			break
+		}
+	}
+	if matched == nil {
+		return nil, fmt.Errorf("上游未找到匹配订单")
+	}
+
+	statusStr := mapGetString(matched, "status")
+	newStatus := ydsjMapUpstreamStatus(statusStr)
+	remarks := mapGetString(matched, "bz")
+
+	database.DB.Exec("UPDATE qingka_wangke_hzw_ydsj SET status = ?, remarks = ? WHERE id = ?", newStatus, remarks, id)
+
+	return map[string]interface{}{
+		"id":         id,
+		"status":     newStatus,
+		"status_str": statusStr,
+		"remarks":    remarks,
+	}, nil
+}
+
 // ---------- 切换跑步状态 ----------
 
 func (s *YDSJService) ToggleRun(uid, id int, isAdmin bool) (string, error) {
 	var orderUID, isRun int
 	err := database.DB.QueryRow("SELECT uid, is_run FROM qingka_wangke_hzw_ydsj WHERE id = ?", id).Scan(&orderUID, &isRun)
+	log.Printf("[YDSJ] ToggleRun id=%d uid=%d is_run=%d err=%v", id, orderUID, isRun, err)
 	if err != nil {
 		return "", fmt.Errorf("订单不存在")
 	}

@@ -227,10 +227,11 @@ func yyyGetClasses(sup *model.SupplierFull) ([]SupplierClassItem, error) {
 			}
 		}
 		classes = append(classes, SupplierClassItem{
-			CID:     fmt.Sprintf("%d", item.ID),
-			Name:    item.Name,
-			Price:   price,
-			Content: item.Trans,
+			CID:          fmt.Sprintf("%d", item.ID),
+			Name:         item.Name,
+			Price:        price,
+			Content:      item.Trans,
+			CategoryName: sup.Name,
 		})
 	}
 

@@ -7,11 +7,12 @@ import {
 } from 'ant-design-vue';
 import {
   PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, DownOutlined,
+  SwapOutlined, TagOutlined,
 } from '@ant-design/icons-vue';
 import {
   getCategoryListApi, saveCategoryApi, deleteCategoryApi,
   getClassManageListApi, saveClassApi, toggleClassStatusApi, batchDeleteClassApi,
-  batchCategoryClassApi, batchPriceClassApi,
+  batchCategoryClassApi, batchPriceClassApi, batchReplaceKeywordApi, batchAddPrefixApi,
   getSupplierListApi,
   type CategoryItem, type ClassItem, type SupplierItem,
 } from '#/api/admin';
@@ -191,6 +192,50 @@ async function doBatchPrice() {
   } catch (e: any) { message.error(e?.message || '修改失败'); }
 }
 
+// ===== 批量替换关键词 =====
+const batchReplaceVisible = ref(false);
+const batchReplaceForm = reactive({ search: '', replace: '', scope: 'all', scopeId: '' });
+const batchReplaceLoading = ref(false);
+
+function handleBatchReplace() {
+  Object.assign(batchReplaceForm, { search: '', replace: '', scope: 'all', scopeId: '' });
+  batchReplaceVisible.value = true;
+}
+
+async function doBatchReplace() {
+  if (!batchReplaceForm.search.trim()) { message.warning('请输入要替换的关键词'); return; }
+  batchReplaceLoading.value = true;
+  try {
+    const res = await batchReplaceKeywordApi(batchReplaceForm.search, batchReplaceForm.replace, batchReplaceForm.scope, batchReplaceForm.scopeId);
+    message.success((res as any).msg || '替换成功');
+    batchReplaceVisible.value = false;
+    loadClasses(classPagination.page);
+  } catch (e: any) { message.error(e?.message || '替换失败'); }
+  finally { batchReplaceLoading.value = false; }
+}
+
+// ===== 批量添加前缀 =====
+const batchPrefixVisible = ref(false);
+const batchPrefixForm = reactive({ prefix: '', scope: 'all', scopeId: '' });
+const batchPrefixLoading = ref(false);
+
+function handleBatchPrefix() {
+  Object.assign(batchPrefixForm, { prefix: '', scope: 'all', scopeId: '' });
+  batchPrefixVisible.value = true;
+}
+
+async function doBatchPrefix() {
+  if (!batchPrefixForm.prefix.trim()) { message.warning('请输入要添加的前缀'); return; }
+  batchPrefixLoading.value = true;
+  try {
+    const res = await batchAddPrefixApi(batchPrefixForm.prefix, batchPrefixForm.scope, batchPrefixForm.scopeId);
+    message.success((res as any).msg || '添加前缀成功');
+    batchPrefixVisible.value = false;
+    loadClasses(classPagination.page);
+  } catch (e: any) { message.error(e?.message || '添加前缀失败'); }
+  finally { batchPrefixLoading.value = false; }
+}
+
 const classColumns = [
   { title: 'CID', dataIndex: 'cid', key: 'cid', width: 70 },
   { title: '课程名称', dataIndex: 'name', key: 'name', ellipsis: true },
@@ -241,6 +286,8 @@ onMounted(() => {
                   <Menu>
                     <MenuItem key="cat" @click="handleBatchCategory">批量改分类</MenuItem>
                     <MenuItem key="price" @click="handleBatchPrice">批量改价格</MenuItem>
+                    <MenuItem key="replace" @click="handleBatchReplace"><SwapOutlined /> 批量替换关键词</MenuItem>
+                    <MenuItem key="prefix" @click="handleBatchPrefix"><TagOutlined /> 批量添加前缀</MenuItem>
                     <MenuItem key="del" danger @click="handleBatchDelete">批量删除</MenuItem>
                   </Menu>
                 </template>
@@ -407,6 +454,54 @@ onMounted(() => {
       <Select v-model:value="batchCatId" placeholder="选择目标分类" show-search option-filter-prop="label" style="width: 100%">
         <SelectOption v-for="c in categories" :key="c.id" :value="c.id" :label="c.name">{{ c.name }}</SelectOption>
       </Select>
+    </Modal>
+
+    <!-- 批量替换关键词弹窗 -->
+    <Modal v-model:open="batchReplaceVisible" title="批量替换关键词" :confirm-loading="batchReplaceLoading" @ok="doBatchReplace" ok-text="确定替换">
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium mb-1">要替换的关键词</label>
+          <Input v-model:value="batchReplaceForm.search" placeholder="请输入要替换的关键词" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">替换后的关键词</label>
+          <Input v-model:value="batchReplaceForm.replace" placeholder="留空则删除关键词" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">执行范围</label>
+          <Select v-model:value="batchReplaceForm.scope" style="width: 100%">
+            <SelectOption value="all">对所有课程执行</SelectOption>
+            <SelectOption value="cate">按分类ID筛选</SelectOption>
+            <SelectOption value="docking">按对接平台ID筛选</SelectOption>
+          </Select>
+        </div>
+        <div v-if="batchReplaceForm.scope !== 'all'">
+          <label class="block text-sm font-medium mb-1">{{ batchReplaceForm.scope === 'cate' ? '分类ID' : '对接平台ID' }}</label>
+          <Input v-model:value="batchReplaceForm.scopeId" placeholder="请输入ID" />
+        </div>
+      </div>
+    </Modal>
+
+    <!-- 批量添加前缀弹窗 -->
+    <Modal v-model:open="batchPrefixVisible" title="批量添加前缀" :confirm-loading="batchPrefixLoading" @ok="doBatchPrefix" ok-text="确定添加">
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium mb-1">要添加的前缀</label>
+          <Input v-model:value="batchPrefixForm.prefix" placeholder="如：（牛逼）" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">执行范围</label>
+          <Select v-model:value="batchPrefixForm.scope" style="width: 100%">
+            <SelectOption value="all">对所有课程执行</SelectOption>
+            <SelectOption value="cate">按分类ID筛选</SelectOption>
+            <SelectOption value="docking">按对接平台ID筛选</SelectOption>
+          </Select>
+        </div>
+        <div v-if="batchPrefixForm.scope !== 'all'">
+          <label class="block text-sm font-medium mb-1">{{ batchPrefixForm.scope === 'cate' ? '分类ID' : '对接平台ID' }}</label>
+          <Input v-model:value="batchPrefixForm.scopeId" placeholder="请输入ID" />
+        </div>
+      </div>
     </Modal>
 
     <!-- 批量修改价格弹窗 -->

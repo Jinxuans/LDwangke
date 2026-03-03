@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"net/url"
@@ -76,7 +77,7 @@ func (s *SDXYService) SaveConfig(cfg *SDXYConfig) error {
 	}
 	data, _ := json.Marshal(cfg)
 	_, err := database.DB.Exec(
-		"INSERT INTO qingka_wangke_config (skey, svalue) VALUES ('sdxy_config', ?) ON DUPLICATE KEY UPDATE svalue = ?",
+		"INSERT INTO qingka_wangke_config (v, k, skey, svalue) VALUES ('sdxy_config', '', 'sdxy_config', ?) ON DUPLICATE KEY UPDATE svalue = ?",
 		string(data), string(data),
 	)
 	return err
@@ -212,6 +213,7 @@ func (s *SDXYService) AddOrder(uid int, form map[string]interface{}) (string, er
 	password := mapGetString(form, "password")
 	distance := mapGetString(form, "dis")
 	zoneId := mapGetString(form, "zone_id")
+	zoneName := mapGetString(form, "zone_name")
 	runType := mapGetString(form, "run_type")
 	studentId := mapGetString(form, "student_id")
 	runRuleId := mapGetString(form, "run_rule_id")
@@ -220,7 +222,8 @@ func (s *SDXYService) AddOrder(uid int, form map[string]interface{}) (string, er
 	if phone == "" {
 		return "", fmt.Errorf("手机号不能为空")
 	}
-	if distance == "" || zoneId == "" || runType == "" || studentId == "" || runRuleId == "" {
+	if distance == "" || (zoneId == "" && zoneName == "") || runType == "" || studentId == "" || runRuleId == "" {
+		log.Printf("[SDXY-AddOrder] 字段缺失: dis=%q zone_id=%q zone_name=%q run_type=%q student_id=%q run_rule_id=%q", distance, zoneId, zoneName, runType, studentId, runRuleId)
 		return "", fmt.Errorf("请将信息填写完整")
 	}
 	taskListCount := len(taskList)
@@ -250,6 +253,7 @@ func (s *SDXYService) AddOrder(uid int, form map[string]interface{}) (string, er
 		"form[password]":    password,
 		"form[dis]":         distance,
 		"form[zone_id]":     zoneId,
+		"form[zone_name]":   zoneName,
 		"form[run_type]":    runType,
 		"form[student_id]":  studentId,
 		"form[run_rule_id]": runRuleId,
@@ -264,8 +268,10 @@ func (s *SDXYService) AddOrder(uid int, form map[string]interface{}) (string, er
 
 	result, err := s.upstreamRequest("add", params)
 	if err != nil {
+		log.Printf("[SDXY-AddOrder] 上游请求失败: %v", err)
 		return "", err
 	}
+	log.Printf("[SDXY-AddOrder] 上游响应: %+v", result)
 
 	code := mapGetFloat(result, "code")
 	if code != 0 {

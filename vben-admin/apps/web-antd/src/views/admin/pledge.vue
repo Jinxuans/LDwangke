@@ -3,7 +3,7 @@ import { ref, reactive, onMounted } from 'vue';
 import { Page } from '@vben/common-ui';
 import {
   Card, Table, Button, Input, InputNumber, Space, Tag, Modal, Tabs, TabPane,
-  Popconfirm, message, Pagination, Switch,
+  Popconfirm, message, Pagination, Switch, Select, SelectOption,
 } from 'ant-design-vue';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons-vue';
 import {
@@ -11,6 +11,7 @@ import {
   togglePledgeConfigApi, getPledgeRecordListApi,
   type PledgeConfig, type PledgeRecord,
 } from '#/api/auxiliary';
+import { getCategoryListApi, type CategoryItem } from '#/api/admin';
 
 const activeTab = ref('configs');
 
@@ -118,7 +119,19 @@ function onTabChange(key: string) {
   if (key === 'records' && records.value.length === 0) loadRecords();
 }
 
-onMounted(() => loadConfigs());
+const categories = ref<CategoryItem[]>([]);
+
+async function loadCategories() {
+  try {
+    const res = await getCategoryListApi();
+    categories.value = Array.isArray(res) ? res : [];
+  } catch (e) { console.error(e); }
+}
+
+onMounted(() => {
+  loadConfigs();
+  loadCategories();
+});
 </script>
 
 <template>
@@ -197,8 +210,18 @@ onMounted(() => loadConfigs());
            :width="480" style="max-width: 95vw">
       <div class="space-y-4 py-2">
         <div>
-          <label class="block text-sm font-medium mb-1">分类 ID</label>
-          <InputNumber v-model:value="configForm.category_id" :min="1" style="width: 100%" placeholder="对应分类表的ID" />
+          <label class="block text-sm font-medium mb-1">分类</label>
+          <Select
+            v-model:value="configForm.category_id"
+            style="width: 100%"
+            placeholder="选择分类"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+          >
+            <SelectOption v-for="cat in categories" :key="cat.id" :value="cat.id" :label="cat.name">
+              {{ cat.name }} (ID: {{ cat.id }})
+            </SelectOption>
+          </Select>
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">质押金额（元）</label>

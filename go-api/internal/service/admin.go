@@ -411,6 +411,65 @@ func (s *AdminService) ClassBatchPrice(cids []int, rate float64, yunsuan string)
 	return result.RowsAffected()
 }
 
+// ClassBatchReplaceKeyword 批量替换课程名称中的关键词
+// scope: "all"=所有, "cate"=按分类ID, "docking"=按对接平台ID
+func (s *AdminService) ClassBatchReplaceKeyword(search, replace, scope, scopeID string) (int64, error) {
+	if search == "" {
+		return 0, fmt.Errorf("搜索关键词不能为空")
+	}
+	where := "1=1"
+	args := []interface{}{search, replace}
+	switch scope {
+	case "cate":
+		if scopeID != "" {
+			where = "fenlei = ?"
+			args = append(args, scopeID)
+		}
+	case "docking":
+		if scopeID != "" {
+			where = "docking = ?"
+			args = append(args, scopeID)
+		}
+	}
+	sql := "UPDATE qingka_wangke_class SET name = REPLACE(name, ?, ?) WHERE " + where
+	result, err := database.DB.Exec(sql, args...)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+// ClassBatchAddPrefix 批量为课程名称添加前缀
+// scope: "all"=所有, "cate"=按分类ID, "docking"=按对接平台ID
+func (s *AdminService) ClassBatchAddPrefix(prefix, scope, scopeID string) (int64, error) {
+	if prefix == "" {
+		return 0, fmt.Errorf("前缀不能为空")
+	}
+	where := "1=1"
+	args := []interface{}{prefix}
+	switch scope {
+	case "cate":
+		if scopeID != "" {
+			where = "fenlei = ?"
+			args = append(args, scopeID)
+		}
+	case "docking":
+		if scopeID != "" {
+			where = "docking = ?"
+			args = append(args, scopeID)
+		}
+	}
+	// 避免重复添加前缀：只更新不以该前缀开头的记录
+	where += " AND name NOT LIKE ?"
+	args = append(args, prefix+"%")
+	sql := "UPDATE qingka_wangke_class SET name = CONCAT(?, name) WHERE " + where
+	result, err := database.DB.Exec(sql, args...)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 // ===== 货源管理 =====
 
 func (s *AdminService) SupplierList() ([]model.Supplier, error) {

@@ -131,16 +131,16 @@ var platformRegistry = map[string]PlatformConfig{
 	"hzw": {SuccessCode: "1", ReturnsYID: true, ProgressAct: "chadan", ProgressNoYID: "chadan", UseIDParam: true, AlwaysUsername: true, PauseAct: "stop", LogAct: "cha_logwk", BalanceMoneyField: "money"},
 	// 龙龙 - 下单 code=0, yid 在 data 数组，查单用 uuid 参数
 	"longlong": {SuccessCode: "0", ReturnsYID: true, YIDInDataArray: true, UseUUIDParam: true, ProgressAct: "chadan", ProgressNoYID: "chadan", PauseAct: "zanting", BalanceAct: "money", BalanceMoneyField: "data"},
-	// 流年 - 进度用 /api/chadan1，改密用 xgmm
-	"liunian": {SuccessCode: "0", ReturnsYID: true, ProgressPath: "/api/chadan1", ChangePassAct: "xgmm", ChangePassParam: "xgmm"},
+	// 流年 - 进度用 /api/chadan1，改密用 xgmm，暂停用 zt，日志用 xq，补单用 budan，秒刷用 ms_order，分类用 getfl，工单用 submitWorkOrder/queryWorkOrder
+	"liunian": {SuccessCode: "0", ReturnsYID: true, ProgressPath: "/api/chadan1", ChangePassAct: "xgmm", ChangePassParam: "xgmm", PauseAct: "zt", LogAct: "xq", CategoryAct: "getfl", ReportAct: "submitWorkOrder", GetReportAct: "queryWorkOrder", BalanceMoneyField: "money"},
 	// 学习通官方 - 本地脚本，新系统暂不支持
 	"xxtgf": {QueryAct: "local_script"},
 	// 毛豆 mooc - 本地脚本，新系统暂不支持
 	"moocmd": {QueryAct: "local_script"},
 	// yyy - 完全自定义 API（JSON+Bearer token），独立适配器处理
 	"yyy": {QueryAct: "yyy_custom", SuccessCode: "200", ReturnsYID: true, BalanceMoneyField: "money"},
-	// 爱学习 (2xx) - JSON API，暂停用/api/stop，改密用/api/update，补单用/api/reset
-	"2xx": {SuccessCode: "0", ReturnsYID: true, PausePath: "/api/stop", ChangePassPath: "/api/update", ResubmitPath: "/api/reset", UseJSON: true, BalancePath: "/api/getinfo", BalanceMoneyField: "data.money", ReportPath: "/api/submitWork", GetReportPath: "/api/queryWork", ReportParamStyle: "token", ReportAuthType: "token_only"},
+	// 爱学习 (2xx) - JSON API (token认证)，暂停用/api/stop，改密用/api/update，补单用/api/reset，刷新用/api/refresh
+	"2xx": {SuccessCode: "1", ReturnsYID: true, PausePath: "/api/stop", ChangePassPath: "/api/update", ResubmitPath: "/api/reset", RefreshPath: "/api/refresh", UseJSON: true, BalancePath: "/api/getinfo", BalanceMoneyField: "data.money", ReportPath: "/api/submitWork", GetReportPath: "/api/queryWork", ReportParamStyle: "token", ReportAuthType: "token_only"},
 	// KUN - 自定义接口：GET /query/ 查课、GET /getorder/ 下单、GET /upPwd/ 改密，日志用 /log/ GET
 	"KUN": {QueryAct: "KUN_custom", SuccessCode: "0", LogPath: "/log/", LogMethod: "GET"},
 	// kunba - 同 KUN
@@ -167,6 +167,8 @@ var platformRegistry = map[string]PlatformConfig{
 	"skyriver": {SuccessCode: "1", ReturnsYID: true, ProgressPath: "/api/chadan1", ProgressNoYID: "chadan", ChangePassAct: "xgmm", ChangePassParam: "newpass", ChangePassIDParam: "oid", CategoryAct: "getfl", ReportAct: "submitWorkOrder", GetReportAct: "queryWorkOrder", BalanceMoneyField: "money"},
 	// 学妹 - 成功码"0"，返回yid，进度用chadan(username)，暂停用ikunStop，改密用gaimi(oid/pwd)，日志用cha_logwk(oid)，售后用shouhou
 	"xuemei": {SuccessCode: "0", ReturnsYID: true, ProgressAct: "chadan", ProgressNoYID: "chadan", AlwaysUsername: true, PauseAct: "ikunStop", ChangePassAct: "gaimi", ChangePassIDParam: "oid", ChangePassParam: "pwd", LogAct: "cha_logwk", LogIDParam: "oid", BalanceMoneyField: "money"},
+	// 至强(simple) - 完全自定义 API（token 认证，/Api/* 端点），独立适配器处理
+	"simple": {QueryAct: "simple_custom", SuccessCode: "1", BalanceMoneyField: "money"},
 }
 
 // dbConfigCache 数据库平台配置缓存
@@ -363,6 +365,7 @@ func GetPlatformNames() map[string]string {
 		"Benz":     "奔驰",
 		"skyriver": "天河",
 		"xuemei":   "学妹",
+		"simple":   "至强",
 	}
 
 	dbConfigMu.RLock()
@@ -533,6 +536,24 @@ func (s *SupplierService) QueryCourse(cid int, userinfo string) (*model.CourseQu
 			Data:     result.Data,
 		}, nil
 
+	case "simple_custom":
+		// 至强平台：POST /Api/Get
+		result, err := simpleCallQuery(sup, cls.Noun, school, user, pass)
+		if err != nil {
+			return &model.CourseQueryResponse{
+				UserInfo: userinfo,
+				UserName: user,
+				Msg:      fmt.Sprintf("查课失败：%s", err.Error()),
+				Data:     []model.CourseItem{},
+			}, nil
+		}
+		return &model.CourseQueryResponse{
+			UserInfo: userinfo,
+			UserName: result.UserName,
+			Msg:      result.Msg,
+			Data:     result.Data,
+		}, nil
+
 	default:
 		// 标准 API 查课
 		result, err := s.callSupplierQuery(sup, cls, school, user, pass)
@@ -639,6 +660,11 @@ func (s *SupplierService) CallSupplierOrder(sup *model.SupplierFull, cls *model.
 	// KUN/kunba 平台走独立适配器
 	if sup.PT == "KUN" || sup.PT == "kunba" {
 		return kunCallOrder(sup, cls.Noun, school, user, pass, kcname, kcid)
+	}
+
+	// 至强(simple) 平台走独立适配器
+	if sup.PT == "simple" {
+		return simpleCallOrder(sup, cls.Noun, school, user, pass, kcname, kcid)
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
@@ -834,7 +860,7 @@ func (s *SupplierService) GetSupplierCategories(sup *model.SupplierFull) map[str
 
 		if cfg.ReportAuthType == "token_only" && cfg.UseJSON {
 			apiURL := baseURL + "/api/" + act
-			jsonData, _ := json.Marshal(map[string]string{"token": sup.Pass})
+			jsonData, _ := json.Marshal(map[string]string{"token": getSupplierToken(sup)})
 			req, _ := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonData)))
 			req.Header.Set("Content-Type", "application/json")
 			resp, err = client.Do(req)
@@ -937,7 +963,7 @@ func (s *SupplierService) GetSupplierClasses(sup *model.SupplierFull) ([]Supplie
 			baseURL = "http://" + baseURL
 		}
 		apiURL := baseURL + "/api/getclass"
-		jsonData, _ := json.Marshal(map[string]string{"token": sup.Pass})
+		jsonData, _ := json.Marshal(map[string]string{"token": getSupplierToken(sup)})
 		req, _ := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonData)))
 		req.Header.Set("Content-Type", "application/json")
 		resp, err = s.client.Do(req)
@@ -1203,6 +1229,23 @@ func (s *SupplierService) QueryOrderProgress(sup *model.SupplierFull, yid string
 		return yyyQueryProgress(sup, username)
 	}
 
+	// 至强(simple) 平台走独立适配器
+	if sup.PT == "simple" {
+		platform := ""
+		kcname := ""
+		kcid := ""
+		school := ""
+		pass := ""
+		if orderExtra != nil {
+			platform = orderExtra["noun"]
+			kcname = orderExtra["kcname"]
+			kcid = orderExtra["kcid"]
+			school = orderExtra["school"]
+			pass = orderExtra["pass"]
+		}
+		return simpleQueryProgress(sup, platform, school, username, pass, kcname, kcid)
+	}
+
 	cfg := GetPlatformConfig(sup.PT)
 
 	params := url.Values{}
@@ -1344,6 +1387,15 @@ func (s *SupplierService) QueryOrderProgress(sup *model.SupplierFull, yid string
 	}
 
 	return items, nil
+}
+
+// getSupplierToken 获取供应商 token（优先 Pass，其次 Token 字段）
+// 用于 token_only 平台（如 2xx 爱学习），兼容用户把 token 存在不同字段
+func getSupplierToken(sup *model.SupplierFull) string {
+	if sup.Pass != "" {
+		return sup.Pass
+	}
+	return sup.Token
 }
 
 // buildSupplierURL 构建供应商 API URL
@@ -1489,6 +1541,11 @@ func (s *SupplierService) ChangePassword(sup *model.SupplierFull, yid, newPwd st
 func (s *SupplierService) ResubmitOrder(sup *model.SupplierFull, yid string) (int, string, error) {
 	if sup.PT == "tuboshu" || sup.PT == "nx" {
 		return -1, "当前平台暂不支持补单操作", nil
+	}
+
+	// 至强(simple) 平台走独立适配器
+	if sup.PT == "simple" {
+		return simpleResubmit(sup, yid)
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
@@ -1923,14 +1980,14 @@ func (s *SupplierService) QueryBalance(hid int) (map[string]interface{}, error) 
 		}
 		resp, err = s.client.Do(req)
 	case "token_only":
-		// token 在 pass 字段 (如 2xx)
+		// token 在 pass 或 token 字段 (如 2xx)
 		if cfg.UseJSON {
-			jsonData, _ := json.Marshal(map[string]string{"token": sup.Pass})
+			jsonData, _ := json.Marshal(map[string]string{"token": getSupplierToken(sup)})
 			req, _ := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonData)))
 			req.Header.Set("Content-Type", "application/json")
 			resp, err = s.client.Do(req)
 		} else {
-			formData.Set("token", sup.Pass)
+			formData.Set("token", getSupplierToken(sup))
 			resp, err = s.client.PostForm(apiURL, formData)
 		}
 	default:
@@ -2071,7 +2128,7 @@ func (s *SupplierService) SubmitReport(sup *model.SupplierFull, yid, ticketType,
 	if cfg.ReportParamStyle == "token" {
 		apiURL := baseURL + cfg.ReportPath
 		jsonData, _ := json.Marshal(map[string]string{
-			"token":   sup.Pass,
+			"token":   getSupplierToken(sup),
 			"type":    ticketType,
 			"id":      yid,
 			"content": content,
@@ -2135,7 +2192,7 @@ func (s *SupplierService) QueryReport(sup *model.SupplierFull, reportID string) 
 	if cfg.ReportParamStyle == "token" {
 		apiURL := baseURL + cfg.GetReportPath
 		jsonData, _ := json.Marshal(map[string]string{
-			"token":  sup.Pass,
+			"token":  getSupplierToken(sup),
 			"workId": reportID,
 		})
 		req, _ := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonData)))

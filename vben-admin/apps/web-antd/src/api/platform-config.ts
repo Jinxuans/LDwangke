@@ -152,3 +152,20 @@ export interface DetectResult {
 export async function detectPlatformApi(data: DetectRequest) {
   return requestClient.post<DetectResult>('/admin/platform-config/detect', data);
 }
+
+export interface AutoDetectSaveRequest extends DetectRequest {
+  pt: string;
+  name: string;
+}
+
+export interface AutoDetectSaveResult {
+  success: boolean;
+  msg: string;
+  detect: DetectResult;
+  config: Partial<PlatformConfig>;
+}
+
+/** 一键检测并保存平台配置 */
+export async function autoDetectSaveApi(data: AutoDetectSaveRequest) {
+  return requestClient.post<AutoDetectSaveResult>('/admin/platform-config/auto-detect-save', data);
+}

@@ -70,7 +70,22 @@ export async function ydsjRefundOrderApi(id: number) {
   return requestClient.post('/ydsj/refund', { id });
 }
 
+// 修改备注
+export async function ydsjEditRemarksApi(id: number, remarks: string) {
+  return requestClient.post('/ydsj/edit-remarks', { id, remarks });
+}
+
+// 手动同步订单
+export async function ydsjSyncOrderApi(id: number) {
+  return requestClient.post('/ydsj/sync-order', { id });
+}
+
 // 切换跑步状态
 export async function ydsjToggleRunApi(id: number) {
   return requestClient.post('/ydsj/toggle-run', { id });
+}
+
+// 学校列表
+export async function ydsjGetSchoolsApi() {
+  return requestClient.get<any[]>('/ydsj/schools');
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"go-api/internal/model"
 	"io"
 	"net/http"
 	"net/url"
@@ -23,32 +24,32 @@ type DetectRequest struct {
 // DetectResult 自动检测结果
 type DetectResult struct {
 	Success       bool              `json:"success"`
-	AuthType      string            `json:"auth_type"`       // 检测到的认证方式
-	SuccessCode   string            `json:"success_code"`    // 检测到的成功码
-	APIStyle      string            `json:"api_style"`       // standard / rest
-	BalanceOK     bool              `json:"balance_ok"`      // 余额接口是否可用
-	BalanceMoney  string            `json:"balance_money"`   // 检测到的余额
-	BalanceAct    string            `json:"balance_act"`     // 余额 act
-	BalancePath   string            `json:"balance_path"`    // 余额路径
-	BalanceField  string            `json:"balance_field"`   // 余额字段路径
-	QueryOK       bool              `json:"query_ok"`        // 查课接口是否可用
-	QueryAct      string            `json:"query_act"`       // 查课 act
-	ClassListOK   bool              `json:"class_list_ok"`   // 课程列表接口是否可用
-	CategoryOK    bool              `json:"category_ok"`     // 分类接口是否可用
-	UseJSON       bool              `json:"use_json"`        // 是否使用 JSON
-	ReturnsYID    bool              `json:"returns_yid"`     // 下单是否返回 YID
-	Probes        []ProbeDetail     `json:"probes"`          // 所有探测详情
-	SuggestedName string            `json:"suggested_name"`  // 建议平台名
-	Config        map[string]string `json:"config"`          // 建议的完整配置
+	AuthType      string            `json:"auth_type"`      // 检测到的认证方式
+	SuccessCode   string            `json:"success_code"`   // 检测到的成功码
+	APIStyle      string            `json:"api_style"`      // standard / rest
+	BalanceOK     bool              `json:"balance_ok"`     // 余额接口是否可用
+	BalanceMoney  string            `json:"balance_money"`  // 检测到的余额
+	BalanceAct    string            `json:"balance_act"`    // 余额 act
+	BalancePath   string            `json:"balance_path"`   // 余额路径
+	BalanceField  string            `json:"balance_field"`  // 余额字段路径
+	QueryOK       bool              `json:"query_ok"`       // 查课接口是否可用
+	QueryAct      string            `json:"query_act"`      // 查课 act
+	ClassListOK   bool              `json:"class_list_ok"`  // 课程列表接口是否可用
+	CategoryOK    bool              `json:"category_ok"`    // 分类接口是否可用
+	UseJSON       bool              `json:"use_json"`       // 是否使用 JSON
+	ReturnsYID    bool              `json:"returns_yid"`    // 下单是否返回 YID
+	Probes        []ProbeDetail     `json:"probes"`         // 所有探测详情
+	SuggestedName string            `json:"suggested_name"` // 建议平台名
+	Config        map[string]string `json:"config"`         // 建议的完整配置
 }
 
 // ProbeDetail 单次探测详情
 type ProbeDetail struct {
 	Endpoint string `json:"endpoint"`
 	Method   string `json:"method"`
-	Status   string `json:"status"`  // ok / fail / timeout / error
-	Code     string `json:"code"`    // 响应中的 code 值
-	Msg      string `json:"msg"`     // 简要说明
+	Status   string `json:"status"`   // ok / fail / timeout / error
+	Code     string `json:"code"`     // 响应中的 code 值
+	Msg      string `json:"msg"`      // 简要说明
 	RawBody  string `json:"raw_body"` // 响应体前200字符
 }
 
@@ -70,14 +71,14 @@ func DetectPlatform(req DetectRequest) *DetectResult {
 	// 阶段1：检测认证方式 + 余额接口（最安全的只读接口）
 	// =============================================
 	type balanceProbe struct {
-		name      string
-		url       string
-		method    string
-		authType  string
-		act       string
-		path      string
-		useJSON   bool
-		buildReq  func() (*http.Request, error)
+		name     string
+		url      string
+		method   string
+		authType string
+		act      string
+		path     string
+		useJSON  bool
+		buildReq func() (*http.Request, error)
 	}
 
 	var probes []balanceProbe
@@ -87,8 +88,8 @@ func DetectPlatform(req DetectRequest) *DetectResult {
 		for _, act := range []string{"getmoney", "money"} {
 			actCopy := act
 			probes = append(probes, balanceProbe{
-				name: fmt.Sprintf("uid+key act=%s", actCopy),
-				url:  fmt.Sprintf("%s/api.php?act=%s", baseURL, actCopy),
+				name:   fmt.Sprintf("uid+key act=%s", actCopy),
+				url:    fmt.Sprintf("%s/api.php?act=%s", baseURL, actCopy),
 				method: "POST", authType: "uid_key", act: actCopy,
 				buildReq: func() (*http.Request, error) {
 					data := url.Values{"uid": {req.UID}, "key": {req.Key}}
@@ -144,10 +145,10 @@ func DetectPlatform(req DetectRequest) *DetectResult {
 
 	// 并发探测余额接口
 	type probeResult struct {
-		idx     int
-		body    []byte
-		err     error
-		status  int
+		idx    int
+		body   []byte
+		err    error
+		status int
 	}
 
 	var wg sync.WaitGroup
@@ -438,6 +439,97 @@ func DetectPlatform(req DetectRequest) *DetectResult {
 	return result
 }
 
+// AutoDetectRequest 自动检测并保存请求
+type AutoDetectRequest struct {
+	DetectRequest
+	PT   string `json:"pt" binding:"required"` // 平台标识
+	Name string `json:"name"`                  // 平台名称（留空则自动生成）
+}
+
+// BuildConfigFromDetection 将检测结果转换为可保存的平台配置
+func BuildConfigFromDetection(result *DetectResult, pt, name string) *model.PlatformConfigSaveRequest {
+	if result == nil || !result.Success {
+		return nil
+	}
+
+	cfg := result.Config
+	req := &model.PlatformConfigSaveRequest{
+		PT:           pt,
+		Name:         name,
+		AuthType:     getOr(cfg, "auth_type", "uid_key"),
+		APIPathStyle: getOr(cfg, "api_path_style", "standard"),
+		SuccessCodes: getOr(cfg, "success_codes", "0"),
+		UseJSON:      cfg["use_json"] == "true",
+		ReturnsYID:   result.ReturnsYID,
+	}
+
+	// 查课
+	req.QueryAct = getOr(cfg, "query_act", "get")
+	req.QueryPath = cfg["query_path"]
+
+	// 下单
+	req.OrderAct = getOr(cfg, "order_act", "add")
+	req.OrderPath = cfg["order_path"]
+
+	// 进度
+	req.ProgressAct = getOr(cfg, "progress_act", "chadan2")
+	req.ProgressNoYID = getOr(cfg, "progress_no_yid", "chadan")
+	req.ProgressPath = cfg["progress_path"]
+	req.ProgressMethod = getOr(cfg, "progress_method", "POST")
+
+	// 暂停
+	req.PauseAct = getOr(cfg, "pause_act", "zt")
+	req.PausePath = cfg["pause_path"]
+	req.PauseIDParam = getOr(cfg, "pause_id_param", "id")
+
+	// 改密
+	req.ChangePassAct = getOr(cfg, "change_pass_act", "gaimi")
+	req.ChangePassPath = cfg["change_pass_path"]
+	req.ChangePassParam = getOr(cfg, "change_pass_param", "newPwd")
+	req.ChangePassIDParam = getOr(cfg, "change_pass_id_param", "id")
+
+	// 补单
+	req.ResubmitPath = cfg["resubmit_path"]
+	req.ResubmitIDParam = getOr(cfg, "resubmit_id_param", "id")
+
+	// 日志
+	req.LogAct = getOr(cfg, "log_act", "xq")
+	req.LogPath = cfg["log_path"]
+	req.LogMethod = getOr(cfg, "log_method", "POST")
+	req.LogIDParam = getOr(cfg, "log_id_param", "id")
+
+	// 余额
+	req.BalanceAct = getOr(cfg, "balance_act", "getmoney")
+	req.BalancePath = cfg["balance_path"]
+	req.BalanceMoneyField = getOr(cfg, "balance_money_field", "money")
+	req.BalanceMethod = getOr(cfg, "balance_method", "POST")
+	if cfg["auth_type"] == "bearer_token" {
+		req.BalanceAuthType = "bearer_token"
+	}
+
+	// 工单
+	req.ReportPath = cfg["report_path"]
+	req.GetReportPath = cfg["get_report_path"]
+	req.ReportParamStyle = cfg["report_param_style"]
+	req.ReportAuthType = cfg["report_auth_type"]
+
+	// 刷新
+	req.RefreshPath = cfg["refresh_path"]
+
+	if name == "" {
+		req.Name = result.SuggestedName
+	}
+
+	return req
+}
+
+func getOr(m map[string]string, key, def string) string {
+	if v, ok := m[key]; ok && v != "" {
+		return v
+	}
+	return def
+}
+
 // moneyExtract 余额提取结果
 type moneyExtract struct {
 	value string
@@ -520,7 +612,6 @@ func probeEndpoint(client *http.Client, name, apiURL string, data url.Values) Pr
 	return detail
 }
 
-
 // probeEndpointJSON 探测一个 JSON POST 端点
 func probeEndpointJSON(client *http.Client, name, apiURL string, params map[string]string) ProbeDetail {
 	detail := ProbeDetail{Endpoint: name, Method: "POST"}
@@ -569,6 +660,7 @@ func probeEndpointJSON(client *http.Client, name, apiURL string, params map[stri
 	}
 	return detail
 }
+
 // probeEndpointGET 探测一个 GET 端点
 func probeEndpointGET(client *http.Client, name, apiURL, uid, key string) ProbeDetail {
 	detail := ProbeDetail{Endpoint: name, Method: "GET"}

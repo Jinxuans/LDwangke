@@ -33,6 +33,8 @@ type XMOrder struct {
 	ProjectID int         `json:"project_id"`
 	Status    string      `json:"status_name"`
 	Type      interface{} `json:"type"`
+	Pace      *float64    `json:"pace"`
+	Distance  *float64    `json:"distance"`
 	TotalKM   int         `json:"total_km"`
 	IsDeleted bool        `json:"is_deleted"`
 	RunKM     *float64    `json:"run_km"`
@@ -87,6 +89,8 @@ func (s *XMService) EnsureTable() {
 		account VARCHAR(255) NOT NULL COMMENT '账号',
 		password VARCHAR(255) NOT NULL COMMENT '密码',
 		type INT DEFAULT NULL COMMENT '跑步类型',
+		pace DECIMAL(5,2) DEFAULT NULL COMMENT '配速（分/公里）',
+		distance DECIMAL(5,2) DEFAULT NULL COMMENT '单次距离（公里）',
 		project_id BIGINT NOT NULL COMMENT '项目ID',
 		status VARCHAR(50) NOT NULL COMMENT '订单状态',
 		total_km INT NOT NULL COMMENT '下单总公里数',
@@ -106,6 +110,10 @@ func (s *XMService) EnsureTable() {
 	if err != nil {
 		fmt.Printf("[XM] 建 xm_order 表失败: %v\n", err)
 	}
+
+	// 3.2 升级：添加 pace 和 distance 字段（已有表兼容）
+	database.DB.Exec("ALTER TABLE xm_order ADD COLUMN `pace` DECIMAL(5,2) DEFAULT NULL COMMENT '配速（分/公里）' AFTER `type`")
+	database.DB.Exec("ALTER TABLE xm_order ADD COLUMN `distance` DECIMAL(5,2) DEFAULT NULL COMMENT '单次距离（公里）' AFTER `pace`")
 }
 
 // ---------- HTTP 工具 ----------
@@ -308,6 +316,15 @@ func (s *XMService) AddOrder(uid int, data map[string]interface{}) (map[string]i
 		orderType = &t
 	}
 
+	var pace *float64
+	if v, ok := data["pace"].(float64); ok {
+		pace = &v
+	}
+	var distance *float64
+	if v, ok := data["distance"].(float64); ok {
+		distance = &v
+	}
+
 	if projectID == 0 || school == "" || account == "" || totalKM == 0 || startDay == "" || startTime == "" || endTime == "" {
 		return nil, fmt.Errorf("缺少必填参数")
 	}
@@ -346,9 +363,9 @@ func (s *XMService) AddOrder(uid int, data map[string]interface{}) (map[string]i
 	}
 
 	result, err := database.DB.Exec(
-		`INSERT INTO xm_order (y_oid, user_id, school, account, password, type, project_id, status, total_km, run_km, run_date, start_day, start_time, end_time, deduction, is_deleted, created_at, updated_at)
-		VALUES (NULL, ?, ?, ?, ?, ?, ?, '已下单', ?, NULL, ?, ?, ?, ?, ?, 0, NOW(), NOW())`,
-		uid, school, account, password, typeSQL, projectID, totalKM, string(runDateJSON), startDay, startTime, endTime, orderMoney,
+		`INSERT INTO xm_order (y_oid, user_id, school, account, password, type, pace, distance, project_id, status, total_km, run_km, run_date, start_day, start_time, end_time, deduction, is_deleted, created_at, updated_at)
+		VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, '已下单', ?, NULL, ?, ?, ?, ?, ?, 0, NOW(), NOW())`,
+		uid, school, account, password, typeSQL, pace, distance, projectID, totalKM, string(runDateJSON), startDay, startTime, endTime, orderMoney,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("下单失败请联系管理员")
@@ -380,6 +397,12 @@ func (s *XMService) AddOrder(uid int, data map[string]interface{}) (map[string]i
 		"start_time": startTime,
 		"end_time":   endTime,
 		"type":       orderType,
+	}
+	if pace != nil {
+		postData["pace"] = *pace
+	}
+	if distance != nil {
+		postData["distance"] = *distance
 	}
 
 	externalResult, err := s.projectRequest(project, "add_order", postData, "POST")
@@ -413,6 +436,8 @@ func (s *XMService) AddOrder(uid int, data map[string]interface{}) (map[string]i
 		"project_id":  projectID,
 		"status_name": "已提交",
 		"type":        typeStr,
+		"pace":        pace,
+		"distance":    distance,
 		"total_km":    totalKM,
 		"is_deleted":  false,
 		"run_km":      nil,
@@ -423,6 +448,192 @@ func (s *XMService) AddOrder(uid int, data map[string]interface{}) (map[string]i
 		"deduction":   orderMoney,
 		"updated_at":  time.Now().Format("2006-01-02 15:04:05"),
 	}, nil
+}
+
+// AddOrderKM 增加订单次数/公里数
+func (s *XMService) AddOrderKM(uid int, orderID int, addKM int, isAdmin bool) (map[string]interface{}, error) {
+	if orderID <= 0 || addKM <= 0 {
+		return nil, fmt.Errorf("参数错误")
+	}
+
+	// 查询订单
+	var query string
+	if isAdmin {
+		query = "SELECT * FROM xm_order WHERE id = ? LIMIT 1"
+	} else {
+		query = "SELECT * FROM xm_order WHERE id = ? AND user_id = ? LIMIT 1"
+	}
+	rows, err := database.DB.Query(query, func() []interface{} {
+		if isAdmin {
+			return []interface{}{orderID}
+		}
+		return []interface{}{orderID, uid}
+	}()...)
+	if err != nil {
+		return nil, fmt.Errorf("查询失败")
+	}
+	defer rows.Close()
+	columns, _ := rows.Columns()
+	if !rows.Next() {
+		return nil, fmt.Errorf("订单不存在")
+	}
+	values := make([]interface{}, len(columns))
+	valuePtrs := make([]interface{}, len(columns))
+	for i := range values {
+		valuePtrs[i] = &values[i]
+	}
+	rows.Scan(valuePtrs...)
+	order := make(map[string]interface{})
+	for i, col := range columns {
+		val := values[i]
+		if b, ok := val.([]byte); ok {
+			order[col] = string(b)
+		} else {
+			order[col] = val
+		}
+	}
+	rows.Close()
+
+	isDeleted := fmt.Sprintf("%v", order["is_deleted"])
+	if isDeleted == "1" {
+		return nil, fmt.Errorf("该订单已删除，无法增加次数")
+	}
+
+	// 查询项目
+	projectID := 0
+	fmt.Sscanf(fmt.Sprintf("%v", order["project_id"]), "%d", &projectID)
+	project, err := s.getProjectRow(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("项目不存在")
+	}
+
+	// 获取订单所属用户信息
+	orderUserID := 0
+	fmt.Sscanf(fmt.Sprintf("%v", order["user_id"]), "%d", &orderUserID)
+
+	var addprice, userMoney float64
+	err = database.DB.QueryRow("SELECT addprice, money FROM qingka_wangke_user WHERE uid = ?", orderUserID).Scan(&addprice, &userMoney)
+	if err != nil {
+		return nil, fmt.Errorf("用户不存在")
+	}
+
+	// 计算费用
+	projectPrice := 0.0
+	if p, ok := project["price"].(string); ok {
+		fmt.Sscanf(p, "%f", &projectPrice)
+	} else if p, ok := project["price"].(float64); ok {
+		projectPrice = p
+	}
+	danjia := math.Round(projectPrice*addprice*100) / 100
+	if danjia <= 0 || addprice < 0.1 {
+		return nil, fmt.Errorf("单价异常，请联系管理员")
+	}
+	money := math.Round(float64(addKM)*danjia*100) / 100
+
+	if userMoney < money {
+		return nil, fmt.Errorf("用户余额不足")
+	}
+
+	// 如果有外部订单ID，调用外部接口
+	yOidStr := fmt.Sprintf("%v", order["y_oid"])
+	yOid := 0
+	fmt.Sscanf(yOidStr, "%d", &yOid)
+
+	if yOid > 0 {
+		pType := 0
+		if t, ok := project["type"].(string); ok {
+			fmt.Sscanf(t, "%d", &pType)
+		} else if t, ok := project["type"].(int64); ok {
+			pType = int(t)
+		}
+
+		var externalResult map[string]interface{}
+		if pType == 0 {
+			pURL := fmt.Sprintf("%v", project["url"])
+			key := fmt.Sprintf("%v", project["key"])
+			pUID := fmt.Sprintf("%v", project["uid"])
+			params := url.Values{}
+			params.Set("act", "add_order_km")
+			params.Set("key", key)
+			params.Set("uid", pUID)
+			queryURL := pURL + "?" + params.Encode()
+			postData := map[string]interface{}{
+				"order_id": yOid,
+				"add_km":   addKM,
+			}
+			externalResult, err = s.httpRequest("POST", queryURL, postData, map[string]string{"Content-Type": "application/json"})
+		} else {
+			// type=1: 提取域名，拼接 /api/v1/runorder/add_total_km
+			pURL := strings.TrimSpace(fmt.Sprintf("%v", project["url"]))
+			token := fmt.Sprintf("%v", project["token"])
+			domain := extractDomain(pURL)
+			params := url.Values{}
+			params.Set("order_id", fmt.Sprintf("%d", yOid))
+			params.Set("add_km", fmt.Sprintf("%d", addKM))
+			queryURL := domain + "/api/v1/runorder/add_total_km?" + params.Encode()
+			externalResult, err = s.httpRequest("GET", queryURL, nil, map[string]string{"token": token, "Accept": "application/json"})
+		}
+
+		if err != nil || externalResult == nil {
+			return nil, fmt.Errorf("外部接口返回格式错误")
+		}
+		code, _ := externalResult["code"].(float64)
+		if int(code) != 200 {
+			msg, _ := externalResult["msg"].(string)
+			if msg == "" {
+				msg = "外部接口增加次数失败"
+			}
+			return nil, fmt.Errorf("%s", msg)
+		}
+	}
+
+	// 扣除用户余额
+	database.DB.Exec("UPDATE qingka_wangke_user SET money = money - ? WHERE uid = ? LIMIT 1", money, orderUserID)
+
+	// 更新订单
+	oldTotalKM := 0
+	fmt.Sscanf(fmt.Sprintf("%v", order["total_km"]), "%d", &oldTotalKM)
+	oldDeduction := 0.0
+	fmt.Sscanf(fmt.Sprintf("%v", order["deduction"]), "%f", &oldDeduction)
+
+	newTotalKM := oldTotalKM + addKM
+	newDeduction := oldDeduction + money
+
+	database.DB.Exec("UPDATE xm_order SET total_km = ?, deduction = ?, updated_at = NOW() WHERE id = ? LIMIT 1",
+		newTotalKM, newDeduction, orderID)
+
+	xmLog(orderUserID, "增加次数", fmt.Sprintf("订单 %d 增加 %d 次，扣除 %.2f 元", orderID, addKM, money), -money)
+
+	// 获取最新余额
+	var latestBalance float64
+	database.DB.QueryRow("SELECT money FROM qingka_wangke_user WHERE uid = ?", orderUserID).Scan(&latestBalance)
+
+	return map[string]interface{}{
+		"order_id":       orderID,
+		"add_km":         addKM,
+		"add_deduction":  fmt.Sprintf("%.4f", money),
+		"latest_balance": latestBalance,
+		"total_km":       newTotalKM,
+		"deduction":      fmt.Sprintf("%.4f", newDeduction),
+	}, nil
+}
+
+// extractDomain 从完整URL中提取域名部分（去除 /api/v1/runorder 等路径）
+func extractDomain(rawURL string) string {
+	pathToRemove := "/api/v1/runorder"
+	if strings.HasSuffix(rawURL, pathToRemove) {
+		return strings.TrimSuffix(rawURL, pathToRemove)
+	}
+	// 尝试 parse_url
+	if !strings.HasPrefix(rawURL, "http") {
+		rawURL = "http://" + rawURL
+	}
+	parts := strings.SplitN(rawURL, "://", 2)
+	if len(parts) == 2 {
+		hostPart := strings.SplitN(parts[1], "/", 2)
+		return parts[0] + "://" + hostPart[0]
+	}
+	return strings.TrimRight(rawURL, "/")
 }
 
 // GetOrders 查询订单列表
@@ -462,7 +673,7 @@ func (s *XMService) GetOrders(uid int, isAdmin bool, page, pageSize int, filters
 		return nil, 0, err
 	}
 
-	querySQL := fmt.Sprintf("SELECT id, user_id, school, account, password, project_id, status, COALESCE(type,-1), total_km, is_deleted, run_km, run_date, start_day, start_time, end_time, deduction, updated_at FROM xm_order WHERE %s ORDER BY id DESC LIMIT ?, ?", where)
+	querySQL := fmt.Sprintf("SELECT id, user_id, school, account, password, project_id, status, COALESCE(type,-1), pace, distance, total_km, is_deleted, run_km, run_date, start_day, start_time, end_time, deduction, updated_at FROM xm_order WHERE %s ORDER BY id DESC LIMIT ?, ?", where)
 	args = append(args, offset, pageSize)
 
 	rows, err := database.DB.Query(querySQL, args...)
@@ -481,7 +692,7 @@ func (s *XMService) GetOrders(uid int, isAdmin bool, page, pageSize int, filters
 		var typeInt int
 		var updatedAtTime time.Time
 		err := rows.Scan(&o.ID, &o.UserID, &o.School, &o.Account, &o.Password,
-			&o.ProjectID, &o.Status, &typeInt, &o.TotalKM, &isDeletedInt,
+			&o.ProjectID, &o.Status, &typeInt, &o.Pace, &o.Distance, &o.TotalKM, &isDeletedInt,
 			&o.RunKM, &runDateStr, &o.StartDay, &o.StartTime, &o.EndTime,
 			&o.Deduction, &updatedAtTime)
 		if err != nil {

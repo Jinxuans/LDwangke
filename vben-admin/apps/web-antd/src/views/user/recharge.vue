@@ -89,8 +89,11 @@ const pagination = reactive({ page: 1, limit: 10, total: 0 });
 async function loadChannels() {
   try {
     const raw = await getPayChannelsApi();
-    channels.value = raw;
-    if (!Array.isArray(channels.value)) channels.value = [];
+    const list = Array.isArray(raw) ? raw : [];
+    channels.value = list.map((ch: any) => ({
+      key: ch.key || ch.type || '',
+      label: ch.label || ch.name || '',
+    }));
     if (channels.value.length > 0 && !selectedChannel.value) {
       selectedChannel.value = channels.value[0]!.key;
     }
@@ -254,14 +257,19 @@ onMounted(() => {
 
       <div class="mb-4" v-if="channels.length > 0">
         <div class="mb-2 font-medium">支付方式</div>
-        <RadioGroup v-model:value="selectedChannel" button-style="solid" size="large">
-          <RadioButton v-for="ch in channels" :key="ch.key" :value="ch.key">
-            <AlipayCircleOutlined v-if="ch.key === 'alipay'" class="mr-1" />
-            <WechatOutlined v-if="ch.key === 'wxpay'" class="mr-1" />
-            <QqOutlined v-if="ch.key === 'qqpay'" class="mr-1" />
-            {{ ch.label }}
-          </RadioButton>
-        </RadioGroup>
+        <div class="flex flex-wrap gap-3">
+          <div
+            v-for="ch in channels" :key="ch.key"
+            class="pay-channel-btn"
+            :class="{ 'pay-channel-active': selectedChannel === ch.key }"
+            @click="selectedChannel = ch.key"
+          >
+            <AlipayCircleOutlined v-if="ch.key === 'alipay'" class="mr-2 text-blue-500 text-lg" />
+            <WechatOutlined v-if="ch.key === 'wxpay'" class="mr-2 text-green-500 text-lg" />
+            <QqOutlined v-if="ch.key === 'qqpay'" class="mr-2 text-blue-400 text-lg" />
+            <span class="text-sm font-medium">{{ ch.label }}</span>
+          </div>
+        </div>
       </div>
       <Alert v-else type="warning" message="暂无可用支付渠道，请联系管理员配置。" show-icon class="mb-4" />
 
@@ -333,5 +341,36 @@ onMounted(() => {
 html.dark .bonus-card {
   background: linear-gradient(135deg, #431407, #7c2d12);
   border-color: #9a3412;
+}
+.pay-channel-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 24px;
+  border: 2px solid #d9d9d9;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.2s;
+  user-select: none;
+}
+.pay-channel-btn:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+}
+.pay-channel-active {
+  border-color: #1677ff;
+  background: #e6f4ff;
+  color: #1677ff;
+}
+html.dark .pay-channel-btn {
+  border-color: #424242;
+}
+html.dark .pay-channel-btn:hover {
+  border-color: #1677ff;
+}
+html.dark .pay-channel-active {
+  border-color: #1677ff;
+  background: rgba(22, 119, 255, 0.15);
 }
 </style>

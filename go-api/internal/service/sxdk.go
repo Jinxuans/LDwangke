@@ -93,7 +93,7 @@ func (s *SXDKService) SaveConfig(cfg *SXDKConfig) error {
 		_, err := database.DB.Exec("UPDATE qingka_wangke_config SET svalue = ? WHERE skey = 'sxdk_config'", string(data))
 		return err
 	}
-	_, err := database.DB.Exec("INSERT INTO qingka_wangke_config (skey, svalue) VALUES ('sxdk_config', ?)", string(data))
+	_, err := database.DB.Exec("INSERT INTO qingka_wangke_config (v, k, skey, svalue) VALUES ('sxdk_config', '', 'sxdk_config', ?)", string(data))
 	return err
 }
 

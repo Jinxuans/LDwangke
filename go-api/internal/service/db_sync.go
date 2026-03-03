@@ -173,18 +173,12 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, tableName string, update
 	// 3. 确保本地表有这些列（自动补列）
 	s.ensureLocalColumns(tableName, extDB, srcCols)
 
-	// 4. 构建 SELECT（所有列全部读取为字符串 / sql.NullString，最大兼容）
+	// 4. 构建列名列表
 	var selectParts []string
 	for _, col := range srcCols {
 		selectParts = append(selectParts, fmt.Sprintf("`%s`", col))
 	}
-	selectSQL := fmt.Sprintf("SELECT %s FROM `%s`", strings.Join(selectParts, ", "), tableName)
-
-	rows, err := extDB.Query(selectSQL)
-	if err != nil {
-		return nil, fmt.Errorf("查询源表失败: %v", err)
-	}
-	defer rows.Close()
+	colList := strings.Join(selectParts, ", ")
 
 	// 5. 找到主键在列中的索引
 	pkIdx := -1
@@ -206,7 +200,6 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, tableName string, update
 		}
 	}
 
-	// INSERT: INSERT INTO table (col1, col2, ...) VALUES (?, ?, ...)
 	allColsQuoted := make([]string, len(srcCols))
 	for i, c := range srcCols {
 		allColsQuoted[i] = fmt.Sprintf("`%s`", c)
@@ -218,7 +211,6 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, tableName string, update
 	insertSQL := fmt.Sprintf("INSERT INTO `%s` (%s) VALUES (%s)",
 		tableName, strings.Join(allColsQuoted, ", "), strings.Join(placeholders, ", "))
 
-	// UPDATE: UPDATE table SET col2=?, col3=? WHERE pk=?
 	var setParts []string
 	for _, col := range nonPKCols {
 		setParts = append(setParts, fmt.Sprintf("`%s`=?", col))
@@ -231,69 +223,88 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, tableName string, update
 
 	checkSQL := fmt.Sprintf("SELECT COUNT(*) FROM `%s` WHERE `%s`=?", tableName, pk)
 
-	// 7. 逐行读取和写入
+	// 7. 分批读取和写入（每批 1000 条，防止大表内存溢出或连接超时）
+	const batchSize = 1000
 	colCount := len(srcCols)
-	for rows.Next() {
-		// 全部用 sql.NullString 扫描，最大兼容
-		vals := make([]sql.NullString, colCount)
-		ptrs := make([]interface{}, colCount)
-		for i := range vals {
-			ptrs[i] = &vals[i]
+	offset := 0
+
+	for {
+		selectSQL := fmt.Sprintf("SELECT %s FROM `%s` ORDER BY `%s` LIMIT %d OFFSET %d",
+			colList, tableName, pk, batchSize, offset)
+
+		rows, err := extDB.Query(selectSQL)
+		if err != nil {
+			return nil, fmt.Errorf("查询源表失败(offset=%d): %v", offset, err)
 		}
-		if err := rows.Scan(ptrs...); err != nil {
-			info.Failed++
-			continue
-		}
-		info.Total++
 
-		pkVal := vals[pkIdx].String
+		batchCount := 0
+		for rows.Next() {
+			batchCount++
+			vals := make([]sql.NullString, colCount)
+			ptrs := make([]interface{}, colCount)
+			for i := range vals {
+				ptrs[i] = &vals[i]
+			}
+			if err := rows.Scan(ptrs...); err != nil {
+				info.Failed++
+				continue
+			}
+			info.Total++
 
-		// 检查本地是否存在
-		var exists int
-		database.DB.QueryRow(checkSQL, pkVal).Scan(&exists)
+			pkVal := vals[pkIdx].String
 
-		if exists > 0 {
-			if updateExisting && updateSQL != "" {
-				// 构建 UPDATE 参数：非PK列值 + PK值
-				args := make([]interface{}, 0, len(nonPKCols)+1)
-				for _, col := range nonPKCols {
-					for j, sc := range srcCols {
-						if strings.EqualFold(sc, col) {
-							if vals[j].Valid {
-								args = append(args, vals[j].String)
-							} else {
-								args = append(args, nil)
+			var exists int
+			database.DB.QueryRow(checkSQL, pkVal).Scan(&exists)
+
+			if exists > 0 {
+				if updateExisting && updateSQL != "" {
+					args := make([]interface{}, 0, len(nonPKCols)+1)
+					for _, col := range nonPKCols {
+						for j, sc := range srcCols {
+							if strings.EqualFold(sc, col) {
+								if vals[j].Valid {
+									args = append(args, vals[j].String)
+								} else {
+									args = append(args, nil)
+								}
+								break
 							}
-							break
 						}
 					}
+					args = append(args, pkVal)
+					if _, err := database.DB.Exec(updateSQL, args...); err != nil {
+						info.Failed++
+					} else {
+						info.Updated++
+					}
+				} else {
+					info.Skipped++
 				}
-				args = append(args, pkVal)
-				if _, err := database.DB.Exec(updateSQL, args...); err != nil {
+			} else {
+				args := make([]interface{}, colCount)
+				for i := range vals {
+					if vals[i].Valid {
+						args[i] = vals[i].String
+					} else {
+						args[i] = nil
+					}
+				}
+				if _, err := database.DB.Exec(insertSQL, args...); err != nil {
 					info.Failed++
 				} else {
-					info.Updated++
+					info.Inserted++
 				}
-			} else {
-				info.Skipped++
-			}
-		} else {
-			// 构建 INSERT 参数：按 srcCols 顺序
-			args := make([]interface{}, colCount)
-			for i := range vals {
-				if vals[i].Valid {
-					args[i] = vals[i].String
-				} else {
-					args[i] = nil
-				}
-			}
-			if _, err := database.DB.Exec(insertSQL, args...); err != nil {
-				info.Failed++
-			} else {
-				info.Inserted++
 			}
 		}
+		rows.Close()
+
+		if batchCount < batchSize {
+			break // 最后一批，没有更多数据了
+		}
+		offset += batchSize
+		log.Printf("[DBSync] %s 已处理 %d 条...", tableName, offset)
 	}
+
 	return info, nil
 }
 

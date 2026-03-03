@@ -351,20 +351,39 @@ onMounted(async () => {
     const extMenus = await getExtMenusPublicApi();
     if (extMenus?.length && fullMenusBackup.value.length) {
       for (const ext of extMenus) {
-        const routePath = `/admin/ext/${ext.id}`;
-        const menuItem = {
-          name: ext.title,
-          path: routePath,
-          icon: ext.icon || 'mdi:puzzle-outline',
-          order: 900 + ext.sort_order,
-          show: true,
-          children: [],
-        };
-        const adminMenu = fullMenusBackup.value.find((m: any) => m.path === '/admin');
-        if (adminMenu?.children) {
-          if (!adminMenu.children.find((c: any) => c.path === routePath)) {
-            adminMenu.children.push(menuItem);
-            adminMenu.children.sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+        if (ext.scope === 'backend' || !ext.scope) {
+          // 后台扩展菜单 → 注入 /admin 子菜单
+          const routePath = `/admin/ext/${ext.id}`;
+          const menuItem = {
+            name: ext.title,
+            path: routePath,
+            icon: ext.icon || 'mdi:puzzle-outline',
+            order: 900 + ext.sort_order,
+            show: true,
+            children: [],
+          };
+          const adminMenu = fullMenusBackup.value.find((m: any) => m.path === '/admin');
+          if (adminMenu?.children) {
+            if (!adminMenu.children.find((c: any) => c.path === routePath)) {
+              adminMenu.children.push(menuItem);
+              adminMenu.children.sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+            }
+          }
+        } else if (ext.scope === 'frontend') {
+          // 前台扩展菜单 → 注入顶级菜单
+          const routePath = `/ext/${ext.id}`;
+          const menuItem = {
+            name: ext.title,
+            path: routePath,
+            icon: ext.icon || 'mdi:puzzle-outline',
+            meta: { order: 900 + ext.sort_order, title: ext.title, icon: ext.icon || 'mdi:puzzle-outline' },
+            order: 900 + ext.sort_order,
+            show: true,
+            children: [],
+          };
+          if (!fullMenusBackup.value.find((m: any) => m.path === routePath)) {
+            fullMenusBackup.value.push(menuItem);
+            fullMenusBackup.value.sort((a: any, b: any) => (a.order ?? a.meta?.order ?? 0) - (b.order ?? b.meta?.order ?? 0));
           }
         }
       }

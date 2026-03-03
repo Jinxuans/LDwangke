@@ -3,11 +3,11 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"net/http"
 	"net/url"
-	"io"
 	"strings"
 	"time"
 
@@ -17,16 +17,16 @@ import (
 // ---------- 数据结构 ----------
 
 type YongyeConfig struct {
-	ApiURL  string  `json:"api_url"`  // 上游API地址 如 https://yy.rgrg.cc/api
-	Token   string  `json:"token"`    // 上游token
+	ApiURL  string  `json:"api_url"` // 上游API地址 如 https://yy.rgrg.cc/api
+	Token   string  `json:"token"`   // 上游token
 	Dj      float64 `json:"dj"`      // 等级(最高级) 如0.2
 	Zs      float64 `json:"zs"`      // 赠送倍率 如1.25
 	Beis    float64 `json:"beis"`    // 学校价格倍数 如1.3
-	Xzdj    float64 `json:"xzdj"`   // 限制等级
-	Xzmo    float64 `json:"xzmo"`   // 限制余额
-	Tk      float64 `json:"tk"`     // 退款手续费率 如0.01=1%
+	Xzdj    float64 `json:"xzdj"`    // 限制等级
+	Xzmo    float64 `json:"xzmo"`    // 限制余额
+	Tk      float64 `json:"tk"`      // 退款手续费率 如0.01=1%
 	Content string  `json:"content"` // 下单页说明
-	Tcgg    string  `json:"tcgg"`   // 弹窗公告
+	Tcgg    string  `json:"tcgg"`    // 弹窗公告
 }
 
 type YongyeOrder struct {
@@ -180,7 +180,7 @@ func (s *YongyeService) GetConfig() (*YongyeConfig, error) {
 func (s *YongyeService) SaveConfig(cfg *YongyeConfig) error {
 	data, _ := json.Marshal(cfg)
 	_, err := database.DB.Exec(
-		"INSERT INTO qingka_wangke_config (skey, svalue) VALUES ('yongye_config', ?) ON DUPLICATE KEY UPDATE svalue = ?",
+		"INSERT INTO qingka_wangke_config (v, k, skey, svalue) VALUES ('yongye_config', '', 'yongye_config', ?) ON DUPLICATE KEY UPDATE svalue = ?",
 		string(data), string(data),
 	)
 	return err

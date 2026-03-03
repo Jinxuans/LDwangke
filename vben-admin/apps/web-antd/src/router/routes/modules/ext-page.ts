@@ -26,6 +26,28 @@ const routes: RouteRecordRaw[] = [
       },
     ],
   },
+  {
+    component: BasicLayout,
+    meta: {
+      hideInMenu: true,
+      hideInBreadcrumb: true,
+      order: 998,
+      title: '扩展页面',
+    },
+    name: 'FrontExtPageWrapper',
+    path: '/ext',
+    children: [
+      {
+        name: 'FrontExtPage',
+        path: '/ext/:id',
+        component: () => import('#/views/ext/IframePage.vue'),
+        meta: {
+          title: '扩展页面',
+          hideInMenu: true,
+        },
+      },
+    ],
+  },
 ];
 
 export default routes;

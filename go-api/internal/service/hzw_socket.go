@@ -397,7 +397,7 @@ func GetHZWSocketURL() string {
 // SetHZWSocketURL 保存 HZW Socket URL 到 qingka_wangke_config
 func SetHZWSocketURL(socketURL string) error {
 	_, err := database.DB.Exec(
-		"INSERT INTO qingka_wangke_config (skey, svalue) VALUES ('hzw_socket_url', ?) ON DUPLICATE KEY UPDATE svalue = ?",
+		"INSERT INTO qingka_wangke_config (v, k, skey, svalue) VALUES ('hzw_socket_url', '', 'hzw_socket_url', ?) ON DUPLICATE KEY UPDATE svalue = ?",
 		socketURL, socketURL,
 	)
 	return err

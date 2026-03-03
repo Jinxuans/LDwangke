@@ -303,6 +303,59 @@ func AdminClassBatchPrice(c *gin.Context) {
 	response.Success(c, gin.H{"updated": updated, "msg": fmt.Sprintf("成功修改 %d 个课程的价格", updated)})
 }
 
+// AdminClassBatchReplaceKeyword 批量替换课程名称关键词
+func AdminClassBatchReplaceKeyword(c *gin.Context) {
+	var body struct {
+		Search  string `json:"search"`
+		Replace string `json:"replace"`
+		Scope   string `json:"scope"`
+		ScopeID string `json:"scope_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	if body.Search == "" {
+		response.BadRequest(c, "请输入要替换的关键词")
+		return
+	}
+	if body.Scope == "" {
+		body.Scope = "all"
+	}
+	updated, err := adminService.ClassBatchReplaceKeyword(body.Search, body.Replace, body.Scope, body.ScopeID)
+	if err != nil {
+		response.ServerError(c, "替换失败: "+err.Error())
+		return
+	}
+	response.Success(c, gin.H{"updated": updated, "msg": fmt.Sprintf("成功替换 %d 个课程的关键词", updated)})
+}
+
+// AdminClassBatchAddPrefix 批量为课程名称添加前缀
+func AdminClassBatchAddPrefix(c *gin.Context) {
+	var body struct {
+		Prefix  string `json:"prefix"`
+		Scope   string `json:"scope"`
+		ScopeID string `json:"scope_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	if body.Prefix == "" {
+		response.BadRequest(c, "请输入要添加的前缀")
+		return
+	}
+	if body.Scope == "" {
+		body.Scope = "all"
+	}
+	updated, err := adminService.ClassBatchAddPrefix(body.Prefix, body.Scope, body.ScopeID)
+	if err != nil {
+		response.ServerError(c, "添加前缀失败: "+err.Error())
+		return
+	}
+	response.Success(c, gin.H{"updated": updated, "msg": fmt.Sprintf("成功为 %d 个课程添加前缀", updated)})
+}
+
 // ===== 货源管理 =====
 
 func AdminSupplierList(c *gin.Context) {

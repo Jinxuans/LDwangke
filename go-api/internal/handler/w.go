@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"strconv"
 
 	"go-api/internal/response"
@@ -210,7 +211,14 @@ func WProxyAction(c *gin.Context) {
 		response.BusinessError(c, -1, err.Error())
 		return
 	}
-	c.Data(200, "application/json; charset=utf-8", resp)
+	// 将上游原始响应包装成标准格式 {code:0, data: <upstream_response>}
+	// 这样前端 requestClient 拦截器能正确解析
+	var upstream interface{}
+	if jsonErr := json.Unmarshal(resp, &upstream); jsonErr != nil {
+		response.Success(c, string(resp))
+		return
+	}
+	response.Success(c, upstream)
 }
 
 // WEditOrder 编辑订单

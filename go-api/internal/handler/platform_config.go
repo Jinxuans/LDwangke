@@ -193,6 +193,7 @@ func AdminPlatformConfigSave(c *gin.Context) {
 		return
 	}
 
+	service.ReloadPlatformConfigs()
 	response.SuccessMsg(c, "保存成功")
 }
 
@@ -214,6 +215,7 @@ func AdminPlatformConfigDelete(c *gin.Context) {
 		response.BadRequest(c, "平台不存在")
 		return
 	}
+	service.ReloadPlatformConfigs()
 	response.SuccessMsg(c, "删除成功")
 }
 
@@ -227,6 +229,106 @@ func AdminDetectPlatform(c *gin.Context) {
 
 	result := service.DetectPlatform(req)
 	response.Success(c, result)
+}
+
+// AdminAutoDetectSave 自动检测平台并保存配置（一键完成）
+func AdminAutoDetectSave(c *gin.Context) {
+	var req service.AutoDetectRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "请提供平台 URL 和标识")
+		return
+	}
+
+	// 1. 执行检测
+	result := service.DetectPlatform(req.DetectRequest)
+	if !result.Success {
+		response.Success(c, gin.H{
+			"success": false,
+			"msg":     "未检测到可用接口，请检查 URL 和凭证",
+			"detect":  result,
+		})
+		return
+	}
+
+	// 2. 转换为可保存的配置
+	saveReq := service.BuildConfigFromDetection(result, req.PT, req.Name)
+	if saveReq == nil {
+		response.Success(c, gin.H{
+			"success": false,
+			"msg":     "检测结果无法转换为配置",
+			"detect":  result,
+		})
+		return
+	}
+
+	// 3. 保存到数据库（与 AdminPlatformConfigSave 相同的 upsert 逻辑）
+	query := `INSERT INTO qingka_platform_config (
+		pt, name, auth_type, api_path_style, success_codes,
+		use_json, need_proxy, returns_yid, extra_params,
+		query_act, query_path, query_param_style, query_polling, query_max_attempts, query_interval, query_response_map,
+		order_act, order_path, yid_in_data_array,
+		progress_act, progress_no_yid, progress_path, progress_method, progress_needs_auth,
+		use_id_param, use_uuid_param, always_username,
+		pause_act, pause_path, pause_id_param, resume_act, resume_path,
+		change_pass_act, change_pass_path, change_pass_param, change_pass_id_param,
+		resubmit_path, resubmit_id_param,
+		log_act, log_path, log_method, log_id_param,
+		balance_act, balance_path, balance_money_field, balance_method, balance_auth_type,
+		report_param_style, report_auth_type, report_path, get_report_path, refresh_path,
+		source_code
+	) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+	ON DUPLICATE KEY UPDATE
+		name=VALUES(name), auth_type=VALUES(auth_type), api_path_style=VALUES(api_path_style),
+		success_codes=VALUES(success_codes), use_json=VALUES(use_json),
+		returns_yid=VALUES(returns_yid),
+		query_act=VALUES(query_act), query_path=VALUES(query_path),
+		order_act=VALUES(order_act), order_path=VALUES(order_path),
+		progress_act=VALUES(progress_act), progress_no_yid=VALUES(progress_no_yid),
+		progress_path=VALUES(progress_path), progress_method=VALUES(progress_method),
+		pause_act=VALUES(pause_act), pause_path=VALUES(pause_path), pause_id_param=VALUES(pause_id_param),
+		change_pass_act=VALUES(change_pass_act), change_pass_path=VALUES(change_pass_path),
+		change_pass_param=VALUES(change_pass_param), change_pass_id_param=VALUES(change_pass_id_param),
+		resubmit_path=VALUES(resubmit_path), resubmit_id_param=VALUES(resubmit_id_param),
+		log_act=VALUES(log_act), log_path=VALUES(log_path), log_method=VALUES(log_method),
+		log_id_param=VALUES(log_id_param),
+		balance_act=VALUES(balance_act), balance_path=VALUES(balance_path),
+		balance_money_field=VALUES(balance_money_field), balance_method=VALUES(balance_method),
+		balance_auth_type=VALUES(balance_auth_type),
+		report_param_style=VALUES(report_param_style), report_auth_type=VALUES(report_auth_type),
+		report_path=VALUES(report_path), get_report_path=VALUES(get_report_path), refresh_path=VALUES(refresh_path)`
+
+	_, err := database.DB.Exec(query,
+		saveReq.PT, saveReq.Name, saveReq.AuthType, saveReq.APIPathStyle, saveReq.SuccessCodes,
+		saveReq.UseJSON, saveReq.NeedProxy, saveReq.ReturnsYID, saveReq.ExtraParams,
+		saveReq.QueryAct, saveReq.QueryPath, saveReq.QueryParamStyle, saveReq.QueryPolling, saveReq.QueryMaxAttempts, saveReq.QueryInterval, saveReq.QueryResponseMap,
+		saveReq.OrderAct, saveReq.OrderPath, saveReq.YIDInDataArray,
+		saveReq.ProgressAct, saveReq.ProgressNoYID, saveReq.ProgressPath, saveReq.ProgressMethod, saveReq.ProgressNeedsAuth,
+		saveReq.UseIDParam, saveReq.UseUUIDParam, saveReq.AlwaysUsername,
+		saveReq.PauseAct, saveReq.PausePath, saveReq.PauseIDParam, saveReq.ResumeAct, saveReq.ResumePath,
+		saveReq.ChangePassAct, saveReq.ChangePassPath, saveReq.ChangePassParam, saveReq.ChangePassIDParam,
+		saveReq.ResubmitPath, saveReq.ResubmitIDParam,
+		saveReq.LogAct, saveReq.LogPath, saveReq.LogMethod, saveReq.LogIDParam,
+		saveReq.BalanceAct, saveReq.BalancePath, saveReq.BalanceMoneyField, saveReq.BalanceMethod, saveReq.BalanceAuthType,
+		saveReq.ReportParamStyle, saveReq.ReportAuthType, saveReq.ReportPath, saveReq.GetReportPath, saveReq.RefreshPath,
+		"",
+	)
+	if err != nil {
+		response.Success(c, gin.H{
+			"success": false,
+			"msg":     "检测成功但保存失败: " + err.Error(),
+			"detect":  result,
+			"config":  saveReq,
+		})
+		return
+	}
+
+	service.ReloadPlatformConfigs()
+	response.Success(c, gin.H{
+		"success": true,
+		"msg":     "检测成功并已保存配置",
+		"detect":  result,
+		"config":  saveReq,
+	})
 }
 
 // AdminParsePHPCode 解析 PHP 代码，提取平台配置

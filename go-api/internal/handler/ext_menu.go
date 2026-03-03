@@ -3,6 +3,7 @@ package handler
 import (
 	"strconv"
 
+	"go-api/internal/database"
 	"go-api/internal/model"
 	"go-api/internal/response"
 	"go-api/internal/service"
@@ -48,6 +49,24 @@ func AdminExtMenuDelete(c *gin.Context) {
 		return
 	}
 	response.SuccessMsg(c, "删除成功")
+}
+
+// AdminExtMenuReorder 批量更新扩展菜单排序
+func AdminExtMenuReorder(c *gin.Context) {
+	var req struct {
+		Items []struct {
+			ID        int `json:"id"`
+			SortOrder int `json:"sort_order"`
+		} `json:"items"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	for _, item := range req.Items {
+		database.DB.Exec("UPDATE qingka_ext_menu SET sort_order=? WHERE id=?", item.SortOrder, item.ID)
+	}
+	response.SuccessMsg(c, "排序已更新")
 }
 
 // ExtMenuPublicList 获取可见的扩展菜单（公开，用于前端动态菜单）

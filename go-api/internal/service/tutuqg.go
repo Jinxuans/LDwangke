@@ -99,7 +99,7 @@ func (s *TutuQGService) SaveConfig(cfg *TutuQGConfig) error {
 		_, err := database.DB.Exec("UPDATE qingka_wangke_config SET svalue = ? WHERE skey = 'tutuqg_config'", string(data))
 		return err
 	}
-	_, err := database.DB.Exec("INSERT INTO qingka_wangke_config (skey, svalue) VALUES ('tutuqg_config', ?)", string(data))
+	_, err := database.DB.Exec("INSERT INTO qingka_wangke_config (v, k, skey, svalue) VALUES ('tutuqg_config', '', 'tutuqg_config', ?)", string(data))
 	return err
 }
 

@@ -18,6 +18,8 @@ export interface XMOrder {
   project_id: number;
   status_name: string;
   type: string | null;
+  pace: number | null;
+  distance: number | null;
   total_km: number;
   is_deleted: boolean;
   run_km: number | null;
@@ -70,6 +72,11 @@ export async function xmDeleteOrderApi(orderId: number) {
 // 同步订单
 export async function xmSyncOrderApi(orderId: number) {
   return requestClient.get(`/xm/sync?order_id=${orderId}`);
+}
+
+// 增加次数/公里
+export async function xmAddOrderKMApi(orderId: number, addKM: number) {
+  return requestClient.post('/xm/add-order-km', { order_id: orderId, add_km: addKM });
 }
 
 // 订单日志

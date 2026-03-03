@@ -121,6 +121,6 @@
   },
   "dependencies": {
     "cssnano": "^7.1.2",
-    "vuedraggable": "^2.24.3"
+    "sortablejs": "^1.15.6"
   }
 }

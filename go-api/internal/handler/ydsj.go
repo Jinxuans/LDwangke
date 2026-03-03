@@ -146,6 +146,53 @@ func YDSJRefundOrder(c *gin.Context) {
 	response.SuccessMsg(c, msg)
 }
 
+// ---------- 修改备注 ----------
+
+func YDSJEditRemarks(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "super" || role == "admin"
+
+	var req struct {
+		ID      int    `json:"id" binding:"required"`
+		Remarks string `json:"remarks"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	svc := service.NewYDSJService()
+	msg, err := svc.EditRemarks(uid, req.ID, req.Remarks, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.SuccessMsg(c, msg)
+}
+
+// ---------- 手动同步订单 ----------
+
+func YDSJSyncOrder(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "super" || role == "admin"
+
+	var req struct {
+		ID int `json:"id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	svc := service.NewYDSJService()
+	result, err := svc.SyncOrder(uid, req.ID, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 // ---------- 切换跑步状态 ----------
 
 func YDSJToggleRun(c *gin.Context) {

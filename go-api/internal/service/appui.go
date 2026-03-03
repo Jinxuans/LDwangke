@@ -77,7 +77,7 @@ func (s *AppuiService) GetConfig() (*AppuiConfig, error) {
 func (s *AppuiService) SaveConfig(cfg *AppuiConfig) error {
 	data, _ := json.Marshal(cfg)
 	_, err := database.DB.Exec(
-		"INSERT INTO qingka_wangke_config (skey, svalue) VALUES ('appui_config', ?) ON DUPLICATE KEY UPDATE svalue = ?",
+		"INSERT INTO qingka_wangke_config (v, k, skey, svalue) VALUES ('appui_config', '', 'appui_config', ?) ON DUPLICATE KEY UPDATE svalue = ?",
 		string(data), string(data),
 	)
 	return err

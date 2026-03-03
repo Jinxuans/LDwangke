@@ -84,6 +84,38 @@ func XMGetOrders(c *gin.Context) {
 	response.SuccessPage(c, orders, int64(total), page, pageSize)
 }
 
+// ---------- 增加次数 ----------
+
+func XMAddOrderKM(c *gin.Context) {
+	uid := c.GetInt("uid")
+	role, _ := c.Get("role")
+	isAdmin := role == "super" || role == "admin"
+	if uid == 1 {
+		isAdmin = true
+	}
+
+	var body struct {
+		OrderID int `json:"order_id"`
+		AddKM   int `json:"add_km"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "请求数据格式错误")
+		return
+	}
+	if body.OrderID <= 0 || body.AddKM <= 0 {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+
+	svc := service.NewXMService()
+	result, err := svc.AddOrderKM(uid, body.OrderID, body.AddKM, isAdmin)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
 // ---------- 查询跑步状态 ----------
 
 func XMQueryRun(c *gin.Context) {
