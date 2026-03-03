@@ -40,7 +40,11 @@ func PhpProxy() gin.HandlerFunc {
 			response.BusinessError(c, 1003, "PHP 后端连接失败: "+err.Error())
 		}
 
-		// 传递原始请求头
+		// 去掉 /php-api 前缀，PHP 内置服务器的 document root 是 public/
+		c.Request.URL.Path = strings.TrimPrefix(c.Request.URL.Path, "/php-api")
+		if c.Request.URL.Path == "" {
+			c.Request.URL.Path = "/"
+		}
 		c.Request.Host = target.Host
 		proxy.ServeHTTP(c.Writer, c.Request)
 	}
