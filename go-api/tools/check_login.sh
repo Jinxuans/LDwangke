@@ -2,39 +2,55 @@
 
 # 登录问题诊断脚本
 # 用于快速排查登录时出现的内部服务器错误
+# 使用方法：./tools/check_login.sh
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONFIG_PATH="$PROJECT_ROOT/config/config.yaml"
+
+yaml_value() {
+    local section="$1"
+    local key="$2"
+    awk -v section="$section" -v key="$key" '
+        $0 ~ "^" section ":" { in_section = 1; next }
+        in_section && /^[^[:space:]]/ { in_section = 0 }
+        in_section && $1 == key ":" {
+            gsub(/"/, "", $2)
+            print $2
+            exit
+        }
+    ' "$CONFIG_PATH"
+}
 
 echo "=========================================="
 echo "登录问题诊断工具"
 echo "=========================================="
+echo "项目目录：$PROJECT_ROOT"
 echo ""
 
-# 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# 检查配置文件
 echo "1. 检查配置文件..."
-if [ -f "config/config.yaml" ]; then
+if [ -f "$CONFIG_PATH" ]; then
     echo -e "${GREEN}✓${NC} 配置文件存在"
-    
-    # 检查数据库配置
-    if grep -q "database:" config/config.yaml; then
+
+    if grep -q "database:" "$CONFIG_PATH"; then
         echo -e "${GREEN}✓${NC} 数据库配置存在"
     else
         echo -e "${RED}✗${NC} 数据库配置缺失"
     fi
-    
-    # 检查JWT配置
-    if grep -q "jwt:" config/config.yaml; then
+
+    if grep -q "jwt:" "$CONFIG_PATH"; then
         echo -e "${GREEN}✓${NC} JWT配置存在"
     else
         echo -e "${RED}✗${NC} JWT配置缺失"
     fi
 else
-    echo -e "${RED}✗${NC} 配置文件不存在: config/config.yaml"
-    echo "请从 config.example.yaml 复制并配置"
+    echo -e "${RED}✗${NC} 配置文件不存在: $CONFIG_PATH"
+    echo "请从 config/config.example.yaml 复制并配置"
     exit 1
 fi
 
@@ -43,12 +59,11 @@ echo ""
 # 检查数据库连接
 echo "2. 检查数据库连接..."
 
-# 从配置文件读取数据库信息（简化版，实际可能需要 yq 工具）
-DB_HOST=$(grep -A 5 "database:" config/config.yaml | grep "host:" | awk '{print $2}' | tr -d '"')
-DB_PORT=$(grep -A 5 "database:" config/config.yaml | grep "port:" | awk '{print $2}')
-DB_USER=$(grep -A 5 "database:" config/config.yaml | grep "username:" | awk '{print $2}' | tr -d '"')
-DB_PASS=$(grep -A 5 "database:" config/config.yaml | grep "password:" | awk '{print $2}' | tr -d '"')
-DB_NAME=$(grep -A 5 "database:" config/config.yaml | grep "database:" | awk '{print $2}' | tr -d '"')
+DB_HOST="$(yaml_value database host)"
+DB_PORT="$(yaml_value database port)"
+DB_USER="$(yaml_value database user)"
+DB_PASS="$(yaml_value database password)"
+DB_NAME="$(yaml_value database dbname)"
 
 if [ -z "$DB_HOST" ]; then
     echo -e "${YELLOW}⚠${NC} 无法从配置文件读取数据库信息，请手动检查"
@@ -109,19 +124,23 @@ fi
 
 echo ""
 
-# 检查 Redis 连接
 echo "4. 检查 Redis 连接..."
 
-REDIS_ADDR=$(grep -A 3 "redis:" config/config.yaml | grep "addr:" | awk '{print $2}' | tr -d '"')
+REDIS_HOST="$(yaml_value redis host)"
+REDIS_PORT="$(yaml_value redis port)"
+REDIS_PASS="$(yaml_value redis password)"
 
-if [ ! -z "$REDIS_ADDR" ]; then
-    echo "Redis 地址: $REDIS_ADDR"
-    
-    if command -v redis-cli &> /dev/null; then
-        REDIS_HOST=$(echo $REDIS_ADDR | cut -d':' -f1)
-        REDIS_PORT=$(echo $REDIS_ADDR | cut -d':' -f2)
-        
-        if redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" ping &> /dev/null; then
+if [ -n "$REDIS_HOST" ] && [ -n "$REDIS_PORT" ]; then
+    echo "Redis 地址: $REDIS_HOST:$REDIS_PORT"
+
+    if command -v redis-cli >/dev/null 2>&1; then
+        if [ -n "$REDIS_PASS" ]; then
+            redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" -a "$REDIS_PASS" ping >/dev/null 2>&1
+        else
+            redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" ping >/dev/null 2>&1
+        fi
+
+        if [ $? -eq 0 ]; then
             echo -e "${GREEN}✓${NC} Redis 连接成功"
         else
             echo -e "${YELLOW}⚠${NC} Redis 连接失败（不影响基本登录功能）"
@@ -135,40 +154,39 @@ fi
 
 echo ""
 
-# 检查服务进程
 echo "5. 检查服务状态..."
 
-if pgrep -f "go-api" > /dev/null; then
-    echo -e "${GREEN}✓${NC} go-api 服务正在运行"
-    
-    # 检查端口
-    PORT=$(grep -A 2 "server:" config/config.yaml | grep "port:" | awk '{print $2}')
-    if [ ! -z "$PORT" ]; then
-        if netstat -tuln 2>/dev/null | grep -q ":$PORT " || ss -tuln 2>/dev/null | grep -q ":$PORT "; then
-            echo -e "${GREEN}✓${NC} 服务端口 $PORT 正在监听"
-        else
-            echo -e "${RED}✗${NC} 服务端口 $PORT 未监听"
-        fi
+PORT="$(yaml_value server port)"
+if [ -z "$PORT" ]; then
+    PORT=8080
+fi
+
+if pgrep -f "$PROJECT_ROOT/server|$PROJECT_ROOT/go-api-linux|go-api.*server" >/dev/null 2>&1; then
+    echo -e "${GREEN}✓${NC} Go API 服务正在运行"
+
+    if netstat -tuln 2>/dev/null | grep -q ":$PORT " || ss -tuln 2>/dev/null | grep -q ":$PORT "; then
+        echo -e "${GREEN}✓${NC} 服务端口 $PORT 正在监听"
+    else
+        echo -e "${RED}✗${NC} 服务端口 $PORT 未监听"
     fi
 else
-    echo -e "${RED}✗${NC} go-api 服务未运行"
-    echo "启动命令: ./go-api 或 ./restart.sh"
+    echo -e "${RED}✗${NC} Go API 服务未运行"
+    echo "启动命令: ./tools/restart.sh"
 fi
 
 echo ""
 
-# 检查日志文件
 echo "6. 检查最近的错误日志..."
 
-if [ -f "logs/app.log" ]; then
+if [ -f "$PROJECT_ROOT/go-api.log" ]; then
     echo "最近的错误日志（最后10条包含 error 的记录）:"
     echo "----------------------------------------"
-    grep -i "error" logs/app.log | tail -10 || echo "未发现错误日志"
+    grep -i "error" "$PROJECT_ROOT/go-api.log" | tail -10 || echo "未发现错误日志"
     echo "----------------------------------------"
-elif [ -f "nohup.out" ]; then
+elif [ -f "$PROJECT_ROOT/nohup.out" ]; then
     echo "最近的错误日志（nohup.out 最后10条包含 error 的记录）:"
     echo "----------------------------------------"
-    grep -i "error" nohup.out | tail -10 || echo "未发现错误日志"
+    grep -i "error" "$PROJECT_ROOT/nohup.out" | tail -10 || echo "未发现错误日志"
     echo "----------------------------------------"
 else
     echo -e "${YELLOW}⚠${NC} 未找到日志文件"
@@ -176,17 +194,10 @@ fi
 
 echo ""
 
-# 测试登录接口
 echo "7. 测试登录接口..."
 
-PORT=$(grep -A 2 "server:" config/config.yaml | grep "port:" | awk '{print $2}')
-if [ -z "$PORT" ]; then
-    PORT=8080
-fi
-
 if command -v curl &> /dev/null; then
-    echo "测试 API 健康检查..."
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$PORT/health 2>/dev/null)
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$PORT/api/v1/site/config" 2>/dev/null)
     
     if [ "$HTTP_CODE" = "200" ]; then
         echo -e "${GREEN}✓${NC} API 服务响应正常"
@@ -209,6 +220,6 @@ echo "1. 数据库连接失败 -> 检查数据库服务和配置"
 echo "2. pass2 字段缺失 -> 执行 SQL: ALTER TABLE qingka_wangke_user ADD COLUMN pass2 VARCHAR(255) DEFAULT '';"
 echo "3. 配置表缺失 -> 执行 SQL: INSERT INTO qingka_wangke_config (v, k) VALUES ('pass2_kg', '0');"
 echo "4. JWT 配置问题 -> 检查 config.yaml 中的 jwt.secret"
-echo "5. 服务未启动 -> 执行 ./restart.sh 或 ./go-api"
+echo "5. 服务未启动 -> 执行 ./tools/restart.sh"
 echo ""
 echo "详细诊断报告请查看: LOGIN_ERROR_DIAGNOSIS.md"

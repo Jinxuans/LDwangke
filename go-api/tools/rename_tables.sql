@@ -5,7 +5,7 @@
 
 -- 使用说明：
 -- 1. 先备份数据库：mysqldump -u root -p old_db > backup.sql
--- 2. 执行此脚本：mysql -u root -p new_db < rename_tables.sql
+-- 2. 执行此脚本：mysql -u root -p new_db < tools/rename_tables.sql
 -- 3. 运行 Go 系统的 Fix() 补充缺失字段
 
 -- ========================================

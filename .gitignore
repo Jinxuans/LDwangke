@@ -9,6 +9,7 @@ go-api/server.exe
 go-api/go-api
 go-api/go-api-bin
 go-api/bin/
+go-api/.gocache
 *.exe
 *.log
 
@@ -45,6 +46,8 @@ CLAUDE.md
 .opencode/
 Cline/
 .windsurf/
+/*/.serena
+.serena
 
 # SSL challenge
 .well-known/
