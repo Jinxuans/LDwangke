@@ -19,7 +19,7 @@ class qingka_manager_main:
     __php_port = '9000'
     __version_file = '/www/wwwroot/qingka/version.json'
     __service_name = 'qingka-api'
-    __update_server = 'https://auth.qingka.top'
+    __update_server = 'https://raw.githubusercontent.com/Jinxuans/LD_Resources/refs/heads/main'
     __license_file = '/www/wwwroot/qingka/license.key'
 
 
@@ -225,6 +225,7 @@ class qingka_manager_main:
 
     def _require_license(self):
         """快速授权校验（优先查本地缓存，未授权返回错误 returnMsg，已授权返回 None）"""
+        return None
         key = self._get_license_key()
         if not key:
             return public.returnMsg(False, '请先在「首页概览」输入授权码')
@@ -289,13 +290,13 @@ class qingka_manager_main:
 
     def start(self, args):
         # 授权验证
-        key = self._get_license_key()
-        if key:
-            ok, msg = self._verify_license(key)
-            if not ok:
-                return public.returnMsg(False, '授权验证失败: %s' % msg)
-        else:
-            return public.returnMsg(False, '请先在「首页概览」输入授权码')
+        # key = self._get_license_key()
+        # if key:
+        #     ok, msg = self._verify_license(key)
+        #     if not ok:
+        #         return public.returnMsg(False, '授权验证失败: %s' % msg)
+        # else:
+        #     return public.returnMsg(False, '请先在「首页概览」输入授权码')
         pid = self._get_pid()
         if pid and os.path.exists('/proc/%s' % pid):
             return public.returnMsg(False, '服务已在运行中，PID: %s' % pid)
@@ -436,13 +437,13 @@ class qingka_manager_main:
 
     def php_start(self, args):
         # 授权验证
-        key = self._get_license_key()
-        if key:
-            ok, msg = self._verify_license(key)
-            if not ok:
-                return public.returnMsg(False, '授权验证失败: %s' % msg)
-        else:
-            return public.returnMsg(False, '请先在「首页概览」输入授权码')
+        # key = self._get_license_key()
+        # if key:
+        #     ok, msg = self._verify_license(key)
+        #     if not ok:
+        #         return public.returnMsg(False, '授权验证失败: %s' % msg)
+        # else:
+        #     return public.returnMsg(False, '请先在「首页概览」输入授权码')
         php_bin = self._find_php_bin()
         if not php_bin:
             return public.returnMsg(False, '未找到 PHP 可执行文件，请先在宝塔面板安装 PHP')

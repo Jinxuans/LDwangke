@@ -55,7 +55,7 @@ journalctl -u go-api -f
 ```bash
 # 测试数据库连接
 cd 29-colnt-com/go-api
-./diagnose.sh
+./tools/diagnose.sh
 ```
 
 ### 步骤 3: 验证数据库表结构

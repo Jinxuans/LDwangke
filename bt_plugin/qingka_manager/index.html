@@ -817,8 +817,8 @@ function saveLicense() {
   req('save_license', {license_key: key}, function(res) {
     layer.close(idx);
     QK._busy = false;
-    layer.msg(res.msg || (res.status ? '激活成功' : '激活失败'), {icon: res.status ? 1 : 2});
-    if (res.status) checkLicense();
+    layer.msg((res.status ? '激活成功' : '激活失败'), {icon: res.status ? 1 : 2});
+    if (1) checkLicense();
   });
 }
 

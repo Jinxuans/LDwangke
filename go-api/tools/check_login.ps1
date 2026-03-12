@@ -1,5 +1,6 @@
 # check_login.ps1
-# Windows PowerShell diagnostic script for intermittent login 500 errors
+# Windows PowerShell diagnostic script for intermittent login errors
+# Usage: .\tools\check_login.ps1
 
 Write-Host "=========================================="
 Write-Host "Login Diagnostic Tool (PowerShell)"
@@ -14,35 +15,46 @@ function Ok($msg) { Write-Host "[OK] $msg" -ForegroundColor $GreenColor }
 function Fail($msg) { Write-Host "[ERR] $msg" -ForegroundColor $RedColor }
 function Warn($msg) { Write-Host "[WARN] $msg" -ForegroundColor $YellowColor }
 
-# Safe yaml value parser (simple key:value, first match)
-function Get-YamlVal([string]$text, [string]$key) {
-  $escapedKey = [regex]::Escape($key)
-  $pattern = '(?m)^\s*' + $escapedKey + '\s*:\s*"?([^"#\r\n]+)"?'
-  $m = [regex]::Match($text, $pattern)
-  if ($m.Success) { return $m.Groups[1].Value.Trim() }
+function Get-YamlSectionValue([string[]]$lines, [string]$section, [string]$key) {
+  $inSection = $false
+  foreach ($line in $lines) {
+    if ($line -match ('^\s*' + [regex]::Escape($section) + ':\s*$')) {
+      $inSection = $true
+      continue
+    }
+    if ($inSection -and $line -match '^\S') {
+      break
+    }
+    if ($inSection -and $line -match ('^\s+' + [regex]::Escape($key) + ':\s*"?([^"#\r\n]+)"?')) {
+      return $Matches[1].Trim()
+    }
+  }
   return ""
 }
 
-# 1) config check
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = Split-Path -Parent $scriptDir
+$configPath = Join-Path $projectRoot 'config\config.yaml'
+
 Write-Host "1) Check config file..."
-$configPath = "config/config.yaml"
 if (-not (Test-Path $configPath)) {
   Fail "Missing config file: $configPath"
-  Write-Host "Please create it from config/config.example.yaml"
+  Write-Host "Please create it from config\config.example.yaml"
   exit 1
 }
 Ok "Found config: $configPath"
 
-$cfgText = Get-Content $configPath -Raw
+$cfgLines = Get-Content $configPath
+$cfgText = $cfgLines -join "`n"
 if ($cfgText -match "database:") { Ok "database section exists" } else { Fail "database section missing" }
 if ($cfgText -match "jwt:") { Ok "jwt section exists" } else { Fail "jwt section missing" }
 
-$dbHost = Get-YamlVal $cfgText "host"
-$dbPort = Get-YamlVal $cfgText "port"
-$dbUser = Get-YamlVal $cfgText "username"
-$dbPass = Get-YamlVal $cfgText "password"
-$dbName = Get-YamlVal $cfgText "database"
-$port = Get-YamlVal $cfgText "port"
+$dbHost = Get-YamlSectionValue $cfgLines "database" "host"
+$dbPort = Get-YamlSectionValue $cfgLines "database" "port"
+$dbUser = Get-YamlSectionValue $cfgLines "database" "user"
+$dbPass = Get-YamlSectionValue $cfgLines "database" "password"
+$dbName = Get-YamlSectionValue $cfgLines "database" "dbname"
+$port = Get-YamlSectionValue $cfgLines "server" "port"
 if (-not $port) { $port = "8080" }
 
 Write-Host ""
@@ -84,9 +96,8 @@ if ($mysqlCmd -and $dbHost -and $dbPort -and $dbUser -and $dbName) {
 
 Write-Host ""
 
-# 4) process/port
 Write-Host "4) Check process and listen port..."
-$proc = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match "go-api|server" } | Select-Object -First 1
+$proc = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match "go-api|server|go-api-linux" } | Select-Object -First 1
 if ($proc) { Ok "process found: $($proc.ProcessName) pid=$($proc.Id)" } else { Warn "no go-api/server process found" }
 
 try {
@@ -98,13 +109,12 @@ try {
 
 Write-Host ""
 
-# 5) health endpoint
-Write-Host "5) Check /health endpoint..."
+Write-Host "5) Check /api/v1/site/config endpoint..."
 try {
-  $resp = Invoke-WebRequest -Uri ("http://127.0.0.1:{0}/health" -f $port) -UseBasicParsing -TimeoutSec 5
-  if ($resp.StatusCode -eq 200) { Ok "/health returned 200" } else { Warn "/health status: $($resp.StatusCode)" }
+  $resp = Invoke-WebRequest -Uri ("http://127.0.0.1:{0}/api/v1/site/config" -f $port) -UseBasicParsing -TimeoutSec 5
+  if ($resp.StatusCode -eq 200) { Ok "/api/v1/site/config returned 200" } else { Warn "endpoint status: $($resp.StatusCode)" }
 } catch {
-  Fail "Cannot access /health: $($_.Exception.Message)"
+  Fail "Cannot access public endpoint: $($_.Exception.Message)"
 }
 
 Write-Host ""

@@ -203,7 +203,7 @@ mysql -u root -p -e "CREATE DATABASE new_db CHARACTER SET utf8mb4 COLLATE utf8mb
 mysql -u root -p new_db < backup_$(date +%Y%m%d).sql
 
 # 4. 重命名核心表
-mysql -u root -p new_db < rename_tables.sql
+mysql -u root -p new_db < tools/rename_tables.sql
 
 # 5. 启动 Go 系统
 cd 29-colnt-com/go-api

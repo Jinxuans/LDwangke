@@ -1,10 +1,26 @@
 #!/bin/bash
 
 # 订单进度诊断和修复脚本
-# 使用方法：./fix-order-progress.sh [订单 ID 列表]
-# 示例：./fix-order-progress.sh 3 4
+# 使用方法：./tools/fix-order-progress.sh [订单 ID 列表]
+# 示例：./tools/fix-order-progress.sh 3 4
 
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONFIG_PATH="$PROJECT_ROOT/config/config.yaml"
+
+yaml_value() {
+    local section="$1"
+    local key="$2"
+    awk -v section="$section" -v key="$key" '
+        $0 ~ "^" section ":" { in_section = 1; next }
+        in_section && /^[^[:space:]]/ { in_section = 0 }
+        in_section && $1 == key ":" {
+            gsub(/"/, "", $2)
+            print $2
+            exit
+        }
+    ' "$CONFIG_PATH"
+}
 
 echo "========================================"
 echo "  订单进度诊断和修复工具"
@@ -12,11 +28,11 @@ echo "========================================"
 echo ""
 
 # 加载数据库配置
-DB_USER=$(grep "^  user:" config/config.yaml | head -1 | awk '{print $2}')
-DB_PASS=$(grep "^  password:" config/config.yaml | head -1 | awk '{print $2}' | tr -d '"')
-DB_NAME=$(grep "^  dbname:" config/config.yaml | awk '{print $2}' | tr -d '"')
-DB_HOST=$(grep "^  host:" config/config.yaml | head -1 | awk '{print $2}')
-DB_PORT=$(grep "^  port:" config/config.yaml | head -1 | awk '{print $2}')
+DB_USER="$(yaml_value database user)"
+DB_PASS="$(yaml_value database password)"
+DB_NAME="$(yaml_value database dbname)"
+DB_HOST="$(yaml_value database host)"
+DB_PORT="$(yaml_value database port)"
 
 MYSQL_CMD="mysql -h$DB_HOST -P$DB_PORT -u$DB_USER -p$DB_PASS $DB_NAME"
 
