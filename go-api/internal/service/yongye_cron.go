@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,18 +11,19 @@ import (
 	"go-api/internal/database"
 )
 
-// StartYongyeCron 启动永夜运动后台同步任务
-func StartYongyeCron() {
+func RunYongyeCron(ctx context.Context) {
 	log.Println("[Yongye] 后台同步任务启动")
-	go yongyeCronRetryFailed()  // 重试失败的订单
-	go yongyeCronSyncStudents() // 同步学生状态
-	go yongyeCronRefund()       // 处理退款
+	go yongyeCronRetryFailed(ctx)  // 重试失败的订单
+	go yongyeCronSyncStudents(ctx) // 同步学生状态
+	go yongyeCronRefund(ctx)       // 处理退款
 }
 
 // ---------- 1. 重试失败订单 ----------
 
-func yongyeCronRetryFailed() {
-	time.Sleep(60 * time.Second)
+func yongyeCronRetryFailed(ctx context.Context) {
+	if !sleepWithContext(ctx, 60*time.Second) {
+		return
+	}
 	for {
 		func() {
 			defer func() {
@@ -30,7 +32,7 @@ func yongyeCronRetryFailed() {
 				}
 			}()
 
-			svc := NewYongyeService()
+			svc := Yongye()
 			cfg, err := svc.GetConfig()
 			if err != nil || cfg.ApiURL == "" || cfg.Token == "" {
 				return
@@ -83,7 +85,9 @@ func yongyeCronRetryFailed() {
 				respBody, err := svc.yongyeUpstreamPost(cfg, "add", apiData)
 				if err != nil {
 					log.Printf("[Yongye-cron-retry] 订单#%d 重试失败: %v", o.ID, err)
-					time.Sleep(5 * time.Second)
+					if !sleepWithContext(ctx, 5*time.Second) {
+						return
+					}
 					continue
 				}
 
@@ -98,18 +102,24 @@ func yongyeCronRetryFailed() {
 					log.Printf("[Yongye-cron-retry] 订单#%d 重试失败: %s", o.ID, mapGetString(apiResp, "msg"))
 				}
 
-				time.Sleep(3 * time.Second)
+				if !sleepWithContext(ctx, 3*time.Second) {
+					return
+				}
 			}
 		}()
 
-		time.Sleep(5 * time.Minute)
+		if !sleepWithContext(ctx, 5*time.Minute) {
+			return
+		}
 	}
 }
 
 // ---------- 2. 同步学生状态 ----------
 
-func yongyeCronSyncStudents() {
-	time.Sleep(90 * time.Second)
+func yongyeCronSyncStudents(ctx context.Context) {
+	if !sleepWithContext(ctx, 90*time.Second) {
+		return
+	}
 	for {
 		func() {
 			defer func() {
@@ -118,7 +128,7 @@ func yongyeCronSyncStudents() {
 				}
 			}()
 
-			svc := NewYongyeService()
+			svc := Yongye()
 			cfg, err := svc.GetConfig()
 			if err != nil || cfg.ApiURL == "" || cfg.Token == "" {
 				return
@@ -132,9 +142,9 @@ func yongyeCronSyncStudents() {
 			defer rows.Close()
 
 			type stuKey struct {
-				User    string
-				Type    int
-				UID     int
+				User string
+				Type int
+				UID  int
 			}
 			var keys []stuKey
 			for rows.Next() {
@@ -164,18 +174,24 @@ func yongyeCronSyncStudents() {
 					database.DB.Exec("UPDATE yy_ydsj_student SET last_time = ? WHERE id = ?", now, existID)
 				}
 
-				time.Sleep(time.Second)
+				if !sleepWithContext(ctx, time.Second) {
+					return
+				}
 			}
 		}()
 
-		time.Sleep(3 * time.Minute)
+		if !sleepWithContext(ctx, 3*time.Minute) {
+			return
+		}
 	}
 }
 
 // ---------- 3. 处理自动退款 ----------
 
-func yongyeCronRefund() {
-	time.Sleep(120 * time.Second)
+func yongyeCronRefund(ctx context.Context) {
+	if !sleepWithContext(ctx, 120*time.Second) {
+		return
+	}
 	for {
 		func() {
 			defer func() {
@@ -184,7 +200,7 @@ func yongyeCronRefund() {
 				}
 			}()
 
-			svc := NewYongyeService()
+			svc := Yongye()
 			cfg, err := svc.GetConfig()
 			if err != nil || cfg.ApiURL == "" || cfg.Token == "" {
 				return
@@ -235,6 +251,8 @@ func yongyeCronRefund() {
 			}
 		}()
 
-		time.Sleep(5 * time.Minute)
+		if !sleepWithContext(ctx, 5*time.Minute) {
+			return
+		}
 	}
 }

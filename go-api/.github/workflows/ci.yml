@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.7"
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          test -z "$(gofmt -l cmd internal)"
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test ./...

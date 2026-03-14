@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue';
 import { Page } from '@vben/common-ui';
 import {
   Card, Button, Input, InputNumber, Switch, Select, SelectOption,
   message, Spin, Tabs, TabPane, Row, Col, Divider, Tag, Checkbox,
-  Table, Modal, Badge,
+  Table, Modal, Badge, Alert,
 } from 'ant-design-vue';
 import {
   SaveOutlined, ReloadOutlined, DesktopOutlined, TeamOutlined,
@@ -189,23 +189,57 @@ const dbTesting = ref(false);
 const dbSyncing = ref(false);
 const dbTestResult = ref<SyncTestResult | null>(null);
 const dbSyncResult = ref<SyncResult | null>(null);
+const dbConfirmationToken = ref('');
+const dbSyncResultRef = ref<HTMLElement | null>(null);
 const dbTableLabels: Record<string, string> = {
+  qingka_wangke_dengji: '等级',
   qingka_wangke_huoyuan: '货源',
   qingka_wangke_user: '用户',
   qingka_wangke_fenlei: '分类',
   qingka_wangke_class: '商品',
+  qingka_wangke_config: '配置',
+  qingka_wangke_gonggao: '公告',
+  qingka_wangke_mijia: '密价',
+  qingka_wangke_km: '卡密',
   qingka_wangke_order: '订单',
+  qingka_wangke_pay: '支付',
 };
 const canDbSync = computed(() => syncForm.value.host && syncForm.value.db_name && syncForm.value.user);
+const dbPrecheckPassed = computed(() => !dbTesting.value && !!dbTestResult.value?.connected && !!dbTestResult.value?.ready && !!dbConfirmationToken.value);
+
+function resetDbSyncState() {
+  dbConfirmationToken.value = '';
+  dbTestResult.value = null;
+  dbSyncResult.value = null;
+}
+
+async function scrollToDbSyncResult() {
+  await nextTick();
+  dbSyncResultRef.value?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  });
+}
+
+watch(syncForm, () => {
+  resetDbSyncState();
+}, { deep: true });
 
 async function doDbTest() {
   dbTesting.value = true;
-  dbTestResult.value = null;
+  dbConfirmationToken.value = '';
+  dbSyncResult.value = null;
   try {
     dbTestResult.value = await dbSyncTestApi(syncForm.value);
-    if (dbTestResult.value.connected) message.success('连接成功');
-    else message.error('连接失败: ' + (dbTestResult.value.error || '未知错误'));
+    dbConfirmationToken.value = dbTestResult.value.confirmation_token || '';
+    if (!dbTestResult.value.connected) {
+      message.error('连接失败: ' + (dbTestResult.value.error || '未知错误'));
+      return;
+    }
+    if (dbTestResult.value.ready) message.success('预检查通过');
+    else message.warning('预检查未通过，请先处理结构差异');
   } catch (e: any) {
+    dbConfirmationToken.value = '';
     message.error('测试失败: ' + (e?.message || e));
   } finally {
     dbTesting.value = false;
@@ -214,26 +248,56 @@ async function doDbTest() {
 
 async function doDbSync() {
   if (!canDbSync.value) { message.warning('请填写完整的数据库连接信息'); return; }
-  dbSyncing.value = true;
-  dbSyncResult.value = null;
-  try {
-    dbSyncResult.value = await dbSyncExecuteApi(syncForm.value);
-    if (dbSyncResult.value.success) message.success('同步完成');
-    else message.warning('同步完成，但有部分错误');
-  } catch (e: any) {
-    message.error('同步失败: ' + (e?.message || e));
-  } finally {
-    dbSyncing.value = false;
-  }
+  if (!dbPrecheckPassed.value || !dbTestResult.value) { message.warning('请先完成预检查并确保通过'); return; }
+  const warningText = dbTestResult.value.warnings?.length ? `\n\n风险提示：${dbTestResult.value.warnings.join('；')}` : '';
+  Modal.confirm({
+    title: '确认开始导入？',
+    content: `请先确认已完成当前数据库备份。导入将写入当前系统的核心数据表，且预检查令牌仅在 10 分钟内有效。${warningText}`,
+    okText: '确认导入',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      dbSyncing.value = true;
+      dbSyncResult.value = null;
+      try {
+        dbSyncResult.value = await dbSyncExecuteApi({
+          ...syncForm.value,
+          confirmation_token: dbConfirmationToken.value,
+        });
+        dbConfirmationToken.value = '';
+        if (dbSyncResult.value.success) message.success('导入完成');
+        else message.warning('导入完成，但有部分错误');
+      } catch (e: any) {
+        message.error('同步失败: ' + (e?.message || e));
+      } finally {
+        dbSyncing.value = false;
+        if (dbSyncResult.value) {
+          await scrollToDbSyncResult();
+        }
+      }
+    },
+  });
 }
 
 const dbSyncColumns = [
   { title: '数据类型', dataIndex: 'label', key: 'label', width: 100 },
   { title: '总数', dataIndex: 'total', key: 'total', width: 80 },
+  { title: '本地前', dataIndex: 'local_before', key: 'local_before', width: 90 },
+  { title: '本地后', dataIndex: 'local_after', key: 'local_after', width: 90 },
   { title: '新增', dataIndex: 'inserted', key: 'inserted', width: 80 },
   { title: '更新', dataIndex: 'updated', key: 'updated', width: 80 },
   { title: '跳过', dataIndex: 'skipped', key: 'skipped', width: 80 },
   { title: '失败', dataIndex: 'failed', key: 'failed', width: 80 },
+];
+
+const dbPrecheckColumns = [
+  { title: '数据类型', dataIndex: 'label', key: 'label', width: 110 },
+  { title: '命中源表', dataIndex: 'source_table', key: 'source_table', width: 180 },
+  { title: '源库条数', dataIndex: 'source_count', key: 'source_count', width: 100 },
+  { title: '本地条数', dataIndex: 'local_count', key: 'local_count', width: 100 },
+  { title: '状态', dataIndex: 'ready', key: 'ready', width: 100 },
+  { title: '缺失字段', dataIndex: 'missing_local_columns', key: 'missing_local_columns', width: 180 },
+  { title: '说明', dataIndex: 'message', key: 'message' },
 ];
 
 // ===== 数据库结构检测 =====
@@ -830,7 +894,7 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                 <TabPane key="sync" tab="数据同步">
                   <div class="mb-6">
                     <h3 class="text-base sm:text-lg font-medium mb-1">从其他系统同步数据</h3>
-                    <div class="text-gray-500 text-xs sm:text-sm">连接到外部 MySQL 数据库，将货源、用户、分类、商品、订单同步到当前系统。</div>
+                    <div class="text-gray-500 text-xs sm:text-sm">连接到旧 29 系统 MySQL 数据库，将等级、货源、用户、分类、商品、配置、公告、密价、卡密、订单、支付数据导入到当前系统。</div>
                   </div>
 
                   <Card title="外部数据库连接" size="small" :bordered="true" class="mb-6 shadow-sm">
@@ -870,30 +934,116 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                     <div class="flex flex-wrap gap-3 mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
                       <Button @click="doDbTest" :loading="dbTesting" :disabled="!canDbSync" class="w-full sm:w-32">
                         <template #icon><ApiOutlined /></template>
-                        测试连接
+                        预检查
                       </Button>
-                      <Button type="primary" @click="doDbSync" :loading="dbSyncing" :disabled="!canDbSync" class="w-full sm:w-32">
+                      <Button type="primary" danger @click="doDbSync" :loading="dbSyncing" :disabled="!dbPrecheckPassed" class="w-full sm:w-32">
                         <template #icon><SyncOutlined /></template>
-                        开始同步
+                        开始导入
                       </Button>
                     </div>
+
+                    <Alert
+                      v-if="dbSyncing"
+                      class="mt-4"
+                      type="info"
+                      show-icon
+                      message="正在导入数据"
+                      description="导入可能持续较久，完成后页面会自动定位到结果区域。"
+                    />
+                    <Alert
+                      v-else-if="dbSyncResult"
+                      class="mt-4"
+                      :type="dbSyncResult.success ? 'success' : 'warning'"
+                      show-icon
+                      :message="dbSyncResult.success ? '导入已完成' : '导入已完成（有警告）'"
+                      :description="dbSyncResult.summary"
+                    />
                   </Card>
 
                   <!-- 测试结果 -->
                   <div v-if="dbTestResult" class="mb-6 animate-fade-in">
-                    <Card size="small" :bordered="true" class="shadow-sm border-l-4" :class="dbTestResult.connected ? 'border-l-green-500' : 'border-l-red-500'">
+                    <Card size="small" :bordered="true" class="shadow-sm">
                       <template #title>
-                        <span :class="dbTestResult.connected ? 'text-green-600' : 'text-red-500'">
-                          <CheckCircleOutlined v-if="dbTestResult.connected" class="mr-1" />
+                        <span :class="dbTestResult.connected && dbTestResult.ready ? 'text-green-600' : 'text-orange-500'">
+                          <CheckCircleOutlined v-if="dbTestResult.connected && dbTestResult.ready" class="mr-1" />
                           <ExclamationCircleOutlined v-else class="mr-1" />
-                          {{ dbTestResult.connected ? '连接成功' : '连接失败' }}
+                          {{ dbTestResult.connected ? (dbTestResult.ready ? '预检查通过' : '预检查未通过') : '连接失败' }}
                         </span>
                       </template>
+                      <template #extra>
+                        <span class="text-gray-400 text-xs">{{ dbTestResult.tested_at }}</span>
+                      </template>
                       <template v-if="dbTestResult.connected && dbTestResult.tables">
-                        <div class="flex flex-wrap gap-3">
-                          <Tag v-for="(count, tbl) in dbTestResult.tables" :key="tbl" :color="count >= 0 ? 'blue' : 'red'" class="px-3 py-1 text-sm border-0 bg-blue-50 dark:bg-blue-900/30">
+                        <div class="flex flex-wrap gap-3 mb-4">
+                          <Tag v-for="(count, tbl) in dbTestResult.tables" :key="tbl" :color="count >= 0 ? 'blue' : 'red'">
                             {{ dbTableLabels[tbl] || tbl }} <Divider type="vertical" class="mx-2" /> <span class="font-semibold">{{ count >= 0 ? count : '缺失' }}</span>
                           </Tag>
+                        </div>
+                        <div class="mb-4 rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-gray-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
+                          {{ dbTestResult.summary }}
+                        </div>
+                        <template v-if="dbTestResult.warnings?.length">
+                          <Alert
+                            v-for="(warning, i) in dbTestResult.warnings"
+                            :key="i"
+                            type="warning"
+                            :message="warning"
+                            class="mb-2"
+                            show-icon
+                          />
+                        </template>
+                        <div class="overflow-x-auto">
+                          <Table
+                            :dataSource="dbTestResult.table_checks"
+                            :columns="dbPrecheckColumns"
+                            :pagination="false"
+                            size="small"
+                            rowKey="table"
+                            bordered
+                            class="min-w-[720px]"
+                          >
+                            <template #bodyCell="{ column, record }">
+                              <template v-if="column.key === 'label'">
+                                <div class="flex flex-col">
+                                  <div class="flex items-center gap-2">
+                                    <span class="font-medium">{{ record.label }}</span>
+                                    <Tag v-if="record.skipped_empty" color="orange">已跳过（源表为空）</Tag>
+                                  </div>
+                                  <span v-if="record.source_table" class="text-xs text-gray-400">
+                                    源表：{{ record.source_table }}
+                                  </span>
+                                  <span v-if="record.message && !record.skipped_empty" class="text-xs text-gray-400">
+                                    {{ record.message }}
+                                  </span>
+                                </div>
+                              </template>
+                              <template v-else-if="column.key === 'source_table'">
+                                <span :class="record.source_table && record.source_table !== record.table ? 'text-blue-500' : 'text-gray-500'">
+                                  {{ record.source_table || '-' }}
+                                </span>
+                              </template>
+                              <template v-else-if="column.key === 'ready'">
+                                <Badge
+                                  :status="record.skip ? 'warning' : (record.ready ? 'success' : 'error')"
+                                  :text="record.skip ? '将跳过' : (record.ready ? '可导入' : '需处理')"
+                                />
+                              </template>
+                              <template v-else-if="column.key === 'missing_local_columns'">
+                                <span v-if="record.missing_local_columns?.length" class="text-red-500 text-xs">
+                                  {{ record.missing_local_columns.join(', ') }}
+                                </span>
+                                <span v-else class="text-gray-400">无</span>
+                              </template>
+                              <template v-else-if="column.key === 'source_count' || column.key === 'local_count'">
+                                <span :class="record[column.key] < 0 ? 'text-red-500' : 'text-gray-500'">
+                                  {{ record[column.key] < 0 ? '不可用' : record[column.key] }}
+                                </span>
+                              </template>
+                              <template v-else>
+                                <span class="text-gray-500">{{ record[column.key] }}</span>
+                              </template>
+                            </template>
+                          </Table>
                         </div>
                       </template>
                       <div v-if="dbTestResult.error" class="text-red-500">{{ dbTestResult.error }}</div>
@@ -902,8 +1052,8 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
 
                   <!-- 同步结果 -->
                   <Spin :spinning="dbSyncing" tip="正在同步数据，请勿关闭页面...">
-                    <div v-if="dbSyncResult" class="animate-fade-in">
-                      <Card size="small" :bordered="true" class="shadow-sm border-l-4" :class="dbSyncResult.success ? 'border-l-green-500' : 'border-l-orange-500'">
+                    <div v-if="dbSyncResult" ref="dbSyncResultRef" class="animate-fade-in">
+                      <Card size="small" :bordered="true" class="shadow-sm">
                         <template #title>
                           <span :class="dbSyncResult.success ? 'text-green-600' : 'text-orange-500'">
                             <CheckCircleOutlined v-if="dbSyncResult.success" class="mr-1" />
@@ -915,7 +1065,9 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                           <span class="text-gray-400 text-xs">{{ dbSyncResult.sync_time }}</span>
                         </template>
                         
-                        <div class="text-gray-600 dark:text-gray-400 mb-4">{{ dbSyncResult.summary }}</div>
+                        <div class="mb-4 rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-gray-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-400">
+                          {{ dbSyncResult.summary }}
+                        </div>
                         
                         <div class="overflow-x-auto">
                           <Table
@@ -929,7 +1081,15 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                           >
                             <template #bodyCell="{ column, record }">
                               <template v-if="column.key === 'label'">
-                                <span class="font-medium">{{ record.label }}</span>
+                                <div class="flex flex-col">
+                                  <span class="font-medium">{{ record.label }}</span>
+                                  <span v-if="record.source_table" class="text-xs text-gray-400">
+                                    源表：{{ record.source_table }}
+                                  </span>
+                                  <span v-if="record.message" class="text-xs text-gray-400 whitespace-normal break-all">
+                                    {{ record.message }}
+                                  </span>
+                                </div>
                               </template>
                               <template v-else-if="column.key === 'inserted' && record.inserted > 0">
                                 <span class="text-green-600 font-medium">+{{ record.inserted }}</span>
@@ -947,10 +1107,16 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                           </Table>
                         </div>
                         
-                        <div v-if="dbSyncResult.errors && dbSyncResult.errors.length > 0" class="bg-red-50 dark:bg-red-900/20 p-3 rounded-md mt-4">
-                          <div class="text-red-600 font-medium mb-2">错误日志：</div>
-                          <div v-for="(err, i) in dbSyncResult.errors" :key="i" class="text-red-500 text-xs mb-1">{{ err }}</div>
-                        </div>
+                        <template v-if="dbSyncResult.errors && dbSyncResult.errors.length > 0">
+                          <Alert
+                            v-for="(err, i) in dbSyncResult.errors"
+                            :key="i"
+                            type="error"
+                            :message="err"
+                            class="mt-2"
+                            show-icon
+                          />
+                        </template>
                       </Card>
                     </div>
                   </Spin>

@@ -12,18 +12,17 @@ import (
 	"go-api/internal/database"
 )
 
-// StartYDSJCron 启动运动世界后台同步任务（替代4个PHP cron）
-func StartYDSJCron() {
+func RunYDSJCron(ctx context.Context) {
 	log.Println("[YDSJ] 后台同步任务启动")
-	go ydsjCronOrderStatus() // cron_order.php    — 同步订单状态
-	go ydsjCronOrderYID()    // cron_order_yid.php — 同步上游订单ID
-	go ydsjCronOrderInfo()   // cron_order_info.php — 同步订单详情
-	go ydsjCronOrderRefund() // cron_order_refund.php — 同步退款状态
+	go ydsjCronOrderStatus(ctx) // cron_order.php    — 同步订单状态
+	go ydsjCronOrderYID(ctx)    // cron_order_yid.php — 同步上游订单ID
+	go ydsjCronOrderInfo(ctx)   // cron_order_info.php — 同步订单详情
+	go ydsjCronOrderRefund(ctx) // cron_order_refund.php — 同步退款状态
 }
 
 // ydsjUpstreamQuery 调用上游查询订单接口（LearnExp: POST /ydsj/api.php?act=orders）
 func ydsjUpstreamQuery(cfg *YDSJConfig, user string, runType int) ([]map[string]interface{}, error) {
-	svc := NewYDSJService()
+	svc := YDSJ()
 	params := map[string]string{
 		"type":     "2",
 		"keywords": user,
@@ -78,8 +77,10 @@ func ydsjGetProjectName(runType int) string {
 
 // ---------- 1. 订单状态同步 (cron_order.php) ----------
 
-func ydsjCronOrderStatus() {
-	time.Sleep(30 * time.Second) // 启动延迟
+func ydsjCronOrderStatus(ctx context.Context) {
+	if !sleepWithContext(ctx, 30*time.Second) { // 启动延迟
+		return
+	}
 	for {
 		func() {
 			defer func() {
@@ -88,7 +89,7 @@ func ydsjCronOrderStatus() {
 				}
 			}()
 
-			svc := NewYDSJService()
+			svc := YDSJ()
 			cfg, err := svc.GetConfig()
 			if err != nil || !ydsjIsConfigured(cfg) {
 				return
@@ -120,7 +121,9 @@ func ydsjCronOrderStatus() {
 			for _, o := range orders {
 				items, err := ydsjUpstreamQuery(cfg, o.User, o.RunType)
 				if err != nil || len(items) == 0 {
-					time.Sleep(3 * time.Second)
+					if !sleepWithContext(ctx, 3*time.Second) {
+						return
+					}
 					continue
 				}
 
@@ -184,18 +187,24 @@ func ydsjCronOrderStatus() {
 					database.DB.Exec("UPDATE qingka_wangke_hzw_ydsj SET real_fees = ? WHERE id = ?", fmt.Sprintf("%.2f", originRealCost), o.ID)
 				}
 
-				time.Sleep(3 * time.Second)
+				if !sleepWithContext(ctx, 3*time.Second) {
+					return
+				}
 			}
 		}()
 
-		time.Sleep(10 * time.Minute)
+		if !sleepWithContext(ctx, 10*time.Minute) {
+			return
+		}
 	}
 }
 
 // ---------- 2. 上游订单ID同步 (cron_order_yid.php) ----------
 
-func ydsjCronOrderYID() {
-	time.Sleep(45 * time.Second) // 启动延迟（错开）
+func ydsjCronOrderYID(ctx context.Context) {
+	if !sleepWithContext(ctx, 45*time.Second) { // 启动延迟（错开）
+		return
+	}
 	for {
 		func() {
 			defer func() {
@@ -204,7 +213,7 @@ func ydsjCronOrderYID() {
 				}
 			}()
 
-			svc := NewYDSJService()
+			svc := YDSJ()
 			cfg, err := svc.GetConfig()
 			if err != nil || !ydsjIsConfigured(cfg) {
 				return
@@ -242,15 +251,18 @@ func ydsjCronOrderYID() {
 			}
 		}()
 
-		time.Sleep(3 * time.Minute)
+		if !sleepWithContext(ctx, 3*time.Minute) {
+			return
+		}
 	}
 }
 
 // ---------- 3. 订单详情同步 (cron_order_info.php) ----------
 
-func ydsjCronOrderInfo() {
-	time.Sleep(60 * time.Second) // 启动延迟
-	ctx := context.Background()
+func ydsjCronOrderInfo(ctx context.Context) {
+	if !sleepWithContext(ctx, 60*time.Second) { // 启动延迟
+		return
+	}
 
 	for {
 		func() {
@@ -261,20 +273,20 @@ func ydsjCronOrderInfo() {
 			}()
 
 			if cache.RDB == nil {
-				time.Sleep(time.Minute)
+				sleepWithContext(ctx, time.Minute)
 				return
 			}
 
-			svc := NewYDSJService()
+			svc := YDSJ()
 			cfg, err := svc.GetConfig()
 			if err != nil || !ydsjIsConfigured(cfg) {
-				time.Sleep(time.Minute)
+				sleepWithContext(ctx, time.Minute)
 				return
 			}
 
 			orderID, err := cache.RDB.LPop(ctx, "ydsj_cron_ids").Result()
 			if err != nil || orderID == "" {
-				time.Sleep(time.Minute)
+				sleepWithContext(ctx, time.Minute)
 				return
 			}
 
@@ -284,14 +296,14 @@ func ydsjCronOrderInfo() {
 			err = database.DB.QueryRow("SELECT id, yid, `user`, run_type FROM qingka_wangke_hzw_ydsj WHERE yid = ? LIMIT 1", orderID).
 				Scan(&id, &yid, &user, &runType)
 			if err != nil || user == "" || yid == "" {
-				time.Sleep(time.Second)
+				sleepWithContext(ctx, time.Second)
 				return
 			}
 
 			items, err := ydsjUpstreamQuery(cfg, user, runType)
 			if err != nil || len(items) == 0 {
 				cache.RDB.LPush(ctx, "ydsj_cron_ids", orderID)
-				time.Sleep(60 * time.Second)
+				sleepWithContext(ctx, 60*time.Second)
 				return
 			}
 
@@ -307,7 +319,7 @@ func ydsjCronOrderInfo() {
 
 			if matched == nil {
 				cache.RDB.LPush(ctx, "ydsj_cron_ids", orderID)
-				time.Sleep(60 * time.Second)
+				sleepWithContext(ctx, 60*time.Second)
 				return
 			}
 
@@ -318,14 +330,18 @@ func ydsjCronOrderInfo() {
 			log.Printf("[YDSJ-cron-info] 订单#%d 状态已同步: %s -> %d", id, statusStr, status)
 		}()
 
-		time.Sleep(time.Second)
+		if !sleepWithContext(ctx, time.Second) {
+			return
+		}
 	}
 }
 
 // ---------- 4. 退款状态同步 (cron_order_refund.php) ----------
 
-func ydsjCronOrderRefund() {
-	time.Sleep(90 * time.Second) // 启动延迟
+func ydsjCronOrderRefund(ctx context.Context) {
+	if !sleepWithContext(ctx, 90*time.Second) { // 启动延迟
+		return
+	}
 	for {
 		func() {
 			defer func() {
@@ -334,7 +350,7 @@ func ydsjCronOrderRefund() {
 				}
 			}()
 
-			svc := NewYDSJService()
+			svc := YDSJ()
 			cfg, err := svc.GetConfig()
 			if err != nil || !ydsjIsConfigured(cfg) {
 				return
@@ -405,6 +421,8 @@ func ydsjCronOrderRefund() {
 			}
 		}()
 
-		time.Sleep(3 * time.Minute)
+		if !sleepWithContext(ctx, 3*time.Minute) {
+			return
+		}
 	}
 }

@@ -1,0 +1,3329 @@
+{
+  "data": [
+    {
+      "school_name": "贵州大学明德学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "东莞理工学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湄洲湾职业技术学院东软现代产业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山东商业职业技术学院食品药品学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "中国矿业大学银川学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "宁波工程学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江科技学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "北京联合大学",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "东北师范大学人文学院",
+      "price1": "1.83",
+      "price2": "1.99"
+    },
+    {
+      "school_name": "贵州黔南科技学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "重庆安全职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "四川外国语大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "温州市轻工职业技术学校",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "云南国防工业职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "海南省职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "厦门南阳职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "唐山海运职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "兰考三农职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "大连海洋大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "广东培正学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "贵州黔南科技学院 ",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "内蒙古科技大学包头医学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "湖南娄底职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "黑龙江生态工程职业学院 ",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江科贸职业技术学院 ",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "潍坊培真科技学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "石嘴山工贸技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "湖南食品药品职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "贵州职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山西铁道职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "天津市机电职业技术学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "广西自然资源职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河南鹤壁职业技术学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "浙江树人学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "淮纺理工学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "黑龙江职业学校",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "昆明理工大学",
+      "price1": "1.91",
+      "price2": "2.05"
+    },
+    {
+      "school_name": "黑龙江农业工程学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "惠州经济职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "许昌学院医学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "山西阳泉师范高等专科学校",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "广州舞蹈戏剧职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "安徽电子信息职业技术学院",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "安徽机电职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "安徽理工大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "安徽芜湖高级职业技术学校",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "安徽职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "安顺学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "安顺职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "安阳学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "白银希望职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "包头轻工职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "包头师范体育学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "包头师范学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "包头医学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "包头职业技术学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "保定职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "保险职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "北部湾大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "北方工业大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "北方民族大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "北华大学",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "北京财贸职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "北京工商大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "北京工业职业技术学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "北京建筑大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "北京经济管理职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "北京科技大学",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "北京林业大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "北京农业职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "北京培黎职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "北京社会管理职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "北京石油化工学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "北京市商业学校",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "北京铁路电气化学校",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "北京信息科技大学",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "北京邮电大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "北京语言大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "北京政法职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "北京中医药大学",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "毕节医学高等专科学校",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "渤海大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "沧州医学高等专科学校",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "曹妃甸职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "沈阳北软信息职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "沈阳城市建设学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "沈阳工业大学",
+      "price1": "1.83",
+      "price2": "1.99"
+    },
+    {
+      "school_name": "沈阳化工大学",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "沈阳农业大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "沈阳师范大学",
+      "price1": "2.21",
+      "price2": "2.37"
+    },
+    {
+      "school_name": "沈阳药科大学",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "沈阳职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "成都医学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "楚雄医药高等专科学校",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "大连东软信息学院",
+      "price1": "1.76",
+      "price2": "2.04"
+    },
+    {
+      "school_name": "大连枫叶职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "大连工业大学",
+      "price1": "1.91",
+      "price2": "2.05"
+    },
+    {
+      "school_name": "大连海事大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "大连理工大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "大连医科大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "大庆职业学院",
+      "price1": "1.63",
+      "price2": "1.77"
+    },
+    {
+      "school_name": "滇西应用技术大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "东北大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "东北大学秦皇岛分校",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "东北电力大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "东北师范大学",
+      "price1": "1.91",
+      "price2": "2.05"
+    },
+    {
+      "school_name": "东北石油大学",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "东莞理工学校",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "东莞理工学院城市学院",
+      "price1": "1.51",
+      "price2": "1.63"
+    },
+    {
+      "school_name": "东莞商业学校",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "东莞职业技术学院",
+      "price1": "1.51",
+      "price2": "1.63"
+    },
+    {
+      "school_name": "东华理工大学南昌广兰校区",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "东营科技职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "东营职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "对外经济贸易大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "鄂尔多斯应用技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "防灾科技学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "佛山职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "福建船政交通职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "福建华南女子职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "福建农业职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "福建省莆田卫生学校",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "福建信息职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "福州理工学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "福州墨尔本理工职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "福州职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "广东工业大学华立学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "广东海洋大学",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "广东海洋大学阳江校区",
+      "price1": "1.22",
+      "price2": "1.37"
+    },
+    {
+      "school_name": "广东技术师范大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "广东建设职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "广东交通职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "广东金融学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "广东科贸职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "广东农工商职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "广东培正学院学生区",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "广东轻工职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "广东生态工程职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "广东食品药品职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "广东水利电力职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "广东舞蹈戏剧职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "广东药科大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "广东医科大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "广东职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "广西金融职业技术学院",
+      "price1": "1.22",
+      "price2": "1.37"
+    },
+    {
+      "school_name": "广西民族师范学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "广西外国语学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "广西职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "广西中医药大学",
+      "price1": "1.37",
+      "price2": "1.52"
+    },
+    {
+      "school_name": "广西自然资源职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "广州大学松田学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "广州番禺职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "广州工商学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "广州航海学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "广州科技贸易职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "广州南方学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "广州软件学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "广州医科大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "贵阳人文科技学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "贵阳信息科技学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "贵阳幼儿师范高等专科学校",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "贵州财经大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "贵州财经职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "贵州大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "贵州大学科技学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "贵州电子商务职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "贵州航天职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "贵州经贸职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "贵州开放大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "贵州理工学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "贵州民用航空职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "贵州民族大学",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "贵州轻工职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "贵州食品工程职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "贵州水利水电职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "贵州医科大学神奇民族医药学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "贵州应用技术职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "贵州中医药大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "桂林航天工业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "桂林理工大学南宁分校",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "哈尔滨华夏中等专业学校",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "哈尔滨剑桥学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "哈尔滨石油学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "哈尔滨铁道职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "哈尔滨信息工程学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "哈尔滨医科大学大庆校区",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "海南大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "海南经贸职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "海南卫生健康职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "海南医学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "海南政法职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "海南职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "邯郸学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "杭州电子科技大学信息工程学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "杭州科技职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "杭州师范大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "杭州师范大学钱江学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "杭州医学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "杭州职业技术学院",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "河北大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河北工业大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "河北工业大学廊坊分校",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "河北化工医药职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河北环境工程学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "河北机电职业技术学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "河北交通职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "河北金融学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "河北科技大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "河北美术学院",
+      "price1": "1.63",
+      "price2": "1.77"
+    },
+    {
+      "school_name": "河北农业大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河北农业大学渤海校区",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河北农业大学海洋学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河北政法职业学院",
+      "price1": "1.37",
+      "price2": "1.51"
+    },
+    {
+      "school_name": "河海大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "河南财经政法大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "河南财政金融学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "河南大学",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "河南地矿职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "河南工程学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河南工学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河南工业大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河南工业和信息化职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "河南经贸职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "河南警察学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "河南科技大学",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "河南科技学院",
+      "price1": "1.22",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河南牧业经济学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "河南物流职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "河南医学高等专科学校",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河南应用技术职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河南应用技术职业学院开封",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "河套学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "河源市卫生学校学生区",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "河源职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "鹤壁职业技术学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "黑河学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "黑龙江东方学院",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "黑龙江林业职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "黑龙江民族职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "黑龙江农业工程职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "黑龙江生态工程职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "黑龙江职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "黑龙江中医药大学",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "红河卫生职业学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "呼和浩特职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖北第二师范学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "湖南财政经济学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南第一师范学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南第一师范学院城南书院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "湖南电气职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "湖南高速铁路职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "湖南环境生物职业技术学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "湖南机电职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "湖南交通职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "湖南科技职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "湖南劳动人事职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南理工职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "湖南民族职业学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "湖南农业大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南人文科技学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南商务职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "湖南涉外经济学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南生物机电职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "湖南师范大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南石油化工职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南食品药品职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南水利水电职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南司法警官职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南外国语职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南外贸职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南网络工程职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "湖南信息学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "湖南信息职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湖南中医药大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "华北电力大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "华北电力大学（北京）",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "华北科技学院",
+      "price1": "1.83",
+      "price2": "1.99"
+    },
+    {
+      "school_name": "华北理工大学轻工学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "华北水利水电大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "华东理工大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "华中科技大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "怀化学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "惠州城市职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "惠州经济职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "吉利学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "吉林电子信息职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "吉林工程技术师范学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "吉林工商学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "吉林化工学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "吉林师范大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "吉林师范大学博达学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "吉林铁道职业技术学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "吉林外国语大学",
+      "price1": "1.91",
+      "price2": "2.05"
+    },
+    {
+      "school_name": "吉首大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "吉首大学张家界学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "集宁师范学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "济南幼儿师范高等专科学校",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "济南职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "嘉兴技师学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "嘉兴南洋职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "嘉兴职业技术学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "江南大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "江苏省南京工程高等职业学校",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "江苏信息职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "江西环境工程职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "江西卫生职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "江西信息应用职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "晋中信息学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "九江学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "九州职业技术学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "凯里学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "跬步白云学院",
+      "price1": "1.92",
+      "price2": "2.04"
+    },
+    {
+      "school_name": "跬步商务合作学院3",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "跬步同济学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "昆明卫生职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "昆明文理学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "昆明学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "辽宁工业大学",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "辽宁轨道交通职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "辽宁何氏医学院",
+      "price1": "1.63",
+      "price2": "1.77"
+    },
+    {
+      "school_name": "辽宁金融职业学院",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "辽宁警察学院",
+      "price1": "1.51",
+      "price2": "1.63"
+    },
+    {
+      "school_name": "辽宁民族师范高等专科学校",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "辽宁农业职业技术学院",
+      "price1": "1.51",
+      "price2": "1.63"
+    },
+    {
+      "school_name": "辽宁轻工职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "辽宁生态工程职业学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "辽宁省交通高等专科学校",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "辽宁师范大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "辽宁师范大学海华学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "辽宁师范高等专科学校",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "辽宁中医药大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "辽宁装备制造职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "聊城大学东昌学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "六盘水师范学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "龙岩学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "娄底职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "洛阳理工学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "洛阳师范学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "漯河医学高等专科学校",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "茅台学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "湄洲湾职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "湄洲湾职业技术学院（仙游校区）",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "绵阳飞行职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "闽江师范高等专科学校",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "闽江学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "闽南科技学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "闽西职业技术学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "牡丹江医学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "南昌工学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "南昌师范学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "南昌医学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "南华大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "南京工程学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "南京工业大学浦江学院",
+      "price1": "1.83",
+      "price2": "1.99"
+    },
+    {
+      "school_name": "南京机电职业技术学院",
+      "price1": "1.83",
+      "price2": "1.99"
+    },
+    {
+      "school_name": "南京理工大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "南京农业大学",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "南京师范大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "南宁师范大学师园学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "南阳职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "内蒙古工业大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "内蒙古民族大学",
+      "price1": "1.83",
+      "price2": "1.99"
+    },
+    {
+      "school_name": "内蒙古医科大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "宁波财经学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "宁波工程学院杭州湾校区",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "宁波卫生职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "宁波职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "宁夏职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "盘锦职业技术学院",
+      "price1": "1.51",
+      "price2": "1.63"
+    },
+    {
+      "school_name": "莆田学院学生区",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "齐鲁工业大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "黔东南民族职业技术学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "黔南民族师范学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "黔南民族幼儿师范高等专科学校",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "清远市南方技工学校",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "清远职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "衢州职业技术学院",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "三门峡职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "厦门南洋职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "山东城市建设职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "山东传媒职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山东第一医科大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山东化工职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "山东交通学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "山东劳动职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "山东理工大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "山东农业工程学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "山东女子学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山东青年政治学院",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "山东商业职业技术学院创新创业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山东商业职业技术学院信创与网络学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山东石油化工学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山东协和学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "山东英才学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "山东政法学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山西大同大学",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "山西工程技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "山西工程科技职业大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山西工商学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "山西华澳商贸职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山西机电职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山西金融职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "山西晋中理工学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "山西警察学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "山西旅游职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "山西能源学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "山西水利职业技术学院运城校区",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "山西铁道职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "山西同文职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "山西应用科技学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "山西职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "汕头职业技术学院新津校区",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "商丘师范学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "商丘学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "商丘学院应用科技学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "上海财经大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "上海财经大学浙江学院",
+      "price1": "1.91",
+      "price2": "2.05"
+    },
+    {
+      "school_name": "上海出版印刷高等专科学校",
+      "price1": "1.66",
+      "price2": "1.66"
+    },
+    {
+      "school_name": "上海大学",
+      "price1": "2.21",
+      "price2": "2.37"
+    },
+    {
+      "school_name": "上海国家会计学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "上海建桥学院",
+      "price1": "1.83",
+      "price2": "1.99"
+    },
+    {
+      "school_name": "上海交通大学",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "上海科技大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "上海应用技术大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "上海中侨职业技术大学",
+      "price1": "2.13",
+      "price2": "2.29"
+    },
+    {
+      "school_name": "邵阳职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "绍兴文理学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "绍兴文理学院元培学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "绍兴职业技术学院",
+      "price1": "1.91",
+      "price2": "2.05"
+    },
+    {
+      "school_name": "石家庄工程技术学校",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "石家庄科技工程职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "石家庄铁路职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "石家庄学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "石家庄邮电职业技术学院",
+      "price1": "1.51",
+      "price2": "1.63"
+    },
+    {
+      "school_name": "石家庄幼儿师范高等专科学校",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "石嘴山工贸职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "首钢工学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "私立华联学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "四川航空股份有限公司飞行部",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "四川水利职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "四川外国语大学（学生）",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "四川文化艺术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "四川职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "苏州科技大学",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "绥化学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "塔里木大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "台州职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "台州职业技术学院玉环分院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "太原城市职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "太原理工大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "太原旅游职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "太原师范学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "太原学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "泰山学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "唐山海运职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "天津城建大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "天津电子信息职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "天津国土资源和房屋职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "天津机电职业技术学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "天津科技大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "天津理工大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "天津理工大学中环信息学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "天津铁道职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "铁岭师范高等专科学校",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "通辽职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "同济大学浙江学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "铜仁学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "铜仁幼儿师范高等专科学校",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "外交学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "潍坊工程职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "潍坊护理职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "潍坊护理职业学院（潍坊校区）",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "潍坊护理职业学院益都校区",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "潍坊理工学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "潍坊培真科技工程学校",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "温州商学院",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "温州市轻工职业学校",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "温州医科大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "温州职业技术学院",
+      "price1": "2.21",
+      "price2": "2.21"
+    },
+    {
+      "school_name": "无锡城市职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "无锡太湖学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "五邑大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "武汉传媒学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "武汉工程大学邮电与信息工程学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "武汉铁路桥梁职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "武汉职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "西安工程大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "西安工业大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "西安理工大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "西南科技大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "西南林业大学",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "咸阳师范学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "湘潭大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "湘潭医卫职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "忻州师范学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "新疆工程学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "新疆农业大学科学技术学院",
+      "price1": "1.91",
+      "price2": "1.77"
+    },
+    {
+      "school_name": "新乡学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "新乡职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "信阳农林学院",
+      "price1": "1.51",
+      "price2": "1.63"
+    },
+    {
+      "school_name": "信阳师范学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "兴义民族师范学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "徐州工业职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "徐州生物工程职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "徐州幼儿师范高等专科学校",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "许昌学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "烟台黄金职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "延边大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "燕京理工学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "燕山大学",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "燕山大学里仁学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "阳江职业技术学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "阳泉师范高等专科学校",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "阳泉职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "伊犁师范大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "宜春学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "义乌工商职业技术学院",
+      "price1": "2.05",
+      "price2": "2.21"
+    },
+    {
+      "school_name": "益阳师范高等专科学校",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "益阳医学高等专科学校",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "银川科技学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "玉溪师范学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "岳阳职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "云南财经大学",
+      "price1": "1.60",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "云南财经职业学院",
+      "price1": "1.52",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "云南大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "云南工商学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "云南机电职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "云南交通职业技术学院",
+      "price1": "1.37",
+      "price2": "1.52"
+    },
+    {
+      "school_name": "云南经济管理学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "云南经贸外事职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "云南警官学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "云南开放大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "云南理工职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "云南林业职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "云南民族大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "云南民族大学应用技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "云南农业大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "云南商务职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "云南师范大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "云南文化艺术职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "云南中医药大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "长春财经学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "长春大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "长春电子科技学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "长春工业大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "长春建筑学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "长春理工大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "长春人文学院",
+      "price1": "1.83",
+      "price2": "1.99"
+    },
+    {
+      "school_name": "长沙航空职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "长沙环境保护职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "长沙民政职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "长沙师范学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "长垣烹饪职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "长治学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "长治医学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "长治职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "昭通卫生职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "昭通学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "浙大城市学院",
+      "price1": "1.66",
+      "price2": "1.78"
+    },
+    {
+      "school_name": "浙江安防职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江财经大学",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "浙江财经大学东方学院",
+      "price1": "1.63",
+      "price2": "1.77"
+    },
+    {
+      "school_name": "浙江传媒学院",
+      "price1": "2.04",
+      "price2": "2.21"
+    },
+    {
+      "school_name": "浙江大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江大学宁波理工学院",
+      "price1": "2.13",
+      "price2": "2.29"
+    },
+    {
+      "school_name": "浙江东方职业技术学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "浙江工贸职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "浙江工商大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "浙江工商大学杭州商学院",
+      "price1": "2.05",
+      "price2": "2.21"
+    },
+    {
+      "school_name": "浙江工业大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江工业职业",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "浙江工业职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江国际海运职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江建设职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "浙江交通职业技术学院",
+      "price1": "1.66",
+      "price2": "1.78"
+    },
+    {
+      "school_name": "浙江交通职业技术学院海运学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "浙江金华科贸职业技术学院",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "浙江金融职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江金融职业学院银领学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江经济职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江经贸职业技术学院",
+      "price1": "1.60",
+      "price2": "1.92"
+    },
+    {
+      "school_name": "浙江科技大学",
+      "price1": "1.68",
+      "price2": "1.83"
+    },
+    {
+      "school_name": "浙江理工大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江理工大学科技与艺术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江商业技师学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "浙江商业职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江师范大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江师范大学萧山校区",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江师范大学行知学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "浙江水利水电学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "浙江特殊教育职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "浙江同济科技职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江外国语学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江艺术职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江音乐学院",
+      "price1": "2.05",
+      "price2": "2.21"
+    },
+    {
+      "school_name": "浙江邮电职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江宇翔职业技术学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "浙江长征职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "郑州财经学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "郑州财税金融职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "郑州大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "郑州电力高等专科学校",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "郑州工业应用技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "郑州航空工业管理学院",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "郑州科技学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "郑州旅游职业学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "郑州轻工业大学",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "郑州商学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "郑州食品工程职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "郑州体育职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "郑州铁路职业技术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "郑州职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "中国地质大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "中国地质大学长城学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "中国计量大学现代科技学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "中国矿业大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "中国矿业大学（北京）",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "中国矿业大学徐海学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "中国美术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "中国民航大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "中国农业大学",
+      "price1": "1.14",
+      "price2": "1.30"
+    },
+    {
+      "school_name": "中国药科大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "中南大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "中南林业科技大学",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "中山火炬职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "中山职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "中原工学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "中原科技学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "仲恺农业工程学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "重庆安全技术职业学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "重庆科技职业学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "周口师范学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "珠海城市职业技术学院",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "淄博职业学院",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "遵义师范学院",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "遵义医科大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "遵义医药高等专科学校",
+      "price1": "1.52",
+      "price2": "1.68"
+    },
+    {
+      "school_name": "遵义职业技术学院",
+      "price1": "1.44",
+      "price2": "1.60"
+    },
+    {
+      "school_name": "江门职业技术学院",
+      "price1": "1.60",
+      "price2": "0.07"
+    },
+    {
+      "school_name": "江苏安全职业技术学院",
+      "price1": "1.60",
+      "price2": "0.07"
+    },
+    {
+      "school_name": "广东外语外贸大学南国商学院",
+      "price1": "1.60",
+      "price2": "0.07"
+    },
+    {
+      "school_name": "吉林动画学院",
+      "price1": "1.60",
+      "price2": "0.07"
+    },
+    {
+      "school_name": "南京信息职业技术学院",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "云南旅游职业学院",
+      "price1": "2.05",
+      "price2": "2.21"
+    },
+    {
+      "school_name": "浙江横店影视职业学院",
+      "price1": "2.13",
+      "price2": "2.29"
+    },
+    {
+      "school_name": "贵州师范大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "沈阳大学",
+      "price1": "2.21",
+      "price2": "2.37"
+    },
+    {
+      "school_name": "广州大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "广东工业大学",
+      "price1": "1.30",
+      "price2": "1.44"
+    },
+    {
+      "school_name": "湖南工学院",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "鞍山师范学院",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "成都东软学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "浙江树人大学",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "郑州澍青医学高等专科学校",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "湖南城市学院",
+      "price1": "1.76",
+      "price2": "1.91"
+    },
+    {
+      "school_name": "广州美术学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "黑龙江外国语学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "辽宁传媒学院",
+      "price1": "1.91",
+      "price2": "2.05"
+    },
+    {
+      "school_name": "沈阳航空航天大学",
+      "price1": "1.91",
+      "price2": "2.05"
+    },
+    {
+      "school_name": "浙江广厦建设职业技术大学",
+      "price1": "1.91",
+      "price2": "2.05"
+    },
+    {
+      "school_name": "浙江育英职业技术学院",
+      "price1": "1.91",
+      "price2": "2.05"
+    },
+    {
+      "school_name": "杭州万向职业技术学院",
+      "price1": "1.91",
+      "price2": "2.05"
+    },
+    {
+      "school_name": "黑龙江八一农垦大学",
+      "price1": "1.91",
+      "price2": "2.05"
+    },
+    {
+      "school_name": "河北科技师范学院",
+      "price1": "1.60",
+      "price2": "1.76"
+    },
+    {
+      "school_name": "自动识别",
+      "price1": "2.00",
+      "price2": "2.00"
+    }
+  ]
+}

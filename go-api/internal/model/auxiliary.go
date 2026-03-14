@@ -115,29 +115,6 @@ type PledgeListRequest struct {
 	UID   int `form:"uid" json:"uid"`
 }
 
-// ===== 网签系统 =====
-
-type MlsxCompany struct {
-	ID      int    `json:"id" db:"id"`
-	QYMC    string `json:"qymc" db:"qymc"`
-	WQBS    string `json:"wqbs" db:"wqbs"`
-	ShiJian string `json:"shijian" db:"shijian"`
-}
-
-type MlsxCompanySaveRequest struct {
-	ID   int    `json:"id"`
-	QYMC string `json:"qymc" binding:"required"`
-	WQBS string `json:"wqbs"`
-}
-
-type MlsxFile struct {
-	ID      int    `json:"id" db:"id"`
-	WJID    string `json:"wjid" db:"wjid"`
-	Name    string `json:"name" db:"name"`
-	IP      string `json:"ip" db:"ip"`
-	ShiJian string `json:"shijian" db:"shijian"`
-}
-
 // ===== 外部查单 =====
 
 type CheckOrderRequest struct {

@@ -11,15 +11,7 @@ import (
 	"go-api/internal/database"
 )
 
-// PushService 推送通知服务
-type PushService struct{}
-
-func NewPushService() *PushService {
-	return &PushService{}
-}
-
-// BindPushUID 绑定微信推送UID到指定订单
-func (s *PushService) BindPushUID(orderID int, pushUID string) error {
+func BindPushUID(orderID int, pushUID string) error {
 	_, err := database.DB.Exec(
 		"UPDATE qingka_wangke_order SET pushUid=?, pushStatus='0' WHERE oid=?",
 		pushUID, orderID,
@@ -27,8 +19,7 @@ func (s *PushService) BindPushUID(orderID int, pushUID string) error {
 	return err
 }
 
-// UnbindPushUID 解绑微信推送UID（按账号批量）
-func (s *PushService) UnbindPushUIDByAccount(account string) (int64, error) {
+func UnbindPushUIDByAccount(account string) (int64, error) {
 	result, err := database.DB.Exec(
 		"UPDATE qingka_wangke_order SET pushUid='', pushStatus='0' WHERE user=?",
 		account,
@@ -39,8 +30,7 @@ func (s *PushService) UnbindPushUIDByAccount(account string) (int64, error) {
 	return result.RowsAffected()
 }
 
-// BatchBindPushUID 批量绑定微信推送UID
-func (s *PushService) BatchBindPushUID(orderIDs []int, pushUID string) (int64, error) {
+func BatchBindPushUID(orderIDs []int, pushUID string) (int64, error) {
 	if len(orderIDs) == 0 {
 		return 0, nil
 	}
@@ -62,8 +52,7 @@ func (s *PushService) BatchBindPushUID(orderIDs []int, pushUID string) (int64, e
 	return result.RowsAffected()
 }
 
-// BindPushEmail 绑定邮箱推送（单个订单或按账号批量）
-func (s *PushService) BindPushEmail(orderID int, account string, email string) (int64, error) {
+func BindPushEmail(orderID int, account string, email string) (int64, error) {
 	if orderID > 0 {
 		result, err := database.DB.Exec(
 			"UPDATE qingka_wangke_order SET pushEmail=?, pushEmailStatus='0' WHERE oid=?",
@@ -87,8 +76,7 @@ func (s *PushService) BindPushEmail(orderID int, account string, email string) (
 	return 0, fmt.Errorf("需要订单ID或账号")
 }
 
-// BindShowDocPush 绑定ShowDoc推送（单个订单或按账号批量）
-func (s *PushService) BindShowDocPush(orderID int, account string, showdocURL string) (int64, error) {
+func BindShowDocPush(orderID int, account string, showdocURL string) (int64, error) {
 	if orderID > 0 {
 		result, err := database.DB.Exec(
 			"UPDATE qingka_wangke_order SET showdoc_push_url=?, pushShowdocStatus='0' WHERE oid=?",
@@ -112,10 +100,8 @@ func (s *PushService) BindShowDocPush(orderID int, account string, showdocURL st
 	return 0, fmt.Errorf("需要订单ID或账号")
 }
 
-// WxPusherQRCode 生成WxPusher扫码二维码（从系统配置读取）
-func (s *PushService) WxPusherQRCode(account string) (map[string]interface{}, error) {
-	conf, _ := NewAdminService().GetConfig()
-	appToken := conf["wxpusher_token"]
+func WxPusherQRCode(account string) (map[string]interface{}, error) {
+	appToken := getAdminConfigValue("wxpusher_token")
 	if appToken == "" {
 		return nil, fmt.Errorf("WxPusher未配置，请在系统设置-推送与同步中配置AppToken")
 	}
@@ -157,8 +143,7 @@ func (s *PushService) WxPusherQRCode(account string) (map[string]interface{}, er
 	return nil, fmt.Errorf("二维码生成失败: %s", msg)
 }
 
-// WxPusherScanUID 查询扫码结果获取UID
-func (s *PushService) WxPusherScanUID(code string) (string, error) {
+func WxPusherScanUID(code string) (string, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get("https://wxpusher.zjiecode.com/api/fun/scan-qrcode-uid?code=" + code)
 	if err != nil {
@@ -182,29 +167,9 @@ func (s *PushService) WxPusherScanUID(code string) (string, error) {
 	return "", fmt.Errorf("未扫码或已过期")
 }
 
-// LogPush 记录推送日志
-func (s *PushService) LogPush(orderID int, uid string, pushType string, receiver string, content string, status string) {
-	var emailCol, uidCol, showdocCol interface{}
-	switch pushType {
-	case "email":
-		emailCol = receiver
-	case "wxpusher":
-		uidCol = receiver
-	case "showdoc":
-		showdocCol = receiver
-	}
-	database.DB.Exec(
-		`INSERT INTO qingka_wangke_push_logs (order_id, uid, type, receiver_email, receiver_uid, showdoc_url, content, status)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		orderID, uid, pushType, emailCol, uidCol, showdocCol, content, status,
-	)
-}
-
-// PupLogin 获取Pup自动登录URL（从系统配置读取）
-func (s *PushService) PupLogin(oid int) (string, error) {
-	conf, _ := NewAdminService().GetConfig()
-	baseURL := conf["pup_base_url"]
-	plan := conf["pup_plan"]
+func PupLogin(oid int) (string, error) {
+	baseURL := getAdminConfigValue("pup_base_url")
+	plan := getAdminConfigValue("pup_plan")
 	if baseURL == "" {
 		return "", fmt.Errorf("Pup登录地址未配置，请在系统设置-推送与同步中配置")
 	}

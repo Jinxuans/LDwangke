@@ -9,6 +9,7 @@ import (
 	"go-api/internal/config"
 
 	"github.com/go-sql-driver/mysql"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var DB *sql.DB
@@ -100,15 +101,26 @@ func autoMigrate(db *sql.DB) {
 		log.Println("[AutoMigrate] 已添加 moneylog.mark/remarks 列")
 	}
 
-	// 确保管理员账号存在
+	// 默认管理员改为显式开关控制，避免启动期产生隐式高权限账号。
 	var adminCount int
 	db.QueryRow("SELECT COUNT(*) FROM qingka_wangke_user WHERE grade='3'").Scan(&adminCount)
 	if adminCount == 0 {
-		_, err := db.Exec("INSERT INTO qingka_wangke_user (uuid, user, pass, name, grade, active, addprice, addtime) VALUES (1, 'admin', 'admin123', 'Admin', '3', '1', 1, NOW())")
+		if config.Global == nil || !config.Global.CreateDefaultAdminEnabled() {
+			log.Println("[AutoMigrate] 未发现管理员账号，已跳过默认管理员自动创建；如需启用请设置 bootstrap.create_default_admin=true 或 GO_API_BOOTSTRAP_CREATE_DEFAULT_ADMIN=true")
+			return
+		}
+
+		hashed, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+		if err != nil {
+			log.Printf("[AutoMigrate] 生成默认管理员密码哈希失败: %v", err)
+			return
+		}
+
+		_, err = db.Exec("INSERT INTO qingka_wangke_user (uuid, user, pass, name, grade, active, addprice, addtime) VALUES (1, 'admin', ?, 'Admin', '3', '1', 1, NOW())", string(hashed))
 		if err != nil {
 			log.Printf("[AutoMigrate] 插入管理员失败: %v", err)
 		} else {
-			log.Println("[AutoMigrate] 已自动创建管理员账号 admin/admin123")
+			log.Println("[AutoMigrate] 已按显式开关创建默认管理员账号 admin/admin123")
 		}
 	}
 }

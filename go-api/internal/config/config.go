@@ -3,18 +3,30 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	Redis    RedisConfig    `yaml:"redis"`
-	JWT      JWTConfig      `yaml:"jwt"`
-	Cache    CacheConfig    `yaml:"cache"`
-	SMTP     SMTPConfig     `yaml:"smtp"`
-	License  LicenseConfig  `yaml:"license"`
+	Server    ServerConfig    `yaml:"server"`
+	Database  DatabaseConfig  `yaml:"database"`
+	Redis     RedisConfig     `yaml:"redis"`
+	JWT       JWTConfig       `yaml:"jwt"`
+	Cache     CacheConfig     `yaml:"cache"`
+	SMTP      SMTPConfig      `yaml:"smtp"`
+	License   LicenseConfig   `yaml:"license"`
+	Security  SecurityConfig  `yaml:"security"`
+	Bootstrap BootstrapConfig `yaml:"bootstrap"`
+}
+
+type SecurityConfig struct {
+	AllowLegacyPlaintextPasswords *bool `yaml:"allow_legacy_plaintext_passwords"`
+}
+
+type BootstrapConfig struct {
+	CreateDefaultAdmin *bool `yaml:"create_default_admin"`
 }
 
 type LicenseConfig struct {
@@ -84,6 +96,107 @@ func Load(path string) *Config {
 		log.Fatalf("解析配置文件失败: %v", err)
 	}
 
+	applyEnvOverrides(cfg)
 	Global = cfg
 	return cfg
+}
+
+func (c *Config) AllowLegacyPlaintextPasswords() bool {
+	if v, ok := envBool("GO_API_SECURITY_ALLOW_LEGACY_PLAINTEXT_PASSWORDS"); ok {
+		return v
+	}
+	if c.Security.AllowLegacyPlaintextPasswords != nil {
+		return *c.Security.AllowLegacyPlaintextPasswords
+	}
+	return true
+}
+
+func (c *Config) CreateDefaultAdminEnabled() bool {
+	if v, ok := envBool("GO_API_BOOTSTRAP_CREATE_DEFAULT_ADMIN"); ok {
+		return v
+	}
+	if c.Bootstrap.CreateDefaultAdmin != nil {
+		return *c.Bootstrap.CreateDefaultAdmin
+	}
+	return false
+}
+
+func applyEnvOverrides(cfg *Config) {
+	cfg.Server.Port = envString("GO_API_SERVER_PORT", cfg.Server.Port)
+	cfg.Server.Mode = envString("GO_API_SERVER_MODE", cfg.Server.Mode)
+	cfg.Server.PhpBackend = envString("GO_API_SERVER_PHP_BACKEND", cfg.Server.PhpBackend)
+	cfg.Server.PhpPublicURL = envString("GO_API_SERVER_PHP_PUBLIC_URL", cfg.Server.PhpPublicURL)
+	cfg.Server.BridgeSecret = envString("GO_API_SERVER_BRIDGE_SECRET", cfg.Server.BridgeSecret)
+
+	cfg.Database.Host = envString("GO_API_DATABASE_HOST", cfg.Database.Host)
+	cfg.Database.Port = envInt("GO_API_DATABASE_PORT", cfg.Database.Port)
+	cfg.Database.User = envString("GO_API_DATABASE_USER", cfg.Database.User)
+	cfg.Database.Password = envString("GO_API_DATABASE_PASSWORD", cfg.Database.Password)
+	cfg.Database.DBName = envString("GO_API_DATABASE_DBNAME", cfg.Database.DBName)
+	cfg.Database.MaxOpenConns = envInt("GO_API_DATABASE_MAX_OPEN_CONNS", cfg.Database.MaxOpenConns)
+	cfg.Database.MaxIdleConns = envInt("GO_API_DATABASE_MAX_IDLE_CONNS", cfg.Database.MaxIdleConns)
+
+	cfg.Redis.Host = envString("GO_API_REDIS_HOST", cfg.Redis.Host)
+	cfg.Redis.Port = envInt("GO_API_REDIS_PORT", cfg.Redis.Port)
+	cfg.Redis.Password = envString("GO_API_REDIS_PASSWORD", cfg.Redis.Password)
+	cfg.Redis.DB = envInt("GO_API_REDIS_DB", cfg.Redis.DB)
+
+	cfg.JWT.Secret = envString("GO_API_JWT_SECRET", cfg.JWT.Secret)
+	cfg.JWT.AccessTTL = envInt("GO_API_JWT_ACCESS_TTL", cfg.JWT.AccessTTL)
+	cfg.JWT.RefreshTTL = envInt("GO_API_JWT_REFRESH_TTL", cfg.JWT.RefreshTTL)
+
+	cfg.Cache.OrderListTTL = envInt("GO_API_CACHE_ORDER_LIST_TTL", cfg.Cache.OrderListTTL)
+	cfg.Cache.ClassListTTL = envInt("GO_API_CACHE_CLASS_LIST_TTL", cfg.Cache.ClassListTTL)
+
+	cfg.SMTP.Host = envString("GO_API_SMTP_HOST", cfg.SMTP.Host)
+	cfg.SMTP.Port = envInt("GO_API_SMTP_PORT", cfg.SMTP.Port)
+	cfg.SMTP.User = envString("GO_API_SMTP_USER", cfg.SMTP.User)
+	cfg.SMTP.Password = envString("GO_API_SMTP_PASSWORD", cfg.SMTP.Password)
+	cfg.SMTP.FromName = envString("GO_API_SMTP_FROM_NAME", cfg.SMTP.FromName)
+	cfg.SMTP.Encryption = envString("GO_API_SMTP_ENCRYPTION", cfg.SMTP.Encryption)
+
+	cfg.License.ServerURL = envString("GO_API_LICENSE_SERVER_URL", cfg.License.ServerURL)
+	cfg.License.LicenseKey = envString("GO_API_LICENSE_LICENSE_KEY", cfg.License.LicenseKey)
+	cfg.License.KeyFile = envString("GO_API_LICENSE_KEY_FILE", cfg.License.KeyFile)
+	cfg.License.Domain = envString("GO_API_LICENSE_DOMAIN", cfg.License.Domain)
+	cfg.License.CacheFile = envString("GO_API_LICENSE_CACHE_FILE", cfg.License.CacheFile)
+	cfg.License.SecretsFile = envString("GO_API_LICENSE_SECRETS_FILE", cfg.License.SecretsFile)
+
+	if v, ok := envBool("GO_API_SECURITY_ALLOW_LEGACY_PLAINTEXT_PASSWORDS"); ok {
+		cfg.Security.AllowLegacyPlaintextPasswords = &v
+	}
+	if v, ok := envBool("GO_API_BOOTSTRAP_CREATE_DEFAULT_ADMIN"); ok {
+		cfg.Bootstrap.CreateDefaultAdmin = &v
+	}
+}
+
+func envString(key, current string) string {
+	if val, ok := os.LookupEnv(key); ok {
+		return val
+	}
+	return current
+}
+
+func envInt(key string, current int) int {
+	if val, ok := os.LookupEnv(key); ok {
+		parsed, err := strconv.Atoi(strings.TrimSpace(val))
+		if err == nil {
+			return parsed
+		}
+		log.Printf("[config] 忽略无效整数环境变量 %s=%q", key, val)
+	}
+	return current
+}
+
+func envBool(key string) (bool, bool) {
+	val, ok := os.LookupEnv(key)
+	if !ok {
+		return false, false
+	}
+	parsed, err := strconv.ParseBool(strings.TrimSpace(val))
+	if err != nil {
+		log.Printf("[config] 忽略无效布尔环境变量 %s=%q", key, val)
+		return false, false
+	}
+	return parsed, true
 }

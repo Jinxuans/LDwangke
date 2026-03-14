@@ -29,8 +29,7 @@ func emailLayout(siteName, title, body string) string {
 </html>`, siteName, title, body)
 }
 
-// TemplateVerifyCode 注册验证码邮件
-func TemplateVerifyCode(siteName, code string, expireMinutes int) string {
+func templateVerifyCode(siteName, code string, expireMinutes int) string {
 	body := fmt.Sprintf(`
     <p style="color:#555;line-height:1.8;">您正在注册账号，请使用以下验证码完成注册：</p>
     <div style="text-align:center;margin:24px 0;">
@@ -40,8 +39,7 @@ func TemplateVerifyCode(siteName, code string, expireMinutes int) string {
 	return emailLayout(siteName, "注册验证码", body)
 }
 
-// TemplateResetPassword 重置密码验证码邮件
-func TemplateResetPassword(siteName, code string, expireMinutes int) string {
+func templateResetPassword(siteName, code string, expireMinutes int) string {
 	body := fmt.Sprintf(`
     <p style="color:#555;line-height:1.8;">您正在重置登录密码，请使用以下验证码：</p>
     <div style="text-align:center;margin:24px 0;">
@@ -51,8 +49,7 @@ func TemplateResetPassword(siteName, code string, expireMinutes int) string {
 	return emailLayout(siteName, "重置密码验证码", body)
 }
 
-// TemplateLoginAlert 异地/新设备登录安全提醒
-func TemplateLoginAlert(siteName, username, ip, ua, loginTime string) string {
+func templateLoginAlert(siteName, username, ip, ua, loginTime string) string {
 	body := fmt.Sprintf(`
     <p style="color:#555;line-height:1.8;">您的账号刚刚在一台新设备上登录，详情如下：</p>
     <table style="width:100%%;margin:16px 0;border-collapse:collapse;">
@@ -65,24 +62,21 @@ func TemplateLoginAlert(siteName, username, ip, ua, loginTime string) string {
 	return emailLayout(siteName, "登录安全提醒", body)
 }
 
-// TemplatePasswordChanged 密码修改通知
-func TemplatePasswordChanged(siteName, username, changeTime string) string {
+func templatePasswordChanged(siteName, username, changeTime string) string {
 	body := fmt.Sprintf(`
     <p style="color:#555;line-height:1.8;">您的账号 <strong>%s</strong> 的登录密码已于 <strong>%s</strong> 成功修改。</p>
     <p style="color:#ff4d4f;font-size:13px;">⚠️ 如果这不是您本人的操作，请立即联系管理员。</p>`, username, changeTime)
 	return emailLayout(siteName, "密码修改通知", body)
 }
 
-// TemplateEmailChanged 邮箱变更通知（发送到旧邮箱）
-func TemplateEmailChanged(siteName, username, newEmail, changeTime string) string {
+func templateEmailChanged(siteName, username, newEmail, changeTime string) string {
 	body := fmt.Sprintf(`
     <p style="color:#555;line-height:1.8;">您的账号 <strong>%s</strong> 的绑定邮箱已于 <strong>%s</strong> 变更为 <strong>%s</strong>。</p>
     <p style="color:#ff4d4f;font-size:13px;">⚠️ 如果这不是您本人的操作，请立即联系管理员。</p>`, username, changeTime, newEmail)
 	return emailLayout(siteName, "邮箱变更通知", body)
 }
 
-// TemplateChangeEmailCode 邮箱变更验证码（发送到新邮箱）
-func TemplateChangeEmailCode(siteName, code string, expireMinutes int) string {
+func templateChangeEmailCode(siteName, code string, expireMinutes int) string {
 	body := fmt.Sprintf(`
     <p style="color:#555;line-height:1.8;">您正在变更绑定邮箱，请使用以下验证码完成验证：</p>
     <div style="text-align:center;margin:24px 0;">
@@ -92,16 +86,14 @@ func TemplateChangeEmailCode(siteName, code string, expireMinutes int) string {
 	return emailLayout(siteName, "邮箱变更验证码", body)
 }
 
-// TemplateAccountDisabled 账号禁用通知
-func TemplateAccountDisabled(siteName, username string) string {
+func templateAccountDisabled(siteName, username string) string {
 	body := fmt.Sprintf(`
     <p style="color:#555;line-height:1.8;">您的账号 <strong>%s</strong> 已被管理员禁用。</p>
     <p style="color:#999;font-size:13px;">如有疑问，请联系管理员。</p>`, username)
 	return emailLayout(siteName, "账号禁用通知", body)
 }
 
-// TemplateAccountEnabled 账号启用通知
-func TemplateAccountEnabled(siteName, username string) string {
+func templateAccountEnabled(siteName, username string) string {
 	body := fmt.Sprintf(`
     <p style="color:#555;line-height:1.8;">您的账号 <strong>%s</strong> 已被管理员重新启用，您可以正常登录使用。</p>`, username)
 	return emailLayout(siteName, "账号启用通知", body)
