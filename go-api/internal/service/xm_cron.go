@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,16 +12,17 @@ import (
 	"go-api/internal/database"
 )
 
-// StartXMCron 启动小米运动后台批量同步任务（替代 xm_redis_ru.php + xm_redis_chu.php）
-func StartXMCron() {
+func RunXMCron(ctx context.Context) {
 	log.Println("[XM] 后台批量同步任务启动")
-	go xmCronBatchSync()
+	go xmCronBatchSync(ctx)
 }
 
 // ---------- 批量同步订单状态 ----------
 
-func xmCronBatchSync() {
-	time.Sleep(2*time.Minute + 30*time.Second) // 启动延迟，错开其他 cron
+func xmCronBatchSync(ctx context.Context) {
+	if !sleepWithContext(ctx, 2*time.Minute+30*time.Second) { // 启动延迟，错开其他 cron
+		return
+	}
 	for {
 		func() {
 			defer func() {
@@ -88,7 +90,7 @@ func xmCronBatchSync() {
 				projMap[p.ID] = p
 			}
 
-			svc := NewXMService()
+			svc := XM()
 
 			// 每个项目逐条同步
 			for projectID, yOids := range projOrders {
@@ -114,7 +116,9 @@ func xmCronBatchSync() {
 					} else {
 						syncCount++
 					}
-					time.Sleep(500 * time.Millisecond)
+					if !sleepWithContext(ctx, 500*time.Millisecond) {
+						return
+					}
 				}
 
 				if syncCount > 0 {
@@ -123,7 +127,9 @@ func xmCronBatchSync() {
 			}
 		}()
 
-		time.Sleep(5 * time.Minute)
+		if !sleepWithContext(ctx, 5*time.Minute) {
+			return
+		}
 	}
 }
 

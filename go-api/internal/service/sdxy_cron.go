@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -8,15 +9,19 @@ import (
 	"go-api/internal/database"
 )
 
-func StartSDXYCron() {
-	svc := NewSDXYService()
+func RunSDXYCron(ctx context.Context) {
+	svc := SDXY()
 
 	// 启动30秒后开始首次同步
-	time.Sleep(30 * time.Second)
+	if !sleepWithContext(ctx, 30*time.Second) {
+		return
+	}
 
 	for {
 		sdxyCronSync(svc)
-		time.Sleep(5 * time.Minute)
+		if !sleepWithContext(ctx, 5*time.Minute) {
+			return
+		}
 	}
 }
 

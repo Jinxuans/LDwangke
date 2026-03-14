@@ -44,3 +44,17 @@ smtp:
   password: ""                     # 邮箱授权码（非登录密码）
   from_name: "系统通知"             # 发件人显示名
   encryption: "ssl"                # ssl | starttls | none
+
+security:
+  allow_legacy_plaintext_passwords: true   # 为平滑迁移保留明文密码自动升级能力；可通过环境变量禁用
+
+bootstrap:
+  create_default_admin: false              # 默认不再在启动期自动创建 admin/admin123
+
+# 可通过环境变量覆盖关键配置，例如：
+# GO_API_SERVER_PORT=8081
+# GO_API_DATABASE_HOST=127.0.0.1
+# GO_API_DATABASE_PASSWORD=your_password
+# GO_API_JWT_SECRET=your_secret
+# GO_API_SECURITY_ALLOW_LEGACY_PLAINTEXT_PASSWORDS=false
+# GO_API_BOOTSTRAP_CREATE_DEFAULT_ADMIN=true

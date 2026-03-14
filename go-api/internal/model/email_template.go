@@ -3,7 +3,7 @@ package model
 // EmailTemplate 邮件模板
 type EmailTemplate struct {
 	ID        int    `json:"id"`
-	Code      string `json:"code"`      // register / reset_password / system_notify
+	Code      string `json:"code"` // register / reset_password / system_notify
 	Name      string `json:"name"`
 	Subject   string `json:"subject"`   // 支持 {site_name} 等变量
 	Content   string `json:"content"`   // HTML内容，支持变量

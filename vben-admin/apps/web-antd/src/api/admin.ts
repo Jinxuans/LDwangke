@@ -742,17 +742,43 @@ export interface SyncRequest {
   user: string;
   password: string;
   update_existing: boolean;
+  confirmation_token?: string;
+}
+
+export interface SyncTableCheck {
+  table: string;
+  label: string;
+  source_table?: string;
+  source_exists: boolean;
+  local_exists: boolean;
+  source_count: number;
+  local_count: number;
+  missing_local_columns: string[];
+  skip: boolean;
+  ready: boolean;
+  message: string;
 }
 
 export interface SyncTestResult {
   connected: boolean;
+  ready: boolean;
   tables: Record<string, number>;
+  table_checks: SyncTableCheck[];
+  warnings: string[];
+  summary: string;
+  tested_at: string;
+  confirmation_token?: string;
   error?: string;
 }
 
 export interface SyncTableInfo {
   table: string;
   label: string;
+  source_table?: string;
+  skipped_empty: boolean;
+  message?: string;
+  local_before?: number;
+  local_after?: number;
   total: number;
   inserted: number;
   updated: number;
@@ -769,11 +795,15 @@ export interface SyncResult {
 }
 
 export async function dbSyncTestApi(data: SyncRequest) {
-  return requestClient.post<SyncTestResult>('/admin/db-sync/test', data);
+  return requestClient.post<SyncTestResult>('/admin/db-sync/test', data, {
+    timeout: 60_000,
+  });
 }
 
 export async function dbSyncExecuteApi(data: SyncRequest) {
-  return requestClient.post<SyncResult>('/admin/db-sync/execute', data);
+  return requestClient.post<SyncResult>('/admin/db-sync/execute', data, {
+    timeout: 0,
+  });
 }
 
 // ===== YF打卡项目管理 =====

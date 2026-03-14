@@ -7,7 +7,7 @@ import (
 )
 
 type PushMessage struct {
-	Type    string      `json:"type"`    // order_status / payment / system / chat_notify
+	Type    string      `json:"type"` // order_status / payment / system / chat_notify
 	Title   string      `json:"title"`
 	Content string      `json:"content"`
 	Data    interface{} `json:"data,omitempty"`
@@ -24,6 +24,8 @@ type Hub struct {
 	clients    map[int]*Client // uid -> client
 	register   chan *Client
 	unregister chan *Client
+	done       chan struct{}
+	stopOnce   sync.Once
 }
 
 var GlobalHub *Hub
@@ -33,6 +35,7 @@ func NewHub() *Hub {
 		clients:    make(map[int]*Client),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+		done:       make(chan struct{}),
 	}
 	GlobalHub = hub
 	return hub
@@ -41,6 +44,15 @@ func NewHub() *Hub {
 func (h *Hub) Run() {
 	for {
 		select {
+		case <-h.done:
+			h.mu.Lock()
+			for uid, client := range h.clients {
+				delete(h.clients, uid)
+				close(client.Send)
+			}
+			h.mu.Unlock()
+			return
+
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client.UID] = client
@@ -60,15 +72,38 @@ func (h *Hub) Run() {
 }
 
 func (h *Hub) Register(client *Client) {
-	h.register <- client
+	select {
+	case <-h.done:
+		return
+	case h.register <- client:
+	}
 }
 
 func (h *Hub) Unregister(client *Client) {
-	h.unregister <- client
+	select {
+	case <-h.done:
+		return
+	case h.unregister <- client:
+	}
+}
+
+func (h *Hub) Stop() {
+	if h == nil {
+		return
+	}
+	h.stopOnce.Do(func() {
+		close(h.done)
+	})
 }
 
 // PushToUser 向指定用户推送消息
 func (h *Hub) PushToUser(uid int, msg PushMessage) {
+	select {
+	case <-h.done:
+		return
+	default:
+	}
+
 	h.mu.RLock()
 	client, ok := h.clients[uid]
 	h.mu.RUnlock()
@@ -93,6 +128,12 @@ func (h *Hub) PushToUser(uid int, msg PushMessage) {
 
 // Broadcast 向所有在线用户广播
 func (h *Hub) Broadcast(msg PushMessage) {
+	select {
+	case <-h.done:
+		return
+	default:
+	}
+
 	data, err := json.Marshal(msg)
 	if err != nil {
 		log.Printf("序列化广播消息失败: %v", err)

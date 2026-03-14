@@ -23,11 +23,43 @@ type EmailPoolService struct {
 var poolOnce sync.Once
 var poolInstance *EmailPoolService
 
-func GetEmailPoolService() *EmailPoolService {
+func EmailPool() *EmailPoolService {
 	poolOnce.Do(func() {
 		poolInstance = &EmailPoolService{}
 	})
 	return poolInstance
+}
+
+func EmailPoolList() ([]model.EmailPoolAccount, error) {
+	return EmailPool().List()
+}
+
+func SaveEmailPoolAccount(req model.EmailPoolSaveRequest) error {
+	return EmailPool().Save(req)
+}
+
+func DeleteEmailPoolAccount(id int) error {
+	return EmailPool().Delete(id)
+}
+
+func ToggleEmailPoolStatus(id, status int) error {
+	return EmailPool().ToggleStatus(id, status)
+}
+
+func ResetEmailPoolCounters() error {
+	return EmailPool().ResetCounters()
+}
+
+func TestEmailPoolAccount(id int, testTo string) error {
+	return EmailPool().TestAccount(id, testTo)
+}
+
+func QueryEmailPoolLogs(q model.EmailSendLogQuery) ([]model.EmailSendLog, int64, error) {
+	return EmailPool().QueryLogs(q)
+}
+
+func EmailPoolStats() map[string]interface{} {
+	return EmailPool().Stats()
 }
 
 // -------- CRUD --------
@@ -335,7 +367,6 @@ func (s *EmailPoolService) TestAccount(id int, testTo string) error {
 	if err != nil {
 		return err
 	}
-	es := NewEmailService()
 	from := a.User
 	if a.FromEmail != "" {
 		from = a.FromEmail
@@ -344,15 +375,15 @@ func (s *EmailPoolService) TestAccount(id int, testTo string) error {
 	if fromName == "" {
 		fromName = "System"
 	}
-	msg := es.buildMessage(from, fromName, testTo, "邮箱池测试", "<p>这是一封测试邮件，如果您收到说明该邮箱配置正确。</p>")
+	msg := emailService.buildMessage(from, fromName, testTo, "邮箱池测试", "<p>这是一封测试邮件，如果您收到说明该邮箱配置正确。</p>")
 	addr := fmt.Sprintf("%s:%d", a.Host, a.Port)
 	cfg := toSMTPConfig(a)
 	switch a.Encryption {
 	case "ssl", "tls":
-		return es.sendSSL(addr, cfg, from, testTo, msg)
+		return emailService.sendSSL(addr, cfg, from, testTo, msg)
 	case "starttls":
-		return es.sendSTARTTLS(addr, cfg, from, testTo, msg)
+		return emailService.sendSTARTTLS(addr, cfg, from, testTo, msg)
 	default:
-		return es.sendPlain(addr, cfg, from, testTo, msg)
+		return emailService.sendPlain(addr, cfg, from, testTo, msg)
 	}
 }

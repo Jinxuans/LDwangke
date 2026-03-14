@@ -83,3 +83,11 @@ type OrderAddResult struct {
 	SkippedItems []string `json:"skipped_items,omitempty"`
 	OIDs         []int64  `json:"oids,omitempty"`
 }
+
+type OrderLogEntry struct {
+	Time    string `json:"time"`
+	Course  string `json:"course"`
+	Status  string `json:"status"`
+	Process string `json:"process"`
+	Remarks string `json:"remarks"`
+}

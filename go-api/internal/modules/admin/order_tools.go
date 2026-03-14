@@ -1,0 +1,150 @@
+package admin
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"time"
+
+	"go-api/internal/database"
+	commonmodule "go-api/internal/modules/common"
+	mailmodule "go-api/internal/modules/mail"
+)
+
+func notifyAdminOrderStatusChange(oid int, status, process, remarks string) {
+	go func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				log.Printf("[AdminPush] oid=%d panic: %v", oid, recovered)
+			}
+		}()
+
+		var user, kcname, pushUID, pushEmail, showDocURL string
+		err := database.DB.QueryRow(
+			`SELECT COALESCE(user,''), COALESCE(kcname,''), COALESCE(pushUid,''),
+			 COALESCE(pushEmail,''), COALESCE(showdoc_push_url,'')
+			 FROM qingka_wangke_order WHERE oid=?`,
+			oid,
+		).Scan(&user, &kcname, &pushUID, &pushEmail, &showDocURL)
+		if err != nil {
+			return
+		}
+		if pushUID == "" && pushEmail == "" && showDocURL == "" {
+			return
+		}
+
+		content := fmt.Sprintf("订单 #%d 状态更新\n账号: %s\n课程: %s\n状态: %s", oid, user, kcname, status)
+		if process != "" {
+			content += fmt.Sprintf("\n进度: %s", process)
+		}
+		if remarks != "" {
+			content += fmt.Sprintf("\n备注: %s", remarks)
+		}
+
+		if pushUID != "" {
+			sendAdminWxPush(oid, user, pushUID, content)
+		}
+		if showDocURL != "" {
+			sendAdminShowDocPush(oid, user, showDocURL, content)
+		}
+		if pushEmail != "" {
+			sendAdminEmailPush(oid, user, pushEmail, status, content)
+		}
+	}()
+}
+
+func sendAdminWxPush(oid int, user, pushUID, content string) {
+	configMap, _ := commonmodule.GetAdminConfigMap()
+	appToken := configMap["wxpusher_token"]
+	if appToken == "" {
+		return
+	}
+
+	body := map[string]interface{}{
+		"appToken":    appToken,
+		"content":     content,
+		"contentType": 1,
+		"uids":        []string{pushUID},
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Post(
+		"https://wxpusher.zjiecode.com/api/send/message",
+		"application/json",
+		bytes.NewReader(bodyJSON),
+	)
+	if err != nil {
+		logAdminPush(oid, user, "wxpusher", pushUID, content, "失败")
+		database.DB.Exec("UPDATE qingka_wangke_order SET pushStatus='失败' WHERE oid=?", oid)
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var result map[string]interface{}
+	json.Unmarshal(respBody, &result)
+
+	if code, _ := result["code"].(float64); int(code) == 1000 {
+		logAdminPush(oid, user, "wxpusher", pushUID, content, "成功")
+		database.DB.Exec("UPDATE qingka_wangke_order SET pushStatus='成功' WHERE oid=?", oid)
+		return
+	}
+
+	logAdminPush(oid, user, "wxpusher", pushUID, content, "失败")
+	database.DB.Exec("UPDATE qingka_wangke_order SET pushStatus='失败' WHERE oid=?", oid)
+}
+
+func sendAdminShowDocPush(oid int, user, showDocURL, content string) {
+	body := map[string]interface{}{
+		"title":   fmt.Sprintf("订单 #%d 状态更新", oid),
+		"content": content,
+	}
+	bodyJSON, _ := json.Marshal(body)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Post(showDocURL, "application/json", bytes.NewReader(bodyJSON))
+	if err != nil {
+		logAdminPush(oid, user, "showdoc", showDocURL, content, "失败")
+		database.DB.Exec("UPDATE qingka_wangke_order SET pushShowdocStatus='失败' WHERE oid=?", oid)
+		return
+	}
+	defer resp.Body.Close()
+
+	logAdminPush(oid, user, "showdoc", showDocURL, content, "成功")
+	database.DB.Exec("UPDATE qingka_wangke_order SET pushShowdocStatus='成功' WHERE oid=?", oid)
+}
+
+func sendAdminEmailPush(oid int, user, email, status, content string) {
+	subject := fmt.Sprintf("订单 #%d 状态更新: %s", oid, status)
+	htmlBody := fmt.Sprintf("<pre>%s</pre>", content)
+
+	if err := mailmodule.Mail().SendEmailWithType(email, subject, htmlBody, "push"); err != nil {
+		logAdminPush(oid, user, "email", email, content, "失败")
+		database.DB.Exec("UPDATE qingka_wangke_order SET pushEmailStatus='失败' WHERE oid=?", oid)
+		return
+	}
+
+	logAdminPush(oid, user, "email", email, content, "成功")
+	database.DB.Exec("UPDATE qingka_wangke_order SET pushEmailStatus='成功' WHERE oid=?", oid)
+}
+
+func logAdminPush(oid int, uid, pushType, receiver, content, status string) {
+	var emailCol, uidCol, showDocCol interface{}
+	switch pushType {
+	case "email":
+		emailCol = receiver
+	case "wxpusher":
+		uidCol = receiver
+	case "showdoc":
+		showDocCol = receiver
+	}
+	database.DB.Exec(
+		`INSERT INTO qingka_wangke_push_logs (order_id, uid, type, receiver_email, receiver_uid, showdoc_url, content, status)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		oid, uid, pushType, emailCol, uidCol, showDocCol, content, status,
+	)
+}

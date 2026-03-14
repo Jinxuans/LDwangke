@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,17 +11,18 @@ import (
 	"go-api/internal/database"
 )
 
-// StartWCron 启动鲸鱼运动后台批量同步任务（替代 w_redis_ru.php + w_redis_chu.php）
-func StartWCron() {
+func RunWCron(ctx context.Context) {
 	log.Println("[W] 后台批量同步任务启动")
-	go wCronBatchSync()
-	go wCronRetryWaitAdd()
+	go wCronBatchSync(ctx)
+	go wCronRetryWaitAdd(ctx)
 }
 
 // ---------- 1. 批量同步订单状态 (w_redis_ru + w_redis_chu 合一) ----------
 
-func wCronBatchSync() {
-	time.Sleep(2 * time.Minute) // 启动延迟
+func wCronBatchSync(ctx context.Context) {
+	if !sleepWithContext(ctx, 2*time.Minute) { // 启动延迟
+		return
+	}
 	for {
 		func() {
 			defer func() {
@@ -89,7 +91,7 @@ func wCronBatchSync() {
 				appMap[a.ID] = a
 			}
 
-			svc := NewWService()
+			svc := W()
 
 			// 每个项目批量同步
 			for appID, orderIDs := range appOrders {
@@ -124,12 +126,16 @@ func wCronBatchSync() {
 					} else {
 						log.Printf("[W-cron-sync] [%s] 批量同步 %d 条", app.Name, len(batch))
 					}
-					time.Sleep(time.Second)
+					if !sleepWithContext(ctx, time.Second) {
+						return
+					}
 				}
 			}
 		}()
 
-		time.Sleep(5 * time.Minute)
+		if !sleepWithContext(ctx, 5*time.Minute) {
+			return
+		}
 	}
 }
 
@@ -195,8 +201,10 @@ func wSyncBatch(svc *WService, app struct {
 
 // ---------- 2. 自动重试 WAITADD 订单 ----------
 
-func wCronRetryWaitAdd() {
-	time.Sleep(3 * time.Minute) // 启动延迟
+func wCronRetryWaitAdd(ctx context.Context) {
+	if !sleepWithContext(ctx, 3*time.Minute) { // 启动延迟
+		return
+	}
 	for {
 		func() {
 			defer func() {
@@ -234,7 +242,7 @@ func wCronRetryWaitAdd() {
 				return
 			}
 
-			svc := NewWService()
+			svc := W()
 
 			for _, o := range orders {
 				if o.SubOrder == "" {
@@ -287,10 +295,14 @@ func wCronRetryWaitAdd() {
 				// 失败，恢复 WAITADD
 				database.DB.Exec("UPDATE w_order SET status = 'WAITADD' WHERE id = ? LIMIT 1", o.ID)
 				log.Printf("[W-cron-retry] 订单#%d 重新提交失败", o.ID)
-				time.Sleep(3 * time.Second)
+				if !sleepWithContext(ctx, 3*time.Second) {
+					return
+				}
 			}
 		}()
 
-		time.Sleep(5 * time.Minute)
+		if !sleepWithContext(ctx, 5*time.Minute) {
+			return
+		}
 	}
 }
