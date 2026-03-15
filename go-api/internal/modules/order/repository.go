@@ -3,16 +3,34 @@ package order
 import (
 	"errors"
 	"fmt"
+	"go-api/internal/config"
 	"go-api/internal/database"
 	"go-api/internal/model"
 	suppliermodule "go-api/internal/modules/supplier"
 	"go-api/internal/queue"
 	shared "go-api/internal/shared/db"
+	"log"
 	"math"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
+
+func autoSyncVerboseLogging() bool {
+	if config.Global == nil {
+		return true
+	}
+	return strings.ToLower(strings.TrimSpace(config.Global.Server.Mode)) != "release"
+}
+
+func autoSyncProgressLogStep() int64 {
+	if autoSyncVerboseLogging() {
+		return 200
+	}
+	return 1000
+}
 
 // Repository 为订单模块提供最小的存取边界，当前先复用旧 service 实现。
 type Repository interface {
@@ -27,6 +45,7 @@ type Repository interface {
 	ModifyRemarks(oids []int, remarks string) error
 	ManualDockOrders(oids []int) (int, int, error)
 	SyncOrderProgress(oids []int) (int, error)
+	AutoSyncAllProgress() (int, int, error)
 	BatchSyncOrders(oids []int) (int, error)
 	BatchResendOrders(oids []int) (int, int, error)
 }
@@ -533,6 +552,11 @@ func (r *legacyRepository) ManualDockOrders(oids []int) (int, int, error) {
 	return success, fail, nil
 }
 
+// SyncOrderProgress 处理“手动同步订单进度”。
+// 这条链路的输入是明确的 oid 列表，特点是：
+// 1. 只处理用户/管理员选中的订单；
+// 2. 每条订单单独查询上游，不做跨供应商聚合；
+// 3. 成功后立即回写主订单表并触发状态通知。
 func (r *legacyRepository) SyncOrderProgress(oids []int) (int, error) {
 	if len(oids) == 0 {
 		return 0, errors.New("请选择订单")
@@ -540,48 +564,255 @@ func (r *legacyRepository) SyncOrderProgress(oids []int) (int, error) {
 	updated := 0
 
 	for _, oid := range oids {
+		// 先把本地主订单的“查询上游”所需最小字段取出来：
+		// yid/hid 用于定位上游订单和供应商，
+		// user/kcname/noun 用于那些要求附带账号、课程名、上游商品ID 的平台做回退匹配。
 		var yidStr, hidStr string
-		var user, kcname, status string
+		var user, kcname, kcid, noun, status string
 		err := database.DB.QueryRow(
-			"SELECT COALESCE(yid,''), COALESCE(hid,'0'), COALESCE(user,''), COALESCE(kcname,''), COALESCE(status,'') FROM qingka_wangke_order WHERE oid = ?",
+			"SELECT COALESCE(yid,''), COALESCE(hid,'0'), COALESCE(user,''), COALESCE(kcname,''), COALESCE(kcid,''), COALESCE(noun,''), COALESCE(status,'') FROM qingka_wangke_order WHERE oid = ?",
 			oid,
-		).Scan(&yidStr, &hidStr, &user, &kcname, &status)
+		).Scan(&yidStr, &hidStr, &user, &kcname, &kcid, &noun, &status)
 		hid, _ := strconv.Atoi(hidStr)
 		if err != nil || hid == 0 {
 			continue
 		}
+		// 已退款/已退单的订单不再主动向上游查进度，
+		// 避免把本地已经终态的业务重新改回“进行中”等中间态。
 		if status == "已退款" || status == "已退单" {
 			continue
 		}
 
+		// 通过 hid 找到本地保存的供应商配置。
+		// 这里的供应商对象会携带平台类型、域名、密钥等信息，供 QueryOrderProgress 组装上游请求。
 		sup, err := r.sup.GetSupplierByHID(hid)
 		if err != nil {
 			continue
 		}
 
-		orderExtra := map[string]string{"kcname": kcname}
+		// kcname 作为额外上下文传下去，主要是兼容某些平台只支持“用户名 + 课程名”联合查询。
+		orderExtra := map[string]string{
+			"kcname":       kcname,
+			"kcid":         kcid,
+			"noun":         noun,
+			"__debug_http": "1",
+			"__debug_oid":  strconv.Itoa(oid),
+		}
 		items, err := r.sup.QueryOrderProgress(sup, yidStr, user, orderExtra)
 		if err != nil {
 			continue
 		}
 
 		for _, item := range items {
+			// 不同平台返回的状态字段并不完全一致。
+			// 优先使用 status_text 这种更接近中文业务态的字段，没有时再退回原始 status。
 			statusText := item.Status
 			if item.StatusText != "" {
 				statusText = item.StatusText
 			}
+			// 更新时保留了旧系统的匹配条件：oid 是主键定位，
+			// user + kcname 则作为额外保护，避免极端情况下把别的课程结果错写到当前订单上。
 			database.DB.Exec(
 				"UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ? WHERE user = ? AND kcname = ? AND oid = ?",
 				item.KCName, item.YID, statusText, item.Process, item.Remarks,
 				item.CourseStartTime, item.CourseEndTime, item.ExamStartTime, item.ExamEndTime,
 				item.User, item.KCName, oid,
 			)
+			// 回写后立即通知站内推送/前端状态感知逻辑，
+			// 这样手动点“同步上游进度”后，订单通知链路也能保持一致。
 			orderStatusNotifier(oid, statusText, item.Process, item.Remarks)
 			updated++
 		}
 	}
 
 	return updated, nil
+}
+
+// AutoSyncAllProgress 处理“主订单表全局自动轮询”。
+// 它和手动同步最大的区别是：
+// 1. 不接收外部传入 oid，而是自己扫描所有已对接订单；
+// 2. 为了降低上游接口压力，先按供应商 hid 分组，再并发轮询；
+// 3. 会输出较详细的运行日志，便于观察几万单的大批量同步进度。
+func (r *legacyRepository) AutoSyncAllProgress() (int, int, error) {
+	rows, err := database.DB.Query(`
+		SELECT oid, COALESCE(yid,''), COALESCE(hid,'0'), COALESCE(user,''), COALESCE(kcname,''), COALESCE(noun,''), COALESCE(kcid,'')
+		FROM qingka_wangke_order
+		WHERE dockstatus = 1
+		ORDER BY oid DESC`)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer rows.Close()
+
+	type syncItem struct {
+		OID    int
+		YID    string
+		HID    int
+		User   string
+		KCName string
+		Noun   string
+		KCID   string
+	}
+
+	// 先把所有待轮询订单按 hid 分组。
+	// 这样后面每个 goroutine 处理一个供应商分组，日志和上游限流都更容易控制。
+	hidGroups := map[int][]syncItem{}
+	totalCount := 0
+	for rows.Next() {
+		var item syncItem
+		var hidStr string
+		if err := rows.Scan(&item.OID, &item.YID, &hidStr, &item.User, &item.KCName, &item.Noun, &item.KCID); err != nil {
+			continue
+		}
+		item.HID, _ = strconv.Atoi(hidStr)
+		if item.HID > 0 {
+			hidGroups[item.HID] = append(hidGroups[item.HID], item)
+			totalCount++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, 0, err
+	}
+	if totalCount == 0 {
+		log.Printf("[AutoSync] 当前没有可同步的已对接订单")
+		return 0, 0, nil
+	}
+
+	log.Printf("[AutoSync] 开始同步 %d 个已对接订单（%d 个供应商）", totalCount, len(hidGroups))
+
+	verboseLogging := autoSyncVerboseLogging()
+	var updatedCount int64
+	var errorCount int64
+	var processedCount int64
+	var sampleErrorMu sync.Mutex
+	var sampleErrors []string
+	sem := make(chan struct{}, 5)
+	var wg sync.WaitGroup
+	progressLogStep := autoSyncProgressLogStep()
+	const sampleErrorLimit = 8
+
+	// 只保留少量失败样例，避免几万单场景把日志刷爆。
+	recordSampleError := func(message string) {
+		sampleErrorMu.Lock()
+		defer sampleErrorMu.Unlock()
+		if len(sampleErrors) < sampleErrorLimit {
+			sampleErrors = append(sampleErrors, message)
+		}
+	}
+
+	logProgress := func(delta int64) {
+		if delta <= 0 {
+			return
+		}
+		// processedCount 统计的是“已经处理完的订单数”，
+		// 不区分成功还是失败，只用来给运维一个可见的推进刻度。
+		current := atomic.AddInt64(&processedCount, delta)
+		previous := current - delta
+		if current == int64(totalCount) || current/progressLogStep != previous/progressLogStep {
+			log.Printf(
+				"[AutoSync] 进度 %d/%d，已更新 %d，失败 %d",
+				current,
+				totalCount,
+				atomic.LoadInt64(&updatedCount),
+				atomic.LoadInt64(&errorCount),
+			)
+		}
+	}
+
+	for hid, items := range hidGroups {
+		sem <- struct{}{}
+		wg.Add(1)
+
+		go func(hid int, items []syncItem) {
+			// 使用固定大小的信号量限制供应商并发，避免同时打爆太多上游。
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
+
+			// 同一个 hid 分组内的订单都共用同一份供应商配置。
+			sup, err := r.sup.GetSupplierByHID(hid)
+			if err != nil {
+				message := fmt.Sprintf("供应商 hid=%d 查询失败: %v（影响 %d 个订单）", hid, err, len(items))
+				if verboseLogging {
+					log.Printf("[AutoSync] %s", message)
+				}
+				recordSampleError(message)
+				atomic.AddInt64(&errorCount, int64(len(items)))
+				logProgress(int64(len(items)))
+				return
+			}
+
+			for _, item := range items {
+				// 自动轮询仍然把 kcname 透传给供应商查询层，
+				// 这样与手动同步保持相同的平台兼容行为。
+				orderExtra := map[string]string{
+					"kcname": item.KCName,
+					"noun":   item.Noun,
+				}
+				if item.KCID != "" {
+					orderExtra["kcid"] = item.KCID
+				}
+				progressItems, err := r.sup.QueryOrderProgress(sup, item.YID, item.User, orderExtra)
+				if err != nil {
+					message := fmt.Sprintf("oid=%d 查询进度失败(hid=%d yid=%s): %v", item.OID, hid, item.YID, err)
+					if verboseLogging {
+						log.Printf("[AutoSync] %s", message)
+					}
+					recordSampleError(message)
+					atomic.AddInt64(&errorCount, 1)
+					logProgress(1)
+					continue
+				}
+				if len(progressItems) == 0 {
+					// “接口成功但 data 为空”在业务上也视为失败，
+					// 因为这说明当前订单没有拿到任何可回写的上游进度。
+					message := fmt.Sprintf("oid=%d 未查询到上游进度(hid=%d yid=%s)", item.OID, hid, item.YID)
+					if verboseLogging {
+						log.Printf("[AutoSync] %s", message)
+					}
+					recordSampleError(message)
+					atomic.AddInt64(&errorCount, 1)
+					logProgress(1)
+					continue
+				}
+
+				for _, progress := range progressItems {
+					// 归一化上游状态字段，优先用 status_text 显示更接近用户视角的状态。
+					statusText := progress.Status
+					if progress.StatusText != "" {
+						statusText = progress.StatusText
+					}
+					// 自动轮询这里直接按 oid 回写，不再附带 user/kcname 条件。
+					// 因为前面已经先从主订单表扫描出了明确的 oid，自动任务更强调吞吐量和确定性。
+					if _, err := database.DB.Exec(
+						"UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ? WHERE oid = ?",
+						progress.KCName, progress.YID, statusText, progress.Process, progress.Remarks,
+						progress.CourseStartTime, progress.CourseEndTime, progress.ExamStartTime, progress.ExamEndTime,
+						item.OID,
+					); err != nil {
+						message := fmt.Sprintf("oid=%d 更新进度失败(hid=%d yid=%s): %v", item.OID, hid, item.YID, err)
+						if verboseLogging {
+							log.Printf("[AutoSync] %s", message)
+						}
+						recordSampleError(message)
+						atomic.AddInt64(&errorCount, 1)
+						continue
+					}
+					// 自动轮询更新后同样走统一通知器，确保消息推送和状态广播与手动同步一致。
+					orderStatusNotifier(item.OID, statusText, progress.Process, progress.Remarks)
+					atomic.AddInt64(&updatedCount, 1)
+				}
+				logProgress(1)
+			}
+		}(hid, items)
+	}
+
+	wg.Wait()
+	if len(sampleErrors) > 0 {
+		log.Printf("[AutoSync] 失败样例: %s", strings.Join(sampleErrors, "；"))
+	}
+	return int(updatedCount), int(errorCount), nil
 }
 
 func (r *legacyRepository) BatchSyncOrders(oids []int) (int, error) {

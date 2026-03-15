@@ -154,7 +154,7 @@ func simpleCallOrder(sup *model.SupplierFull, platform, school, user, pass, kcna
 	return result, nil
 }
 
-func simpleQueryProgress(sup *model.SupplierFull, platform, school, user, pass, kcname, kcid string) ([]model.SupplierProgressItem, error) {
+func simpleQueryProgress(sup *model.SupplierFull, platform, school, user, pass, kcname, kcid string, debugInfo progressDebugInfo) ([]model.SupplierProgressItem, error) {
 	baseURL := simpleBuildBaseURL(sup)
 	token := simpleGetToken(sup)
 
@@ -172,8 +172,10 @@ func simpleQueryProgress(sup *model.SupplierFull, platform, school, user, pass, 
 	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
+	debugInfo.logRequest(sup, "POST", baseURL+"/Api/Query", "application/x-www-form-urlencoded", formData.Encode())
 	resp, err := client.PostForm(baseURL+"/Api/Query", formData)
 	if err != nil {
+		debugInfo.logRequestError(sup, err)
 		return nil, fmt.Errorf("请求至强进度失败：%v", err)
 	}
 	defer resp.Body.Close()
@@ -182,6 +184,7 @@ func simpleQueryProgress(sup *model.SupplierFull, platform, school, user, pass, 
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败：%v", err)
 	}
+	debugInfo.logResponse(sup, resp.Status, body)
 
 	var raw map[string]interface{}
 	if err := json.Unmarshal(body, &raw); err != nil {

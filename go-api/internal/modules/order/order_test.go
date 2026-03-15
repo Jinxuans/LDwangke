@@ -26,6 +26,7 @@ type stubRepository struct {
 	modifyCalled       bool
 	manualDockCalled   bool
 	syncProgressCalled bool
+	autoSyncCalled     bool
 	batchSyncCalled    bool
 	batchResendCalled  bool
 	addCalled          bool
@@ -199,6 +200,11 @@ func (s *stubRepository) SyncOrderProgress(oids []int) (int, error) {
 	return 1, nil
 }
 
+func (s *stubRepository) AutoSyncAllProgress() (int, int, error) {
+	s.autoSyncCalled = true
+	return 2, 1, nil
+}
+
 func (s *stubRepository) BatchSyncOrders(oids []int) (int, error) {
 	s.batchSyncCalled = true
 	return 2, nil
@@ -286,6 +292,11 @@ func TestCommandAndSyncServicesDelegateToRepository(t *testing.T) {
 	progressCount, err := syncSvc.SyncProgress([]int{1})
 	if progressCount != 1 || err != nil || !repo.syncProgressCalled {
 		t.Fatalf("sync progress delegation failed: count=%d err=%v called=%v", progressCount, err, repo.syncProgressCalled)
+	}
+
+	autoUpdated, autoFailed, err := syncSvc.AutoSyncAllProgress()
+	if autoUpdated != 2 || autoFailed != 1 || err != nil || !repo.autoSyncCalled {
+		t.Fatalf("auto sync delegation failed: updated=%d failed=%d err=%v called=%v", autoUpdated, autoFailed, err, repo.autoSyncCalled)
 	}
 
 	batchSynced, err := syncSvc.BatchSync([]int{1, 2})
@@ -513,15 +524,15 @@ func TestLegacyRepositorySyncAndResendSkipTerminalOrders(t *testing.T) {
 
 	t.Run("SyncProgressSkipsRefundedOrder", func(t *testing.T) {
 		changeStatusQueryHook = func(query string, args []driver.NamedValue) (driver.Rows, error) {
-			if !strings.Contains(query, "SELECT COALESCE(yid,''), COALESCE(hid,'0'), COALESCE(user,''), COALESCE(kcname,''), COALESCE(status,'') FROM qingka_wangke_order WHERE oid = ?") {
+			if !strings.Contains(query, "SELECT COALESCE(yid,''), COALESCE(hid,'0'), COALESCE(user,''), COALESCE(kcname,''), COALESCE(kcid,''), COALESCE(noun,''), COALESCE(status,'') FROM qingka_wangke_order WHERE oid = ?") {
 				return nil, fmt.Errorf("unexpected query: %s", query)
 			}
 			if got := namedValueStrings(args); !reflect.DeepEqual(got, []string{"30"}) {
 				return nil, fmt.Errorf("unexpected args: %v", got)
 			}
 			return singleRow(
-				[]string{"yid", "hid", "user", "kcname", "status"},
-				"Y30", "8", "student", "course", "已退款",
+				[]string{"yid", "hid", "user", "kcname", "kcid", "noun", "status"},
+				"Y30", "8", "student", "course", "CID-30", "NOUN-30", "已退款",
 			), nil
 		}
 
@@ -1068,7 +1079,7 @@ func TestLegacyRepositoryManualDockAndSyncSuccessPaths(t *testing.T) {
 					return &model.SupplierFull{HID: 9}, nil
 				},
 				queryProgress: func(sup *model.SupplierFull, yid string, username string, orderExtra map[string]string) ([]model.SupplierProgressItem, error) {
-					if yid != "Y62" || username != "user" || orderExtra["kcname"] != "课程C" {
+					if yid != "Y62" || username != "user" || orderExtra["kcname"] != "课程C" || orderExtra["noun"] != "NOUN-62" || orderExtra["kcid"] != "KC-62" {
 						t.Fatalf("unexpected progress params: yid=%q username=%q extra=%v", yid, username, orderExtra)
 					}
 					return []model.SupplierProgressItem{{
@@ -1088,10 +1099,10 @@ func TestLegacyRepositoryManualDockAndSyncSuccessPaths(t *testing.T) {
 		}
 
 		changeStatusQueryHook = func(query string, args []driver.NamedValue) (driver.Rows, error) {
-			if !strings.Contains(query, "SELECT COALESCE(yid,''), COALESCE(hid,'0'), COALESCE(user,''), COALESCE(kcname,''), COALESCE(status,'') FROM qingka_wangke_order WHERE oid = ?") {
+			if !strings.Contains(query, "SELECT COALESCE(yid,''), COALESCE(hid,'0'), COALESCE(user,''), COALESCE(kcname,''), COALESCE(kcid,''), COALESCE(noun,''), COALESCE(status,'') FROM qingka_wangke_order WHERE oid = ?") {
 				return nil, fmt.Errorf("unexpected query: %s", query)
 			}
-			return singleRow([]string{"yid", "hid", "user", "kcname", "status"}, "Y62", "9", "user", "课程C", "进行中"), nil
+			return singleRow([]string{"yid", "hid", "user", "kcname", "kcid", "noun", "status"}, "Y62", "9", "user", "课程C", "KC-62", "NOUN-62", "进行中"), nil
 		}
 
 		execCalled := false
@@ -1125,6 +1136,80 @@ func TestLegacyRepositoryManualDockAndSyncSuccessPaths(t *testing.T) {
 			t.Fatal("expected sync progress update to execute")
 		}
 		if want := []string{"62|已完成|100%|done"}; !reflect.DeepEqual(notified, want) {
+			t.Fatalf("unexpected notifier calls: got=%v want=%v", notified, want)
+		}
+	})
+
+	t.Run("AutoSyncAllProgressUpdatesDockedOrders", func(t *testing.T) {
+		repo := &legacyRepository{
+			sup: &stubSupplierGateway{
+				getSupplierByHID: func(hid int) (*model.SupplierFull, error) {
+					if hid != 9 {
+						t.Fatalf("unexpected supplier hid: %d", hid)
+					}
+					return &model.SupplierFull{HID: 9}, nil
+				},
+				queryProgress: func(sup *model.SupplierFull, yid string, username string, orderExtra map[string]string) ([]model.SupplierProgressItem, error) {
+					if yid != "Y70" || username != "student" || orderExtra["kcname"] != "课程D" || orderExtra["noun"] != "NOUN-70" || orderExtra["kcid"] != "KC-70" {
+						t.Fatalf("unexpected progress params: yid=%q username=%q extra=%v", yid, username, orderExtra)
+					}
+					return []model.SupplierProgressItem{{
+						KCName:          "课程D",
+						YID:             "Y70",
+						StatusText:      "进行中",
+						Process:         "80%",
+						Remarks:         "同步中",
+						User:            "student",
+						CourseStartTime: "2026-03-01",
+						CourseEndTime:   "2026-03-08",
+						ExamStartTime:   "2026-03-09",
+						ExamEndTime:     "2026-03-10",
+					}}, nil
+				},
+			},
+		}
+
+		changeStatusQueryHook = func(query string, args []driver.NamedValue) (driver.Rows, error) {
+			if !strings.Contains(query, "FROM qingka_wangke_order") || !strings.Contains(query, "WHERE dockstatus = 1") {
+				return nil, fmt.Errorf("unexpected query: %s", query)
+			}
+			return &testRows{
+				columns: []string{"oid", "yid", "hid", "user", "kcname", "noun", "kcid"},
+				values:  [][]driver.Value{{int64(70), "Y70", "9", "student", "课程D", "NOUN-70", "KC-70"}},
+			}, nil
+		}
+
+		execCalled := false
+		changeStatusExecHook = func(query string, args []driver.NamedValue) error {
+			execCalled = true
+			if !strings.Contains(query, "UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ? WHERE oid = ?") {
+				return fmt.Errorf("unexpected exec query: %s", query)
+			}
+			want := []string{"课程D", "Y70", "进行中", "80%", "同步中", "2026-03-01", "2026-03-08", "2026-03-09", "2026-03-10", "70"}
+			if got := namedValueStrings(args); !reflect.DeepEqual(got, want) {
+				return fmt.Errorf("unexpected exec args: got=%v want=%v", got, want)
+			}
+			return nil
+		}
+
+		var notified []string
+		originalNotifier := orderStatusNotifier
+		defer func() { orderStatusNotifier = originalNotifier }()
+		SetOrderStatusNotifier(func(oid int, newStatus string, newProcess string, remarks string) {
+			notified = append(notified, fmt.Sprintf("%d|%s|%s|%s", oid, newStatus, newProcess, remarks))
+		})
+
+		updated, failed, err := repo.AutoSyncAllProgress()
+		if err != nil {
+			t.Fatalf("auto sync returned error: %v", err)
+		}
+		if updated != 1 || failed != 0 {
+			t.Fatalf("unexpected auto sync counts: updated=%d failed=%d", updated, failed)
+		}
+		if !execCalled {
+			t.Fatal("expected auto sync update to execute")
+		}
+		if want := []string{"70|进行中|80%|同步中"}; !reflect.DeepEqual(notified, want) {
 			t.Fatalf("unexpected notifier calls: got=%v want=%v", notified, want)
 		}
 	})

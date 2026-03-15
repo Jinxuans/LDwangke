@@ -267,14 +267,22 @@ func GetTurboStatus() TurboStatus {
 	return turboStatus
 }
 
+// InitSyncTicker 启动主订单表的自动轮询定时器。
+// 这里故意只做“调度”，不写任何订单查询逻辑：
+// 真正的业务规则放在 order.Sync.AutoSyncAllProgress 中，避免 runtimeops 与订单域耦合过深。
 func InitSyncTicker(interval time.Duration) {
 	syncTickerMu.Lock()
 	defer syncTickerMu.Unlock()
 
 	syncTickerStop = make(chan struct{})
+	log.Printf("[AutoSync] 主订单自动同步已启动，首次执行延迟 10s，轮询间隔 %s", interval)
 	go runSyncTicker(interval, syncTickerStop)
 }
 
+// runSyncTicker 的职责很单纯：
+// - 启动 10 秒后先触发一次，避免服务刚起时长时间没有任何自动同步；
+// - 然后按给定 interval 循环执行；
+// - 收到 stop 信号后退出，供 turbo 档位热更新时重建 ticker。
 func runSyncTicker(interval time.Duration, stop chan struct{}) {
 	select {
 	case <-time.After(10 * time.Second):
@@ -295,33 +303,22 @@ func runSyncTicker(interval time.Duration, stop chan struct{}) {
 	}
 }
 
+// syncPendingOrderProgress 是调度层到订单域的桥接点。
+// 调度层只关心“现在该执行一次了”，至于扫哪些订单、怎么查上游、怎么打日志，
+// 都交给 order 模块内部完成。
 func syncPendingOrderProgress() {
-	rows, err := database.DB.Query(`
-		SELECT oid
-		FROM qingka_wangke_order
-		WHERE COALESCE(dockstatus,'0') = '1'
-		  AND COALESCE(yid,'') <> ''
-		  AND COALESCE(status,'') NOT IN ('已完成','已退款','已退单','已取消','失败')
-		  AND (tongbtime IS NULL OR tongbtime = '' OR tongbtime <= NOW())
-		ORDER BY oid ASC
-		LIMIT 100`)
+	if database.DB == nil {
+		log.Printf("[AutoSync] 跳过执行：数据库未初始化")
+		return
+	}
+
+	log.Printf("[AutoSync] 开始执行主订单自动同步")
+	updated, failed, err := ordermodule.NewServices().Sync.AutoSyncAllProgress()
 	if err != nil {
+		log.Printf("[AutoSync] 查询进行中订单失败: %v", err)
 		return
 	}
-	defer rows.Close()
-
-	var oids []int
-	for rows.Next() {
-		var oid int
-		if err := rows.Scan(&oid); err == nil && oid > 0 {
-			oids = append(oids, oid)
-		}
-	}
-	if len(oids) == 0 {
-		return
-	}
-
-	_, _ = ordermodule.NewServices().Sync.SyncProgress(oids)
+	log.Printf("[AutoSync] 同步完成，更新 %d 个订单，失败 %d 个", updated, failed)
 }
 
 func updateSyncInterval(interval time.Duration) {
@@ -332,5 +329,6 @@ func updateSyncInterval(interval time.Duration) {
 		close(syncTickerStop)
 	}
 	syncTickerStop = make(chan struct{})
+	log.Printf("[AutoSync] 主订单自动同步间隔已更新为 %s", interval)
 	go runSyncTicker(interval, syncTickerStop)
 }

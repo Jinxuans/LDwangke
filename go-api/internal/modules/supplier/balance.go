@@ -65,19 +65,48 @@ func (s *Service) QueryBalance(hid int) (map[string]interface{}, error) {
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
-	baseURL := strings.TrimRight(sup.URL, "/")
-	if !strings.HasPrefix(baseURL, "http") {
-		baseURL = "http://" + baseURL
-	}
-
-	apiURL := fmt.Sprintf("%s/api.php?act=%s", baseURL, cfg.BalanceAct)
-	if cfg.BalancePath != "" {
-		apiURL = baseURL + cfg.BalancePath
-	}
+	apiURL := resolveConfiguredActionURL(sup.URL, cfg.BalancePath)
 
 	authType := cfg.BalanceAuthType
 	if authType == "" {
-		authType = "uid_key"
+		authType = cfg.AuthType
+	}
+
+	if strings.TrimSpace(cfg.BalanceParamMap) != "" {
+		defaultParams := defaultSupplierAuthParams(sup, authType)
+		execResult, err := s.executeConfiguredAction(
+			sup,
+			apiURL,
+			cfg.BalanceMethod,
+			cfg.BalanceBodyType,
+			cfg.BalanceParamMap,
+			http.MethodPost,
+			"form",
+			defaultParams,
+			map[string]string{},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("请求上游余额接口失败：%v", err)
+		}
+
+		var raw map[string]interface{}
+		if err := json.Unmarshal(execResult.Body, &raw); err != nil {
+			return nil, fmt.Errorf("解析响应失败：%s", string(execResult.Body))
+		}
+
+		money := extractMoneyField(raw, cfg.BalanceMoneyField)
+		result := map[string]interface{}{
+			"code":  200,
+			"money": money,
+			"pt":    sup.PT,
+			"name":  sup.Name,
+			"hid":   hid,
+			"raw":   raw,
+		}
+		if money != "" && money != "<nil>" {
+			database.DB.Exec("UPDATE qingka_wangke_huoyuan SET money = ? WHERE hid = ?", money, hid)
+		}
+		return result, nil
 	}
 
 	var resp *http.Response

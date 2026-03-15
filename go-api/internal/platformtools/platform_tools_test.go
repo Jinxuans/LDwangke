@@ -12,7 +12,6 @@ func TestBuildConfigFromDetection(t *testing.T) {
 		ReturnsYID:    true,
 		Config: map[string]string{
 			"auth_type":           "token_only",
-			"api_path_style":      "rest",
 			"success_codes":       "0,1",
 			"use_json":            "true",
 			"query_path":          "/api/get",
@@ -35,8 +34,8 @@ func TestBuildConfigFromDetection(t *testing.T) {
 	if cfg.Name != "demo-platform" {
 		t.Fatalf("expected suggested name, got %q", cfg.Name)
 	}
-	if cfg.AuthType != "token_only" || cfg.APIPathStyle != "rest" {
-		t.Fatalf("unexpected auth/api style: %+v", cfg)
+	if cfg.AuthType != "token_only" {
+		t.Fatalf("unexpected auth type: %+v", cfg)
 	}
 	if cfg.QueryPath != "/api/get" || cfg.OrderPath != "/api/add" {
 		t.Fatalf("unexpected query/order path: %+v", cfg)
@@ -46,6 +45,9 @@ func TestBuildConfigFromDetection(t *testing.T) {
 	}
 	if cfg.BalanceMoneyField != "data.balance" {
 		t.Fatalf("unexpected balance field: %q", cfg.BalanceMoneyField)
+	}
+	if cfg.ProgressParamMap != "" {
+		t.Fatalf("expected empty progress param map, got %q", cfg.ProgressParamMap)
 	}
 }
 
@@ -71,8 +73,8 @@ func TestParsePHPCodeExtractsSignals(t *testing.T) {
 	if cfg.AuthType != "token_only" {
 		t.Fatalf("expected token_only auth, got %q", cfg.AuthType)
 	}
-	if cfg.APIPathStyle != "rest" || cfg.QueryPath != "/api/query" {
-		t.Fatalf("unexpected rest parsing result: %+v", cfg)
+	if cfg.QueryPath != "/api/query" {
+		t.Fatalf("unexpected parsing result: %+v", cfg)
 	}
 	if !strings.Contains(cfg.SuccessCodes, "0") || !strings.Contains(cfg.SuccessCodes, "200") {
 		t.Fatalf("unexpected success codes: %q", cfg.SuccessCodes)

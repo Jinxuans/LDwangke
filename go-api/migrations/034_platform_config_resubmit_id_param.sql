@@ -16,7 +16,6 @@ DROP PROCEDURE IF EXISTS _patch_034_resubmit_id_param;
 -- 更新 pup 平台配置
 UPDATE `qingka_platform_config` SET
   `extra_params`=1,
-  `progress_act`='chadan',
-  `progress_no_yid`='chadan',
+  `progress_path`='/api.php?act=chadan',
   `resubmit_id_param`='oid'
 WHERE `pt`='pup';

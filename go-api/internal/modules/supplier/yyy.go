@@ -117,9 +117,9 @@ func (s *yyySession) login() error {
 	return nil
 }
 
-func (s *yyySession) doRequest(method, path string, body interface{}) ([]byte, error) {
+func (s *yyySession) doRequest(method, path string, body interface{}) ([]byte, string, error) {
 	if err := s.login(); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var bodyBytes []byte
@@ -127,14 +127,14 @@ func (s *yyySession) doRequest(method, path string, body interface{}) ([]byte, e
 		bodyBytes, _ = json.Marshal(body)
 	}
 
-	requestOnce := func() ([]byte, error) {
+	requestOnce := func() ([]byte, string, error) {
 		var bodyReader io.Reader
 		if len(bodyBytes) > 0 {
 			bodyReader = bytes.NewReader(bodyBytes)
 		}
 		req, err := http.NewRequest(method, s.baseURL+path, bodyReader)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Requested-With", "XMLHttpRequest")
@@ -146,15 +146,19 @@ func (s *yyySession) doRequest(method, path string, body interface{}) ([]byte, e
 
 		resp, err := s.client.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("yyy请求失败: %v", err)
+			return nil, "", fmt.Errorf("yyy请求失败: %v", err)
 		}
 		defer resp.Body.Close()
-		return io.ReadAll(resp.Body)
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, resp.Status, err
+		}
+		return respBody, resp.Status, nil
 	}
 
-	respBody, err := requestOnce()
+	respBody, status, err := requestOnce()
 	if err != nil {
-		return nil, err
+		return nil, status, err
 	}
 
 	var check struct {
@@ -167,12 +171,12 @@ func (s *yyySession) doRequest(method, path string, body interface{}) ([]byte, e
 		s.loggedIn = false
 		s.mu.Unlock()
 		if err := s.login(); err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		return requestOnce()
 	}
 
-	return respBody, nil
+	return respBody, status, nil
 }
 
 func extractYYYMoney(raw map[string]interface{}) string {
@@ -189,7 +193,7 @@ func extractYYYMoney(raw map[string]interface{}) string {
 
 func yyyGetClasses(sup *model.SupplierFull) ([]SupplierClassItem, error) {
 	session := getYYYSession(yyyBaseURL(sup.URL), sup.User, sup.Pass)
-	respBody, err := session.doRequest("POST", "/api/site", map[string]interface{}{"version": nil})
+	respBody, _, err := session.doRequest("POST", "/api/site", map[string]interface{}{"version": nil})
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +240,7 @@ func yyyGetClasses(sup *model.SupplierFull) ([]SupplierClassItem, error) {
 
 func yyyQueryBalance(sup *model.SupplierFull) (map[string]interface{}, error) {
 	session := getYYYSession(yyyBaseURL(sup.URL), sup.User, sup.Pass)
-	respBody, err := session.doRequest("POST", "/api/money", nil)
+	respBody, _, err := session.doRequest("POST", "/api/money", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +264,7 @@ func yyyCallOrder(sup *model.SupplierFull, user, pass, kcname string, siteID str
 	session := getYYYSession(yyyBaseURL(sup.URL), sup.User, sup.Pass)
 
 	orderData := fmt.Sprintf("%s %s %s", user, pass, kcname)
-	respBody, err := session.doRequest("POST", "/api/order", map[string]interface{}{
+	respBody, _, err := session.doRequest("POST", "/api/order", map[string]interface{}{
 		"lastoid":   siteID,
 		"orderData": orderData,
 		"orderNote": "",
@@ -293,9 +297,9 @@ func yyyCallOrder(sup *model.SupplierFull, user, pass, kcname string, siteID str
 	return orderResult, nil
 }
 
-func yyyQueryProgress(sup *model.SupplierFull, username string) ([]model.SupplierProgressItem, error) {
+func yyyQueryProgress(sup *model.SupplierFull, username string, debugInfo progressDebugInfo) ([]model.SupplierProgressItem, error) {
 	session := getYYYSession(yyyBaseURL(sup.URL), sup.User, sup.Pass)
-	respBody, err := session.doRequest("POST", "/api/getorder", map[string]interface{}{
+	requestBody := map[string]interface{}{
 		"lastoid":   "",
 		"odname":    username,
 		"nickname":  "",
@@ -304,10 +308,15 @@ func yyyQueryProgress(sup *model.SupplierFull, username string) ([]model.Supplie
 		"statusbox": []string{},
 		"page":      1,
 		"pageSize":  50,
-	})
+	}
+	bodyBytes, _ := json.Marshal(requestBody)
+	debugInfo.logRequest(sup, "POST", yyyBaseURL(sup.URL)+"/api/getorder", "application/json", string(bodyBytes))
+	respBody, status, err := session.doRequest("POST", "/api/getorder", requestBody)
 	if err != nil {
+		debugInfo.logRequestError(sup, err)
 		return nil, err
 	}
+	debugInfo.logResponse(sup, status, respBody)
 
 	var result struct {
 		Code int `json:"code"`

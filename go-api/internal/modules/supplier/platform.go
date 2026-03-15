@@ -1,6 +1,7 @@
 package supplier
 
 import (
+	"strings"
 	"sync"
 
 	"go-api/internal/database"
@@ -8,74 +9,76 @@ import (
 
 // PlatformConfig 平台接口差异配置。
 type PlatformConfig struct {
-	QueryAct          string
-	OrderAct          string
-	ProgressAct       string
-	ProgressNoYID     string
-	ProgressPath      string
-	ProgressMethod    string
-	SuccessCode       string
-	ReturnsYID        bool
-	ExtraParams       bool
-	UseIDParam        bool
-	AlwaysUsername    bool
-	YIDInDataArray    bool
-	UseUUIDParam      bool
-	PauseAct          string
-	PauseIDParam      string
-	ChangePassAct     string
-	PausePath         string
-	ChangePassPath    string
-	UseJSON           bool
-	LogPath           string
-	LogMethod         string
-	LogAct            string
-	LogIDParam        string
-	ChangePassParam   string
-	ChangePassIDParam string
-	ResubmitPath      string
-	ResubmitIDParam   string
-	BalanceAct        string
-	BalancePath       string
-	BalanceMoneyField string
-	BalanceMethod     string
-	BalanceAuthType   string
-	ReportAct         string
-	ReportPath        string
-	GetReportAct      string
-	GetReportPath     string
-	ReportSuccessCode string
-	ReportParamStyle  string
-	ReportAuthType    string
-	RefreshPath       string
-	CategoryAct       string
-}
-
-var platformRegistry = map[string]PlatformConfig{
-	"27":       {QueryAct: "local_time", SuccessCode: "0", ExtraParams: true},
-	"zy":       {QueryAct: "local_time", SuccessCode: "0"},
-	"haha":     {SuccessCode: "0", ReturnsYID: true, ExtraParams: true, ProgressPath: "/api/search", ProgressMethod: "GET"},
-	"hzw":      {SuccessCode: "1", ReturnsYID: true, ProgressAct: "chadan", ProgressNoYID: "chadan", UseIDParam: true, AlwaysUsername: true, PauseAct: "stop", LogAct: "cha_logwk", BalanceMoneyField: "money"},
-	"longlong": {SuccessCode: "0", ReturnsYID: true, YIDInDataArray: true, UseUUIDParam: true, ProgressAct: "chadan", ProgressNoYID: "chadan", PauseAct: "zanting", BalanceAct: "money", BalanceMoneyField: "data"},
-	"liunian":  {SuccessCode: "0", ReturnsYID: true, ProgressPath: "/api/chadan1", ChangePassAct: "xgmm", ChangePassParam: "xgmm", PauseAct: "zt", LogAct: "xq", CategoryAct: "getfl", ReportAct: "submitWorkOrder", GetReportAct: "queryWorkOrder", BalanceMoneyField: "money"},
-	"xxtgf":    {QueryAct: "local_script"},
-	"moocmd":   {QueryAct: "local_script"},
-	"yyy":      {QueryAct: "yyy_custom", SuccessCode: "200", ReturnsYID: true, BalanceMoneyField: "money"},
-	"2xx":      {SuccessCode: "1", ReturnsYID: true, PausePath: "/api/stop", ChangePassPath: "/api/update", ResubmitPath: "/api/reset", RefreshPath: "/api/refresh", UseJSON: true, BalancePath: "/api/getinfo", BalanceMoneyField: "data.money", ReportPath: "/api/submitWork", GetReportPath: "/api/queryWork", ReportParamStyle: "token", ReportAuthType: "token_only"},
-	"KUN":      {QueryAct: "KUN_custom", SuccessCode: "0", LogPath: "/log/", LogMethod: "GET"},
-	"kunba":    {QueryAct: "KUN_custom", SuccessCode: "0", LogPath: "/log/", LogMethod: "GET"},
-	"Benz":     {SuccessCode: "0", ReturnsYID: true, ProgressAct: "chadan", ProgressNoYID: "chadan", ChangePassAct: "xgmm", ChangePassIDParam: "oid", ChangePassParam: "pwd", LogAct: "getOrderLogs", LogIDParam: "oid", PauseAct: "ztdd", PauseIDParam: "oid"},
-	"tuboshu":  {QueryAct: "tuboshu_custom", SuccessCode: "0", BalanceMoneyField: "data.money"},
-	"29":       {SuccessCode: "0", ChangePassAct: "xgmm", ChangePassParam: "xgmm", BalanceMoneyField: "money"},
-	"spi":      {SuccessCode: "0", ReturnsYID: true, ProgressPath: "/api/search", ProgressMethod: "GET", ChangePassAct: "xgmm", ChangePassParam: "newPwd", BalanceMoneyField: "money"},
-	"lg":       {SuccessCode: "0", ReturnsYID: true, BalanceMoneyField: "data.money"},
-	"nx":       {QueryAct: "nx_custom", SuccessCode: "0", ReturnsYID: true, BalancePath: "/api/getuserinfo/", BalanceMoneyField: "data.remainscore", BalanceAuthType: "bearer_token"},
-	"pup":      {SuccessCode: "0", ReturnsYID: true, ExtraParams: true, ProgressAct: "chadan", ProgressNoYID: "chadan", ChangePassAct: "updateorderpwd", ChangePassIDParam: "oid", ChangePassParam: "newpwd", LogAct: "orderlog", LogIDParam: "oid", ResubmitIDParam: "oid"},
-	"wanzi":    {SuccessCode: "1", ReturnsYID: true, ProgressAct: "chadan", ProgressNoYID: "chadan", LogAct: "getOrderLogs", ChangePassAct: "xgmm", ChangePassIDParam: "oid", ChangePassParam: "pwd", PauseAct: "pause"},
-	"lgwk":     {QueryAct: "lgwk_custom", SuccessCode: "0"},
-	"skyriver": {SuccessCode: "1", ReturnsYID: true, ProgressPath: "/api/chadan1", ProgressNoYID: "chadan", ChangePassAct: "xgmm", ChangePassParam: "newpass", ChangePassIDParam: "oid", CategoryAct: "getfl", ReportAct: "submitWorkOrder", GetReportAct: "queryWorkOrder", BalanceMoneyField: "money"},
-	"xuemei":   {SuccessCode: "0", ReturnsYID: true, ProgressAct: "chadan", ProgressNoYID: "chadan", AlwaysUsername: true, PauseAct: "ikunStop", ChangePassAct: "gaimi", ChangePassIDParam: "oid", ChangePassParam: "pwd", LogAct: "cha_logwk", LogIDParam: "oid", BalanceMoneyField: "money"},
-	"simple":   {QueryAct: "simple_custom", SuccessCode: "1", BalanceMoneyField: "money"},
+	AuthType           string
+	QueryAct           string
+	QueryPath          string
+	QueryMethod        string
+	QueryBodyType      string
+	QueryParamMap      string
+	OrderPath          string
+	OrderMethod        string
+	OrderBodyType      string
+	OrderParamMap      string
+	ProgressPath       string
+	ProgressMethod     string
+	ProgressBodyType   string
+	ProgressParamMap   string
+	SuccessCode        string
+	ReturnsYID         bool
+	ExtraParams        bool
+	YIDInDataArray     bool
+	PauseMethod        string
+	PauseBodyType      string
+	PauseParamMap      string
+	PauseIDParam       string
+	ChangePassMethod   string
+	ChangePassBodyType string
+	ChangePassParamMap string
+	PausePath          string
+	ChangePassPath     string
+	UseJSON            bool
+	ResumePath         string
+	ResumeMethod       string
+	ResumeBodyType     string
+	ResumeParamMap     string
+	LogPath            string
+	LogMethod          string
+	LogBodyType        string
+	LogParamMap        string
+	LogIDParam         string
+	ChangePassParam    string
+	ChangePassIDParam  string
+	ResubmitPath       string
+	ResubmitMethod     string
+	ResubmitBodyType   string
+	ResubmitParamMap   string
+	ResubmitIDParam    string
+	BalancePath        string
+	BalanceMoneyField  string
+	BalanceMethod      string
+	BalanceBodyType    string
+	BalanceParamMap    string
+	BalanceAuthType    string
+	ReportPath         string
+	ReportMethod       string
+	ReportBodyType     string
+	ReportParamMap     string
+	GetReportPath      string
+	GetReportMethod    string
+	GetReportBodyType  string
+	GetReportParamMap  string
+	ReportSuccessCode  string
+	ReportParamStyle   string
+	ReportAuthType     string
+	RefreshPath        string
+	CategoryPath       string
+	CategoryMethod     string
+	CategoryBodyType   string
+	CategoryParamMap   string
+	ClassListPath      string
+	ClassListMethod    string
+	ClassListBodyType  string
+	ClassListParamMap  string
 }
 
 var (
@@ -85,21 +88,39 @@ var (
 	dbConfigLoaded bool
 )
 
+func isCustomQueryDriver(driver string) bool {
+	switch strings.TrimSpace(driver) {
+	case "local_time", "local_script", "xxt_query", "KUN_custom", "simple_custom", "yyy_custom", "tuboshu_custom", "nx_custom", "lgwk_custom":
+		return true
+	default:
+		return false
+	}
+}
+
 func loadDBPlatformConfigs() {
 	dbConfigMu.Lock()
 	defer dbConfigMu.Unlock()
 
-	rows, err := database.DB.Query(`SELECT pt, name, success_codes,
-		query_act, order_act, extra_params, returns_yid,
-		progress_act, progress_no_yid, progress_path, progress_method,
-		use_id_param, use_uuid_param, always_username, yid_in_data_array,
-		pause_act, pause_path, COALESCE(pause_id_param,'id'),
-		change_pass_act, change_pass_param, change_pass_id_param,
-		change_pass_path, resubmit_path, COALESCE(resubmit_id_param,'id'), log_act, log_path, log_method, log_id_param, use_json,
-		COALESCE(balance_act,'getmoney'), COALESCE(balance_path,''), COALESCE(balance_money_field,'money'),
-		COALESCE(balance_method,'POST'), COALESCE(balance_auth_type,''),
+	rows, err := database.DB.Query(`SELECT pt, name, auth_type, success_codes,
+		query_act, COALESCE(query_path,''), COALESCE(query_method,'POST'), COALESCE(query_body_type,''), COALESCE(query_param_map,''),
+		COALESCE(order_path,''), COALESCE(order_method,'POST'), COALESCE(order_body_type,''), COALESCE(order_param_map,''),
+		extra_params, returns_yid,
+		progress_path, progress_method,
+		COALESCE(progress_body_type,''), COALESCE(progress_param_map,''), yid_in_data_array,
+		COALESCE(category_path,''), COALESCE(category_method,'POST'), COALESCE(category_body_type,''), COALESCE(category_param_map,''),
+		COALESCE(class_list_path,''), COALESCE(class_list_method,'POST'), COALESCE(class_list_body_type,''), COALESCE(class_list_param_map,''),
+		COALESCE(pause_path,''), COALESCE(pause_method,'POST'), COALESCE(pause_body_type,''), COALESCE(pause_param_map,''), COALESCE(pause_id_param,'id'),
+		COALESCE(resume_path,''), COALESCE(resume_method,'POST'), COALESCE(resume_body_type,''), COALESCE(resume_param_map,''),
+		change_pass_param, change_pass_id_param,
+		COALESCE(change_pass_path,''), COALESCE(change_pass_method,'POST'), COALESCE(change_pass_body_type,''), COALESCE(change_pass_param_map,''),
+		COALESCE(resubmit_path,''), COALESCE(resubmit_method,'POST'), COALESCE(resubmit_body_type,''), COALESCE(resubmit_param_map,''), COALESCE(resubmit_id_param,'id'),
+		COALESCE(log_path,''), COALESCE(log_method,'POST'), COALESCE(log_body_type,''), COALESCE(log_param_map,''), log_id_param, use_json,
+		COALESCE(balance_path,''), COALESCE(balance_money_field,'money'),
+		COALESCE(balance_method,'POST'), COALESCE(balance_body_type,''), COALESCE(balance_param_map,''), COALESCE(balance_auth_type,''),
 		COALESCE(report_param_style,''), COALESCE(report_auth_type,''),
-		COALESCE(report_path,''), COALESCE(get_report_path,''), COALESCE(refresh_path,'')
+		COALESCE(report_path,''), COALESCE(report_method,'POST'), COALESCE(report_body_type,''), COALESCE(report_param_map,''),
+		COALESCE(get_report_path,''), COALESCE(get_report_method,'POST'), COALESCE(get_report_body_type,''), COALESCE(get_report_param_map,''),
+		COALESCE(refresh_path,'')
 		FROM qingka_platform_config`)
 	if err != nil {
 		dbConfigLoaded = true
@@ -114,16 +135,23 @@ func loadDBPlatformConfigs() {
 		var pt, name, successCodes string
 		var cfg PlatformConfig
 		err := rows.Scan(
-			&pt, &name, &successCodes,
-			&cfg.QueryAct, &cfg.OrderAct, &cfg.ExtraParams, &cfg.ReturnsYID,
-			&cfg.ProgressAct, &cfg.ProgressNoYID, &cfg.ProgressPath, &cfg.ProgressMethod,
-			&cfg.UseIDParam, &cfg.UseUUIDParam, &cfg.AlwaysUsername, &cfg.YIDInDataArray,
-			&cfg.PauseAct, &cfg.PausePath, &cfg.PauseIDParam,
-			&cfg.ChangePassAct, &cfg.ChangePassParam, &cfg.ChangePassIDParam,
-			&cfg.ChangePassPath, &cfg.ResubmitPath, &cfg.ResubmitIDParam, &cfg.LogAct, &cfg.LogPath, &cfg.LogMethod, &cfg.LogIDParam, &cfg.UseJSON,
-			&cfg.BalanceAct, &cfg.BalancePath, &cfg.BalanceMoneyField, &cfg.BalanceMethod, &cfg.BalanceAuthType,
+			&pt, &name, &cfg.AuthType, &successCodes,
+			&cfg.QueryAct, &cfg.QueryPath, &cfg.QueryMethod, &cfg.QueryBodyType, &cfg.QueryParamMap,
+			&cfg.OrderPath, &cfg.OrderMethod, &cfg.OrderBodyType, &cfg.OrderParamMap,
+			&cfg.ExtraParams, &cfg.ReturnsYID,
+			&cfg.ProgressPath, &cfg.ProgressMethod, &cfg.ProgressBodyType, &cfg.ProgressParamMap, &cfg.YIDInDataArray,
+			&cfg.CategoryPath, &cfg.CategoryMethod, &cfg.CategoryBodyType, &cfg.CategoryParamMap,
+			&cfg.ClassListPath, &cfg.ClassListMethod, &cfg.ClassListBodyType, &cfg.ClassListParamMap,
+			&cfg.PausePath, &cfg.PauseMethod, &cfg.PauseBodyType, &cfg.PauseParamMap, &cfg.PauseIDParam,
+			&cfg.ResumePath, &cfg.ResumeMethod, &cfg.ResumeBodyType, &cfg.ResumeParamMap,
+			&cfg.ChangePassParam, &cfg.ChangePassIDParam,
+			&cfg.ChangePassPath, &cfg.ChangePassMethod, &cfg.ChangePassBodyType, &cfg.ChangePassParamMap,
+			&cfg.ResubmitPath, &cfg.ResubmitMethod, &cfg.ResubmitBodyType, &cfg.ResubmitParamMap, &cfg.ResubmitIDParam,
+			&cfg.LogPath, &cfg.LogMethod, &cfg.LogBodyType, &cfg.LogParamMap, &cfg.LogIDParam, &cfg.UseJSON,
+			&cfg.BalancePath, &cfg.BalanceMoneyField, &cfg.BalanceMethod, &cfg.BalanceBodyType, &cfg.BalanceParamMap, &cfg.BalanceAuthType,
 			&cfg.ReportParamStyle, &cfg.ReportAuthType,
-			&cfg.ReportPath, &cfg.GetReportPath, &cfg.RefreshPath,
+			&cfg.ReportPath, &cfg.ReportMethod, &cfg.ReportBodyType, &cfg.ReportParamMap,
+			&cfg.GetReportPath, &cfg.GetReportMethod, &cfg.GetReportBodyType, &cfg.GetReportParamMap, &cfg.RefreshPath,
 		)
 		if err != nil {
 			continue
@@ -162,25 +190,29 @@ func GetPlatformConfig(pt string) PlatformConfig {
 	}
 	dbConfigMu.RUnlock()
 
-	if cfg, ok := platformRegistry[pt]; ok {
-		return fillDefaults(cfg)
-	}
-
 	return fillDefaults(PlatformConfig{})
 }
 
 func fillDefaults(cfg PlatformConfig) PlatformConfig {
-	if cfg.QueryAct == "" {
-		cfg.QueryAct = "get"
+	if cfg.AuthType == "" {
+		cfg.AuthType = "uid_key"
 	}
-	if cfg.OrderAct == "" {
-		cfg.OrderAct = "add"
+	if !isCustomQueryDriver(cfg.QueryAct) {
+		if cfg.QueryPath == "" {
+			cfg.QueryPath = "/api.php?act=get"
+		}
 	}
-	if cfg.ProgressAct == "" {
-		cfg.ProgressAct = "chadan2"
+	if cfg.QueryMethod == "" {
+		cfg.QueryMethod = "POST"
 	}
-	if cfg.ProgressNoYID == "" {
-		cfg.ProgressNoYID = "chadan"
+	if cfg.OrderPath == "" {
+		cfg.OrderPath = "/api.php?act=add"
+	}
+	if cfg.OrderMethod == "" {
+		cfg.OrderMethod = "POST"
+	}
+	if cfg.ProgressPath == "" {
+		cfg.ProgressPath = "/api.php?act=chadan2"
 	}
 	if cfg.ProgressMethod == "" {
 		cfg.ProgressMethod = "POST"
@@ -188,8 +220,47 @@ func fillDefaults(cfg PlatformConfig) PlatformConfig {
 	if cfg.SuccessCode == "" {
 		cfg.SuccessCode = "0"
 	}
-	if cfg.BalanceAct == "" {
-		cfg.BalanceAct = "getmoney"
+	if cfg.PauseMethod == "" {
+		cfg.PauseMethod = "POST"
+	}
+	if cfg.PausePath == "" {
+		cfg.PausePath = "/api.php?act=zt"
+	}
+	if cfg.ResumeMethod == "" {
+		cfg.ResumeMethod = "POST"
+	}
+	if cfg.ChangePassMethod == "" {
+		cfg.ChangePassMethod = "POST"
+	}
+	if cfg.ChangePassPath == "" {
+		cfg.ChangePassPath = "/api.php?act=gaimi"
+	}
+	if cfg.ResubmitMethod == "" {
+		cfg.ResubmitMethod = "POST"
+	}
+	if cfg.ResubmitPath == "" {
+		cfg.ResubmitPath = "/api.php?act=budan"
+	}
+	if cfg.LogMethod == "" {
+		cfg.LogMethod = "POST"
+	}
+	if cfg.LogPath == "" {
+		cfg.LogPath = "/api.php?act=xq"
+	}
+	if cfg.CategoryPath == "" {
+		cfg.CategoryPath = "/api.php?act=getcate"
+	}
+	if cfg.CategoryMethod == "" {
+		cfg.CategoryMethod = "POST"
+	}
+	if cfg.ClassListPath == "" {
+		cfg.ClassListPath = "/api.php?act=getclass"
+	}
+	if cfg.ClassListMethod == "" {
+		cfg.ClassListMethod = "POST"
+	}
+	if cfg.BalancePath == "" {
+		cfg.BalancePath = "/api.php?act=getmoney"
 	}
 	if cfg.BalanceMoneyField == "" {
 		cfg.BalanceMoneyField = "money"
@@ -197,11 +268,17 @@ func fillDefaults(cfg PlatformConfig) PlatformConfig {
 	if cfg.BalanceMethod == "" {
 		cfg.BalanceMethod = "POST"
 	}
-	if cfg.ReportAct == "" {
-		cfg.ReportAct = "report"
+	if cfg.ReportPath == "" {
+		cfg.ReportPath = "/api.php?act=report"
 	}
-	if cfg.GetReportAct == "" {
-		cfg.GetReportAct = "getReport"
+	if cfg.ReportMethod == "" {
+		cfg.ReportMethod = "POST"
+	}
+	if cfg.GetReportPath == "" {
+		cfg.GetReportPath = "/api.php?act=getReport"
+	}
+	if cfg.GetReportMethod == "" {
+		cfg.GetReportMethod = "POST"
 	}
 	if cfg.ReportSuccessCode == "" {
 		cfg.ReportSuccessCode = "1"
@@ -211,9 +288,6 @@ func fillDefaults(cfg PlatformConfig) PlatformConfig {
 	}
 	if cfg.ReportParamStyle == "" {
 		cfg.ReportParamStyle = "standard"
-	}
-	if cfg.CategoryAct == "" {
-		cfg.CategoryAct = "getcate"
 	}
 	return cfg
 }
@@ -226,32 +300,7 @@ func GetPlatformNames() map[string]string {
 		loadDBPlatformConfigs()
 	}
 
-	result := map[string]string{
-		"27":       "春秋",
-		"haha":     "乐学",
-		"hzw":      "hzw",
-		"zy":       "志塬查课",
-		"longlong": "龙龙平台",
-		"liunian":  "流年",
-		"xxtgf":    "学习通普通",
-		"moocmd":   "毛豆 mooc",
-		"yyy":      "yyy 平台",
-		"2xx":      "爱学习",
-		"KUN":      "KUN",
-		"kunba":    "kunba",
-		"tuboshu":  "土拨鼠",
-		"29":       "29",
-		"spi":      "spiderman",
-		"lg":       "lg 学习平台",
-		"nx":       "奶昔",
-		"pup":      "pup",
-		"wanzi":    "丸子",
-		"lgwk":     "lgwk",
-		"Benz":     "奔驰",
-		"skyriver": "天河",
-		"xuemei":   "学妹",
-		"simple":   "至强",
-	}
+	result := map[string]string{}
 
 	dbConfigMu.RLock()
 	for pt, name := range dbNameCache {

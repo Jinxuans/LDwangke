@@ -35,6 +35,9 @@ const detectLoading = ref(false);
 const detectSaveLoading = ref(false);
 const detectForm = ref({ url: '', uid: '', key: '', token: '', cookie: '', pt: '', name: '' });
 const detectResult = ref<DetectResult | null>(null);
+const customQueryDrivers = new Set(['local_time', 'local_script', 'xxt_query', 'KUN_custom', 'simple_custom', 'yyy_custom', 'tuboshu_custom', 'nx_custom', 'lgwk_custom']);
+const actionParamHelp = '接口配置现在只认 基础URL + 路径 + 请求方式 + Body类型 + 参数映射。路径本身可以直接写 api.php?act=add。参数映射 JSON 支持模板变量：{{supplier.uid}} {{supplier.key}} {{supplier.token}} {{order.school}} {{order.user}} {{order.pass}} {{order.kcname}} {{order.kcid}} {{order.noun}} {{order.yid}} {{order.new_pwd}} {{order.content}} {{order.report_id}}';
+const progressParamMapExample = '{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","username":"{{order.user}}","kcname":"{{order.kcname}}","cid":"{{order.noun}}","yid":"{{order.yid}}"}';
 
 const filteredData = computed(() => {
   if (!searchText.value) return tableData.value;
@@ -49,13 +52,31 @@ const columns = [
   { title: '名称', dataIndex: 'name', width: 100 },
   { title: '认证', dataIndex: 'auth_type', width: 80 },
   { title: '成功码', dataIndex: 'success_codes', width: 80 },
-  { title: '查课', dataIndex: 'query_act', width: 100 },
-  { title: '下单', dataIndex: 'order_act', width: 80 },
-  { title: '进度', dataIndex: 'progress_act', width: 100 },
-  { title: '改密', dataIndex: 'change_pass_act', width: 80 },
+  { title: '查课接口', key: 'query_endpoint', width: 180 },
+  { title: '下单接口', key: 'order_endpoint', width: 180 },
+  { title: '进度接口', key: 'progress_endpoint', width: 180 },
+  { title: '课程列表', key: 'class_list_endpoint', width: 180 },
   { title: '特性', key: 'features', width: 180 },
   { title: '操作', key: 'action', width: 120, fixed: 'right' as const },
 ];
+
+function firstPath(path?: string, fallbackPath = '') {
+  const normalizedPath = path?.trim();
+  if (normalizedPath) return normalizedPath;
+  if (fallbackPath.trim()) {
+    return fallbackPath.trim();
+  }
+  return '';
+}
+
+function formatEndpoint(path?: string, queryDriver?: string) {
+  const normalizedPath = firstPath(path);
+  if (normalizedPath) return normalizedPath;
+  if (queryDriver && customQueryDrivers.has(queryDriver.trim())) {
+    return `专用驱动: ${queryDriver.trim()}`;
+  }
+  return '-';
+}
 
 async function loadData() {
   loading.value = true;
@@ -72,24 +93,47 @@ async function loadData() {
 function openAdd() {
   isEdit.value = false;
   editForm.value = {
-    auth_type: 'uid_key', api_path_style: 'standard', success_codes: '0',
-    query_act: 'get', order_act: 'add', progress_act: 'chadan2',
-    progress_no_yid: 'chadan', progress_method: 'POST', pause_act: 'zt',
-    pause_id_param: 'id', change_pass_act: 'gaimi', change_pass_param: 'newPwd', change_pass_id_param: 'id',
-    log_act: 'xq', log_method: 'POST', log_id_param: 'id',
-    balance_act: 'getmoney', balance_money_field: 'money', balance_method: 'POST', balance_auth_type: '',
+    auth_type: 'uid_key', success_codes: '0',
+    query_path: '/api.php?act=get', query_method: 'POST', query_body_type: '', query_param_map: '',
+    order_path: '/api.php?act=add', order_method: 'POST', order_body_type: '', order_param_map: '',
+    progress_path: '/api.php?act=chadan2', progress_method: 'POST', progress_body_type: '', progress_param_map: '',
+    category_path: '/api.php?act=getcate', category_method: 'POST', category_body_type: '', category_param_map: '',
+    class_list_path: '/api.php?act=getclass', class_list_method: 'POST', class_list_body_type: '', class_list_param_map: '',
+    pause_path: '/api.php?act=zt', pause_method: 'POST', pause_body_type: '', pause_param_map: '',
+    pause_id_param: 'id', resume_method: 'POST', resume_body_type: '', resume_param_map: '',
+    change_pass_path: '/api.php?act=gaimi', change_pass_method: 'POST', change_pass_body_type: '', change_pass_param_map: '', change_pass_param: 'newPwd', change_pass_id_param: 'id',
+    resubmit_method: 'POST', resubmit_body_type: '', resubmit_param_map: '',
+    resubmit_path: '/api.php?act=budan', resubmit_id_param: 'id',
+    log_path: '/api.php?act=xq', log_method: 'POST', log_body_type: '', log_param_map: '', log_id_param: 'id',
+    balance_path: '/api.php?act=getmoney', balance_money_field: 'money', balance_method: 'POST', balance_body_type: '', balance_param_map: '', balance_auth_type: '',
+    report_method: 'POST', report_body_type: '', report_param_map: '',
+    get_report_method: 'POST', get_report_body_type: '', get_report_param_map: '',
   };
   editVisible.value = true;
 }
 
 function openEdit(row: PlatformConfig) {
   isEdit.value = true;
-  editForm.value = { ...row };
+  editForm.value = {
+    ...row,
+    progress_param_map: row.progress_param_map || '',
+  };
   editVisible.value = true;
 }
 
 async function handleSave() {
   if (!editForm.value.pt) { message.warning('请填写平台标识'); return; }
+  if (!editForm.value.progress_param_map?.trim()) { message.warning('请填写进度参数映射JSON'); return; }
+  try {
+    const parsed = JSON.parse(editForm.value.progress_param_map);
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
+      message.warning('进度参数映射JSON必须是对象');
+      return;
+    }
+  } catch {
+    message.warning('进度参数映射JSON格式错误');
+    return;
+  }
   editLoading.value = true;
   try {
     await savePlatformConfigApi(editForm.value);
@@ -130,19 +174,27 @@ function applyPHPResult() {
   const r = phpResult.value;
   editForm.value = {
     pt: r.pt, name: r.name, auth_type: r.auth_type || 'uid_key',
-    api_path_style: r.api_path_style || 'standard', success_codes: r.success_codes || '0',
-    use_json: r.use_json, query_act: r.query_act || 'get', query_path: r.query_path || '',
-    order_act: r.order_act || 'add', order_path: r.order_path || '',
-    progress_act: r.progress_act || 'chadan2', progress_path: r.progress_path || '',
-    progress_method: r.progress_method || 'POST', pause_act: r.pause_act || 'zt',
-    pause_path: r.pause_path || '', pause_id_param: r.pause_id_param || 'id', change_pass_act: r.change_pass_act || 'gaimi',
-    change_pass_path: r.change_pass_path || '', change_pass_param: r.change_pass_param || 'newPwd',
-    change_pass_id_param: r.change_pass_id_param || 'id', log_act: r.log_act || 'xq',
-    log_path: r.log_path || '', log_id_param: r.log_id_param || 'id',
-    returns_yid: r.returns_yid, progress_no_yid: 'chadan', log_method: 'POST',
-    balance_act: r.balance_act || 'getmoney', balance_path: r.balance_path || '',
-    balance_money_field: r.balance_money_field || 'money', balance_method: 'POST',
-    balance_auth_type: '', source_code: phpCode.value,
+    success_codes: r.success_codes || '0',
+    use_json: r.use_json, query_path: firstPath(r.query_path, '/api.php?act=get'), query_method: 'POST', query_body_type: '', query_param_map: '',
+    order_path: firstPath(r.order_path, '/api.php?act=add'), order_method: 'POST', order_body_type: '', order_param_map: '',
+    progress_path: firstPath(r.progress_path, '/api.php?act=chadan2'),
+    progress_method: r.progress_method || 'POST',
+    progress_body_type: '',
+    progress_param_map: '',
+    category_path: '/api.php?act=getcate', category_method: 'POST', category_body_type: '', category_param_map: '',
+    class_list_path: '/api.php?act=getclass', class_list_method: 'POST', class_list_body_type: '', class_list_param_map: '',
+    pause_path: firstPath(r.pause_path, '/api.php?act=zt'), pause_method: 'POST', pause_body_type: '', pause_param_map: '',
+    pause_id_param: r.pause_id_param || 'id',
+    resume_method: 'POST', resume_body_type: '', resume_param_map: '',
+    change_pass_path: firstPath(r.change_pass_path, '/api.php?act=gaimi'), change_pass_method: 'POST', change_pass_body_type: '', change_pass_param_map: '', change_pass_param: r.change_pass_param || 'newPwd',
+    change_pass_id_param: r.change_pass_id_param || 'id',
+    resubmit_path: '/api.php?act=budan', resubmit_method: 'POST', resubmit_body_type: '', resubmit_param_map: '', resubmit_id_param: 'id',
+    log_path: firstPath(r.log_path, '/api.php?act=xq'), log_body_type: '', log_param_map: '', log_id_param: r.log_id_param || 'id',
+    returns_yid: r.returns_yid, log_method: 'POST',
+    balance_path: firstPath(r.balance_path, '/api.php?act=getmoney'),
+    balance_money_field: r.balance_money_field || 'money', balance_method: 'POST', balance_body_type: '', balance_param_map: '',
+    balance_auth_type: '', report_method: 'POST', report_body_type: '', report_param_map: '',
+    get_report_method: 'POST', get_report_body_type: '', get_report_param_map: '', source_code: phpCode.value,
   };
   isEdit.value = false; phpVisible.value = false; editVisible.value = true;
   message.info('已填充解析结果，请核对后保存');
@@ -193,22 +245,26 @@ function applyDetectResult() {
   const cfg = r.config || {};
   editForm.value = {
     pt: detectForm.value.pt || '', name: detectForm.value.name || r.suggested_name || '', auth_type: cfg.auth_type || 'uid_key',
-    api_path_style: cfg.api_path_style || 'standard', success_codes: cfg.success_codes || '0',
-    use_json: cfg.use_json === 'true', query_act: cfg.query_act || '', query_path: cfg.query_path || '',
-    order_act: cfg.order_act || '', order_path: cfg.order_path || '',
-    progress_act: cfg.progress_act || '', progress_no_yid: cfg.progress_no_yid || '',
-    progress_path: cfg.progress_path || '', progress_method: cfg.progress_method || 'POST',
-    pause_act: cfg.pause_act || '', pause_path: cfg.pause_path || '',
-    pause_id_param: cfg.pause_id_param || 'id', change_pass_act: cfg.change_pass_act || '', change_pass_path: cfg.change_pass_path || '',
-    change_pass_param: 'newPwd', change_pass_id_param: 'id',
-    resubmit_path: cfg.resubmit_path || '', resubmit_id_param: cfg.resubmit_id_param || 'id', refresh_path: cfg.refresh_path || '',
-    log_act: cfg.log_act || '', log_path: cfg.log_path || '',
-    log_method: cfg.log_method || 'POST', log_id_param: 'id',
-    balance_act: cfg.balance_act || '', balance_path: cfg.balance_path || '',
-    balance_money_field: cfg.balance_money_field || 'money', balance_method: 'POST',
+    success_codes: cfg.success_codes || '0',
+    use_json: cfg.use_json === 'true', query_path: firstPath(cfg.query_path, '/api.php?act=get'), query_method: cfg.query_method || 'POST', query_body_type: cfg.query_body_type || '', query_param_map: cfg.query_param_map || '',
+    order_path: firstPath(cfg.order_path, '/api.php?act=add'), order_method: cfg.order_method || 'POST', order_body_type: cfg.order_body_type || '', order_param_map: cfg.order_param_map || '',
+    progress_path: firstPath(cfg.progress_path, '/api.php?act=chadan2'),
+    progress_method: cfg.progress_method || 'POST',
+    progress_body_type: cfg.progress_body_type || '',
+    progress_param_map: cfg.progress_param_map || '',
+    category_path: firstPath(cfg.category_path, '/api.php?act=getcate'), category_method: cfg.category_method || 'POST', category_body_type: cfg.category_body_type || '', category_param_map: cfg.category_param_map || '',
+    class_list_path: firstPath(cfg.class_list_path, '/api.php?act=getclass'), class_list_method: cfg.class_list_method || 'POST', class_list_body_type: cfg.class_list_body_type || '', class_list_param_map: cfg.class_list_param_map || '',
+    pause_path: firstPath(cfg.pause_path, '/api.php?act=zt'), pause_method: cfg.pause_method || 'POST', pause_body_type: cfg.pause_body_type || '', pause_param_map: cfg.pause_param_map || '',
+    pause_id_param: cfg.pause_id_param || 'id', resume_method: cfg.resume_method || 'POST', resume_body_type: cfg.resume_body_type || '', resume_param_map: cfg.resume_param_map || '', change_pass_path: firstPath(cfg.change_pass_path, '/api.php?act=gaimi'),
+    change_pass_method: cfg.change_pass_method || 'POST', change_pass_body_type: cfg.change_pass_body_type || '', change_pass_param_map: cfg.change_pass_param_map || '', change_pass_param: 'newPwd', change_pass_id_param: 'id',
+    resubmit_path: firstPath(cfg.resubmit_path, '/api.php?act=budan'), resubmit_method: cfg.resubmit_method || 'POST', resubmit_body_type: cfg.resubmit_body_type || '', resubmit_param_map: cfg.resubmit_param_map || '', resubmit_id_param: cfg.resubmit_id_param || 'id', refresh_path: cfg.refresh_path || '',
+    log_path: firstPath(cfg.log_path, '/api.php?act=xq'),
+    log_method: cfg.log_method || 'POST', log_body_type: cfg.log_body_type || '', log_param_map: cfg.log_param_map || '', log_id_param: 'id',
+    balance_path: firstPath(cfg.balance_path, '/api.php?act=getmoney'),
+    balance_money_field: cfg.balance_money_field || 'money', balance_method: 'POST', balance_body_type: cfg.balance_body_type || '', balance_param_map: cfg.balance_param_map || '',
     balance_auth_type: cfg.auth_type === 'bearer_token' ? 'bearer_token' : '',
-    report_path: cfg.report_path || '', get_report_path: cfg.get_report_path || '',
-    report_param_style: cfg.report_param_style || '', report_auth_type: cfg.report_auth_type || '',
+    report_path: cfg.report_path || '', report_method: cfg.report_method || 'POST', report_body_type: cfg.report_body_type || '', report_param_map: cfg.report_param_map || '', get_report_path: cfg.get_report_path || '',
+    get_report_method: cfg.get_report_method || 'POST', get_report_body_type: cfg.get_report_body_type || '', get_report_param_map: cfg.get_report_param_map || '', report_param_style: cfg.report_param_style || '', report_auth_type: cfg.report_auth_type || '',
   };
   isEdit.value = false; detectVisible.value = false; editVisible.value = true;
   message.info('已填充检测结果，请核对后保存');
@@ -259,9 +315,17 @@ onMounted(loadData);
         <template v-else-if="column.dataIndex === 'auth_type'">
           <Tag :color="record.auth_type === 'uid_key' ? 'default' : 'orange'">{{ record.auth_type }}</Tag>
         </template>
-        <template v-else-if="column.dataIndex === 'query_act'">
-          <span>{{ record.query_act }}</span>
-          <span v-if="record.query_path" class="ml-1 text-xs text-gray-400">{{ record.query_path }}</span>
+        <template v-else-if="column.key === 'query_endpoint'">
+          <span>{{ formatEndpoint(record.query_path, record.query_act) }}</span>
+        </template>
+        <template v-else-if="column.key === 'order_endpoint'">
+          <span>{{ formatEndpoint(record.order_path) }}</span>
+        </template>
+        <template v-else-if="column.key === 'progress_endpoint'">
+          <span>{{ formatEndpoint(record.progress_path) }}</span>
+        </template>
+        <template v-else-if="column.key === 'class_list_endpoint'">
+          <span>{{ formatEndpoint(record.class_list_path) }}</span>
         </template>
         <template v-else-if="column.key === 'features'">
           <Space :size="2" wrap>
@@ -290,6 +354,9 @@ onMounted(loadData);
     <!-- 编辑弹窗 -->
     <Modal v-model:open="editVisible" :title="isEdit ? `编辑平台：${editForm.pt}` : '添加平台配置'" :confirm-loading="editLoading" width="700px" @ok="handleSave">
       <Form :label-col="{ span: 6 }" :wrapper-col="{ span: 18 }" size="small" class="mt-4">
+        <Typography.Paragraph type="secondary" class="mb-3 text-xs">
+          {{ actionParamHelp }}
+        </Typography.Paragraph>
         <Tabs size="small">
           <TabPane key="basic" tab="基本">
             <div class="grid grid-cols-2 gap-x-4">
@@ -303,12 +370,6 @@ onMounted(loadData);
                   <SelectOption value="token_only">token（pass字段）</SelectOption>
                   <SelectOption value="token_field">token（token字段）</SelectOption>
                   <SelectOption value="none">无认证</SelectOption>
-                </Select>
-              </FormItem>
-              <FormItem label="API风格">
-                <Select v-model:value="editForm.api_path_style">
-                  <SelectOption value="standard">/api.php?act=</SelectOption>
-                  <SelectOption value="rest">REST 自定义路径</SelectOption>
                 </Select>
               </FormItem>
             </div>
@@ -326,28 +387,58 @@ onMounted(loadData);
             </div>
           </TabPane>
           <TabPane key="query" tab="查课">
+            <FormItem label="查课路径"><Input v-model:value="editForm.query_path" placeholder="如 /api/query-course 或 api.php?act=get" /></FormItem>
             <div class="grid grid-cols-2 gap-x-4">
-              <FormItem label="查课 act"><Input v-model:value="editForm.query_act" placeholder="get" /></FormItem>
-              <FormItem label="查课路径"><Input v-model:value="editForm.query_path" placeholder="REST时填" /></FormItem>
+              <FormItem label="请求方式">
+                <Select v-model:value="editForm.query_method">
+                  <SelectOption value="POST">POST</SelectOption>
+                  <SelectOption value="GET">GET</SelectOption>
+                  <SelectOption value="PUT">PUT</SelectOption>
+                </Select>
+              </FormItem>
+              <FormItem label="Body类型">
+                <Select v-model:value="editForm.query_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
             </div>
             <div class="grid grid-cols-2 gap-x-4">
-              <FormItem label="参数风格"><Input v-model:value="editForm.query_param_style" placeholder="standard" /></FormItem>
+              <FormItem label="兼容参数风格"><Input v-model:value="editForm.query_param_style" placeholder="standard" /></FormItem>
               <FormItem label="需要轮询"><Switch v-model:checked="editForm.query_polling" /></FormItem>
             </div>
+            <FormItem label="参数映射JSON">
+              <Input.TextArea v-model:value="editForm.query_param_map" :rows="4" placeholder='{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","school":"{{order.school}}","user":"{{order.user}}","pass":"{{order.pass}}","platform":"{{order.noun}}"}' />
+            </FormItem>
           </TabPane>
           <TabPane key="order" tab="下单">
+            <FormItem label="下单路径"><Input v-model:value="editForm.order_path" placeholder="如 /api/order/create 或 api.php?act=add" /></FormItem>
             <div class="grid grid-cols-2 gap-x-4">
-              <FormItem label="下单 act"><Input v-model:value="editForm.order_act" placeholder="add" /></FormItem>
-              <FormItem label="下单路径"><Input v-model:value="editForm.order_path" placeholder="REST时填" /></FormItem>
+              <FormItem label="请求方式">
+                <Select v-model:value="editForm.order_method">
+                  <SelectOption value="POST">POST</SelectOption>
+                  <SelectOption value="GET">GET</SelectOption>
+                  <SelectOption value="PUT">PUT</SelectOption>
+                </Select>
+              </FormItem>
+              <FormItem label="Body类型">
+                <Select v-model:value="editForm.order_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
             </div>
+            <FormItem label="参数映射JSON">
+              <Input.TextArea v-model:value="editForm.order_param_map" :rows="4" placeholder='{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","platform":"{{order.noun}}","school":"{{order.school}}","user":"{{order.user}}","pass":"{{order.pass}}","kcid":"{{order.kcid}}","kcname":"{{order.kcname}}"}' />
+            </FormItem>
           </TabPane>
           <TabPane key="progress" tab="进度">
             <div class="grid grid-cols-2 gap-x-4">
-              <FormItem label="有YID act"><Input v-model:value="editForm.progress_act" placeholder="chadan2" /></FormItem>
-              <FormItem label="无YID act"><Input v-model:value="editForm.progress_no_yid" placeholder="chadan" /></FormItem>
-            </div>
-            <div class="grid grid-cols-2 gap-x-4">
-              <FormItem label="进度路径"><Input v-model:value="editForm.progress_path" placeholder="如 /api/search" /></FormItem>
+              <FormItem label="进度路径"><Input v-model:value="editForm.progress_path" placeholder="如 /api/search 或 api.php?act=chadan2" /></FormItem>
               <FormItem label="请求方式">
                 <Select v-model:value="editForm.progress_method">
                   <SelectOption value="POST">POST</SelectOption>
@@ -356,44 +447,165 @@ onMounted(loadData);
               </FormItem>
             </div>
             <div class="grid grid-cols-2 gap-x-4">
-              <FormItem label="用id参数"><Switch v-model:checked="editForm.use_id_param" /></FormItem>
-              <FormItem label="用uuid参数"><Switch v-model:checked="editForm.use_uuid_param" /></FormItem>
+              <FormItem label="Body类型">
+                <Select v-model:value="editForm.progress_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
             </div>
+            <FormItem label="参数映射JSON">
+              <Input.TextArea v-model:value="editForm.progress_param_map" :rows="4" :placeholder="progressParamMapExample" />
+            </FormItem>
+          </TabPane>
+          <TabPane key="catalog" tab="分类/课程列表">
+            <Typography.Text type="secondary" class="mb-2 block">分类接口</Typography.Text>
+            <FormItem label="分类路径"><Input v-model:value="editForm.category_path" placeholder="如 /api/categories 或 api.php?act=getcate" /></FormItem>
             <div class="grid grid-cols-2 gap-x-4">
-              <FormItem label="总传username"><Switch v-model:checked="editForm.always_username" /></FormItem>
-              <FormItem label="需要认证"><Switch v-model:checked="editForm.progress_needs_auth" /></FormItem>
+              <FormItem label="请求方式">
+                <Select v-model:value="editForm.category_method">
+                  <SelectOption value="POST">POST</SelectOption>
+                  <SelectOption value="GET">GET</SelectOption>
+                  <SelectOption value="PUT">PUT</SelectOption>
+                </Select>
+              </FormItem>
+              <FormItem label="Body类型">
+                <Select v-model:value="editForm.category_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
             </div>
+            <FormItem label="参数映射JSON">
+              <Input.TextArea v-model:value="editForm.category_param_map" :rows="3" placeholder='{"uid":"{{supplier.uid}}","key":"{{supplier.key}}"}' />
+            </FormItem>
+            <Typography.Text type="secondary" class="mb-2 mt-3 block">课程列表接口</Typography.Text>
+            <FormItem label="课程列表路径"><Input v-model:value="editForm.class_list_path" placeholder="如 /api/getclass 或 api.php?act=getclass" /></FormItem>
+            <div class="grid grid-cols-2 gap-x-4">
+              <FormItem label="请求方式">
+                <Select v-model:value="editForm.class_list_method">
+                  <SelectOption value="POST">POST</SelectOption>
+                  <SelectOption value="GET">GET</SelectOption>
+                  <SelectOption value="PUT">PUT</SelectOption>
+                </Select>
+              </FormItem>
+              <FormItem label="Body类型">
+                <Select v-model:value="editForm.class_list_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
+            </div>
+            <FormItem label="参数映射JSON">
+              <Input.TextArea v-model:value="editForm.class_list_param_map" :rows="3" placeholder='{"uid":"{{supplier.uid}}","key":"{{supplier.key}}"}' />
+            </FormItem>
           </TabPane>
           <TabPane key="other" tab="暂停/改密/日志">
             <Typography.Text type="secondary" class="mb-2 block">暂停/恢复</Typography.Text>
+            <FormItem label="暂停路径"><Input v-model:value="editForm.pause_path" placeholder="如 /api/stop 或 api.php?act=zt" /></FormItem>
             <div class="grid grid-cols-2 gap-x-4">
-              <FormItem label="暂停 act"><Input v-model:value="editForm.pause_act" placeholder="zt" /></FormItem>
-              <FormItem label="暂停路径"><Input v-model:value="editForm.pause_path" placeholder="如 /api/stop" /></FormItem>
+              <FormItem label="暂停方式">
+                <Select v-model:value="editForm.pause_method">
+                  <SelectOption value="POST">POST</SelectOption>
+                  <SelectOption value="GET">GET</SelectOption>
+                  <SelectOption value="PUT">PUT</SelectOption>
+                </Select>
+              </FormItem>
+              <FormItem label="暂停Body">
+                <Select v-model:value="editForm.pause_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
             </div>
             <div class="grid grid-cols-2 gap-x-4">
               <FormItem label="暂停ID参数"><Input v-model:value="editForm.pause_id_param" placeholder="id" /></FormItem>
-              <FormItem label="恢复 act"><Input v-model:value="editForm.resume_act" /></FormItem>
               <FormItem label="恢复路径"><Input v-model:value="editForm.resume_path" /></FormItem>
             </div>
-            <Typography.Text type="secondary" class="mb-2 mt-3 block">改密码</Typography.Text>
+            <FormItem label="暂停参数映射">
+              <Input.TextArea v-model:value="editForm.pause_param_map" :rows="3" placeholder='{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","id":"{{order.yid}}"}' />
+            </FormItem>
             <div class="grid grid-cols-2 gap-x-4">
-              <FormItem label="改密 act"><Input v-model:value="editForm.change_pass_act" placeholder="gaimi" /></FormItem>
-              <FormItem label="改密路径"><Input v-model:value="editForm.change_pass_path" placeholder="如 /api/update" /></FormItem>
+              <FormItem label="恢复方式">
+                <Select v-model:value="editForm.resume_method">
+                  <SelectOption value="POST">POST</SelectOption>
+                  <SelectOption value="GET">GET</SelectOption>
+                  <SelectOption value="PUT">PUT</SelectOption>
+                </Select>
+              </FormItem>
+              <FormItem label="恢复Body">
+                <Select v-model:value="editForm.resume_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
+            </div>
+            <FormItem label="恢复参数映射">
+              <Input.TextArea v-model:value="editForm.resume_param_map" :rows="3" placeholder='{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","id":"{{order.yid}}"}' />
+            </FormItem>
+            <Typography.Text type="secondary" class="mb-2 mt-3 block">改密码</Typography.Text>
+            <FormItem label="改密路径"><Input v-model:value="editForm.change_pass_path" placeholder="如 /api/update 或 api.php?act=gaimi" /></FormItem>
+            <div class="grid grid-cols-2 gap-x-4">
+              <FormItem label="改密方式">
+                <Select v-model:value="editForm.change_pass_method">
+                  <SelectOption value="POST">POST</SelectOption>
+                  <SelectOption value="GET">GET</SelectOption>
+                  <SelectOption value="PUT">PUT</SelectOption>
+                </Select>
+              </FormItem>
+              <FormItem label="改密Body">
+                <Select v-model:value="editForm.change_pass_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
             </div>
             <div class="grid grid-cols-2 gap-x-4">
               <FormItem label="密码参数名"><Input v-model:value="editForm.change_pass_param" placeholder="newPwd" /></FormItem>
               <FormItem label="ID参数名"><Input v-model:value="editForm.change_pass_id_param" placeholder="id" /></FormItem>
             </div>
+            <FormItem label="改密参数映射">
+              <Input.TextArea v-model:value="editForm.change_pass_param_map" :rows="3" placeholder='{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","id":"{{order.yid}}","newPwd":"{{order.new_pwd}}"}' />
+            </FormItem>
             <Typography.Text type="secondary" class="mb-2 mt-3 block">补单</Typography.Text>
             <div class="grid grid-cols-2 gap-x-4">
               <FormItem label="补单路径"><Input v-model:value="editForm.resubmit_path" placeholder="如 /api/reset" /></FormItem>
               <FormItem label="补单ID参数"><Input v-model:value="editForm.resubmit_id_param" placeholder="id" /></FormItem>
             </div>
-            <Typography.Text type="secondary" class="mb-2 mt-3 block">日志</Typography.Text>
             <div class="grid grid-cols-2 gap-x-4">
-              <FormItem label="日志 act"><Input v-model:value="editForm.log_act" placeholder="xq" /></FormItem>
-              <FormItem label="日志路径"><Input v-model:value="editForm.log_path" placeholder="如 /log/" /></FormItem>
+              <FormItem label="补单方式">
+                <Select v-model:value="editForm.resubmit_method">
+                  <SelectOption value="POST">POST</SelectOption>
+                  <SelectOption value="GET">GET</SelectOption>
+                  <SelectOption value="PUT">PUT</SelectOption>
+                </Select>
+              </FormItem>
+              <FormItem label="补单Body">
+                <Select v-model:value="editForm.resubmit_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
             </div>
+            <FormItem label="补单参数映射">
+              <Input.TextArea v-model:value="editForm.resubmit_param_map" :rows="3" placeholder='{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","id":"{{order.yid}}"}' />
+            </FormItem>
+            <Typography.Text type="secondary" class="mb-2 mt-3 block">日志</Typography.Text>
+            <FormItem label="日志路径"><Input v-model:value="editForm.log_path" placeholder="如 /log/ 或 api.php?act=xq" /></FormItem>
             <div class="grid grid-cols-2 gap-x-4">
               <FormItem label="日志方式">
                 <Select v-model:value="editForm.log_method">
@@ -401,14 +613,24 @@ onMounted(loadData);
                   <SelectOption value="GET">GET</SelectOption>
                 </Select>
               </FormItem>
+              <FormItem label="日志Body">
+                <Select v-model:value="editForm.log_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4">
               <FormItem label="日志ID参数"><Input v-model:value="editForm.log_id_param" placeholder="id" /></FormItem>
             </div>
+            <FormItem label="日志参数映射">
+              <Input.TextArea v-model:value="editForm.log_param_map" :rows="3" placeholder='{"dtoken":"{{supplier.token}}","account":"{{order.user}}","password":"{{order.pass}}","course":"{{order.kcname}}","courseId":"{{order.kcid}}"}' />
+            </FormItem>
           </TabPane>
           <TabPane key="balance" tab="余额">
-            <div class="grid grid-cols-2 gap-x-4">
-              <FormItem label="余额 act"><Input v-model:value="editForm.balance_act" placeholder="getmoney" /></FormItem>
-              <FormItem label="余额路径"><Input v-model:value="editForm.balance_path" placeholder="如 /api/getinfo" /></FormItem>
-            </div>
+            <FormItem label="余额路径"><Input v-model:value="editForm.balance_path" placeholder="如 /api/getinfo 或 api.php?act=getmoney" /></FormItem>
             <div class="grid grid-cols-2 gap-x-4">
               <FormItem label="金额字段路径">
                 <Select v-model:value="editForm.balance_money_field">
@@ -424,6 +646,14 @@ onMounted(loadData);
                   <SelectOption value="GET">GET</SelectOption>
                 </Select>
               </FormItem>
+              <FormItem label="Body类型">
+                <Select v-model:value="editForm.balance_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
             </div>
             <FormItem label="认证覆盖">
               <Select v-model:value="editForm.balance_auth_type" allow-clear placeholder="留空跟随全局认证">
@@ -433,12 +663,32 @@ onMounted(loadData);
                 <SelectOption value="bearer_token">Bearer token</SelectOption>
               </Select>
             </FormItem>
+            <FormItem label="参数映射JSON">
+              <Input.TextArea v-model:value="editForm.balance_param_map" :rows="3" placeholder='{"uid":"{{supplier.uid}}","key":"{{supplier.key}}"}' />
+            </FormItem>
           </TabPane>
           <TabPane key="report" tab="工单/刷新">
             <Typography.Text type="secondary" class="mb-2 block">工单（提交/查询）</Typography.Text>
             <div class="grid grid-cols-2 gap-x-4">
               <FormItem label="提交工单路径"><Input v-model:value="editForm.report_path" placeholder="如 /api/submitWork" /></FormItem>
               <FormItem label="查询工单路径"><Input v-model:value="editForm.get_report_path" placeholder="如 /api/queryWork" /></FormItem>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4">
+              <FormItem label="提交方式">
+                <Select v-model:value="editForm.report_method">
+                  <SelectOption value="POST">POST</SelectOption>
+                  <SelectOption value="GET">GET</SelectOption>
+                  <SelectOption value="PUT">PUT</SelectOption>
+                </Select>
+              </FormItem>
+              <FormItem label="提交Body">
+                <Select v-model:value="editForm.report_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
             </div>
             <div class="grid grid-cols-2 gap-x-4">
               <FormItem label="参数风格">
@@ -454,6 +704,29 @@ onMounted(loadData);
                 </Select>
               </FormItem>
             </div>
+            <FormItem label="提交参数映射">
+              <Input.TextArea v-model:value="editForm.report_param_map" :rows="3" placeholder='{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","id":"{{order.yid}}","question":"{{order.content}}"}' />
+            </FormItem>
+            <div class="grid grid-cols-2 gap-x-4">
+              <FormItem label="查询方式">
+                <Select v-model:value="editForm.get_report_method">
+                  <SelectOption value="POST">POST</SelectOption>
+                  <SelectOption value="GET">GET</SelectOption>
+                  <SelectOption value="PUT">PUT</SelectOption>
+                </Select>
+              </FormItem>
+              <FormItem label="查询Body">
+                <Select v-model:value="editForm.get_report_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
+            </div>
+            <FormItem label="查询参数映射">
+              <Input.TextArea v-model:value="editForm.get_report_param_map" :rows="3" placeholder='{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","reportId":"{{order.report_id}}"}' />
+            </FormItem>
             <Typography.Text type="secondary" class="mb-2 mt-3 block">刷新进度</Typography.Text>
             <FormItem label="刷新路径"><Input v-model:value="editForm.refresh_path" placeholder="如 /api/refresh" /></FormItem>
           </TabPane>
@@ -482,11 +755,11 @@ onMounted(loadData);
             <div><b>平台：</b>{{ phpResult.pt || '未识别' }}</div>
             <div><b>认证：</b>{{ phpResult.auth_type }}</div>
             <div><b>成功码：</b>{{ phpResult.success_codes }}</div>
-            <div><b>查课：</b>{{ phpResult.query_act }}{{ phpResult.query_path ? ` (${phpResult.query_path})` : '' }}</div>
-            <div><b>下单：</b>{{ phpResult.order_act }}</div>
-            <div><b>进度：</b>{{ phpResult.progress_act }}</div>
-            <div><b>改密：</b>{{ phpResult.change_pass_act }} ({{ phpResult.change_pass_param }})</div>
-            <div><b>暂停：</b>{{ phpResult.pause_act }}</div>
+            <div><b>查课：</b>{{ formatEndpoint(phpResult.query_path, phpResult.query_act) }}</div>
+            <div><b>下单：</b>{{ formatEndpoint(phpResult.order_path) }}</div>
+            <div><b>进度：</b>{{ formatEndpoint(phpResult.progress_path) }}</div>
+            <div><b>改密：</b>{{ formatEndpoint(phpResult.change_pass_path) }} ({{ phpResult.change_pass_param }})</div>
+            <div><b>暂停：</b>{{ formatEndpoint(phpResult.pause_path) }}</div>
             <div><b>JSON：</b>{{ phpResult.use_json ? '是' : '否' }}</div>
           </div>
           <div v-if="phpResult.warnings?.length" class="mt-2">
@@ -546,10 +819,9 @@ onMounted(loadData);
             </Button>
           </div>
           <template v-if="detectResult.success">
-            <div class="mb-3 grid grid-cols-3 gap-3">
+            <div class="mb-3 grid grid-cols-2 gap-3">
               <Card size="small" :bordered="true"><div class="text-xs text-gray-500">认证方式</div><div class="font-medium">{{ detectResult.auth_type }}</div></Card>
               <Card size="small" :bordered="true"><div class="text-xs text-gray-500">成功码</div><div class="font-medium">{{ detectResult.success_code }}</div></Card>
-              <Card size="small" :bordered="true"><div class="text-xs text-gray-500">API 风格</div><div class="font-medium">{{ detectResult.api_style }}</div></Card>
             </div>
             <div class="mb-3 grid grid-cols-4 gap-3">
               <Card size="small" :bordered="true" :style="{ borderColor: detectResult.balance_ok ? '#52c41a' : '#d9d9d9' }"><div class="text-xs text-gray-500">余额</div><div class="font-medium">{{ detectResult.balance_ok ? detectResult.balance_money : '不可用' }}</div></Card>
