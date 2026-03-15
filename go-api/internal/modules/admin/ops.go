@@ -348,19 +348,23 @@ func AdminPayDataSave(c *gin.Context) {
 }
 
 func AdminPlatformConfigList(c *gin.Context) {
-	rows, err := database.DB.Query(`SELECT id, pt, name, auth_type, api_path_style, success_codes,
+	rows, err := database.DB.Query(`SELECT id, pt, name, auth_type, success_codes,
 		use_json, need_proxy, returns_yid, extra_params,
-		query_act, query_path, query_param_style, query_polling, query_max_attempts, query_interval, COALESCE(query_response_map,''),
-		order_act, order_path, yid_in_data_array,
-		progress_act, progress_no_yid, progress_path, progress_method, progress_needs_auth,
-		use_id_param, use_uuid_param, always_username,
-		pause_act, pause_path, COALESCE(pause_id_param,'id'), resume_act, resume_path,
-		change_pass_act, change_pass_path, change_pass_param, change_pass_id_param,
-		resubmit_path, COALESCE(resubmit_id_param,'id'),
-		log_act, log_path, log_method, log_id_param,
-		COALESCE(balance_act,'getmoney'), COALESCE(balance_path,''), COALESCE(balance_money_field,'money'),
-		COALESCE(balance_method,'POST'), COALESCE(balance_auth_type,''),
-		COALESCE(report_param_style,''), COALESCE(report_auth_type,''), COALESCE(report_path,''), COALESCE(get_report_path,''), COALESCE(refresh_path,''),
+		query_act, query_path, COALESCE(query_method,'POST'), COALESCE(query_body_type,''), query_param_style, COALESCE(query_param_map,''), query_polling, query_max_attempts, query_interval, COALESCE(query_response_map,''),
+		order_path, COALESCE(order_method,'POST'), COALESCE(order_body_type,''), COALESCE(order_param_map,''), yid_in_data_array,
+		progress_path, progress_method,
+		COALESCE(progress_body_type,''), COALESCE(progress_param_map,''),
+		COALESCE(category_path,''), COALESCE(category_method,'POST'), COALESCE(category_body_type,''), COALESCE(category_param_map,''),
+		COALESCE(class_list_path,''), COALESCE(class_list_method,'POST'), COALESCE(class_list_body_type,''), COALESCE(class_list_param_map,''),
+		pause_path, COALESCE(pause_method,'POST'), COALESCE(pause_body_type,''), COALESCE(pause_param_map,''), COALESCE(pause_id_param,'id'),
+		COALESCE(resume_path,''), COALESCE(resume_method,'POST'), COALESCE(resume_body_type,''), COALESCE(resume_param_map,''),
+		change_pass_path, COALESCE(change_pass_method,'POST'), COALESCE(change_pass_body_type,''), COALESCE(change_pass_param_map,''), change_pass_param, change_pass_id_param,
+		resubmit_path, COALESCE(resubmit_method,'POST'), COALESCE(resubmit_body_type,''), COALESCE(resubmit_param_map,''), COALESCE(resubmit_id_param,'id'),
+		log_path, log_method, COALESCE(log_body_type,''), COALESCE(log_param_map,''), log_id_param,
+		COALESCE(balance_path,''), COALESCE(balance_money_field,'money'),
+		COALESCE(balance_method,'POST'), COALESCE(balance_body_type,''), COALESCE(balance_param_map,''), COALESCE(balance_auth_type,''),
+		COALESCE(report_param_style,''), COALESCE(report_auth_type,''), COALESCE(report_path,''), COALESCE(report_method,'POST'), COALESCE(report_body_type,''), COALESCE(report_param_map,''),
+		COALESCE(get_report_path,''), COALESCE(get_report_method,'POST'), COALESCE(get_report_body_type,''), COALESCE(get_report_param_map,''), COALESCE(refresh_path,''),
 		COALESCE(source_code,''), created_at, updated_at
 		FROM qingka_platform_config ORDER BY pt`)
 	if err != nil {
@@ -373,24 +377,27 @@ func AdminPlatformConfigList(c *gin.Context) {
 	for rows.Next() {
 		var cfg model.PlatformConfigDB
 		err := rows.Scan(
-			&cfg.ID, &cfg.PT, &cfg.Name, &cfg.AuthType, &cfg.APIPathStyle, &cfg.SuccessCodes,
+			&cfg.ID, &cfg.PT, &cfg.Name, &cfg.AuthType, &cfg.SuccessCodes,
 			&cfg.UseJSON, &cfg.NeedProxy, &cfg.ReturnsYID, &cfg.ExtraParams,
-			&cfg.QueryAct, &cfg.QueryPath, &cfg.QueryParamStyle, &cfg.QueryPolling, &cfg.QueryMaxAttempts, &cfg.QueryInterval, &cfg.QueryResponseMap,
-			&cfg.OrderAct, &cfg.OrderPath, &cfg.YIDInDataArray,
-			&cfg.ProgressAct, &cfg.ProgressNoYID, &cfg.ProgressPath, &cfg.ProgressMethod, &cfg.ProgressNeedsAuth,
-			&cfg.UseIDParam, &cfg.UseUUIDParam, &cfg.AlwaysUsername,
-			&cfg.PauseAct, &cfg.PausePath, &cfg.PauseIDParam, &cfg.ResumeAct, &cfg.ResumePath,
-			&cfg.ChangePassAct, &cfg.ChangePassPath, &cfg.ChangePassParam, &cfg.ChangePassIDParam,
-			&cfg.ResubmitPath, &cfg.ResubmitIDParam,
-			&cfg.LogAct, &cfg.LogPath, &cfg.LogMethod, &cfg.LogIDParam,
-			&cfg.BalanceAct, &cfg.BalancePath, &cfg.BalanceMoneyField, &cfg.BalanceMethod, &cfg.BalanceAuthType,
-			&cfg.ReportParamStyle, &cfg.ReportAuthType, &cfg.ReportPath, &cfg.GetReportPath, &cfg.RefreshPath,
+			&cfg.QueryAct, &cfg.QueryPath, &cfg.QueryMethod, &cfg.QueryBodyType, &cfg.QueryParamStyle, &cfg.QueryParamMap, &cfg.QueryPolling, &cfg.QueryMaxAttempts, &cfg.QueryInterval, &cfg.QueryResponseMap,
+			&cfg.OrderPath, &cfg.OrderMethod, &cfg.OrderBodyType, &cfg.OrderParamMap, &cfg.YIDInDataArray,
+			&cfg.ProgressPath, &cfg.ProgressMethod, &cfg.ProgressBodyType, &cfg.ProgressParamMap,
+			&cfg.CategoryPath, &cfg.CategoryMethod, &cfg.CategoryBodyType, &cfg.CategoryParamMap,
+			&cfg.ClassListPath, &cfg.ClassListMethod, &cfg.ClassListBodyType, &cfg.ClassListParamMap,
+			&cfg.PausePath, &cfg.PauseMethod, &cfg.PauseBodyType, &cfg.PauseParamMap, &cfg.PauseIDParam,
+			&cfg.ResumePath, &cfg.ResumeMethod, &cfg.ResumeBodyType, &cfg.ResumeParamMap,
+			&cfg.ChangePassPath, &cfg.ChangePassMethod, &cfg.ChangePassBodyType, &cfg.ChangePassParamMap, &cfg.ChangePassParam, &cfg.ChangePassIDParam,
+			&cfg.ResubmitPath, &cfg.ResubmitMethod, &cfg.ResubmitBodyType, &cfg.ResubmitParamMap, &cfg.ResubmitIDParam,
+			&cfg.LogPath, &cfg.LogMethod, &cfg.LogBodyType, &cfg.LogParamMap, &cfg.LogIDParam,
+			&cfg.BalancePath, &cfg.BalanceMoneyField, &cfg.BalanceMethod, &cfg.BalanceBodyType, &cfg.BalanceParamMap, &cfg.BalanceAuthType,
+			&cfg.ReportParamStyle, &cfg.ReportAuthType, &cfg.ReportPath, &cfg.ReportMethod, &cfg.ReportBodyType, &cfg.ReportParamMap, &cfg.GetReportPath, &cfg.GetReportMethod, &cfg.GetReportBodyType, &cfg.GetReportParamMap, &cfg.RefreshPath,
 			&cfg.SourceCode, &cfg.CreatedAt, &cfg.UpdatedAt,
 		)
 		if err != nil {
 			response.ServerError(c, "解析数据失败: "+err.Error())
 			return
 		}
+		canonicalizePlatformConfigDB(&cfg)
 		list = append(list, cfg)
 	}
 	if list == nil {
@@ -406,123 +413,12 @@ func AdminPlatformConfigSave(c *gin.Context) {
 		return
 	}
 
-	if req.AuthType == "" {
-		req.AuthType = "uid_key"
+	normalizePlatformConfigSaveRequest(&req)
+	if msg := validatePlatformConfigSaveRequest(&req); msg != "" {
+		response.BadRequest(c, msg)
+		return
 	}
-	if req.APIPathStyle == "" {
-		req.APIPathStyle = "standard"
-	}
-	if req.SuccessCodes == "" {
-		req.SuccessCodes = "0"
-	}
-	if req.QueryAct == "" {
-		req.QueryAct = "get"
-	}
-	if req.OrderAct == "" {
-		req.OrderAct = "add"
-	}
-	if req.ProgressAct == "" {
-		req.ProgressAct = "chadan2"
-	}
-	if req.ProgressNoYID == "" {
-		req.ProgressNoYID = "chadan"
-	}
-	if req.ProgressMethod == "" {
-		req.ProgressMethod = "POST"
-	}
-	if req.PauseAct == "" {
-		req.PauseAct = "zt"
-	}
-	if req.PauseIDParam == "" {
-		req.PauseIDParam = "id"
-	}
-	if req.ChangePassAct == "" {
-		req.ChangePassAct = "gaimi"
-	}
-	if req.ChangePassParam == "" {
-		req.ChangePassParam = "newPwd"
-	}
-	if req.ChangePassIDParam == "" {
-		req.ChangePassIDParam = "id"
-	}
-	if req.ResubmitIDParam == "" {
-		req.ResubmitIDParam = "id"
-	}
-	if req.LogAct == "" {
-		req.LogAct = "xq"
-	}
-	if req.LogMethod == "" {
-		req.LogMethod = "POST"
-	}
-	if req.LogIDParam == "" {
-		req.LogIDParam = "id"
-	}
-	if req.BalanceAct == "" {
-		req.BalanceAct = "getmoney"
-	}
-	if req.BalanceMoneyField == "" {
-		req.BalanceMoneyField = "money"
-	}
-	if req.BalanceMethod == "" {
-		req.BalanceMethod = "POST"
-	}
-
-	query := `INSERT INTO qingka_platform_config (
-		pt, name, auth_type, api_path_style, success_codes,
-		use_json, need_proxy, returns_yid, extra_params,
-		query_act, query_path, query_param_style, query_polling, query_max_attempts, query_interval, query_response_map,
-		order_act, order_path, yid_in_data_array,
-		progress_act, progress_no_yid, progress_path, progress_method, progress_needs_auth,
-		use_id_param, use_uuid_param, always_username,
-		pause_act, pause_path, pause_id_param, resume_act, resume_path,
-		change_pass_act, change_pass_path, change_pass_param, change_pass_id_param,
-		resubmit_path, resubmit_id_param,
-		log_act, log_path, log_method, log_id_param,
-		balance_act, balance_path, balance_money_field, balance_method, balance_auth_type,
-		report_param_style, report_auth_type, report_path, get_report_path, refresh_path,
-		source_code
-	) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-	ON DUPLICATE KEY UPDATE
-		name=VALUES(name), auth_type=VALUES(auth_type), api_path_style=VALUES(api_path_style),
-		success_codes=VALUES(success_codes), use_json=VALUES(use_json), need_proxy=VALUES(need_proxy),
-		returns_yid=VALUES(returns_yid), extra_params=VALUES(extra_params),
-		query_act=VALUES(query_act), query_path=VALUES(query_path), query_param_style=VALUES(query_param_style),
-		query_polling=VALUES(query_polling), query_max_attempts=VALUES(query_max_attempts),
-		query_interval=VALUES(query_interval), query_response_map=VALUES(query_response_map),
-		order_act=VALUES(order_act), order_path=VALUES(order_path), yid_in_data_array=VALUES(yid_in_data_array),
-		progress_act=VALUES(progress_act), progress_no_yid=VALUES(progress_no_yid),
-		progress_path=VALUES(progress_path), progress_method=VALUES(progress_method),
-		progress_needs_auth=VALUES(progress_needs_auth),
-		use_id_param=VALUES(use_id_param), use_uuid_param=VALUES(use_uuid_param),
-		always_username=VALUES(always_username),
-		pause_act=VALUES(pause_act), pause_path=VALUES(pause_path), pause_id_param=VALUES(pause_id_param),
-		resume_act=VALUES(resume_act), resume_path=VALUES(resume_path),
-		change_pass_act=VALUES(change_pass_act), change_pass_path=VALUES(change_pass_path),
-		change_pass_param=VALUES(change_pass_param), change_pass_id_param=VALUES(change_pass_id_param),
-		resubmit_path=VALUES(resubmit_path), resubmit_id_param=VALUES(resubmit_id_param),
-		log_act=VALUES(log_act), log_path=VALUES(log_path), log_method=VALUES(log_method),
-		log_id_param=VALUES(log_id_param),
-		balance_act=VALUES(balance_act), balance_path=VALUES(balance_path),
-		balance_money_field=VALUES(balance_money_field), balance_method=VALUES(balance_method),
-		balance_auth_type=VALUES(balance_auth_type),
-		report_param_style=VALUES(report_param_style), report_auth_type=VALUES(report_auth_type), report_path=VALUES(report_path), get_report_path=VALUES(get_report_path), refresh_path=VALUES(refresh_path),
-		source_code=VALUES(source_code)`
-
-	_, err := database.DB.Exec(query,
-		req.PT, req.Name, req.AuthType, req.APIPathStyle, req.SuccessCodes,
-		req.UseJSON, req.NeedProxy, req.ReturnsYID, req.ExtraParams,
-		req.QueryAct, req.QueryPath, req.QueryParamStyle, req.QueryPolling, req.QueryMaxAttempts, req.QueryInterval, req.QueryResponseMap,
-		req.OrderAct, req.OrderPath, req.YIDInDataArray,
-		req.ProgressAct, req.ProgressNoYID, req.ProgressPath, req.ProgressMethod, req.ProgressNeedsAuth,
-		req.UseIDParam, req.UseUUIDParam, req.AlwaysUsername,
-		req.PauseAct, req.PausePath, req.PauseIDParam, req.ResumeAct, req.ResumePath,
-		req.ChangePassAct, req.ChangePassPath, req.ChangePassParam, req.ChangePassIDParam,
-		req.ResubmitPath, req.ResubmitIDParam,
-		req.LogAct, req.LogPath, req.LogMethod, req.LogIDParam,
-		req.BalanceAct, req.BalancePath, req.BalanceMoneyField, req.BalanceMethod, req.BalanceAuthType,
-		req.ReportParamStyle, req.ReportAuthType, req.ReportPath, req.GetReportPath, req.RefreshPath,
-		req.SourceCode,
-	)
+	err := upsertAdminPlatformConfig(req)
 	if err != nil {
 		response.ServerError(c, "保存失败: "+err.Error())
 		return
@@ -530,6 +426,212 @@ func AdminPlatformConfigSave(c *gin.Context) {
 
 	supplier.ReloadPlatformConfigs()
 	response.SuccessMsg(c, "保存成功")
+}
+
+func isCustomQueryDriverValue(driver string) bool {
+	switch strings.TrimSpace(driver) {
+	case "local_time", "local_script", "xxt_query", "KUN_custom", "simple_custom", "yyy_custom", "tuboshu_custom", "nx_custom", "lgwk_custom":
+		return true
+	default:
+		return false
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func canonicalizePlatformConfigDB(cfg *model.PlatformConfigDB) {
+	if !isCustomQueryDriverValue(cfg.QueryAct) {
+		cfg.QueryPath = firstNonEmpty(cfg.QueryPath, "/api.php?act=get")
+		cfg.QueryAct = ""
+	}
+	cfg.OrderPath = firstNonEmpty(cfg.OrderPath, "/api.php?act=add")
+	cfg.ProgressPath = firstNonEmpty(cfg.ProgressPath, "/api.php?act=chadan2")
+	cfg.CategoryPath = firstNonEmpty(cfg.CategoryPath, "/api.php?act=getcate")
+	cfg.ClassListPath = firstNonEmpty(cfg.ClassListPath, "/api.php?act=getclass")
+	cfg.PausePath = firstNonEmpty(cfg.PausePath, "/api.php?act=zt")
+	cfg.ResumePath = firstNonEmpty(cfg.ResumePath)
+	cfg.ChangePassPath = firstNonEmpty(cfg.ChangePassPath, "/api.php?act=gaimi")
+	cfg.LogPath = firstNonEmpty(cfg.LogPath, "/api.php?act=xq")
+	cfg.BalancePath = firstNonEmpty(cfg.BalancePath, "/api.php?act=getmoney")
+}
+
+func normalizePlatformConfigSaveRequest(req *model.PlatformConfigSaveRequest) {
+	if req.AuthType == "" {
+		req.AuthType = "uid_key"
+	}
+	if req.SuccessCodes == "" {
+		req.SuccessCodes = "0"
+	}
+	if !isCustomQueryDriverValue(req.QueryAct) {
+		req.QueryPath = firstNonEmpty(req.QueryPath, "/api.php?act=get")
+		req.QueryAct = ""
+	}
+	if req.QueryMethod == "" {
+		req.QueryMethod = "POST"
+	}
+	req.OrderPath = firstNonEmpty(req.OrderPath, "/api.php?act=add")
+	if req.OrderMethod == "" {
+		req.OrderMethod = "POST"
+	}
+	req.ProgressPath = firstNonEmpty(req.ProgressPath, "/api.php?act=chadan2")
+	if req.ProgressMethod == "" {
+		req.ProgressMethod = "POST"
+	}
+	req.ProgressParamMap = strings.TrimSpace(req.ProgressParamMap)
+	req.CategoryPath = firstNonEmpty(req.CategoryPath, "/api.php?act=getcate")
+	if req.CategoryMethod == "" {
+		req.CategoryMethod = "POST"
+	}
+	req.ClassListPath = firstNonEmpty(req.ClassListPath, "/api.php?act=getclass")
+	if req.ClassListMethod == "" {
+		req.ClassListMethod = "POST"
+	}
+	req.PausePath = firstNonEmpty(req.PausePath, "/api.php?act=zt")
+	if req.PauseMethod == "" {
+		req.PauseMethod = "POST"
+	}
+	if req.PauseIDParam == "" {
+		req.PauseIDParam = "id"
+	}
+	req.ResumePath = firstNonEmpty(req.ResumePath)
+	if req.ResumeMethod == "" {
+		req.ResumeMethod = "POST"
+	}
+	req.ChangePassPath = firstNonEmpty(req.ChangePassPath, "/api.php?act=gaimi")
+	if req.ChangePassMethod == "" {
+		req.ChangePassMethod = "POST"
+	}
+	if req.ChangePassParam == "" {
+		req.ChangePassParam = "newPwd"
+	}
+	if req.ChangePassIDParam == "" {
+		req.ChangePassIDParam = "id"
+	}
+	if req.ResubmitMethod == "" {
+		req.ResubmitMethod = "POST"
+	}
+	if req.ResubmitIDParam == "" {
+		req.ResubmitIDParam = "id"
+	}
+	req.ResubmitPath = firstNonEmpty(req.ResubmitPath, "/api.php?act=budan")
+	req.LogPath = firstNonEmpty(req.LogPath, "/api.php?act=xq")
+	if req.LogMethod == "" {
+		req.LogMethod = "POST"
+	}
+	if req.LogIDParam == "" {
+		req.LogIDParam = "id"
+	}
+	req.BalancePath = firstNonEmpty(req.BalancePath, "/api.php?act=getmoney")
+	if req.BalanceMoneyField == "" {
+		req.BalanceMoneyField = "money"
+	}
+	if req.BalanceMethod == "" {
+		req.BalanceMethod = "POST"
+	}
+	if req.ReportMethod == "" {
+		req.ReportMethod = "POST"
+	}
+	if req.GetReportMethod == "" {
+		req.GetReportMethod = "POST"
+	}
+}
+
+func validatePlatformConfigSaveRequest(req *model.PlatformConfigSaveRequest) string {
+	if strings.TrimSpace(req.ProgressParamMap) == "" {
+		return "请填写进度参数映射JSON"
+	}
+
+	var progressParamMap map[string]string
+	if err := json.Unmarshal([]byte(req.ProgressParamMap), &progressParamMap); err != nil {
+		return "进度参数映射JSON格式错误: " + err.Error()
+	}
+	return ""
+}
+
+func upsertAdminPlatformConfig(req model.PlatformConfigSaveRequest) error {
+	args := []interface{}{
+		req.PT, req.Name, req.AuthType, req.SuccessCodes,
+		req.UseJSON, req.NeedProxy, req.ReturnsYID, req.ExtraParams,
+		req.QueryAct, req.QueryPath, req.QueryMethod, req.QueryBodyType, req.QueryParamStyle, req.QueryParamMap, req.QueryPolling, req.QueryMaxAttempts, req.QueryInterval, req.QueryResponseMap,
+		req.OrderPath, req.OrderMethod, req.OrderBodyType, req.OrderParamMap, req.YIDInDataArray,
+		req.ProgressPath, req.ProgressMethod, req.ProgressBodyType, req.ProgressParamMap,
+		req.CategoryPath, req.CategoryMethod, req.CategoryBodyType, req.CategoryParamMap,
+		req.ClassListPath, req.ClassListMethod, req.ClassListBodyType, req.ClassListParamMap,
+		req.PausePath, req.PauseMethod, req.PauseBodyType, req.PauseParamMap, req.PauseIDParam,
+		req.ResumePath, req.ResumeMethod, req.ResumeBodyType, req.ResumeParamMap,
+		req.ChangePassPath, req.ChangePassMethod, req.ChangePassBodyType, req.ChangePassParamMap, req.ChangePassParam, req.ChangePassIDParam,
+		req.ResubmitPath, req.ResubmitMethod, req.ResubmitBodyType, req.ResubmitParamMap, req.ResubmitIDParam,
+		req.LogPath, req.LogMethod, req.LogBodyType, req.LogParamMap, req.LogIDParam,
+		req.BalancePath, req.BalanceMoneyField, req.BalanceMethod, req.BalanceBodyType, req.BalanceParamMap, req.BalanceAuthType,
+		req.ReportParamStyle, req.ReportAuthType, req.ReportPath, req.ReportMethod, req.ReportBodyType, req.ReportParamMap,
+		req.GetReportPath, req.GetReportMethod, req.GetReportBodyType, req.GetReportParamMap, req.RefreshPath,
+		req.SourceCode,
+	}
+
+	query := `INSERT INTO qingka_platform_config (
+		pt, name, auth_type, success_codes,
+		use_json, need_proxy, returns_yid, extra_params,
+		query_act, query_path, query_method, query_body_type, query_param_style, query_param_map, query_polling, query_max_attempts, query_interval, query_response_map,
+		order_path, order_method, order_body_type, order_param_map, yid_in_data_array,
+		progress_path, progress_method, progress_body_type, progress_param_map,
+		category_path, category_method, category_body_type, category_param_map,
+		class_list_path, class_list_method, class_list_body_type, class_list_param_map,
+		pause_path, pause_method, pause_body_type, pause_param_map, pause_id_param,
+		resume_path, resume_method, resume_body_type, resume_param_map,
+		change_pass_path, change_pass_method, change_pass_body_type, change_pass_param_map, change_pass_param, change_pass_id_param,
+		resubmit_path, resubmit_method, resubmit_body_type, resubmit_param_map, resubmit_id_param,
+		log_path, log_method, log_body_type, log_param_map, log_id_param,
+		balance_path, balance_money_field, balance_method, balance_body_type, balance_param_map, balance_auth_type,
+		report_param_style, report_auth_type, report_path, report_method, report_body_type, report_param_map,
+		get_report_path, get_report_method, get_report_body_type, get_report_param_map, refresh_path,
+		source_code
+	) VALUES (` + strings.TrimRight(strings.Repeat("?,", len(args)), ",") + `)
+	ON DUPLICATE KEY UPDATE
+		name=VALUES(name), auth_type=VALUES(auth_type),
+		success_codes=VALUES(success_codes), use_json=VALUES(use_json), need_proxy=VALUES(need_proxy),
+		returns_yid=VALUES(returns_yid), extra_params=VALUES(extra_params),
+		query_act=VALUES(query_act), query_path=VALUES(query_path), query_method=VALUES(query_method),
+		query_body_type=VALUES(query_body_type), query_param_style=VALUES(query_param_style), query_param_map=VALUES(query_param_map),
+		query_polling=VALUES(query_polling), query_max_attempts=VALUES(query_max_attempts),
+		query_interval=VALUES(query_interval), query_response_map=VALUES(query_response_map),
+		order_path=VALUES(order_path), order_method=VALUES(order_method),
+		order_body_type=VALUES(order_body_type), order_param_map=VALUES(order_param_map), yid_in_data_array=VALUES(yid_in_data_array),
+		progress_path=VALUES(progress_path), progress_method=VALUES(progress_method),
+		progress_body_type=VALUES(progress_body_type), progress_param_map=VALUES(progress_param_map),
+		category_path=VALUES(category_path), category_method=VALUES(category_method),
+		category_body_type=VALUES(category_body_type), category_param_map=VALUES(category_param_map),
+		class_list_path=VALUES(class_list_path), class_list_method=VALUES(class_list_method),
+		class_list_body_type=VALUES(class_list_body_type), class_list_param_map=VALUES(class_list_param_map),
+		pause_path=VALUES(pause_path), pause_method=VALUES(pause_method),
+		pause_body_type=VALUES(pause_body_type), pause_param_map=VALUES(pause_param_map), pause_id_param=VALUES(pause_id_param),
+		resume_path=VALUES(resume_path), resume_method=VALUES(resume_method),
+		resume_body_type=VALUES(resume_body_type), resume_param_map=VALUES(resume_param_map),
+		change_pass_path=VALUES(change_pass_path), change_pass_method=VALUES(change_pass_method),
+		change_pass_body_type=VALUES(change_pass_body_type), change_pass_param_map=VALUES(change_pass_param_map),
+		change_pass_param=VALUES(change_pass_param), change_pass_id_param=VALUES(change_pass_id_param),
+		resubmit_path=VALUES(resubmit_path), resubmit_method=VALUES(resubmit_method), resubmit_body_type=VALUES(resubmit_body_type),
+		resubmit_param_map=VALUES(resubmit_param_map), resubmit_id_param=VALUES(resubmit_id_param),
+		log_path=VALUES(log_path), log_method=VALUES(log_method),
+		log_body_type=VALUES(log_body_type), log_param_map=VALUES(log_param_map), log_id_param=VALUES(log_id_param),
+		balance_path=VALUES(balance_path), balance_money_field=VALUES(balance_money_field), balance_method=VALUES(balance_method),
+		balance_body_type=VALUES(balance_body_type), balance_param_map=VALUES(balance_param_map),
+		balance_auth_type=VALUES(balance_auth_type),
+		report_param_style=VALUES(report_param_style), report_auth_type=VALUES(report_auth_type),
+		report_path=VALUES(report_path), report_method=VALUES(report_method), report_body_type=VALUES(report_body_type),
+		report_param_map=VALUES(report_param_map),
+		get_report_path=VALUES(get_report_path), get_report_method=VALUES(get_report_method),
+		get_report_body_type=VALUES(get_report_body_type), get_report_param_map=VALUES(get_report_param_map),
+		refresh_path=VALUES(refresh_path), source_code=VALUES(source_code)`
+
+	_, err := database.DB.Exec(query, args...)
+	return err
 }
 
 func AdminPlatformConfigDelete(c *gin.Context) {
@@ -591,56 +693,18 @@ func AdminAutoDetectSave(c *gin.Context) {
 		return
 	}
 
-	query := `INSERT INTO qingka_platform_config (
-		pt, name, auth_type, api_path_style, success_codes,
-		use_json, need_proxy, returns_yid, extra_params,
-		query_act, query_path, query_param_style, query_polling, query_max_attempts, query_interval, query_response_map,
-		order_act, order_path, yid_in_data_array,
-		progress_act, progress_no_yid, progress_path, progress_method, progress_needs_auth,
-		use_id_param, use_uuid_param, always_username,
-		pause_act, pause_path, pause_id_param, resume_act, resume_path,
-		change_pass_act, change_pass_path, change_pass_param, change_pass_id_param,
-		resubmit_path, resubmit_id_param,
-		log_act, log_path, log_method, log_id_param,
-		balance_act, balance_path, balance_money_field, balance_method, balance_auth_type,
-		report_param_style, report_auth_type, report_path, get_report_path, refresh_path,
-		source_code
-	) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-	ON DUPLICATE KEY UPDATE
-		name=VALUES(name), auth_type=VALUES(auth_type), api_path_style=VALUES(api_path_style),
-		success_codes=VALUES(success_codes), use_json=VALUES(use_json),
-		returns_yid=VALUES(returns_yid),
-		query_act=VALUES(query_act), query_path=VALUES(query_path),
-		order_act=VALUES(order_act), order_path=VALUES(order_path),
-		progress_act=VALUES(progress_act), progress_no_yid=VALUES(progress_no_yid),
-		progress_path=VALUES(progress_path), progress_method=VALUES(progress_method),
-		pause_act=VALUES(pause_act), pause_path=VALUES(pause_path), pause_id_param=VALUES(pause_id_param),
-		change_pass_act=VALUES(change_pass_act), change_pass_path=VALUES(change_pass_path),
-		change_pass_param=VALUES(change_pass_param), change_pass_id_param=VALUES(change_pass_id_param),
-		resubmit_path=VALUES(resubmit_path), resubmit_id_param=VALUES(resubmit_id_param),
-		log_act=VALUES(log_act), log_path=VALUES(log_path), log_method=VALUES(log_method),
-		log_id_param=VALUES(log_id_param),
-		balance_act=VALUES(balance_act), balance_path=VALUES(balance_path),
-		balance_money_field=VALUES(balance_money_field), balance_method=VALUES(balance_method),
-		balance_auth_type=VALUES(balance_auth_type),
-		report_param_style=VALUES(report_param_style), report_auth_type=VALUES(report_auth_type),
-		report_path=VALUES(report_path), get_report_path=VALUES(get_report_path), refresh_path=VALUES(refresh_path)`
-
-	_, err := database.DB.Exec(query,
-		saveReq.PT, saveReq.Name, saveReq.AuthType, saveReq.APIPathStyle, saveReq.SuccessCodes,
-		saveReq.UseJSON, saveReq.NeedProxy, saveReq.ReturnsYID, saveReq.ExtraParams,
-		saveReq.QueryAct, saveReq.QueryPath, saveReq.QueryParamStyle, saveReq.QueryPolling, saveReq.QueryMaxAttempts, saveReq.QueryInterval, saveReq.QueryResponseMap,
-		saveReq.OrderAct, saveReq.OrderPath, saveReq.YIDInDataArray,
-		saveReq.ProgressAct, saveReq.ProgressNoYID, saveReq.ProgressPath, saveReq.ProgressMethod, saveReq.ProgressNeedsAuth,
-		saveReq.UseIDParam, saveReq.UseUUIDParam, saveReq.AlwaysUsername,
-		saveReq.PauseAct, saveReq.PausePath, saveReq.PauseIDParam, saveReq.ResumeAct, saveReq.ResumePath,
-		saveReq.ChangePassAct, saveReq.ChangePassPath, saveReq.ChangePassParam, saveReq.ChangePassIDParam,
-		saveReq.ResubmitPath, saveReq.ResubmitIDParam,
-		saveReq.LogAct, saveReq.LogPath, saveReq.LogMethod, saveReq.LogIDParam,
-		saveReq.BalanceAct, saveReq.BalancePath, saveReq.BalanceMoneyField, saveReq.BalanceMethod, saveReq.BalanceAuthType,
-		saveReq.ReportParamStyle, saveReq.ReportAuthType, saveReq.ReportPath, saveReq.GetReportPath, saveReq.RefreshPath,
-		"",
-	)
+	saveReq.SourceCode = ""
+	normalizePlatformConfigSaveRequest(saveReq)
+	if msg := validatePlatformConfigSaveRequest(saveReq); msg != "" {
+		response.Success(c, gin.H{
+			"success": false,
+			"msg":     "检测成功但还需补充配置: " + msg,
+			"detect":  result,
+			"config":  saveReq,
+		})
+		return
+	}
+	err := upsertAdminPlatformConfig(*saveReq)
 	if err != nil {
 		response.Success(c, gin.H{
 			"success": false,

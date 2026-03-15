@@ -30,41 +30,52 @@ func (s *Service) CallSupplierOrder(sup *model.SupplierFull, cls *model.ClassFul
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
-	apiURL := buildSupplierURL(sup.URL, cfg.OrderAct)
+	apiURL := resolveConfiguredActionURL(sup.URL, cfg.OrderPath)
 
-	formData := url.Values{}
-	formData.Set("uid", sup.User)
-	formData.Set("key", sup.Pass)
-	formData.Set("platform", cls.Noun)
-	formData.Set("school", school)
-	formData.Set("user", user)
-	formData.Set("pass", pass)
-	formData.Set("kcid", kcid)
-	formData.Set("kcname", kcname)
+	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
+	defaultParams["platform"] = cls.Noun
+	defaultParams["school"] = school
+	defaultParams["user"] = user
+	defaultParams["pass"] = pass
+	defaultParams["kcid"] = kcid
+	defaultParams["kcname"] = kcname
+	actionFields := map[string]string{
+		"school":   school,
+		"user":     user,
+		"pass":     pass,
+		"kcid":     kcid,
+		"kcname":   kcname,
+		"platform": cls.Noun,
+		"noun":     cls.Noun,
+	}
 
 	if cfg.ExtraParams && extraFields != nil {
 		for k, v := range extraFields {
 			if v != "" {
-				formData.Set(k, v)
+				defaultParams[k] = v
+				actionFields[k] = v
 			}
 		}
 	}
 
-	waitSupplierHost(sup)
-	resp, err := s.client.PostForm(apiURL, formData)
+	execResult, err := s.executeConfiguredAction(
+		sup,
+		apiURL,
+		cfg.OrderMethod,
+		cfg.OrderBodyType,
+		cfg.OrderParamMap,
+		http.MethodPost,
+		"form",
+		defaultParams,
+		actionFields,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("请求上游失败：%v", err)
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应失败：%v", err)
-	}
 
 	var raw map[string]interface{}
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("解析响应失败：%s", string(body))
+	if err := json.Unmarshal(execResult.Body, &raw); err != nil {
+		return nil, fmt.Errorf("解析响应失败：%s", string(execResult.Body))
 	}
 
 	codeVal := fmt.Sprintf("%v", raw["code"])
@@ -155,9 +166,22 @@ func (s *Service) CallSupplierOrder(sup *model.SupplierFull, cls *model.ClassFul
 	return result, nil
 }
 
+// QueryOrderProgress 把“主订单查询进度”的平台差异收敛在一处。
+// 现在只保留“一套进度接口配置”：
+// - 运行时只读取 progress_path；
+// - 不再区分“有 yid / 无 yid”两套接口。
+//
+// 调用方只提供：
+// - sup: 本地供应商配置，决定该走哪个平台适配器；
+// - yid: 上游订单号，可选，存在时会按参数映射传递；
+// - username: 某些平台仍要求按账号参与查询；
+// - orderExtra: 课程名、课程ID、学校等补充字段，用来兼容特殊平台的搜索接口。
 func (s *Service) QueryOrderProgress(sup *model.SupplierFull, yid string, username string, orderExtra map[string]string) ([]model.SupplierProgressItem, error) {
+	debugInfo := newProgressDebugInfo(orderExtra)
+
+	// `yyy` 和 `simple` 平台历史上就有独立协议，不走通用配置拼装逻辑。
 	if sup.PT == "yyy" {
-		return yyyQueryProgress(sup, username)
+		return yyyQueryProgress(sup, username, debugInfo)
 	}
 	if sup.PT == "simple" {
 		platform := ""
@@ -176,88 +200,62 @@ func (s *Service) QueryOrderProgress(sup *model.SupplierFull, yid string, userna
 			}
 			pass = orderExtra["pass"]
 		}
-		return simpleQueryProgress(sup, platform, school, user, pass, kcname, kcid)
+		return simpleQueryProgress(sup, platform, school, user, pass, kcname, kcid, debugInfo)
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
-	params := url.Values{}
-	params.Set("uid", sup.User)
-	params.Set("key", sup.Pass)
-
-	var apiURL string
-	if cfg.ProgressPath != "" {
-		baseURL := strings.TrimRight(sup.URL, "/")
-		if !strings.HasPrefix(baseURL, "http") {
-			baseURL = "http://" + baseURL
-		}
-		apiURL = baseURL + cfg.ProgressPath
-
-		if strings.Contains(cfg.ProgressPath, "/api/search") {
-			params.Set("username", username)
-			if orderExtra != nil {
-				if v, ok := orderExtra["kcname"]; ok {
-					params.Set("kcname", v)
-				}
-				if v, ok := orderExtra["noun"]; ok {
-					params.Set("cid", v)
-				}
-			}
-		} else {
-			params.Set("username", username)
-			if yid != "" && yid != "0" {
-				params.Set("yid", yid)
-			}
-			if orderExtra != nil {
-				if v, ok := orderExtra["kcname"]; ok {
-					params.Set("kcname", v)
-				}
-				if v, ok := orderExtra["noun"]; ok {
-					params.Set("cid", v)
-				}
-			}
-		}
-	} else if yid != "" && yid != "0" {
-		apiURL = buildSupplierURL(sup.URL, cfg.ProgressAct)
-		if cfg.UseUUIDParam {
-			params.Set("uuid", yid)
-		} else if cfg.UseIDParam {
-			params.Set("id", yid)
-		} else {
-			params.Set("yid", yid)
-		}
-		if cfg.AlwaysUsername {
-			params.Set("username", username)
-		}
-	} else {
-		apiURL = buildSupplierURL(sup.URL, cfg.ProgressNoYID)
-		params.Set("username", username)
+	actionFields := map[string]string{
+		"user": username,
+		"yid":  yid,
 	}
 
-	var resp *http.Response
-	var err error
-	if cfg.ProgressMethod == "GET" {
-		apiURL = apiURL + "?" + params.Encode()
-		waitSupplierHost(sup)
-		resp, err = s.client.Get(apiURL)
-	} else {
-		waitSupplierHost(sup)
-		resp, err = s.client.PostForm(apiURL, params)
+	if orderExtra != nil {
+		for k, v := range orderExtra {
+			actionFields[k] = v
+		}
 	}
+
+	// 进度查询现在始终只走同一套 endpoint 配置。
+	apiURL := resolveConfiguredActionURL(sup.URL, cfg.ProgressPath)
+	params, err := buildActionParams(cfg.ProgressParamMap, sup, actionFields, nil)
 	if err != nil {
+		return nil, err
+	}
+	fallbackBodyType := "form"
+	if strings.EqualFold(cfg.ProgressMethod, http.MethodGet) {
+		fallbackBodyType = "query"
+	}
+	req, contentType, payload, err := prepareActionRequest(
+		apiURL,
+		normalizeActionMethod(cfg.ProgressMethod, http.MethodPost),
+		normalizeActionBodyType(cfg.ProgressBodyType, fallbackBodyType, normalizeActionMethod(cfg.ProgressMethod, http.MethodPost)),
+		params,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("构建请求失败：%v", err)
+	}
+	debugInfo.logRequest(sup, req.Method, req.URL.String(), contentType, payload)
+	waitSupplierHost(sup)
+	resp, err := s.client.Do(req)
+	if err != nil {
+		debugInfo.logRequestError(sup, err)
 		return nil, fmt.Errorf("请求上游失败：%v", err)
 	}
 	defer resp.Body.Close()
 
+	// 上游协议非常不统一，所以这里先读成原始 body，再做宽松 JSON 解析。
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败：%v", err)
 	}
+	debugInfo.logResponse(sup, resp.Status, body)
 
 	var raw map[string]interface{}
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("解析响应失败：%s", string(body))
 	}
 
+	// 统一把各种类型的 code 归一化成字符串，兼容 `"1"` / `1` / `1.0` 这类返回。
 	codeVal := ""
 	if codeRaw, ok := raw["code"]; ok {
 		switch v := codeRaw.(type) {
@@ -272,6 +270,7 @@ func (s *Service) QueryOrderProgress(sup *model.SupplierFull, yid string, userna
 		}
 	}
 	if codeVal != "0" && codeVal != "1" {
+		// 这里返回 error，调用方会把它记成“查询失败”而不是“更新失败”。
 		msg := ""
 		if msgRaw, ok := raw["msg"]; ok {
 			msg = fmt.Sprintf("%v", msgRaw)
@@ -284,6 +283,8 @@ func (s *Service) QueryOrderProgress(sup *model.SupplierFull, yid string, userna
 
 	var items []model.SupplierProgressItem
 	if dataArr, ok := raw["data"].([]interface{}); ok {
+		// 这里把平台原始字段转成统一的 SupplierProgressItem，
+		// 后续订单模块只关心统一结构，不再感知具体平台 JSON 形态。
 		for _, item := range dataArr {
 			if m, ok := item.(map[string]interface{}); ok {
 				items = append(items, model.SupplierProgressItem{
@@ -315,47 +316,35 @@ func (s *Service) PauseOrder(sup *model.SupplierFull, yid string) (int, string, 
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
-	var resp *http.Response
-	var err error
-
-	if cfg.PausePath != "" {
-		baseURL := strings.TrimRight(sup.URL, "/")
-		if !strings.HasPrefix(baseURL, "http") {
-			baseURL = "http://" + baseURL
-		}
-		apiURL := baseURL + cfg.PausePath
-		jsonData, _ := json.Marshal(map[string]string{"id": yid, "username": sup.User})
-		waitSupplierHost(sup)
-		resp, err = s.client.Post(apiURL, "application/json", strings.NewReader(string(jsonData)))
-	} else {
-		pauseAct := cfg.PauseAct
-		if pauseAct == "" {
-			pauseAct = "zt"
-		}
-		apiURL := buildSupplierURL(sup.URL, pauseAct)
-		formData := url.Values{}
-		formData.Set("uid", sup.User)
-		formData.Set("key", sup.Pass)
-		idParam := cfg.PauseIDParam
-		if idParam == "" {
-			idParam = "id"
-		}
-		formData.Set(idParam, yid)
-		waitSupplierHost(sup)
-		resp, err = s.client.PostForm(apiURL, formData)
+	apiURL := resolveConfiguredActionURL(sup.URL, cfg.PausePath)
+	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
+	fallbackBodyType := "form"
+	idParam := cfg.PauseIDParam
+	if idParam == "" {
+		idParam = "id"
 	}
+	defaultParams[idParam] = yid
+	execResult, err := s.executeConfiguredAction(
+		sup,
+		apiURL,
+		cfg.PauseMethod,
+		cfg.PauseBodyType,
+		cfg.PauseParamMap,
+		http.MethodPost,
+		fallbackBodyType,
+		defaultParams,
+		map[string]string{"yid": yid, "id": yid},
+	)
 	if err != nil {
 		return -1, "", fmt.Errorf("请求上游失败：%v", err)
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
 
 	var result struct {
 		Code int    `json:"code"`
 		Msg  string `json:"msg"`
 	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return -1, string(body), nil
+	if err := json.Unmarshal(execResult.Body, &result); err != nil {
+		return -1, string(execResult.Body), nil
 	}
 	return result.Code, result.Msg, nil
 }
@@ -369,52 +358,40 @@ func (s *Service) ChangePassword(sup *model.SupplierFull, yid, newPwd string) (i
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
-	var resp *http.Response
-	var err error
-
-	if cfg.ChangePassPath != "" {
-		baseURL := strings.TrimRight(sup.URL, "/")
-		if !strings.HasPrefix(baseURL, "http") {
-			baseURL = "http://" + baseURL
-		}
-		apiURL := baseURL + cfg.ChangePassPath
-		jsonData, _ := json.Marshal(map[string]string{"id": yid, "username": sup.User, "pass": newPwd})
-		waitSupplierHost(sup)
-		resp, err = s.client.Post(apiURL, "application/json", strings.NewReader(string(jsonData)))
-	} else {
-		changeAct := cfg.ChangePassAct
-		if changeAct == "" {
-			changeAct = "gaimi"
-		}
-		apiURL := buildSupplierURL(sup.URL, changeAct)
-		formData := url.Values{}
-		formData.Set("uid", sup.User)
-		formData.Set("key", sup.Pass)
-		idParam := cfg.ChangePassIDParam
-		if idParam == "" {
-			idParam = "id"
-		}
-		pwdParam := cfg.ChangePassParam
-		if pwdParam == "" {
-			pwdParam = "newPwd"
-		}
-		formData.Set(idParam, yid)
-		formData.Set(pwdParam, newPwd)
-		waitSupplierHost(sup)
-		resp, err = s.client.PostForm(apiURL, formData)
+	apiURL := resolveConfiguredActionURL(sup.URL, cfg.ChangePassPath)
+	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
+	fallbackBodyType := "form"
+	idParam := cfg.ChangePassIDParam
+	if idParam == "" {
+		idParam = "id"
 	}
+	pwdParam := cfg.ChangePassParam
+	if pwdParam == "" {
+		pwdParam = "newPwd"
+	}
+	defaultParams[idParam] = yid
+	defaultParams[pwdParam] = newPwd
+	execResult, err := s.executeConfiguredAction(
+		sup,
+		apiURL,
+		cfg.ChangePassMethod,
+		cfg.ChangePassBodyType,
+		cfg.ChangePassParamMap,
+		http.MethodPost,
+		fallbackBodyType,
+		defaultParams,
+		map[string]string{"yid": yid, "id": yid, "new_pwd": newPwd, "password": newPwd},
+	)
 	if err != nil {
 		return -1, "", fmt.Errorf("请求上游失败：%v", err)
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
 
 	var result struct {
 		Code int    `json:"code"`
 		Msg  string `json:"msg"`
 	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return -1, string(body), nil
+	if err := json.Unmarshal(execResult.Body, &result); err != nil {
+		return -1, string(execResult.Body), nil
 	}
 	return result.Code, result.Msg, nil
 }
@@ -428,39 +405,35 @@ func (s *Service) ResubmitOrder(sup *model.SupplierFull, yid string) (int, strin
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
-	var resp *http.Response
-	var err error
-
-	if cfg.ResubmitPath != "" {
-		baseURL := strings.TrimRight(sup.URL, "/")
-		if !strings.HasPrefix(baseURL, "http") {
-			baseURL = "http://" + baseURL
-		}
-		apiURL := baseURL + cfg.ResubmitPath
-		jsonData, _ := json.Marshal(map[string]string{"id": yid, "username": sup.User})
-		waitSupplierHost(sup)
-		resp, err = s.client.Post(apiURL, "application/json", strings.NewReader(string(jsonData)))
-	} else {
-		apiURL := buildSupplierURL(sup.URL, "budan")
-		formData := url.Values{}
-		formData.Set("uid", sup.User)
-		formData.Set("key", sup.Pass)
-		formData.Set(cfg.ResubmitIDParam, yid)
-		waitSupplierHost(sup)
-		resp, err = s.client.PostForm(apiURL, formData)
+	apiURL := resolveConfiguredActionURL(sup.URL, cfg.ResubmitPath)
+	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
+	fallbackBodyType := "form"
+	idParam := cfg.ResubmitIDParam
+	if idParam == "" {
+		idParam = "id"
 	}
+	defaultParams[idParam] = yid
+	execResult, err := s.executeConfiguredAction(
+		sup,
+		apiURL,
+		cfg.ResubmitMethod,
+		cfg.ResubmitBodyType,
+		cfg.ResubmitParamMap,
+		http.MethodPost,
+		fallbackBodyType,
+		defaultParams,
+		map[string]string{"yid": yid, "id": yid},
+	)
 	if err != nil {
 		return -1, "", fmt.Errorf("请求上游失败：%v", err)
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
 
 	var result struct {
 		Code int    `json:"code"`
 		Msg  string `json:"msg"`
 	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return -1, string(body), nil
+	if err := json.Unmarshal(execResult.Body, &result); err != nil {
+		return -1, string(execResult.Body), nil
 	}
 	return result.Code, result.Msg, nil
 }
@@ -574,65 +547,92 @@ func (s *Service) QueryOrderLogs(sup *model.SupplierFull, yid string, orderExtra
 
 	cfg := GetPlatformConfig(sup.PT)
 	logClient := &http.Client{Timeout: 8 * time.Second}
-	var resp *http.Response
-	var err error
 
-	if cfg.LogPath != "" {
+	var execResult *actionExecutionResult
+	var err error
+	if cfg.LogPath != "" && sup.PT == "wanzi" && strings.TrimSpace(cfg.LogParamMap) == "" {
 		baseURL := strings.TrimRight(sup.URL, "/")
 		if !strings.HasPrefix(baseURL, "http") {
 			baseURL = "http://" + baseURL
 		}
-		if sup.PT == "wanzi" {
-			apiURL := fmt.Sprintf("%s%s%s/logs?pageSize=50&uid=%s&key=%s", baseURL, cfg.LogPath, yid, sup.User, sup.Pass)
-			waitSupplierHost(sup)
-			resp, err = logClient.Get(apiURL)
-		} else {
-			params := url.Values{}
-			if len(orderExtra) > 0 {
-				if v, ok := orderExtra[0]["user"]; ok {
-					params.Set("account", v)
-				}
-				if v, ok := orderExtra[0]["pass"]; ok {
-					params.Set("password", v)
-				}
-				if v, ok := orderExtra[0]["kcname"]; ok {
-					params.Set("course", v)
-				}
-				if v, ok := orderExtra[0]["kcid"]; ok {
-					params.Set("courseId", v)
-				}
+		apiURL := fmt.Sprintf("%s%s%s/logs?pageSize=50&uid=%s&key=%s", baseURL, cfg.LogPath, yid, sup.User, sup.Pass)
+		req, reqErr := http.NewRequest(http.MethodGet, apiURL, nil)
+		if reqErr != nil {
+			return nil, fmt.Errorf("构建请求失败：%v", reqErr)
+		}
+		waitSupplierHost(sup)
+		resp, doErr := logClient.Do(req)
+		if doErr != nil {
+			return nil, fmt.Errorf("请求上游超时或失败")
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		execResult = &actionExecutionResult{Body: body, Status: resp.Status, Method: req.Method, URL: req.URL.String()}
+	} else if cfg.LogPath != "" {
+		fields := map[string]string{"yid": yid, "id": yid}
+		defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
+		if len(orderExtra) > 0 {
+			for k, v := range orderExtra[0] {
+				fields[k] = v
 			}
-			params.Set("dtoken", sup.Token)
-			apiURL := baseURL + cfg.LogPath + "?" + params.Encode()
-			waitSupplierHost(sup)
-			resp, err = logClient.Get(apiURL)
+			if v := orderExtra[0]["user"]; v != "" {
+				defaultParams["account"] = v
+			}
+			if v := orderExtra[0]["pass"]; v != "" {
+				defaultParams["password"] = v
+			}
+			if v := orderExtra[0]["kcname"]; v != "" {
+				defaultParams["course"] = v
+			}
+			if v := orderExtra[0]["kcid"]; v != "" {
+				defaultParams["courseId"] = v
+			}
 		}
+		fallbackBodyType := "form"
+		if strings.EqualFold(cfg.LogMethod, http.MethodGet) {
+			fallbackBodyType = "query"
+		}
+		execResult, err = s.executeConfiguredActionWithClient(
+			logClient,
+			sup,
+			resolveConfiguredActionURL(sup.URL, cfg.LogPath),
+			cfg.LogMethod,
+			cfg.LogBodyType,
+			cfg.LogParamMap,
+			http.MethodGet,
+			fallbackBodyType,
+			defaultParams,
+			fields,
+		)
 	} else {
-		logAct := cfg.LogAct
-		if logAct == "" {
-			logAct = "xq"
-		}
 		logIDParam := cfg.LogIDParam
 		if logIDParam == "" {
 			logIDParam = "id"
 		}
-		apiURL := buildSupplierURL(sup.URL, logAct)
-		formData := url.Values{}
-		formData.Set("uid", sup.User)
-		formData.Set("key", sup.Pass)
-		formData.Set(logIDParam, yid)
-		waitSupplierHost(sup)
-		resp, err = logClient.PostForm(apiURL, formData)
+		execResult, err = s.executeConfiguredActionWithClient(
+			logClient,
+			sup,
+			resolveConfiguredActionURL(sup.URL, cfg.LogPath),
+			cfg.LogMethod,
+			cfg.LogBodyType,
+			cfg.LogParamMap,
+			http.MethodPost,
+			"form",
+			func() map[string]string {
+				params := defaultSupplierAuthParams(sup, cfg.AuthType)
+				params[logIDParam] = yid
+				return params
+			}(),
+			map[string]string{"yid": yid, "id": yid},
+		)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("请求上游超时或失败")
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
 
 	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("解析响应失败：%s", string(body))
+	if err := json.Unmarshal(execResult.Body, &raw); err != nil {
+		return nil, fmt.Errorf("解析响应失败：%s", string(execResult.Body))
 	}
 
 	var code int
@@ -702,48 +702,37 @@ func (s *Service) QueryOrderLogs(sup *model.SupplierFull, yid string, orderExtra
 
 func (s *Service) SubmitReport(sup *model.SupplierFull, yid, ticketType, content string) (int, int, string, error) {
 	cfg := GetPlatformConfig(sup.PT)
-	baseURL := strings.TrimRight(sup.URL, "/")
-	if !strings.HasPrefix(baseURL, "http") {
-		baseURL = "http://" + baseURL
-	}
-
-	var resp *http.Response
-	var err error
+	apiURL := resolveConfiguredActionURL(sup.URL, cfg.ReportPath)
+	defaultParams := map[string]string{}
+	fallbackBodyType := "form"
 	if cfg.ReportParamStyle == "token" {
-		apiURL := baseURL + cfg.ReportPath
-		jsonData, _ := json.Marshal(map[string]string{
-			"token":   getSupplierToken(sup),
-			"type":    ticketType,
-			"id":      yid,
-			"content": content,
-		})
-		req, _ := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonData)))
-		req.Header.Set("Content-Type", "application/json")
-		waitSupplierHost(sup)
-		resp, err = s.client.Do(req)
+		defaultParams["token"] = getSupplierToken(sup)
+		defaultParams["type"] = ticketType
+		defaultParams["id"] = yid
+		defaultParams["content"] = content
+		fallbackBodyType = "json"
 	} else {
-		apiURL := baseURL + cfg.ReportPath
-		if cfg.ReportPath == "" {
-			apiURL = fmt.Sprintf("%s/api.php?act=%s", baseURL, cfg.ReportAct)
-		}
-		formData := url.Values{
-			"uid":      {sup.User},
-			"key":      {sup.Pass},
-			"id":       {yid},
-			"question": {content},
-		}
-		waitSupplierHost(sup)
-		resp, err = s.client.PostForm(apiURL, formData)
+		defaultParams = defaultSupplierAuthParams(sup, cfg.AuthType)
+		defaultParams["id"] = yid
+		defaultParams["question"] = content
 	}
+	execResult, err := s.executeConfiguredAction(
+		sup,
+		apiURL,
+		cfg.ReportMethod,
+		cfg.ReportBodyType,
+		cfg.ReportParamMap,
+		http.MethodPost,
+		fallbackBodyType,
+		defaultParams,
+		map[string]string{"yid": yid, "id": yid, "ticket_type": ticketType, "content": content},
+	)
 	if err != nil {
 		return 0, 0, "", fmt.Errorf("请求上游失败：%v", err)
 	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
 	var raw map[string]interface{}
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return 0, 0, "", fmt.Errorf("上游返回解析失败：%s", string(body))
+	if err := json.Unmarshal(execResult.Body, &raw); err != nil {
+		return 0, 0, "", fmt.Errorf("上游返回解析失败：%s", string(execResult.Body))
 	}
 
 	code := 0
@@ -764,45 +753,34 @@ func (s *Service) SubmitReport(sup *model.SupplierFull, yid, ticketType, content
 
 func (s *Service) QueryReport(sup *model.SupplierFull, reportID string) (int, string, string, error) {
 	cfg := GetPlatformConfig(sup.PT)
-	baseURL := strings.TrimRight(sup.URL, "/")
-	if !strings.HasPrefix(baseURL, "http") {
-		baseURL = "http://" + baseURL
-	}
-
-	var resp *http.Response
-	var err error
+	apiURL := resolveConfiguredActionURL(sup.URL, cfg.GetReportPath)
+	defaultParams := map[string]string{}
+	fallbackBodyType := "form"
 	if cfg.ReportParamStyle == "token" {
-		apiURL := baseURL + cfg.GetReportPath
-		jsonData, _ := json.Marshal(map[string]string{
-			"token":  getSupplierToken(sup),
-			"workId": reportID,
-		})
-		req, _ := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonData)))
-		req.Header.Set("Content-Type", "application/json")
-		waitSupplierHost(sup)
-		resp, err = s.client.Do(req)
+		defaultParams["token"] = getSupplierToken(sup)
+		defaultParams["workId"] = reportID
+		fallbackBodyType = "json"
 	} else {
-		apiURL := baseURL + cfg.GetReportPath
-		if cfg.GetReportPath == "" {
-			apiURL = fmt.Sprintf("%s/api.php?act=%s", baseURL, cfg.GetReportAct)
-		}
-		formData := url.Values{
-			"uid":      {sup.User},
-			"key":      {sup.Pass},
-			"reportId": {reportID},
-		}
-		waitSupplierHost(sup)
-		resp, err = s.client.PostForm(apiURL, formData)
+		defaultParams = defaultSupplierAuthParams(sup, cfg.AuthType)
+		defaultParams["reportId"] = reportID
 	}
+	execResult, err := s.executeConfiguredAction(
+		sup,
+		apiURL,
+		cfg.GetReportMethod,
+		cfg.GetReportBodyType,
+		cfg.GetReportParamMap,
+		http.MethodPost,
+		fallbackBodyType,
+		defaultParams,
+		map[string]string{"report_id": reportID, "id": reportID},
+	)
 	if err != nil {
 		return 0, "", "", fmt.Errorf("请求上游失败：%v", err)
 	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
 	var raw map[string]interface{}
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return 0, "", "", fmt.Errorf("上游返回解析失败：%s", string(body))
+	if err := json.Unmarshal(execResult.Body, &raw); err != nil {
+		return 0, "", "", fmt.Errorf("上游返回解析失败：%s", string(execResult.Body))
 	}
 
 	code := 0

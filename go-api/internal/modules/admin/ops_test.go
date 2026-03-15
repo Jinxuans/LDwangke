@@ -110,3 +110,22 @@ func TestAdminDBSyncExecuteRequiresConfirmationToken(t *testing.T) {
 		t.Fatalf("expected error code 422, got %d", resp.Code)
 	}
 }
+
+func TestAdminPlatformConfigSaveRequiresExplicitProgressParamMap(t *testing.T) {
+	w := performAdminJSONRequest(t, AdminPlatformConfigSave, http.MethodPost, "/admin/platform-config/save", gin.H{
+		"pt":            "demo",
+		"name":          "Demo",
+		"progress_path": "/api/query",
+	})
+	resp := decodeAdminResponse(t, w)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", w.Code, w.Body.String())
+	}
+	if resp.Code != 422 {
+		t.Fatalf("expected business code 422, got %d", resp.Code)
+	}
+	if resp.Message == "" {
+		t.Fatalf("expected validation message, got empty body=%s", w.Body.String())
+	}
+}

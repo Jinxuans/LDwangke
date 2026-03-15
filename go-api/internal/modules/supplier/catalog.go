@@ -3,12 +3,9 @@ package supplier
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"go-api/internal/database"
@@ -17,63 +14,32 @@ import (
 
 func (s *Service) GetSupplierCategories(sup *model.SupplierFull) map[string]string {
 	cfg := GetPlatformConfig(sup.PT)
-
-	baseURL := strings.TrimRight(sup.URL, "/")
-	if !strings.HasPrefix(baseURL, "http") {
-		baseURL = "http://" + baseURL
-	}
-
 	client := &http.Client{Timeout: 8 * time.Second}
-	tryActs := []string{}
-	if cfg.CategoryAct != "" {
-		tryActs = append(tryActs, cfg.CategoryAct)
-	}
-	for _, fallback := range []string{"getfl", "getcate", "getfenlei"} {
-		found := false
-		for _, act := range tryActs {
-			if act == fallback {
-				found = true
-				break
-			}
-		}
-		if !found {
-			tryActs = append(tryActs, fallback)
-		}
-	}
-
-	for _, act := range tryActs {
-		var resp *http.Response
-		var err error
-
-		if cfg.ReportAuthType == "token_only" && cfg.UseJSON {
-			apiURL := baseURL + "/api/" + act
-			jsonData, _ := json.Marshal(map[string]string{"token": getSupplierToken(sup)})
-			req, _ := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonData)))
-			req.Header.Set("Content-Type", "application/json")
-			resp, err = client.Do(req)
-		} else {
-			cateURL := buildSupplierURL(sup.URL, act)
-			formData := url.Values{}
-			formData.Set("uid", sup.User)
-			formData.Set("key", sup.Pass)
-			resp, err = client.PostForm(cateURL, formData)
-		}
-		if err != nil {
-			log.Printf("[GetSupplierCategories] act=%s 请求失败: %v", act, err)
-			continue
-		}
-
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-
-		result := parseCategoryResponse(body)
-		if len(result) > 0 {
-			log.Printf("[GetSupplierCategories] pt=%s act=%s 成功获取 %d 个分类", sup.PT, act, len(result))
-			return result
-		}
+	apiURL := resolveConfiguredActionURL(sup.URL, cfg.CategoryPath)
+	execResult, err := s.executeConfiguredActionWithClient(
+		client,
+		sup,
+		apiURL,
+		cfg.CategoryMethod,
+		cfg.CategoryBodyType,
+		cfg.CategoryParamMap,
+		http.MethodPost,
+		"form",
+		defaultSupplierAuthParams(sup, cfg.AuthType),
+		map[string]string{},
+	)
+	if err != nil {
+		log.Printf("[GetSupplierCategories] pt=%s endpoint=%s 请求失败: %v", sup.PT, apiURL, err)
+		return nil
 	}
 
-	log.Printf("[GetSupplierCategories] pt=%s 所有分类 act 均未获取到数据", sup.PT)
+	result := parseCategoryResponse(execResult.Body)
+	if len(result) > 0 {
+		log.Printf("[GetSupplierCategories] pt=%s endpoint=%s 成功获取 %d 个分类", sup.PT, apiURL, len(result))
+		return result
+	}
+
+	log.Printf("[GetSupplierCategories] pt=%s endpoint=%s 未获取到分类数据", sup.PT, apiURL)
 	return nil
 }
 
@@ -83,39 +49,25 @@ func (s *Service) GetSupplierClasses(sup *model.SupplierFull) ([]SupplierClassIt
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
-	var resp *http.Response
-	var err error
-
-	if cfg.ReportAuthType == "token_only" && cfg.UseJSON {
-		baseURL := strings.TrimRight(sup.URL, "/")
-		if !strings.HasPrefix(baseURL, "http") {
-			baseURL = "http://" + baseURL
-		}
-		apiURL := baseURL + "/api/getclass"
-		jsonData, _ := json.Marshal(map[string]string{"token": getSupplierToken(sup)})
-		req, _ := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonData)))
-		req.Header.Set("Content-Type", "application/json")
-		resp, err = s.client.Do(req)
-	} else {
-		apiURL := buildSupplierURL(sup.URL, "getclass")
-		formData := url.Values{}
-		formData.Set("uid", sup.User)
-		formData.Set("key", sup.Pass)
-		resp, err = s.client.PostForm(apiURL, formData)
-	}
+	apiURL := resolveConfiguredActionURL(sup.URL, cfg.ClassListPath)
+	execResult, err := s.executeConfiguredAction(
+		sup,
+		apiURL,
+		cfg.ClassListMethod,
+		cfg.ClassListBodyType,
+		cfg.ClassListParamMap,
+		http.MethodPost,
+		"form",
+		defaultSupplierAuthParams(sup, cfg.AuthType),
+		map[string]string{},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("请求上游失败：%v", err)
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应失败：%v", err)
-	}
 
 	var raw map[string]interface{}
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("解析响应失败：%s", string(body))
+	if err := json.Unmarshal(execResult.Body, &raw); err != nil {
+		return nil, fmt.Errorf("解析响应失败：%s", string(execResult.Body))
 	}
 
 	codeVal := ""
@@ -329,11 +281,7 @@ func parseCategoryResponse(body []byte) map[string]string {
 }
 
 func buildSupplierURL(baseURL, act string) string {
-	baseURL = strings.TrimRight(baseURL, "/")
-	if !strings.HasPrefix(baseURL, "http") {
-		baseURL = "http://" + baseURL
-	}
-	return fmt.Sprintf("%s/api.php?act=%s", baseURL, act)
+	return fmt.Sprintf("%s/api.php?act=%s", normalizeSupplierBaseURL(baseURL), act)
 }
 
 func getSupplierToken(sup *model.SupplierFull) string {

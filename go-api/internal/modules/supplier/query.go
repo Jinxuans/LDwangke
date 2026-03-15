@@ -4,8 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/url"
+	"net/http"
 	"strings"
 
 	"go-api/internal/model"
@@ -191,30 +190,38 @@ func (s *Service) generateLocalTimeList(noun string) []model.CourseItem {
 }
 
 func (s *Service) callSupplierQuery(sup *model.SupplierFull, cls *model.ClassFull, school, user, pass string) (*model.SupplierQueryResult, error) {
-	apiURL := buildSupplierURL(sup.URL, "get")
+	cfg := GetPlatformConfig(sup.PT)
+	apiURL := resolveConfiguredActionURL(sup.URL, cfg.QueryPath)
 
-	values := url.Values{}
-	values.Set("uid", sup.User)
-	values.Set("key", sup.Pass)
-	values.Set("school", school)
-	values.Set("user", user)
-	values.Set("pass", pass)
-	values.Set("platform", cls.Noun)
-
-	resp, err := s.client.PostForm(apiURL, values)
+	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
+	defaultParams["school"] = school
+	defaultParams["user"] = user
+	defaultParams["pass"] = pass
+	defaultParams["platform"] = cls.Noun
+	result, err := s.executeConfiguredAction(
+		sup,
+		apiURL,
+		cfg.QueryMethod,
+		cfg.QueryBodyType,
+		cfg.QueryParamMap,
+		http.MethodPost,
+		"form",
+		defaultParams,
+		map[string]string{
+			"school":   school,
+			"user":     user,
+			"pass":     pass,
+			"platform": cls.Noun,
+			"noun":     cls.Noun,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("请求上游失败：%v", err)
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应失败：%v", err)
-	}
 
 	var raw map[string]interface{}
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("解析响应失败：%s", string(body))
+	if err := json.Unmarshal(result.Body, &raw); err != nil {
+		return nil, fmt.Errorf("解析响应失败：%s", string(result.Body))
 	}
 
 	msg, _ := raw["msg"].(string)

@@ -198,6 +198,10 @@ func OrderManualDock(c *gin.Context) {
 }
 
 func OrderSyncProgress(c *gin.Context) {
+	// 手动同步入口：
+	// 1. 接收后台传入的订单 oid 列表；
+	// 2. 直接调用订单同步服务逐条查询上游进度；
+	// 3. 将更新条数回给前端，由前端决定是否刷新列表。
 	var body struct {
 		OIDs []int `json:"oids"`
 	}
@@ -219,6 +223,8 @@ func OrderSyncProgress(c *gin.Context) {
 }
 
 func OrderBatchSync(c *gin.Context) {
+	// “批量同步”是历史命名，行为上仍然是查询上游进度并回写主订单表。
+	// 它和 OrderSyncProgress 的差异主要在前端语义和返回文案，便于兼容旧按钮和旧接口名。
 	var body struct {
 		OIDs []int `json:"oids"`
 	}

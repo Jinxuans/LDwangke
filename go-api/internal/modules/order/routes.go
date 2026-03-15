@@ -25,6 +25,9 @@ func RegisterRoutes(api *gin.RouterGroup) {
 
 // RegisterAdminRoutes 注册后台订单管理相关路由。
 func RegisterAdminRoutes(admin *gin.RouterGroup) {
+	// `/order/sync` 和 `/order/batch-sync` 都属于“查询上游进度并回写主订单表”的入口。
+	// 两个接口最终都会走到 SyncService -> Repository -> SupplierGateway 这条链路。
+	// 前者通常由单次手工操作触发，后者只是保留历史接口名给前端按钮和兼容调用方使用。
 	admin.POST("/order/dock", OrderManualDock)
 	admin.POST("/order/sync", OrderSyncProgress)
 	admin.POST("/order/batch-sync", OrderBatchSync)

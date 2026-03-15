@@ -18,8 +18,32 @@ func withRegistryPlatformConfigs(t *testing.T) {
 	oldConfigCache := dbConfigCache
 	oldNameCache := dbNameCache
 	dbConfigLoaded = true
-	dbConfigCache = map[string]PlatformConfig{}
-	dbNameCache = map[string]string{}
+	dbConfigCache = map[string]PlatformConfig{
+		"liunian": {
+			AuthType:         "uid_key",
+			SuccessCode:      "0",
+			ReportPath:       "/api.php?act=submitWorkOrder",
+			GetReportPath:    "/api.php?act=queryWorkOrder",
+			ReportMethod:     "POST",
+			GetReportMethod:  "POST",
+			ReportParamStyle: "standard",
+		},
+		"2xx": {
+			AuthType:         "uid_key",
+			SuccessCode:      "1",
+			ReportPath:       "/api/submitWork",
+			GetReportPath:    "/api/queryWork",
+			ReportMethod:     "POST",
+			GetReportMethod:  "POST",
+			ReportParamStyle: "token",
+			ReportAuthType:   "token_only",
+			UseJSON:          true,
+		},
+	}
+	dbNameCache = map[string]string{
+		"liunian": "流年",
+		"2xx":     "爱学习",
+	}
 	dbConfigMu.Unlock()
 
 	t.Cleanup(func() {
@@ -34,23 +58,26 @@ func withRegistryPlatformConfigs(t *testing.T) {
 func TestFillDefaults(t *testing.T) {
 	cfg := fillDefaults(PlatformConfig{})
 
-	if cfg.QueryAct != "get" {
-		t.Fatalf("expected default QueryAct=get, got %q", cfg.QueryAct)
+	if cfg.AuthType != "uid_key" {
+		t.Fatalf("expected default AuthType=uid_key, got %q", cfg.AuthType)
 	}
-	if cfg.OrderAct != "add" {
-		t.Fatalf("expected default OrderAct=add, got %q", cfg.OrderAct)
+	if cfg.QueryPath != "/api.php?act=get" {
+		t.Fatalf("expected default QueryPath=/api.php?act=get, got %q", cfg.QueryPath)
 	}
-	if cfg.ProgressAct != "chadan2" {
-		t.Fatalf("expected default ProgressAct=chadan2, got %q", cfg.ProgressAct)
+	if cfg.OrderPath != "/api.php?act=add" {
+		t.Fatalf("expected default OrderPath=/api.php?act=add, got %q", cfg.OrderPath)
 	}
-	if cfg.ProgressNoYID != "chadan" {
-		t.Fatalf("expected default ProgressNoYID=chadan, got %q", cfg.ProgressNoYID)
+	if cfg.ProgressPath != "/api.php?act=chadan2" {
+		t.Fatalf("expected default ProgressPath=/api.php?act=chadan2, got %q", cfg.ProgressPath)
 	}
-	if cfg.BalanceAct != "getmoney" {
-		t.Fatalf("expected default BalanceAct=getmoney, got %q", cfg.BalanceAct)
+	if cfg.BalancePath != "/api.php?act=getmoney" {
+		t.Fatalf("expected default BalancePath=/api.php?act=getmoney, got %q", cfg.BalancePath)
 	}
 	if cfg.ReportSuccessCode != "1" {
 		t.Fatalf("expected default ReportSuccessCode=1, got %q", cfg.ReportSuccessCode)
+	}
+	if cfg.CategoryPath != "/api.php?act=getcate" || cfg.ClassListPath != "/api.php?act=getclass" {
+		t.Fatalf("unexpected catalog defaults: %+v", cfg)
 	}
 }
 
@@ -96,6 +123,18 @@ func TestBuildSupplierURL(t *testing.T) {
 	want := "http://example.com/api.php?act=get"
 	if got != want {
 		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestResolveConfiguredActionURLPrefersPath(t *testing.T) {
+	got := resolveConfiguredActionURL("example.com/", "/api/search")
+	if got != "http://example.com/api/search" {
+		t.Fatalf("unexpected resolved path url: %q", got)
+	}
+
+	got = resolveConfiguredActionURL("example.com/", "api.php?act=chadan")
+	if got != "http://example.com/api.php?act=chadan" {
+		t.Fatalf("unexpected resolved configured url: %q", got)
 	}
 }
 
@@ -457,7 +496,7 @@ func TestYYYCallOrderAndProgress(t *testing.T) {
 		t.Fatalf("unexpected yyy order result: %+v", orderResult)
 	}
 
-	progress, err := yyyQueryProgress(sup, "user-a")
+	progress, err := yyyQueryProgress(sup, "user-a", progressDebugInfo{})
 	if err != nil {
 		t.Fatalf("yyyQueryProgress returned error: %v", err)
 	}
@@ -845,7 +884,7 @@ func TestSimpleQueryProgressMapsStatus(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	progress, err := simpleQueryProgress(&model.SupplierFull{URL: srv.URL, Token: "token-value"}, "noun", "school", "user-s", "pwd", "课程S", "KC-1")
+	progress, err := simpleQueryProgress(&model.SupplierFull{URL: srv.URL, Token: "token-value"}, "noun", "school", "user-s", "pwd", "课程S", "KC-1", progressDebugInfo{})
 	if err != nil {
 		t.Fatalf("simpleQueryProgress returned error: %v", err)
 	}
@@ -854,6 +893,283 @@ func TestSimpleQueryProgressMapsStatus(t *testing.T) {
 	}
 	if progress[0].Status != "进行中" || progress[0].Remarks != "暂无详情" || progress[0].Process != "30%" {
 		t.Fatalf("unexpected simple progress item: %+v", progress[0])
+	}
+}
+
+func TestQueryOrderProgressUsesConfiguredProgressParamNames(t *testing.T) {
+	withRegistryPlatformConfigs(t)
+	dbConfigMu.Lock()
+	dbConfigCache["spi"] = PlatformConfig{
+		AuthType:         "uid_key",
+		SuccessCode:      "0",
+		ReturnsYID:       true,
+		ProgressPath:     "/api/search",
+		ProgressMethod:   "POST",
+		ProgressParamMap: `{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","username":"{{order.user}}","kname":"{{order.kcname}}","cid":"{{order.noun}}","yid":"{{order.yid}}"}`,
+	}
+	dbConfigMu.Unlock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/search" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form failed: %v", err)
+		}
+		if r.Form.Get("uid") != "uid-value" || r.Form.Get("key") != "key-value" {
+			t.Fatalf("unexpected auth form: %#v", r.Form)
+		}
+		if r.Form.Get("username") != "user-a" || r.Form.Get("kname") != "课程A" || r.Form.Get("cid") != "UP-COURSE-1" || r.Form.Get("yid") != "Y-1" {
+			t.Fatalf("unexpected progress form: %#v", r.Form)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"code": 0,
+			"data": []map[string]interface{}{
+				{"id": "Y-1", "kcname": "课程A", "user": "user-a", "status": "进行中", "process": "50%", "remarks": "ok"},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	progress, err := svc.QueryOrderProgress(&model.SupplierFull{PT: "spi", URL: srv.URL, User: "uid-value", Pass: "key-value"}, "Y-1", "user-a", map[string]string{
+		"kcname": "课程A",
+		"noun":   "UP-COURSE-1",
+		"kcid":   "CID-1",
+	})
+	if err != nil {
+		t.Fatalf("QueryOrderProgress returned error: %v", err)
+	}
+	if len(progress) != 1 || progress[0].YID != "Y-1" {
+		t.Fatalf("unexpected progress result: %+v", progress)
+	}
+}
+
+func TestQueryOrderProgressWithoutYIDStillUsesSingleConfiguredEndpoint(t *testing.T) {
+	withRegistryPlatformConfigs(t)
+	dbConfigMu.Lock()
+	dbConfigCache["single-progress"] = PlatformConfig{
+		AuthType:         "uid_key",
+		SuccessCode:      "0",
+		ProgressPath:     "/api.php?act=chadan2",
+		ProgressMethod:   "POST",
+		ProgressParamMap: `{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","username":"{{order.user}}"}`,
+	}
+	dbConfigMu.Unlock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api.php" || r.URL.Query().Get("act") != "chadan2" {
+			t.Fatalf("unexpected endpoint: %s", r.URL.String())
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form failed: %v", err)
+		}
+		if r.Form.Get("uid") != "uid-value" || r.Form.Get("key") != "key-value" || r.Form.Get("username") != "user-a" {
+			t.Fatalf("unexpected progress form: %#v", r.Form)
+		}
+		if got := r.Form.Get("yid"); got != "" {
+			t.Fatalf("expected empty yid when not provided, got %q", got)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"code": 0,
+			"data": []map[string]interface{}{
+				{"id": "OID-1", "kcname": "课程A", "user": "user-a", "status": "进行中", "process": "50%", "remarks": "ok"},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	progress, err := svc.QueryOrderProgress(&model.SupplierFull{PT: "single-progress", URL: srv.URL, User: "uid-value", Pass: "key-value"}, "", "user-a", map[string]string{
+		"kcname": "课程A",
+		"noun":   "UP-COURSE-1",
+	})
+	if err != nil {
+		t.Fatalf("QueryOrderProgress returned error: %v", err)
+	}
+	if len(progress) != 1 || progress[0].User != "user-a" {
+		t.Fatalf("unexpected progress result: %+v", progress)
+	}
+}
+
+func TestCallSupplierOrderUsesConfiguredParamMap(t *testing.T) {
+	withRegistryPlatformConfigs(t)
+	dbConfigMu.Lock()
+	dbConfigCache["mapped-order"] = PlatformConfig{
+		SuccessCode:   "0",
+		ReturnsYID:    true,
+		OrderPath:     "/api/order/create",
+		OrderMethod:   http.MethodPost,
+		OrderBodyType: "json",
+		OrderParamMap: `{"token":"{{supplier.key}}","account":"{{order.user}}","password":"{{order.pass}}","courseName":"{{order.kcname}}","courseId":"{{order.kcid}}","platformId":"{{order.noun}}"}`,
+	}
+	dbConfigMu.Unlock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/order/create" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if ct := r.Header.Get("Content-Type"); !strings.Contains(ct, "application/json") {
+			t.Fatalf("unexpected content-type: %s", ct)
+		}
+		var body map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body failed: %v", err)
+		}
+		if body["token"] != "key-1" || body["account"] != "user-1" || body["password"] != "pwd-1" ||
+			body["courseName"] != "课程A" || body["courseId"] != "KC-11" || body["platformId"] != "UP-88" {
+			t.Fatalf("unexpected order payload: %#v", body)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"code": 0, "id": "Y-998", "msg": "ok"})
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	result, err := svc.CallSupplierOrder(
+		&model.SupplierFull{PT: "mapped-order", URL: srv.URL, User: "uid-1", Pass: "key-1"},
+		&model.ClassFull{Noun: "UP-88"},
+		"学校A",
+		"user-1",
+		"pwd-1",
+		"KC-11",
+		"课程A",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("CallSupplierOrder returned error: %v", err)
+	}
+	if result.YID != "Y-998" || result.Code != 1 {
+		t.Fatalf("unexpected order result: %+v", result)
+	}
+}
+
+func TestQueryOrderLogsUsesConfiguredParamMap(t *testing.T) {
+	withRegistryPlatformConfigs(t)
+	dbConfigMu.Lock()
+	dbConfigCache["mapped-log"] = PlatformConfig{
+		LogPath:     "/logs/search",
+		LogMethod:   http.MethodGet,
+		LogBodyType: "query",
+		LogParamMap: `{"token":"{{supplier.token}}","account":"{{order.user}}","password":"{{order.pass}}","course":"{{order.kcname}}","courseId":"{{order.kcid}}"}`,
+	}
+	dbConfigMu.Unlock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/logs/search" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodGet {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		q := r.URL.Query()
+		if q.Get("token") != "token-1" || q.Get("account") != "user-log" || q.Get("password") != "pass-log" ||
+			q.Get("course") != "课程Log" || q.Get("courseId") != "CID-LOG" {
+			t.Fatalf("unexpected log query: %#v", q)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"code": 0, "logs": []string{"line-1"}})
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	logs, err := svc.QueryOrderLogs(
+		&model.SupplierFull{PT: "mapped-log", URL: srv.URL, Token: "token-1"},
+		"OID-1",
+		map[string]string{"user": "user-log", "pass": "pass-log", "kcname": "课程Log", "kcid": "CID-LOG"},
+	)
+	if err != nil {
+		t.Fatalf("QueryOrderLogs returned error: %v", err)
+	}
+	if len(logs) == 0 || logs[len(logs)-1].Remarks != "line-1" {
+		t.Fatalf("unexpected logs: %+v", logs)
+	}
+}
+
+func TestGetSupplierCategoriesUsesConfiguredParamMap(t *testing.T) {
+	withRegistryPlatformConfigs(t)
+	dbConfigMu.Lock()
+	dbConfigCache["mapped-catalog"] = PlatformConfig{
+		AuthType:         "uid_key",
+		CategoryPath:     "/api/catalog/categories",
+		CategoryMethod:   http.MethodPost,
+		CategoryBodyType: "json",
+		CategoryParamMap: `{"token":"{{supplier.key}}","scope":"catalog"}`,
+	}
+	dbConfigMu.Unlock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/catalog/categories" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if ct := r.Header.Get("Content-Type"); !strings.Contains(ct, "application/json") {
+			t.Fatalf("unexpected content-type: %s", ct)
+		}
+		var body map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body failed: %v", err)
+		}
+		if body["token"] != "key-1" || body["scope"] != "catalog" {
+			t.Fatalf("unexpected category payload: %#v", body)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"code": 0,
+			"data": []map[string]interface{}{
+				{"fid": "10", "fname": "分类A"},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	cats := svc.GetSupplierCategories(&model.SupplierFull{PT: "mapped-catalog", URL: srv.URL, User: "uid-1", Pass: "key-1"})
+	if cats["10"] != "分类A" {
+		t.Fatalf("unexpected categories: %#v", cats)
+	}
+}
+
+func TestGetSupplierClassesUsesConfiguredParamMap(t *testing.T) {
+	withRegistryPlatformConfigs(t)
+	dbConfigMu.Lock()
+	dbConfigCache["mapped-class-list"] = PlatformConfig{
+		AuthType:          "uid_key",
+		ClassListPath:     "/api/catalog/classes",
+		ClassListMethod:   http.MethodGet,
+		ClassListBodyType: "query",
+		ClassListParamMap: `{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","catalog":"classes"}`,
+	}
+	dbConfigMu.Unlock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/catalog/classes":
+			q := r.URL.Query()
+			if q.Get("uid") != "uid-1" || q.Get("key") != "key-1" || q.Get("catalog") != "classes" {
+				t.Fatalf("unexpected class list query: %#v", q)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"code": 0,
+				"data": []map[string]interface{}{
+					{"cid": "C-1", "name": "课程A", "price": "12.5", "fenlei": "10", "content": "desc", "category_name": "分类A"},
+				},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	items, err := svc.GetSupplierClasses(&model.SupplierFull{PT: "mapped-class-list", URL: srv.URL, User: "uid-1", Pass: "key-1"})
+	if err != nil {
+		t.Fatalf("GetSupplierClasses returned error: %v", err)
+	}
+	if len(items) != 1 || items[0].CID != "C-1" || items[0].CategoryName != "分类A" {
+		t.Fatalf("unexpected class list: %+v", items)
 	}
 }
 

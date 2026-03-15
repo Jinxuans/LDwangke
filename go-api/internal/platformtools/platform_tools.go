@@ -115,7 +115,7 @@ func DetectPlatform(req DetectRequest) *DetectResult {
 			probes = append(probes, balanceProbe{
 				name:   fmt.Sprintf("uid+key act=%s", actCopy),
 				url:    fmt.Sprintf("%s/api.php?act=%s", baseURL, actCopy),
-				method: "POST", authType: "uid_key", act: actCopy,
+				method: "POST", authType: "uid_key", path: "/api.php?act=" + actCopy,
 				buildReq: func() (*http.Request, error) {
 					data := url.Values{"uid": {req.UID}, "key": {req.Key}}
 					return http.NewRequest("POST", fmt.Sprintf("%s/api.php?act=%s", baseURL, actCopy), strings.NewReader(data.Encode()))
@@ -228,7 +228,6 @@ func DetectPlatform(req DetectRequest) *DetectResult {
 				result.Success = true
 				result.AuthType = probe.authType
 				result.SuccessCode = codeVal
-				result.BalanceAct = probe.act
 				result.BalancePath = probe.path
 				result.UseJSON = probe.useJSON
 				if probe.path != "" {
@@ -257,22 +256,24 @@ func DetectPlatform(req DetectRequest) *DetectResult {
 		result.Probes = append(result.Probes, classDetail)
 		if classDetail.Status == "ok" {
 			result.ClassListOK = true
+			result.Config["class_list_path"] = "/api.php?act=getclass"
 		}
 		cateDetail := probeEndpoint(client, "getcate 分类列表", fmt.Sprintf("%s/api.php?act=getcate", baseURL), data)
 		result.Probes = append(result.Probes, cateDetail)
 		if cateDetail.Status == "ok" {
 			result.CategoryOK = true
+			result.Config["category_path"] = "/api.php?act=getcate"
 		}
 		getDetail := probeEndpoint(client, "get 查课接口", fmt.Sprintf("%s/api.php?act=get", baseURL), data)
 		result.Probes = append(result.Probes, getDetail)
 		if getDetail.Status == "ok" || (getDetail.Code != "" && getDetail.Status == "fail") {
 			result.QueryOK = true
-			result.QueryAct = "get"
+			result.Config["query_path"] = "/api.php?act=get"
 		}
 		addDetail := probeEndpoint(client, "add 下单接口", fmt.Sprintf("%s/api.php?act=add", baseURL), data)
 		result.Probes = append(result.Probes, addDetail)
 		if addDetail.Code != "" {
-			result.Config["order_act"] = "add"
+			result.Config["order_path"] = "/api.php?act=add"
 		}
 		for _, act := range []string{"chadan2", "chadan", "xq", "zt", "gaimi"} {
 			actDetail := probeEndpoint(client, fmt.Sprintf("%s 接口", act), fmt.Sprintf("%s/api.php?act=%s", baseURL, act), data)
@@ -282,15 +283,13 @@ func DetectPlatform(req DetectRequest) *DetectResult {
 			}
 			switch act {
 			case "chadan2":
-				result.Config["progress_act"] = "chadan2"
-			case "chadan":
-				result.Config["progress_no_yid"] = "chadan"
+				result.Config["progress_path"] = "/api.php?act=chadan2"
 			case "xq":
-				result.Config["log_act"] = "xq"
+				result.Config["log_path"] = "/api.php?act=xq"
 			case "zt":
-				result.Config["pause_act"] = "zt"
+				result.Config["pause_path"] = "/api.php?act=zt"
 			case "gaimi":
-				result.Config["change_pass_act"] = "gaimi"
+				result.Config["change_pass_path"] = "/api.php?act=gaimi"
 			}
 		}
 		for _, path := range []string{"/api/search", "/api/chadan1", "/api/stop", "/api/update", "/api/reset", "/log/", "/api/submitWork", "/api/queryWork"} {
@@ -378,21 +377,14 @@ func DetectPlatform(req DetectRequest) *DetectResult {
 	if result.Success {
 		result.Config["auth_type"] = result.AuthType
 		result.Config["success_codes"] = result.SuccessCode
-		result.Config["api_path_style"] = result.APIStyle
 		if result.UseJSON {
 			result.Config["use_json"] = "true"
-		}
-		if result.BalanceAct != "" {
-			result.Config["balance_act"] = result.BalanceAct
 		}
 		if result.BalancePath != "" {
 			result.Config["balance_path"] = result.BalancePath
 		}
 		if result.BalanceField != "" {
 			result.Config["balance_money_field"] = result.BalanceField
-		}
-		if result.QueryAct != "" {
-			result.Config["query_act"] = result.QueryAct
 		}
 		if u, err := url.Parse(baseURL); err == nil {
 			result.SuggestedName = u.Hostname()
@@ -411,34 +403,26 @@ func BuildConfigFromDetection(result *DetectResult, pt, name string) *model.Plat
 		PT:           pt,
 		Name:         name,
 		AuthType:     getOr(cfg, "auth_type", "uid_key"),
-		APIPathStyle: getOr(cfg, "api_path_style", "standard"),
 		SuccessCodes: getOr(cfg, "success_codes", "0"),
 		UseJSON:      cfg["use_json"] == "true",
 		ReturnsYID:   result.ReturnsYID,
 	}
-	req.QueryAct = getOr(cfg, "query_act", "get")
-	req.QueryPath = cfg["query_path"]
-	req.OrderAct = getOr(cfg, "order_act", "add")
-	req.OrderPath = cfg["order_path"]
-	req.ProgressAct = getOr(cfg, "progress_act", "chadan2")
-	req.ProgressNoYID = getOr(cfg, "progress_no_yid", "chadan")
-	req.ProgressPath = cfg["progress_path"]
+	req.QueryPath = getOr(cfg, "query_path", "/api.php?act=get")
+	req.OrderPath = getOr(cfg, "order_path", "/api.php?act=add")
+	req.ProgressPath = getOr(cfg, "progress_path", "/api.php?act=chadan2")
 	req.ProgressMethod = getOr(cfg, "progress_method", "POST")
-	req.PauseAct = getOr(cfg, "pause_act", "zt")
-	req.PausePath = cfg["pause_path"]
+	req.ProgressParamMap = strings.TrimSpace(cfg["progress_param_map"])
+	req.PausePath = getOr(cfg, "pause_path", "/api.php?act=zt")
 	req.PauseIDParam = getOr(cfg, "pause_id_param", "id")
-	req.ChangePassAct = getOr(cfg, "change_pass_act", "gaimi")
-	req.ChangePassPath = cfg["change_pass_path"]
+	req.ChangePassPath = getOr(cfg, "change_pass_path", "/api.php?act=gaimi")
 	req.ChangePassParam = getOr(cfg, "change_pass_param", "newPwd")
 	req.ChangePassIDParam = getOr(cfg, "change_pass_id_param", "id")
 	req.ResubmitPath = cfg["resubmit_path"]
 	req.ResubmitIDParam = getOr(cfg, "resubmit_id_param", "id")
-	req.LogAct = getOr(cfg, "log_act", "xq")
-	req.LogPath = cfg["log_path"]
+	req.LogPath = getOr(cfg, "log_path", "/api.php?act=xq")
 	req.LogMethod = getOr(cfg, "log_method", "POST")
 	req.LogIDParam = getOr(cfg, "log_id_param", "id")
-	req.BalanceAct = getOr(cfg, "balance_act", "getmoney")
-	req.BalancePath = cfg["balance_path"]
+	req.BalancePath = getOr(cfg, "balance_path", "/api.php?act=getmoney")
 	req.BalanceMoneyField = getOr(cfg, "balance_money_field", "money")
 	req.BalanceMethod = getOr(cfg, "balance_method", "POST")
 	if cfg["auth_type"] == "bearer_token" {
@@ -458,17 +442,16 @@ func BuildConfigFromDetection(result *DetectResult, pt, name string) *model.Plat
 func ParsePHPCode(code string) *ParsedPHPConfig {
 	cfg := &ParsedPHPConfig{
 		AuthType:        "uid_key",
-		APIPathStyle:    "standard",
 		SuccessCodes:    "0",
-		QueryAct:        "get",
-		OrderAct:        "add",
-		ProgressAct:     "chadan2",
+		QueryPath:       "/api.php?act=get",
+		OrderPath:       "/api.php?act=add",
+		ProgressPath:    "/api.php?act=chadan2",
 		ProgressMethod:  "POST",
-		PauseAct:        "zt",
-		ChangePassAct:   "gaimi",
+		PausePath:       "/api.php?act=zt",
+		ChangePassPath:  "/api.php?act=gaimi",
 		ChangePassParam: "newPwd",
 		ChangePassID:    "id",
-		LogAct:          "xq",
+		LogPath:         "/api.php?act=xq",
 		LogIDParam:      "id",
 		Warnings:        []string{},
 	}
@@ -489,22 +472,22 @@ func ParsePHPCode(code string) *ParsedPHPConfig {
 		cfg.Confidence += 15
 		switch {
 		case act == "get":
-			cfg.QueryAct = "get"
+			cfg.QueryPath = "/api.php?act=get"
 		case act == "add" || strings.Contains(act, "add"):
-			cfg.OrderAct = act
+			cfg.OrderPath = "/api.php?act=" + act
 		case strings.Contains(act, "chadan"):
-			cfg.ProgressAct = act
+			cfg.ProgressPath = "/api.php?act=" + act
 		case act == "zt" || act == "zanting" || act == "stop":
-			cfg.PauseAct = act
+			cfg.PausePath = "/api.php?act=" + act
 		case act == "gaimi" || act == "xgmm" || strings.Contains(act, "update"):
-			cfg.ChangePassAct = act
+			cfg.ChangePassPath = "/api.php?act=" + act
 		case act == "xq" || strings.Contains(act, "log"):
-			cfg.LogAct = act
+			cfg.LogPath = "/api.php?act=" + act
 		default:
 			if containsAny(code, "school", "user", "pass", "platform", "查课", "get") {
-				cfg.QueryAct = act
+				cfg.QueryPath = "/api.php?act=" + act
 			} else if containsAny(code, "kcname", "kcid", "下单") {
-				cfg.OrderAct = act
+				cfg.OrderPath = "/api.php?act=" + act
 			}
 		}
 	}
@@ -512,7 +495,6 @@ func ParsePHPCode(code string) *ParsedPHPConfig {
 	restPathRe := regexp.MustCompile(`["'](/api/[a-zA-Z0-9_/\-]+)["']`)
 	if m := restPathRe.FindStringSubmatch(code); len(m) > 1 {
 		path := m[1]
-		cfg.APIPathStyle = "rest"
 		cfg.Confidence += 10
 		pathLower := strings.ToLower(path)
 		switch {
@@ -613,12 +595,12 @@ func ParsePHPCode(code string) *ParsedPHPConfig {
 
 	pauseRe := regexp.MustCompile(`act=([a-zA-Z_]+).*(?:暂停|pause|stop|freeze)`)
 	if m := pauseRe.FindStringSubmatch(code); len(m) > 1 {
-		cfg.PauseAct = m[1]
+		cfg.PausePath = "/api.php?act=" + m[1]
 	}
 	if strings.Contains(code, "暂停") || strings.Contains(code, "pause") || strings.Contains(code, "freeze") {
 		pauseActRe := regexp.MustCompile(`act=([a-zA-Z_]+)`)
 		if m := pauseActRe.FindStringSubmatch(code); len(m) > 1 {
-			cfg.PauseAct = m[1]
+			cfg.PausePath = "/api.php?act=" + m[1]
 		}
 	}
 
