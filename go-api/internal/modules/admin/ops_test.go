@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"go-api/internal/model"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -111,21 +113,37 @@ func TestAdminDBSyncExecuteRequiresConfirmationToken(t *testing.T) {
 	}
 }
 
-func TestAdminPlatformConfigSaveRequiresExplicitProgressParamMap(t *testing.T) {
-	w := performAdminJSONRequest(t, AdminPlatformConfigSave, http.MethodPost, "/admin/platform-config/save", gin.H{
-		"pt":            "demo",
-		"name":          "Demo",
-		"progress_path": "/api/query",
-	})
-	resp := decodeAdminResponse(t, w)
+func TestAdminPlatformConfigSaveAllowsEmptyActionBlocks(t *testing.T) {
+	req := model.PlatformConfigSaveRequest{
+		PT:   "demo",
+		Name: "Demo",
+	}
+	normalizePlatformConfigSaveRequest(&req)
+	if msg := validatePlatformConfigSaveRequest(&req); msg != "" {
+		t.Fatalf("expected empty-action config to pass validation, got %q", msg)
+	}
+}
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d body=%s", w.Code, w.Body.String())
+func TestAdminPlatformConfigSaveRejectsPartialQueryConfig(t *testing.T) {
+	req := model.PlatformConfigSaveRequest{
+		PT:        "demo",
+		Name:      "Demo",
+		QueryPath: "/api/query",
 	}
-	if resp.Code != 422 {
-		t.Fatalf("expected business code 422, got %d", resp.Code)
+	normalizePlatformConfigSaveRequest(&req)
+	if msg := validatePlatformConfigSaveRequest(&req); msg == "" {
+		t.Fatal("expected partial query config to fail validation")
 	}
-	if resp.Message == "" {
-		t.Fatalf("expected validation message, got empty body=%s", w.Body.String())
+}
+
+func TestAdminPlatformConfigSaveRejectsPartialOrderConfig(t *testing.T) {
+	req := model.PlatformConfigSaveRequest{
+		PT:        "demo",
+		Name:      "Demo",
+		OrderPath: "/api/order",
+	}
+	normalizePlatformConfigSaveRequest(&req)
+	if msg := validatePlatformConfigSaveRequest(&req); msg == "" {
+		t.Fatal("expected partial order config to fail validation")
 	}
 }

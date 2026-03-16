@@ -100,6 +100,7 @@ export interface ParsedPHPResult {
   progress_method: string;
   pause_act: string;
   pause_path: string;
+  pause_id_param?: string;
   change_pass_act: string;
   change_pass_path: string;
   change_pass_param: string;

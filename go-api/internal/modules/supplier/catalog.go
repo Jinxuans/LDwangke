@@ -14,6 +14,10 @@ import (
 
 func (s *Service) GetSupplierCategories(sup *model.SupplierFull) map[string]string {
 	cfg := GetPlatformConfig(sup.PT)
+	if err := requireExplicitActionConfig("分类接口", cfg.CategoryPath, cfg.CategoryMethod, cfg.CategoryParamMap); err != nil {
+		log.Printf("[GetSupplierCategories] pt=%s %v", sup.PT, err)
+		return nil
+	}
 	client := &http.Client{Timeout: 8 * time.Second}
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.CategoryPath)
 	execResult, err := s.executeConfiguredActionWithClient(
@@ -49,6 +53,9 @@ func (s *Service) GetSupplierClasses(sup *model.SupplierFull) ([]SupplierClassIt
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
+	if err := requireExplicitActionConfig("课程列表接口", cfg.ClassListPath, cfg.ClassListMethod, cfg.ClassListParamMap); err != nil {
+		return nil, err
+	}
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.ClassListPath)
 	execResult, err := s.executeConfiguredAction(
 		sup,

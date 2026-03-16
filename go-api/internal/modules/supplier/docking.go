@@ -30,6 +30,9 @@ func (s *Service) CallSupplierOrder(sup *model.SupplierFull, cls *model.ClassFul
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
+	if err := requireExplicitActionConfig("下单接口", cfg.OrderPath, cfg.OrderMethod, cfg.OrderParamMap); err != nil {
+		return nil, err
+	}
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.OrderPath)
 
 	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
@@ -40,20 +43,19 @@ func (s *Service) CallSupplierOrder(sup *model.SupplierFull, cls *model.ClassFul
 	defaultParams["kcid"] = kcid
 	defaultParams["kcname"] = kcname
 	actionFields := map[string]string{
-		"school":   school,
-		"user":     user,
-		"pass":     pass,
-		"kcid":     kcid,
-		"kcname":   kcname,
-		"platform": cls.Noun,
-		"noun":     cls.Noun,
+		"order.school": school,
+		"order.user":   user,
+		"order.pass":   pass,
+		"order.kcid":   kcid,
+		"order.kcname": kcname,
+		"order.noun":   cls.Noun,
 	}
 
 	if cfg.ExtraParams && extraFields != nil {
 		for k, v := range extraFields {
 			if v != "" {
 				defaultParams[k] = v
-				actionFields[k] = v
+				actionFields["order."+k] = v
 			}
 		}
 	}
@@ -204,18 +206,27 @@ func (s *Service) QueryOrderProgress(sup *model.SupplierFull, yid string, userna
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
-	actionFields := map[string]string{
-		"user": username,
-		"yid":  yid,
+	actionFields := map[string]string{}
+	if username != "" {
+		actionFields["order.user"] = username
+	}
+	if yid != "" {
+		actionFields["order.yid"] = yid
 	}
 
 	if orderExtra != nil {
 		for k, v := range orderExtra {
-			actionFields[k] = v
+			if v == "" {
+				continue
+			}
+			actionFields["order."+k] = v
 		}
 	}
 
 	// 进度查询现在始终只走同一套 endpoint 配置。
+	if err := requireExplicitActionConfig("进度接口", cfg.ProgressPath, cfg.ProgressMethod, cfg.ProgressParamMap); err != nil {
+		return nil, err
+	}
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.ProgressPath)
 	params, err := buildActionParams(cfg.ProgressParamMap, sup, actionFields, nil)
 	if err != nil {
@@ -316,6 +327,9 @@ func (s *Service) PauseOrder(sup *model.SupplierFull, yid string) (int, string, 
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
+	if err := requireExplicitActionConfig("暂停接口", cfg.PausePath, cfg.PauseMethod, cfg.PauseParamMap); err != nil {
+		return -1, "", err
+	}
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.PausePath)
 	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
 	fallbackBodyType := "form"
@@ -333,7 +347,7 @@ func (s *Service) PauseOrder(sup *model.SupplierFull, yid string) (int, string, 
 		http.MethodPost,
 		fallbackBodyType,
 		defaultParams,
-		map[string]string{"yid": yid, "id": yid},
+		map[string]string{"order.yid": yid},
 	)
 	if err != nil {
 		return -1, "", fmt.Errorf("请求上游失败：%v", err)
@@ -358,6 +372,9 @@ func (s *Service) ChangePassword(sup *model.SupplierFull, yid, newPwd string) (i
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
+	if err := requireExplicitActionConfig("改密接口", cfg.ChangePassPath, cfg.ChangePassMethod, cfg.ChangePassParamMap); err != nil {
+		return -1, "", err
+	}
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.ChangePassPath)
 	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
 	fallbackBodyType := "form"
@@ -380,7 +397,7 @@ func (s *Service) ChangePassword(sup *model.SupplierFull, yid, newPwd string) (i
 		http.MethodPost,
 		fallbackBodyType,
 		defaultParams,
-		map[string]string{"yid": yid, "id": yid, "new_pwd": newPwd, "password": newPwd},
+		map[string]string{"order.yid": yid, "action.new_password": newPwd},
 	)
 	if err != nil {
 		return -1, "", fmt.Errorf("请求上游失败：%v", err)
@@ -405,6 +422,9 @@ func (s *Service) ResubmitOrder(sup *model.SupplierFull, yid string) (int, strin
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
+	if err := requireExplicitActionConfig("补单接口", cfg.ResubmitPath, cfg.ResubmitMethod, cfg.ResubmitParamMap); err != nil {
+		return -1, "", err
+	}
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.ResubmitPath)
 	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
 	fallbackBodyType := "form"
@@ -422,7 +442,7 @@ func (s *Service) ResubmitOrder(sup *model.SupplierFull, yid string) (int, strin
 		http.MethodPost,
 		fallbackBodyType,
 		defaultParams,
-		map[string]string{"yid": yid, "id": yid},
+		map[string]string{"order.yid": yid},
 	)
 	if err != nil {
 		return -1, "", fmt.Errorf("请求上游失败：%v", err)
@@ -550,30 +570,21 @@ func (s *Service) QueryOrderLogs(sup *model.SupplierFull, yid string, orderExtra
 
 	var execResult *actionExecutionResult
 	var err error
-	if cfg.LogPath != "" && sup.PT == "wanzi" && strings.TrimSpace(cfg.LogParamMap) == "" {
-		baseURL := strings.TrimRight(sup.URL, "/")
-		if !strings.HasPrefix(baseURL, "http") {
-			baseURL = "http://" + baseURL
+	if err := requireExplicitActionConfig("日志接口", cfg.LogPath, cfg.LogMethod, cfg.LogParamMap); err != nil {
+		return nil, err
+	}
+	if cfg.LogPath != "" {
+		fields := map[string]string{}
+		if yid != "" {
+			fields["order.yid"] = yid
 		}
-		apiURL := fmt.Sprintf("%s%s%s/logs?pageSize=50&uid=%s&key=%s", baseURL, cfg.LogPath, yid, sup.User, sup.Pass)
-		req, reqErr := http.NewRequest(http.MethodGet, apiURL, nil)
-		if reqErr != nil {
-			return nil, fmt.Errorf("构建请求失败：%v", reqErr)
-		}
-		waitSupplierHost(sup)
-		resp, doErr := logClient.Do(req)
-		if doErr != nil {
-			return nil, fmt.Errorf("请求上游超时或失败")
-		}
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		execResult = &actionExecutionResult{Body: body, Status: resp.Status, Method: req.Method, URL: req.URL.String()}
-	} else if cfg.LogPath != "" {
-		fields := map[string]string{"yid": yid, "id": yid}
 		defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
 		if len(orderExtra) > 0 {
 			for k, v := range orderExtra[0] {
-				fields[k] = v
+				if v == "" {
+					continue
+				}
+				fields["order."+k] = v
 			}
 			if v := orderExtra[0]["user"]; v != "" {
 				defaultParams["account"] = v
@@ -603,27 +614,6 @@ func (s *Service) QueryOrderLogs(sup *model.SupplierFull, yid string, orderExtra
 			fallbackBodyType,
 			defaultParams,
 			fields,
-		)
-	} else {
-		logIDParam := cfg.LogIDParam
-		if logIDParam == "" {
-			logIDParam = "id"
-		}
-		execResult, err = s.executeConfiguredActionWithClient(
-			logClient,
-			sup,
-			resolveConfiguredActionURL(sup.URL, cfg.LogPath),
-			cfg.LogMethod,
-			cfg.LogBodyType,
-			cfg.LogParamMap,
-			http.MethodPost,
-			"form",
-			func() map[string]string {
-				params := defaultSupplierAuthParams(sup, cfg.AuthType)
-				params[logIDParam] = yid
-				return params
-			}(),
-			map[string]string{"yid": yid, "id": yid},
 		)
 	}
 	if err != nil {
@@ -702,6 +692,9 @@ func (s *Service) QueryOrderLogs(sup *model.SupplierFull, yid string, orderExtra
 
 func (s *Service) SubmitReport(sup *model.SupplierFull, yid, ticketType, content string) (int, int, string, error) {
 	cfg := GetPlatformConfig(sup.PT)
+	if err := requireExplicitActionConfig("提交工单接口", cfg.ReportPath, cfg.ReportMethod, cfg.ReportParamMap); err != nil {
+		return 0, 0, "", err
+	}
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.ReportPath)
 	defaultParams := map[string]string{}
 	fallbackBodyType := "form"
@@ -725,7 +718,13 @@ func (s *Service) SubmitReport(sup *model.SupplierFull, yid, ticketType, content
 		http.MethodPost,
 		fallbackBodyType,
 		defaultParams,
-		map[string]string{"yid": yid, "id": yid, "ticket_type": ticketType, "content": content},
+		map[string]string{
+			"order.yid":          yid,
+			"ticket_type":        ticketType,
+			"content":            content,
+			"action.ticket_type": ticketType,
+			"action.content":     content,
+		},
 	)
 	if err != nil {
 		return 0, 0, "", fmt.Errorf("请求上游失败：%v", err)
@@ -753,6 +752,9 @@ func (s *Service) SubmitReport(sup *model.SupplierFull, yid, ticketType, content
 
 func (s *Service) QueryReport(sup *model.SupplierFull, reportID string) (int, string, string, error) {
 	cfg := GetPlatformConfig(sup.PT)
+	if err := requireExplicitActionConfig("查询工单接口", cfg.GetReportPath, cfg.GetReportMethod, cfg.GetReportParamMap); err != nil {
+		return 0, "", "", err
+	}
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.GetReportPath)
 	defaultParams := map[string]string{}
 	fallbackBodyType := "form"
@@ -773,7 +775,9 @@ func (s *Service) QueryReport(sup *model.SupplierFull, reportID string) (int, st
 		http.MethodPost,
 		fallbackBodyType,
 		defaultParams,
-		map[string]string{"report_id": reportID, "id": reportID},
+		map[string]string{
+			"action.report_id": reportID,
+		},
 	)
 	if err != nil {
 		return 0, "", "", fmt.Errorf("请求上游失败：%v", err)

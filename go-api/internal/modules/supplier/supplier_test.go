@@ -20,24 +20,28 @@ func withRegistryPlatformConfigs(t *testing.T) {
 	dbConfigLoaded = true
 	dbConfigCache = map[string]PlatformConfig{
 		"liunian": {
-			AuthType:         "uid_key",
-			SuccessCode:      "0",
-			ReportPath:       "/api.php?act=submitWorkOrder",
-			GetReportPath:    "/api.php?act=queryWorkOrder",
-			ReportMethod:     "POST",
-			GetReportMethod:  "POST",
-			ReportParamStyle: "standard",
+			AuthType:          "uid_key",
+			SuccessCode:       "0",
+			ReportPath:        "/api.php?act=submitWorkOrder",
+			GetReportPath:     "/api.php?act=queryWorkOrder",
+			ReportMethod:      "POST",
+			GetReportMethod:   "POST",
+			ReportParamStyle:  "standard",
+			ReportParamMap:    `{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","id":"{{order.yid}}","question":"{{action.content}}"}`,
+			GetReportParamMap: `{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","reportId":"{{action.report_id}}"}`,
 		},
 		"2xx": {
-			AuthType:         "uid_key",
-			SuccessCode:      "1",
-			ReportPath:       "/api/submitWork",
-			GetReportPath:    "/api/queryWork",
-			ReportMethod:     "POST",
-			GetReportMethod:  "POST",
-			ReportParamStyle: "token",
-			ReportAuthType:   "token_only",
-			UseJSON:          true,
+			AuthType:          "uid_key",
+			SuccessCode:       "1",
+			ReportPath:        "/api/submitWork",
+			GetReportPath:     "/api/queryWork",
+			ReportMethod:      "POST",
+			GetReportMethod:   "POST",
+			ReportParamStyle:  "token",
+			ReportAuthType:    "token_only",
+			UseJSON:           true,
+			ReportParamMap:    `{"token":"{{supplier.token}}","type":"{{action.ticket_type}}","id":"{{order.yid}}","content":"{{action.content}}"}`,
+			GetReportParamMap: `{"token":"{{supplier.token}}","workId":"{{action.report_id}}"}`,
 		},
 	}
 	dbNameCache = map[string]string{
@@ -61,23 +65,26 @@ func TestFillDefaults(t *testing.T) {
 	if cfg.AuthType != "uid_key" {
 		t.Fatalf("expected default AuthType=uid_key, got %q", cfg.AuthType)
 	}
-	if cfg.QueryPath != "/api.php?act=get" {
-		t.Fatalf("expected default QueryPath=/api.php?act=get, got %q", cfg.QueryPath)
+	if cfg.QueryPath != "" {
+		t.Fatalf("expected QueryPath to remain explicit-only, got %q", cfg.QueryPath)
 	}
-	if cfg.OrderPath != "/api.php?act=add" {
-		t.Fatalf("expected default OrderPath=/api.php?act=add, got %q", cfg.OrderPath)
+	if cfg.QueryMethod != "" {
+		t.Fatalf("expected QueryMethod to remain explicit-only, got %q", cfg.QueryMethod)
 	}
-	if cfg.ProgressPath != "/api.php?act=chadan2" {
-		t.Fatalf("expected default ProgressPath=/api.php?act=chadan2, got %q", cfg.ProgressPath)
+	if cfg.OrderPath != "" {
+		t.Fatalf("expected OrderPath to remain explicit-only, got %q", cfg.OrderPath)
 	}
-	if cfg.BalancePath != "/api.php?act=getmoney" {
-		t.Fatalf("expected default BalancePath=/api.php?act=getmoney, got %q", cfg.BalancePath)
+	if cfg.ProgressPath != "" {
+		t.Fatalf("expected ProgressPath to remain explicit-only, got %q", cfg.ProgressPath)
+	}
+	if cfg.BalancePath != "" {
+		t.Fatalf("expected BalancePath to remain explicit-only, got %q", cfg.BalancePath)
 	}
 	if cfg.ReportSuccessCode != "1" {
 		t.Fatalf("expected default ReportSuccessCode=1, got %q", cfg.ReportSuccessCode)
 	}
-	if cfg.CategoryPath != "/api.php?act=getcate" || cfg.ClassListPath != "/api.php?act=getclass" {
-		t.Fatalf("unexpected catalog defaults: %+v", cfg)
+	if cfg.CategoryPath != "" || cfg.ClassListPath != "" {
+		t.Fatalf("expected catalog paths to remain explicit-only: %+v", cfg)
 	}
 }
 
@@ -1046,6 +1053,229 @@ func TestCallSupplierOrderUsesConfiguredParamMap(t *testing.T) {
 	}
 	if result.YID != "Y-998" || result.Code != 1 {
 		t.Fatalf("unexpected order result: %+v", result)
+	}
+}
+
+func TestChangePasswordUsesActionNewPasswordTemplateVar(t *testing.T) {
+	withRegistryPlatformConfigs(t)
+	dbConfigMu.Lock()
+	dbConfigCache["mapped-change-pass"] = PlatformConfig{
+		ChangePassPath:     "/api/order/change-password",
+		ChangePassMethod:   http.MethodPost,
+		ChangePassBodyType: "json",
+		ChangePassParamMap: `{"token":"{{supplier.key}}","orderId":"{{order.yid}}","newPassword":"{{action.new_password}}"}`,
+	}
+	dbConfigMu.Unlock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/order/change-password" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if ct := r.Header.Get("Content-Type"); !strings.Contains(ct, "application/json") {
+			t.Fatalf("unexpected content-type: %s", ct)
+		}
+		var body map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body failed: %v", err)
+		}
+		if body["token"] != "key-1" || body["orderId"] != "OID-1" || body["newPassword"] != "fresh-pass" {
+			t.Fatalf("unexpected change password payload: %#v", body)
+		}
+		if _, exists := body["newPwd"]; exists {
+			t.Fatalf("unexpected legacy newPwd payload: %#v", body)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"code": 0, "msg": "ok"})
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	code, msg, err := svc.ChangePassword(
+		&model.SupplierFull{PT: "mapped-change-pass", URL: srv.URL, User: "uid-1", Pass: "key-1"},
+		"OID-1",
+		"fresh-pass",
+	)
+	if err != nil {
+		t.Fatalf("ChangePassword returned error: %v", err)
+	}
+	if code != 0 || msg != "ok" {
+		t.Fatalf("unexpected change password result: code=%d msg=%q", code, msg)
+	}
+}
+
+func TestCallSupplierQueryUsesActionTemplateVars(t *testing.T) {
+	withRegistryPlatformConfigs(t)
+	dbConfigMu.Lock()
+	dbConfigCache["mapped-query"] = PlatformConfig{
+		QueryPath:     "/api/query/course",
+		QueryMethod:   http.MethodPost,
+		QueryBodyType: "json",
+		QueryParamMap: `{"token":"{{supplier.key}}","school":"{{action.school}}","account":"{{action.user}}","password":"{{action.password}}","platform":"{{action.platform}}"}`,
+	}
+	dbConfigMu.Unlock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/query/course" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		var body map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body failed: %v", err)
+		}
+		if body["token"] != "key-1" || body["school"] != "学校A" || body["account"] != "user-1" ||
+			body["password"] != "pwd-1" || body["platform"] != "UP-88" {
+			t.Fatalf("unexpected query payload: %#v", body)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":     0,
+			"msg":      "查询成功",
+			"userName": "张三",
+			"data": []map[string]interface{}{
+				{"id": "K1", "name": "课程A"},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	result, err := svc.callSupplierQuery(
+		&model.SupplierFull{PT: "mapped-query", URL: srv.URL, User: "uid-1", Pass: "key-1"},
+		&model.ClassFull{Noun: "UP-88"},
+		"学校A",
+		"user-1",
+		"pwd-1",
+	)
+	if err != nil {
+		t.Fatalf("callSupplierQuery returned error: %v", err)
+	}
+	if result.UserName != "张三" || len(result.Data) != 1 || result.Data[0].ID != "K1" {
+		t.Fatalf("unexpected query result: %+v", result)
+	}
+}
+
+func TestCallSupplierQueryRequiresExplicitQueryConfig(t *testing.T) {
+	withRegistryPlatformConfigs(t)
+	dbConfigMu.Lock()
+	dbConfigCache["missing-query-config"] = PlatformConfig{}
+	dbConfigMu.Unlock()
+
+	svc := &Service{}
+	_, err := svc.callSupplierQuery(
+		&model.SupplierFull{PT: "missing-query-config"},
+		&model.ClassFull{Noun: "UP-1"},
+		"学校A",
+		"user-1",
+		"pwd-1",
+	)
+	if err == nil {
+		t.Fatal("expected missing query config error")
+	}
+	if !strings.Contains(err.Error(), "查课接口未配置路径") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBuildActionParamsDoesNotExposeLegacyOrderNewPwdVar(t *testing.T) {
+	params, err := buildActionParams(
+		`{"legacy":"{{order.new_pwd}}","current":"{{action.new_password}}"}`,
+		&model.SupplierFull{},
+		map[string]string{"action.new_password": "fresh-pass"},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("buildActionParams returned error: %v", err)
+	}
+	if params["current"] != "fresh-pass" {
+		t.Fatalf("expected action.new_password to resolve, got %#v", params)
+	}
+	if _, exists := params["legacy"]; exists {
+		t.Fatalf("expected legacy order.new_pwd to be unavailable, got %#v", params)
+	}
+}
+
+func TestBuildActionParamsIgnoresUnnamespacedTemplateVars(t *testing.T) {
+	params, err := buildActionParams(
+		`{"scoped":"{{action.user}}","raw":"{{user}}"}`,
+		&model.SupplierFull{},
+		map[string]string{"action.user": "user-a", "user": "user-a"},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("buildActionParams returned error: %v", err)
+	}
+	if params["scoped"] != "user-a" {
+		t.Fatalf("expected scoped action var to resolve, got %#v", params)
+	}
+	if _, exists := params["raw"]; exists {
+		t.Fatalf("expected unnamespaced raw var to be unavailable, got %#v", params)
+	}
+}
+
+func TestSubmitAndQueryReportUseActionTemplateVars(t *testing.T) {
+	withRegistryPlatformConfigs(t)
+	dbConfigMu.Lock()
+	dbConfigCache["mapped-report"] = PlatformConfig{
+		ReportPath:        "/api/report/submit",
+		ReportMethod:      http.MethodPost,
+		ReportBodyType:    "json",
+		ReportParamMap:    `{"token":"{{supplier.key}}","orderId":"{{order.yid}}","type":"{{action.ticket_type}}","content":"{{action.content}}"}`,
+		GetReportPath:     "/api/report/query",
+		GetReportMethod:   http.MethodPost,
+		GetReportBodyType: "json",
+		GetReportParamMap: `{"token":"{{supplier.key}}","reportId":"{{action.report_id}}"}`,
+	}
+	dbConfigMu.Unlock()
+
+	mux := http.NewServeMux()
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	mux.HandleFunc("/api/report/submit", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode submit body failed: %v", err)
+		}
+		if body["token"] != "key-1" || body["orderId"] != "OID-1" || body["type"] != "after-sale" || body["content"] != "content-1" {
+			t.Fatalf("unexpected submit payload: %#v", body)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"code": 1, "msg": "submitted", "workId": 321})
+	})
+	mux.HandleFunc("/api/report/query", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode query body failed: %v", err)
+		}
+		if body["token"] != "key-1" || body["reportId"] != "321" {
+			t.Fatalf("unexpected query payload: %#v", body)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"code": 1,
+			"data": map[string]interface{}{"answer": "done", "state": "closed"},
+		})
+	})
+
+	svc := &Service{client: srv.Client()}
+	sup := &model.SupplierFull{PT: "mapped-report", URL: srv.URL, User: "uid-1", Pass: "key-1"}
+
+	code, workID, msg, err := svc.SubmitReport(sup, "OID-1", "after-sale", "content-1")
+	if err != nil {
+		t.Fatalf("SubmitReport returned error: %v", err)
+	}
+	if code != 1 || workID != 321 || msg != "submitted" {
+		t.Fatalf("unexpected submit result: code=%d workID=%d msg=%q", code, workID, msg)
+	}
+
+	code, answer, state, err := svc.QueryReport(sup, "321")
+	if err != nil {
+		t.Fatalf("QueryReport returned error: %v", err)
+	}
+	if code != 1 || answer != "done" || state != "closed" {
+		t.Fatalf("unexpected query result: code=%d answer=%q state=%q", code, answer, state)
 	}
 }
 

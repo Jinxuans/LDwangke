@@ -24,6 +24,28 @@ type actionExecutionResult struct {
 
 var actionTemplatePattern = regexp.MustCompile(`\{\{\s*([^{}]+?)\s*\}\}`)
 
+func hasExplicitActionConfig(values ...string) bool {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func requireExplicitActionConfig(actionName, path, method, paramMap string) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("%s未配置路径", actionName)
+	}
+	if strings.TrimSpace(method) == "" {
+		return fmt.Errorf("%s未配置请求方式", actionName)
+	}
+	if strings.TrimSpace(paramMap) == "" {
+		return fmt.Errorf("%s未配置参数映射", actionName)
+	}
+	return nil
+}
+
 func buildActionTemplateVars(sup *model.SupplierFull, fields map[string]string) map[string]string {
 	vars := map[string]string{
 		"supplier.uid":    sup.User,
@@ -36,32 +58,10 @@ func buildActionTemplateVars(sup *model.SupplierFull, fields map[string]string) 
 	}
 
 	for k, v := range fields {
-		if k == "" {
+		if k == "" || !strings.Contains(k, ".") {
 			continue
 		}
 		vars[k] = v
-		if !strings.Contains(k, ".") {
-			vars["order."+k] = v
-			vars["input."+k] = v
-		}
-	}
-
-	if v := fields["user"]; v != "" {
-		vars["username"] = v
-		vars["order.username"] = v
-	}
-	if v := fields["pass"]; v != "" {
-		vars["password"] = v
-		vars["order.password"] = v
-	}
-	if v := fields["kcname"]; v != "" {
-		vars["course_name"] = v
-	}
-	if v := fields["kcid"]; v != "" {
-		vars["course_id"] = v
-	}
-	if v := fields["noun"]; v != "" {
-		vars["platform_id"] = v
 	}
 
 	return vars
