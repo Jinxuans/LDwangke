@@ -12,6 +12,7 @@ go-api/bin/
 go-api/.gocache
 *.exe
 *.log
+*.zip
 
 # npm cache
 mall-h5/.npm-cache/
