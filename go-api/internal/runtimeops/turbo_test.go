@@ -20,7 +20,7 @@ func TestCalcProfileFallbackAndModeShape(t *testing.T) {
 	if unknown.Name != "normal" {
 		t.Fatalf("expected unknown mode to fall back to normal, got %q", unknown.Name)
 	}
-	if normal.DBMaxOpen <= 0 || normal.DockWorkers <= 0 || normal.GOMAXPROCS <= 0 {
+	if normal.DBMaxOpen <= 0 || normal.DockBatchLimit <= 0 || normal.GOMAXPROCS <= 0 {
 		t.Fatalf("expected positive tuning values: %+v", normal)
 	}
 

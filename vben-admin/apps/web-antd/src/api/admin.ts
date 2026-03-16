@@ -491,25 +491,52 @@ export async function agentCrossRechargeApi(data: { uid: number; money: number }
   return requestClient.post('/agent/cross-recharge', data);
 }
 
-// ===== 对接队列 =====
-export interface QueueStats {
-  max_workers: number;
+// ===== 待对接订单调度器 =====
+export interface DockSchedulerStats {
   active: number;
   pending: number;
-  processing: number;
-  completed: number;
-  failed: number;
-  queue_size: number;
-  queue_cap: number;
   running: boolean;
+  interval_sec: number;
+  batch_limit: number;
+  last_fetched: number;
+  last_success: number;
+  last_fail: number;
+  total_success: number;
+  total_fail: number;
+  total_runs: number;
+  last_run_time: string;
+  last_trigger: string;
+  last_error: string;
 }
 
-export async function getQueueStatsApi() {
-  return requestClient.get<QueueStats>('/admin/queue/stats');
+export interface DockSchedulerLog {
+  id: number;
+  time: string;
+  trigger: string;
+  level: string;
+  message: string;
+  fetched: number;
+  success: number;
+  fail: number;
+  pending_before: number;
+  pending_after: number;
+  duration_ms: number;
 }
 
-export async function setQueueConcurrencyApi(max_workers: number) {
-  return requestClient.post<QueueStats>('/admin/queue/concurrency', { max_workers });
+export async function getDockSchedulerStatsApi() {
+  return requestClient.get<DockSchedulerStats>('/admin/dock-scheduler/stats');
+}
+
+export async function getDockSchedulerLogsApi(limit: number = 20) {
+  return requestClient.get<DockSchedulerLog[]>('/admin/dock-scheduler/logs', { params: { limit } });
+}
+
+export async function updateDockSchedulerConfigApi(data: { interval_sec: number; batch_limit: number }) {
+  return requestClient.post<DockSchedulerStats>('/admin/dock-scheduler/config', data);
+}
+
+export async function runDockSchedulerApi() {
+  return requestClient.post<DockSchedulerStats>('/admin/dock-scheduler/run');
 }
 
 // ===== 货源排行 =====
@@ -644,7 +671,7 @@ export interface OpsDashboard {
   db: OpsDBHealth;
   redis: OpsRedisHealth;
   ws: OpsWSStatus;
-  queue: QueueStats;
+  dock_scheduler: DockSchedulerStats;
   errors: OpsErrorStats;
   storage: OpsStorageInfo;
   tables: OpsTableSize[];
@@ -678,8 +705,8 @@ export interface TurboProfile {
   db_max_idle_time_sec: number;
   redis_pool_size: number;
   redis_min_idle: number;
-  dock_workers: number;
-  dock_queue_size: number;
+  dock_batch_limit: number;
+  pending_dock_interval_sec: number;
   sync_interval_sec: number;
   gomaxprocs: number;
   gc_percent: number;

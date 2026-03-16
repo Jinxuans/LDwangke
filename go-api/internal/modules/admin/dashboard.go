@@ -4,9 +4,9 @@ import (
 	"log"
 	"strconv"
 
+	"go-api/internal/dockscheduler"
 	"go-api/internal/model"
 	chatmodule "go-api/internal/modules/chat"
-	"go-api/internal/queue"
 	"go-api/internal/response"
 
 	"github.com/gin-gonic/gin"
@@ -16,8 +16,10 @@ func registerDashboardRoutes(admin *gin.RouterGroup) {
 	admin.GET("/dashboard", AdminDashboard)
 	admin.GET("/stats", AdminStats)
 	admin.GET("/moneylog", AdminMoneyLog)
-	admin.GET("/queue/stats", AdminQueueStats)
-	admin.POST("/queue/concurrency", AdminQueueSetConcurrency)
+	admin.GET("/dock-scheduler/stats", AdminDockSchedulerStats)
+	admin.GET("/dock-scheduler/logs", AdminDockSchedulerLogs)
+	admin.POST("/dock-scheduler/config", AdminDockSchedulerConfig)
+	admin.POST("/dock-scheduler/run", AdminDockSchedulerRunNow)
 	admin.GET("/rank/suppliers", AdminSupplierRanking)
 	admin.GET("/rank/agent-products", AdminAgentProductRanking)
 	admin.GET("/chat/sessions", AdminChatSessions)
@@ -65,28 +67,39 @@ func AdminMoneyLog(c *gin.Context) {
 	})
 }
 
-func AdminQueueStats(c *gin.Context) {
-	if queue.GlobalDockQueue == nil {
-		response.ServerError(c, "队列未初始化")
-		return
-	}
-	response.Success(c, queue.GlobalDockQueue.Stats())
+func AdminDockSchedulerStats(c *gin.Context) {
+	response.Success(c, dockscheduler.Snapshot())
 }
 
-func AdminQueueSetConcurrency(c *gin.Context) {
+func AdminDockSchedulerLogs(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	response.Success(c, dockscheduler.RecentLogs(limit))
+}
+
+func AdminDockSchedulerConfig(c *gin.Context) {
 	var body struct {
-		MaxWorkers int `json:"max_workers" binding:"required"`
+		IntervalSec int `json:"interval_sec"`
+		BatchLimit  int `json:"batch_limit"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.BadRequest(c, "参数错误")
 		return
 	}
-	if queue.GlobalDockQueue == nil {
-		response.ServerError(c, "队列未初始化")
+	stats, err := dockscheduler.UpdateConfig(body.IntervalSec, body.BatchLimit)
+	if err != nil {
+		response.ServerError(c, err.Error())
 		return
 	}
-	queue.GlobalDockQueue.SetMaxWorkers(body.MaxWorkers)
-	response.Success(c, queue.GlobalDockQueue.Stats())
+	response.Success(c, stats)
+}
+
+func AdminDockSchedulerRunNow(c *gin.Context) {
+	stats, err := dockscheduler.RunOnce("manual")
+	if err != nil {
+		response.BusinessError(c, 1001, err.Error())
+		return
+	}
+	response.Success(c, stats)
 }
 
 func AdminSupplierRanking(c *gin.Context) {

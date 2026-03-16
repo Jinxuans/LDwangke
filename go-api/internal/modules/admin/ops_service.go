@@ -12,7 +12,7 @@ import (
 
 	"go-api/internal/cache"
 	"go-api/internal/database"
-	"go-api/internal/queue"
+	"go-api/internal/dockscheduler"
 	"go-api/internal/ws"
 )
 
@@ -105,16 +105,16 @@ type HourlyOrder struct {
 }
 
 type OpsDashboard struct {
-	System       SystemInfo             `json:"system"`
-	DB           DBHealth               `json:"db"`
-	Redis        RedisHealth            `json:"redis"`
-	WS           WSStatus               `json:"ws"`
-	Queue        map[string]interface{} `json:"queue"`
-	Errors       ErrorStats             `json:"errors"`
-	Storage      StorageInfo            `json:"storage"`
-	Tables       []TableSize            `json:"tables"`
-	ErrorOrders  []RecentErrorOrder     `json:"error_orders"`
-	HourlyOrders []HourlyOrder          `json:"hourly_orders"`
+	System        SystemInfo             `json:"system"`
+	DB            DBHealth               `json:"db"`
+	Redis         RedisHealth            `json:"redis"`
+	WS            WSStatus               `json:"ws"`
+	DockScheduler map[string]interface{} `json:"dock_scheduler"`
+	Errors        ErrorStats             `json:"errors"`
+	Storage       StorageInfo            `json:"storage"`
+	Tables        []TableSize            `json:"tables"`
+	ErrorOrders   []RecentErrorOrder     `json:"error_orders"`
+	HourlyOrders  []HourlyOrder          `json:"hourly_orders"`
 }
 
 type SupplierProbe struct {
@@ -131,16 +131,16 @@ var adminOpsStartTime = time.Now()
 
 func getAdminOpsDashboard() OpsDashboard {
 	return OpsDashboard{
-		System:       getAdminSystemInfo(),
-		DB:           getAdminDBHealth(),
-		Redis:        getAdminRedisHealth(),
-		WS:           getAdminWSStatus(),
-		Queue:        getAdminQueueStats(),
-		Errors:       getAdminErrorStats(),
-		Storage:      getAdminStorageInfo(),
-		Tables:       getAdminTableSizes(),
-		ErrorOrders:  getAdminRecentErrorOrders(20),
-		HourlyOrders: getAdminTodayHourlyOrders(),
+		System:        getAdminSystemInfo(),
+		DB:            getAdminDBHealth(),
+		Redis:         getAdminRedisHealth(),
+		WS:            getAdminWSStatus(),
+		DockScheduler: getAdminDockSchedulerStats(),
+		Errors:        getAdminErrorStats(),
+		Storage:       getAdminStorageInfo(),
+		Tables:        getAdminTableSizes(),
+		ErrorOrders:   getAdminRecentErrorOrders(20),
+		HourlyOrders:  getAdminTodayHourlyOrders(),
 	}
 }
 
@@ -295,18 +295,31 @@ func getAdminWSStatus() WSStatus {
 	return status
 }
 
-func getAdminQueueStats() map[string]interface{} {
-	if queue.GlobalDockQueue != nil {
-		return queue.GlobalDockQueue.Stats()
+func getAdminDockSchedulerStats() map[string]interface{} {
+	stats := dockscheduler.Snapshot()
+	return map[string]interface{}{
+		"running":       stats.Running,
+		"active":        stats.Active,
+		"pending":       stats.Pending,
+		"interval_sec":  stats.IntervalSec,
+		"batch_limit":   stats.BatchLimit,
+		"last_fetched":  stats.LastFetched,
+		"last_success":  stats.LastSuccess,
+		"last_fail":     stats.LastFail,
+		"total_success": stats.TotalSuccess,
+		"total_fail":    stats.TotalFail,
+		"total_runs":    stats.TotalRuns,
+		"last_run_time": stats.LastRunTime,
+		"last_trigger":  stats.LastTrigger,
+		"last_error":    stats.LastError,
 	}
-	return map[string]interface{}{"running": false}
 }
 
 func getAdminErrorStats() ErrorStats {
 	stats := ErrorStats{}
 	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_order WHERE status = '失败' AND DATE(addtime) = CURDATE()").Scan(&stats.TodayFailed)
 	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_order WHERE status = '异常' AND DATE(addtime) = CURDATE()").Scan(&stats.TodayException)
-	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_order WHERE dockstatus = 0").Scan(&stats.PendingDock)
+	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_order WHERE dockstatus IN (0, 2)").Scan(&stats.PendingDock)
 	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_order WHERE status = '进行中' AND addtime < NOW() - INTERVAL 24 HOUR").Scan(&stats.StuckOrders)
 	return stats
 }

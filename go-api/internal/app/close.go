@@ -20,9 +20,6 @@ func (a *App) Close(_ context.Context) error {
 	if a.Hub != nil {
 		a.Hub.Stop()
 	}
-	if a.DockQueue != nil {
-		a.DockQueue.Stop()
-	}
 	pluginruntime.StopHZWSocket()
 	if a.DB != nil {
 		err = errors.Join(err, a.DB.Close())

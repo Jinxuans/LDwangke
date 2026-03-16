@@ -6,22 +6,22 @@ import (
 )
 
 type TurboProfile struct {
-	Name            string `json:"name"`
-	CPUCores        int    `json:"cpu_cores"`
-	MemTotalMB      int    `json:"mem_total_mb"`
-	GOOS            string `json:"goos"`
-	GOARCH          string `json:"goarch"`
-	DBMaxOpen       int    `json:"db_max_open"`
-	DBMaxIdle       int    `json:"db_max_idle"`
-	DBMaxLifetime   int    `json:"db_max_lifetime_sec"`
-	DBMaxIdleTime   int    `json:"db_max_idle_time_sec"`
-	RedisPoolSize   int    `json:"redis_pool_size"`
-	RedisMinIdle    int    `json:"redis_min_idle"`
-	DockWorkers     int    `json:"dock_workers"`
-	DockQueueSize   int    `json:"dock_queue_size"`
-	SyncIntervalSec int    `json:"sync_interval_sec"`
-	GOMAXPROCS      int    `json:"gomaxprocs"`
-	GCPercent       int    `json:"gc_percent"`
+	Name                   string `json:"name"`
+	CPUCores               int    `json:"cpu_cores"`
+	MemTotalMB             int    `json:"mem_total_mb"`
+	GOOS                   string `json:"goos"`
+	GOARCH                 string `json:"goarch"`
+	DBMaxOpen              int    `json:"db_max_open"`
+	DBMaxIdle              int    `json:"db_max_idle"`
+	DBMaxLifetime          int    `json:"db_max_lifetime_sec"`
+	DBMaxIdleTime          int    `json:"db_max_idle_time_sec"`
+	RedisPoolSize          int    `json:"redis_pool_size"`
+	RedisMinIdle           int    `json:"redis_min_idle"`
+	DockBatchLimit         int    `json:"dock_batch_limit"`
+	PendingDockIntervalSec int    `json:"pending_dock_interval_sec"`
+	SyncIntervalSec        int    `json:"sync_interval_sec"`
+	GOMAXPROCS             int    `json:"gomaxprocs"`
+	GCPercent              int    `json:"gc_percent"`
 }
 
 type TurboStatus struct {
@@ -66,21 +66,21 @@ func mapTurboStatus(status runtimeops.TurboStatus) TurboStatus {
 
 func mapTurboProfile(profile runtimeops.TurboProfile) TurboProfile {
 	return TurboProfile{
-		Name:            profile.Name,
-		CPUCores:        profile.CPUCores,
-		MemTotalMB:      profile.MemTotalMB,
-		GOOS:            profile.GOOS,
-		GOARCH:          profile.GOARCH,
-		DBMaxOpen:       profile.DBMaxOpen,
-		DBMaxIdle:       profile.DBMaxIdle,
-		DBMaxLifetime:   profile.DBMaxLifetime,
-		DBMaxIdleTime:   profile.DBMaxIdleTime,
-		RedisPoolSize:   profile.RedisPoolSize,
-		RedisMinIdle:    profile.RedisMinIdle,
-		DockWorkers:     profile.DockWorkers,
-		DockQueueSize:   profile.DockQueueSize,
-		SyncIntervalSec: profile.SyncIntervalSec,
-		GOMAXPROCS:      profile.GOMAXPROCS,
-		GCPercent:       profile.GCPercent,
+		Name:                   profile.Name,
+		CPUCores:               profile.CPUCores,
+		MemTotalMB:             profile.MemTotalMB,
+		GOOS:                   profile.GOOS,
+		GOARCH:                 profile.GOARCH,
+		DBMaxOpen:              profile.DBMaxOpen,
+		DBMaxIdle:              profile.DBMaxIdle,
+		DBMaxLifetime:          profile.DBMaxLifetime,
+		DBMaxIdleTime:          profile.DBMaxIdleTime,
+		RedisPoolSize:          profile.RedisPoolSize,
+		RedisMinIdle:           profile.RedisMinIdle,
+		DockBatchLimit:         profile.DockBatchLimit,
+		PendingDockIntervalSec: profile.PendingDockIntervalSec,
+		SyncIntervalSec:        profile.SyncIntervalSec,
+		GOMAXPROCS:             profile.GOMAXPROCS,
+		GCPercent:              profile.GCPercent,
 	}
 }

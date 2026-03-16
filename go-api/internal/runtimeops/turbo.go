@@ -12,27 +12,27 @@ import (
 
 	"go-api/internal/cache"
 	"go-api/internal/database"
+	"go-api/internal/dockscheduler"
 	ordermodule "go-api/internal/modules/order"
-	"go-api/internal/queue"
 )
 
 type TurboProfile struct {
-	Name            string `json:"name"`
-	CPUCores        int    `json:"cpu_cores"`
-	MemTotalMB      int    `json:"mem_total_mb"`
-	GOOS            string `json:"goos"`
-	GOARCH          string `json:"goarch"`
-	DBMaxOpen       int    `json:"db_max_open"`
-	DBMaxIdle       int    `json:"db_max_idle"`
-	DBMaxLifetime   int    `json:"db_max_lifetime_sec"`
-	DBMaxIdleTime   int    `json:"db_max_idle_time_sec"`
-	RedisPoolSize   int    `json:"redis_pool_size"`
-	RedisMinIdle    int    `json:"redis_min_idle"`
-	DockWorkers     int    `json:"dock_workers"`
-	DockQueueSize   int    `json:"dock_queue_size"`
-	SyncIntervalSec int    `json:"sync_interval_sec"`
-	GOMAXPROCS      int    `json:"gomaxprocs"`
-	GCPercent       int    `json:"gc_percent"`
+	Name                   string `json:"name"`
+	CPUCores               int    `json:"cpu_cores"`
+	MemTotalMB             int    `json:"mem_total_mb"`
+	GOOS                   string `json:"goos"`
+	GOARCH                 string `json:"goarch"`
+	DBMaxOpen              int    `json:"db_max_open"`
+	DBMaxIdle              int    `json:"db_max_idle"`
+	DBMaxLifetime          int    `json:"db_max_lifetime_sec"`
+	DBMaxIdleTime          int    `json:"db_max_idle_time_sec"`
+	RedisPoolSize          int    `json:"redis_pool_size"`
+	RedisMinIdle           int    `json:"redis_min_idle"`
+	DockBatchLimit         int    `json:"dock_batch_limit"`
+	PendingDockIntervalSec int    `json:"pending_dock_interval_sec"`
+	SyncIntervalSec        int    `json:"sync_interval_sec"`
+	GOMAXPROCS             int    `json:"gomaxprocs"`
+	GCPercent              int    `json:"gc_percent"`
 }
 
 type TurboStatus struct {
@@ -84,22 +84,22 @@ func getMemTotalMB() int {
 
 func detectBaseline() TurboProfile {
 	return TurboProfile{
-		Name:            "normal",
-		CPUCores:        runtime.NumCPU(),
-		MemTotalMB:      getMemTotalMB(),
-		GOOS:            runtime.GOOS,
-		GOARCH:          runtime.GOARCH,
-		DBMaxOpen:       50,
-		DBMaxIdle:       25,
-		DBMaxLifetime:   300,
-		DBMaxIdleTime:   180,
-		RedisPoolSize:   10,
-		RedisMinIdle:    3,
-		DockWorkers:     5,
-		DockQueueSize:   1000,
-		SyncIntervalSec: 120,
-		GOMAXPROCS:      runtime.NumCPU(),
-		GCPercent:       100,
+		Name:                   "normal",
+		CPUCores:               runtime.NumCPU(),
+		MemTotalMB:             getMemTotalMB(),
+		GOOS:                   runtime.GOOS,
+		GOARCH:                 runtime.GOARCH,
+		DBMaxOpen:              50,
+		DBMaxIdle:              25,
+		DBMaxLifetime:          300,
+		DBMaxIdleTime:          180,
+		RedisPoolSize:          10,
+		RedisMinIdle:           3,
+		DockBatchLimit:         100,
+		PendingDockIntervalSec: 30,
+		SyncIntervalSec:        120,
+		GOMAXPROCS:             runtime.NumCPU(),
+		GCPercent:              100,
 	}
 }
 
@@ -133,8 +133,8 @@ func calcProfile(mode string) TurboProfile {
 		p.DBMaxIdleTime = 300
 		p.RedisPoolSize = clampInt(cpus*2, 5, 15)
 		p.RedisMinIdle = 2
-		p.DockWorkers = clampInt(cpus, 2, 5)
-		p.DockQueueSize = 500
+		p.DockBatchLimit = 30
+		p.PendingDockIntervalSec = 60
 		p.SyncIntervalSec = 300
 		p.GOMAXPROCS = max(1, cpus-1)
 		p.GCPercent = 200
@@ -145,8 +145,8 @@ func calcProfile(mode string) TurboProfile {
 		p.DBMaxIdleTime = 180
 		p.RedisPoolSize = clampInt(cpus*3, 10, 30)
 		p.RedisMinIdle = 3
-		p.DockWorkers = clampInt(cpus*2, 5, 15)
-		p.DockQueueSize = 1000
+		p.DockBatchLimit = 100
+		p.PendingDockIntervalSec = 30
 		p.SyncIntervalSec = 120
 		p.GOMAXPROCS = cpus
 		p.GCPercent = 100
@@ -157,8 +157,8 @@ func calcProfile(mode string) TurboProfile {
 		p.DBMaxIdleTime = 120
 		p.RedisPoolSize = clampInt(cpus*5, 20, 60)
 		p.RedisMinIdle = clampInt(cpus*2, 5, 20)
-		p.DockWorkers = clampInt(cpus*3, 10, 30)
-		p.DockQueueSize = 2000
+		p.DockBatchLimit = 200
+		p.PendingDockIntervalSec = 15
 		p.SyncIntervalSec = 60
 		p.GOMAXPROCS = cpus
 		p.GCPercent = 50
@@ -169,8 +169,8 @@ func calcProfile(mode string) TurboProfile {
 		p.DBMaxIdleTime = 60
 		p.RedisPoolSize = clampInt(cpus*8, 30, 100)
 		p.RedisMinIdle = clampInt(cpus*3, 10, 30)
-		p.DockWorkers = clampInt(cpus*5, 15, 50)
-		p.DockQueueSize = 5000
+		p.DockBatchLimit = 400
+		p.PendingDockIntervalSec = 10
 		p.SyncIntervalSec = 30
 		p.GOMAXPROCS = cpus
 		p.GCPercent = 30
@@ -183,7 +183,7 @@ func calcProfile(mode string) TurboProfile {
 		p.DBMaxOpen = min(p.DBMaxOpen, 50)
 		p.DBMaxIdle = min(p.DBMaxIdle, 25)
 		p.RedisPoolSize = min(p.RedisPoolSize, 15)
-		p.DockWorkers = min(p.DockWorkers, 10)
+		p.DockBatchLimit = min(p.DockBatchLimit, 100)
 		p.GCPercent = max(p.GCPercent, 80)
 	}
 
@@ -232,10 +232,8 @@ func applyProfile(p TurboProfile) TurboStatus {
 		log.Printf("[Turbo] Redis连接池: pool=%d minIdle=%d", p.RedisPoolSize, p.RedisMinIdle)
 	}
 
-	if queue.GlobalDockQueue != nil {
-		queue.GlobalDockQueue.SetMaxWorkers(p.DockWorkers)
-		log.Printf("[Turbo] 对接队列: workers=%d", p.DockWorkers)
-	}
+	dockscheduler.Configure(time.Duration(p.PendingDockIntervalSec)*time.Second, p.DockBatchLimit)
+	log.Printf("[Turbo] 待对接调度: batch=%d interval=%ds", p.DockBatchLimit, p.PendingDockIntervalSec)
 
 	prev := runtime.GOMAXPROCS(p.GOMAXPROCS)
 	log.Printf("[Turbo] GOMAXPROCS: %d -> %d", prev, p.GOMAXPROCS)

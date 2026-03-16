@@ -8,7 +8,6 @@ import (
 	"math"
 	"time"
 
-	"go-api/internal/cache"
 	"go-api/internal/database"
 )
 
@@ -272,65 +271,70 @@ func ydsjCronOrderInfo(ctx context.Context) {
 				}
 			}()
 
-			if cache.RDB == nil {
-				sleepWithContext(ctx, time.Minute)
-				return
-			}
-
 			svc := YDSJ()
 			cfg, err := svc.GetConfig()
 			if err != nil || !ydsjIsConfigured(cfg) {
-				sleepWithContext(ctx, time.Minute)
 				return
 			}
 
-			orderID, err := cache.RDB.LPop(ctx, "ydsj_cron_ids").Result()
-			if err != nil || orderID == "" {
-				sleepWithContext(ctx, time.Minute)
+			rows, err := database.DB.Query("SELECT id, yid, `user`, run_type FROM qingka_wangke_hzw_ydsj WHERE status = 1 AND yid <> '' ORDER BY id ASC LIMIT 30")
+			if err != nil {
 				return
 			}
+			defer rows.Close()
 
-			var id int
-			var yid, user string
-			var runType int
-			err = database.DB.QueryRow("SELECT id, yid, `user`, run_type FROM qingka_wangke_hzw_ydsj WHERE yid = ? LIMIT 1", orderID).
-				Scan(&id, &yid, &user, &runType)
-			if err != nil || user == "" || yid == "" {
-				sleepWithContext(ctx, time.Second)
-				return
+			type row struct {
+				ID      int
+				YID     string
+				User    string
+				RunType int
+			}
+			var orders []row
+			for rows.Next() {
+				var o row
+				rows.Scan(&o.ID, &o.YID, &o.User, &o.RunType)
+				orders = append(orders, o)
 			}
 
-			items, err := ydsjUpstreamQuery(cfg, user, runType)
-			if err != nil || len(items) == 0 {
-				cache.RDB.LPush(ctx, "ydsj_cron_ids", orderID)
-				sleepWithContext(ctx, 60*time.Second)
-				return
-			}
+			for _, o := range orders {
+				items, err := ydsjUpstreamQuery(cfg, o.User, o.RunType)
+				if err != nil || len(items) == 0 {
+					if !sleepWithContext(ctx, time.Second) {
+						return
+					}
+					continue
+				}
 
-			// 通过 orderid 匹配 yid
-			var matched map[string]interface{}
-			for _, item := range items {
-				oid := fmt.Sprintf("%v", item["orderid"])
-				if oid == yid {
-					matched = item
-					break
+				// 通过 orderid 精确匹配 yid，不再依赖 Redis 列表串联。
+				var matched map[string]interface{}
+				for _, item := range items {
+					oid := fmt.Sprintf("%v", item["orderid"])
+					if oid == o.YID {
+						matched = item
+						break
+					}
+				}
+
+				if matched == nil {
+					if !sleepWithContext(ctx, time.Second) {
+						return
+					}
+					continue
+				}
+
+				// 新API响应中 status 是字符串，用于更新订单状态
+				statusStr := mapGetString(matched, "status")
+				status := ydsjMapUpstreamStatus(statusStr)
+				database.DB.Exec("UPDATE qingka_wangke_hzw_ydsj SET status = ? WHERE id = ? AND status = 1", status, o.ID)
+				log.Printf("[YDSJ-cron-info] 订单#%d 状态已同步: %s -> %d", o.ID, statusStr, status)
+
+				if !sleepWithContext(ctx, time.Second) {
+					return
 				}
 			}
-
-			if matched == nil {
-				cache.RDB.LPush(ctx, "ydsj_cron_ids", orderID)
-				sleepWithContext(ctx, 60*time.Second)
-				return
-			}
-
-			// 新API响应中 status 是字符串，用于更新订单状态
-			statusStr := mapGetString(matched, "status")
-			status := ydsjMapUpstreamStatus(statusStr)
-			database.DB.Exec("UPDATE qingka_wangke_hzw_ydsj SET status = ? WHERE id = ? AND status = 1", status, id)
-			log.Printf("[YDSJ-cron-info] 订单#%d 状态已同步: %s -> %d", id, statusStr, status)
 		}()
 
-		if !sleepWithContext(ctx, time.Second) {
+		if !sleepWithContext(ctx, 30*time.Second) {
 			return
 		}
 	}

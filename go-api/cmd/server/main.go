@@ -15,7 +15,7 @@ func main() {
 	ctx, stop := bootstrap.NotifyContext()
 	defer stop()
 
-	bootstrap.StartDockQueue(ctx, application)
+	bootstrap.StartPendingDockScheduler(ctx)
 	bootstrap.StartCoreJobs(ctx, application)
 	bootstrap.StartChatCleanup(ctx)
 
