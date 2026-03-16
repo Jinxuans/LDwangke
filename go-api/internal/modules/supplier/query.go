@@ -60,30 +60,18 @@ func (s *Service) QueryCourse(cid int, userinfo string) (*model.CourseQueryRespo
 			Data:     data,
 		}, nil
 	case "local_script":
-		return &model.CourseQueryResponse{
-			UserInfo: userinfo,
-			UserName: user,
-			Msg:      fmt.Sprintf("平台 %s 暂不支持自动查课，请直接下单", sup.PT),
-			Data:     []model.CourseItem{},
-		}, nil
+		return nil, fmt.Errorf("平台 %s 暂不支持自动查课，请直接下单", sup.PT)
 	case "xxt_query":
 		result, err := xxtCallQuery(user, pass, school)
 		if err != nil {
-			return &model.CourseQueryResponse{
-				UserInfo: userinfo,
-				UserName: user,
-				Msg:      fmt.Sprintf("学习通查课失败：%s", err.Error()),
-				Data:     []model.CourseItem{},
-			}, nil
+			return nil, fmt.Errorf("学习通查课失败：%s", err.Error())
 		}
 		if codeVal, _ := result["code"].(int); codeVal == -1 {
 			msg, _ := result["msg"].(string)
-			return &model.CourseQueryResponse{
-				UserInfo: userinfo,
-				UserName: user,
-				Msg:      msg,
-				Data:     []model.CourseItem{},
-			}, nil
+			if msg == "" {
+				msg = "学习通查课失败"
+			}
+			return nil, errors.New(msg)
 		}
 
 		var items []model.CourseItem
@@ -118,12 +106,7 @@ func (s *Service) QueryCourse(cid int, userinfo string) (*model.CourseQueryRespo
 	case "KUN_custom":
 		result, err := kunCallQuery(sup, cls.Noun, school, user, pass)
 		if err != nil {
-			return &model.CourseQueryResponse{
-				UserInfo: userinfo,
-				UserName: user,
-				Msg:      fmt.Sprintf("查课失败：%s", err.Error()),
-				Data:     []model.CourseItem{},
-			}, nil
+			return nil, fmt.Errorf("查课失败：%s", err.Error())
 		}
 		return &model.CourseQueryResponse{
 			UserInfo: userinfo,
@@ -134,12 +117,7 @@ func (s *Service) QueryCourse(cid int, userinfo string) (*model.CourseQueryRespo
 	case "simple_custom":
 		result, err := simpleCallQuery(sup, cls.Noun, school, user, pass)
 		if err != nil {
-			return &model.CourseQueryResponse{
-				UserInfo: userinfo,
-				UserName: user,
-				Msg:      fmt.Sprintf("查课失败：%s", err.Error()),
-				Data:     []model.CourseItem{},
-			}, nil
+			return nil, fmt.Errorf("查课失败：%s", err.Error())
 		}
 		return &model.CourseQueryResponse{
 			UserInfo: userinfo,
@@ -157,12 +135,7 @@ func (s *Service) QueryCourse(cid int, userinfo string) (*model.CourseQueryRespo
 	default:
 		result, err := s.callSupplierQuery(sup, cls, school, user, pass)
 		if err != nil {
-			return &model.CourseQueryResponse{
-				UserInfo: userinfo,
-				UserName: user,
-				Msg:      fmt.Sprintf("查课失败：%s", err.Error()),
-				Data:     []model.CourseItem{},
-			}, nil
+			return nil, fmt.Errorf("查课失败：%s", err.Error())
 		}
 		return &model.CourseQueryResponse{
 			UserInfo: userinfo,
@@ -191,6 +164,11 @@ func (s *Service) generateLocalTimeList(noun string) []model.CourseItem {
 
 func (s *Service) callSupplierQuery(sup *model.SupplierFull, cls *model.ClassFull, school, user, pass string) (*model.SupplierQueryResult, error) {
 	cfg := GetPlatformConfig(sup.PT)
+	if !isCustomQueryDriver(cfg.QueryAct) {
+		if err := requireExplicitActionConfig("查课接口", cfg.QueryPath, cfg.QueryMethod, cfg.QueryParamMap); err != nil {
+			return nil, fmt.Errorf("平台 %s %v", sup.PT, err)
+		}
+	}
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.QueryPath)
 
 	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
@@ -208,11 +186,10 @@ func (s *Service) callSupplierQuery(sup *model.SupplierFull, cls *model.ClassFul
 		"form",
 		defaultParams,
 		map[string]string{
-			"school":   school,
-			"user":     user,
-			"pass":     pass,
-			"platform": cls.Noun,
-			"noun":     cls.Noun,
+			"action.school":   school,
+			"action.user":     user,
+			"action.password": pass,
+			"action.platform": cls.Noun,
 		},
 	)
 	if err != nil {

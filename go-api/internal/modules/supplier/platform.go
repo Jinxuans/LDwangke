@@ -102,24 +102,24 @@ func loadDBPlatformConfigs() {
 	defer dbConfigMu.Unlock()
 
 	rows, err := database.DB.Query(`SELECT pt, name, auth_type, success_codes,
-		query_act, COALESCE(query_path,''), COALESCE(query_method,'POST'), COALESCE(query_body_type,''), COALESCE(query_param_map,''),
-		COALESCE(order_path,''), COALESCE(order_method,'POST'), COALESCE(order_body_type,''), COALESCE(order_param_map,''),
+		query_act, COALESCE(query_path,''), COALESCE(query_method,''), COALESCE(query_body_type,''), COALESCE(query_param_map,''),
+		COALESCE(order_path,''), COALESCE(order_method,''), COALESCE(order_body_type,''), COALESCE(order_param_map,''),
 		extra_params, returns_yid,
-		progress_path, progress_method,
+		COALESCE(progress_path,''), COALESCE(progress_method,''),
 		COALESCE(progress_body_type,''), COALESCE(progress_param_map,''), yid_in_data_array,
-		COALESCE(category_path,''), COALESCE(category_method,'POST'), COALESCE(category_body_type,''), COALESCE(category_param_map,''),
-		COALESCE(class_list_path,''), COALESCE(class_list_method,'POST'), COALESCE(class_list_body_type,''), COALESCE(class_list_param_map,''),
-		COALESCE(pause_path,''), COALESCE(pause_method,'POST'), COALESCE(pause_body_type,''), COALESCE(pause_param_map,''), COALESCE(pause_id_param,'id'),
-		COALESCE(resume_path,''), COALESCE(resume_method,'POST'), COALESCE(resume_body_type,''), COALESCE(resume_param_map,''),
-		change_pass_param, change_pass_id_param,
-		COALESCE(change_pass_path,''), COALESCE(change_pass_method,'POST'), COALESCE(change_pass_body_type,''), COALESCE(change_pass_param_map,''),
-		COALESCE(resubmit_path,''), COALESCE(resubmit_method,'POST'), COALESCE(resubmit_body_type,''), COALESCE(resubmit_param_map,''), COALESCE(resubmit_id_param,'id'),
-		COALESCE(log_path,''), COALESCE(log_method,'POST'), COALESCE(log_body_type,''), COALESCE(log_param_map,''), log_id_param, use_json,
-		COALESCE(balance_path,''), COALESCE(balance_money_field,'money'),
-		COALESCE(balance_method,'POST'), COALESCE(balance_body_type,''), COALESCE(balance_param_map,''), COALESCE(balance_auth_type,''),
+		COALESCE(category_path,''), COALESCE(category_method,''), COALESCE(category_body_type,''), COALESCE(category_param_map,''),
+		COALESCE(class_list_path,''), COALESCE(class_list_method,''), COALESCE(class_list_body_type,''), COALESCE(class_list_param_map,''),
+		COALESCE(pause_path,''), COALESCE(pause_method,''), COALESCE(pause_body_type,''), COALESCE(pause_param_map,''), COALESCE(pause_id_param,''),
+		COALESCE(resume_path,''), COALESCE(resume_method,''), COALESCE(resume_body_type,''), COALESCE(resume_param_map,''),
+		COALESCE(change_pass_param,''), COALESCE(change_pass_id_param,''),
+		COALESCE(change_pass_path,''), COALESCE(change_pass_method,''), COALESCE(change_pass_body_type,''), COALESCE(change_pass_param_map,''),
+		COALESCE(resubmit_path,''), COALESCE(resubmit_method,''), COALESCE(resubmit_body_type,''), COALESCE(resubmit_param_map,''), COALESCE(resubmit_id_param,''),
+		COALESCE(log_path,''), COALESCE(log_method,''), COALESCE(log_body_type,''), COALESCE(log_param_map,''), COALESCE(log_id_param,''), use_json,
+		COALESCE(balance_path,''), COALESCE(balance_money_field,''),
+		COALESCE(balance_method,''), COALESCE(balance_body_type,''), COALESCE(balance_param_map,''), COALESCE(balance_auth_type,''),
 		COALESCE(report_param_style,''), COALESCE(report_auth_type,''),
-		COALESCE(report_path,''), COALESCE(report_method,'POST'), COALESCE(report_body_type,''), COALESCE(report_param_map,''),
-		COALESCE(get_report_path,''), COALESCE(get_report_method,'POST'), COALESCE(get_report_body_type,''), COALESCE(get_report_param_map,''),
+		COALESCE(report_path,''), COALESCE(report_method,''), COALESCE(report_body_type,''), COALESCE(report_param_map,''),
+		COALESCE(get_report_path,''), COALESCE(get_report_method,''), COALESCE(get_report_body_type,''), COALESCE(get_report_param_map,''),
 		COALESCE(refresh_path,'')
 		FROM qingka_platform_config`)
 	if err != nil {
@@ -197,97 +197,11 @@ func fillDefaults(cfg PlatformConfig) PlatformConfig {
 	if cfg.AuthType == "" {
 		cfg.AuthType = "uid_key"
 	}
-	if !isCustomQueryDriver(cfg.QueryAct) {
-		if cfg.QueryPath == "" {
-			cfg.QueryPath = "/api.php?act=get"
-		}
-	}
-	if cfg.QueryMethod == "" {
-		cfg.QueryMethod = "POST"
-	}
-	if cfg.OrderPath == "" {
-		cfg.OrderPath = "/api.php?act=add"
-	}
-	if cfg.OrderMethod == "" {
-		cfg.OrderMethod = "POST"
-	}
-	if cfg.ProgressPath == "" {
-		cfg.ProgressPath = "/api.php?act=chadan2"
-	}
-	if cfg.ProgressMethod == "" {
-		cfg.ProgressMethod = "POST"
-	}
 	if cfg.SuccessCode == "" {
 		cfg.SuccessCode = "0"
 	}
-	if cfg.PauseMethod == "" {
-		cfg.PauseMethod = "POST"
-	}
-	if cfg.PausePath == "" {
-		cfg.PausePath = "/api.php?act=zt"
-	}
-	if cfg.ResumeMethod == "" {
-		cfg.ResumeMethod = "POST"
-	}
-	if cfg.ChangePassMethod == "" {
-		cfg.ChangePassMethod = "POST"
-	}
-	if cfg.ChangePassPath == "" {
-		cfg.ChangePassPath = "/api.php?act=gaimi"
-	}
-	if cfg.ResubmitMethod == "" {
-		cfg.ResubmitMethod = "POST"
-	}
-	if cfg.ResubmitPath == "" {
-		cfg.ResubmitPath = "/api.php?act=budan"
-	}
-	if cfg.LogMethod == "" {
-		cfg.LogMethod = "POST"
-	}
-	if cfg.LogPath == "" {
-		cfg.LogPath = "/api.php?act=xq"
-	}
-	if cfg.CategoryPath == "" {
-		cfg.CategoryPath = "/api.php?act=getcate"
-	}
-	if cfg.CategoryMethod == "" {
-		cfg.CategoryMethod = "POST"
-	}
-	if cfg.ClassListPath == "" {
-		cfg.ClassListPath = "/api.php?act=getclass"
-	}
-	if cfg.ClassListMethod == "" {
-		cfg.ClassListMethod = "POST"
-	}
-	if cfg.BalancePath == "" {
-		cfg.BalancePath = "/api.php?act=getmoney"
-	}
-	if cfg.BalanceMoneyField == "" {
-		cfg.BalanceMoneyField = "money"
-	}
-	if cfg.BalanceMethod == "" {
-		cfg.BalanceMethod = "POST"
-	}
-	if cfg.ReportPath == "" {
-		cfg.ReportPath = "/api.php?act=report"
-	}
-	if cfg.ReportMethod == "" {
-		cfg.ReportMethod = "POST"
-	}
-	if cfg.GetReportPath == "" {
-		cfg.GetReportPath = "/api.php?act=getReport"
-	}
-	if cfg.GetReportMethod == "" {
-		cfg.GetReportMethod = "POST"
-	}
 	if cfg.ReportSuccessCode == "" {
 		cfg.ReportSuccessCode = "1"
-	}
-	if cfg.ResubmitIDParam == "" {
-		cfg.ResubmitIDParam = "id"
-	}
-	if cfg.ReportParamStyle == "" {
-		cfg.ReportParamStyle = "standard"
 	}
 	return cfg
 }

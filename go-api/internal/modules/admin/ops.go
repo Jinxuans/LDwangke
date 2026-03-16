@@ -350,21 +350,21 @@ func AdminPayDataSave(c *gin.Context) {
 func AdminPlatformConfigList(c *gin.Context) {
 	rows, err := database.DB.Query(`SELECT id, pt, name, auth_type, success_codes,
 		use_json, need_proxy, returns_yid, extra_params,
-		query_act, query_path, COALESCE(query_method,'POST'), COALESCE(query_body_type,''), query_param_style, COALESCE(query_param_map,''), query_polling, query_max_attempts, query_interval, COALESCE(query_response_map,''),
-		order_path, COALESCE(order_method,'POST'), COALESCE(order_body_type,''), COALESCE(order_param_map,''), yid_in_data_array,
-		progress_path, progress_method,
+		query_act, COALESCE(query_path,''), COALESCE(query_method,''), COALESCE(query_body_type,''), COALESCE(query_param_style,''), COALESCE(query_param_map,''), query_polling, query_max_attempts, query_interval, COALESCE(query_response_map,''),
+		COALESCE(order_path,''), COALESCE(order_method,''), COALESCE(order_body_type,''), COALESCE(order_param_map,''), yid_in_data_array,
+		COALESCE(progress_path,''), COALESCE(progress_method,''),
 		COALESCE(progress_body_type,''), COALESCE(progress_param_map,''),
-		COALESCE(category_path,''), COALESCE(category_method,'POST'), COALESCE(category_body_type,''), COALESCE(category_param_map,''),
-		COALESCE(class_list_path,''), COALESCE(class_list_method,'POST'), COALESCE(class_list_body_type,''), COALESCE(class_list_param_map,''),
-		pause_path, COALESCE(pause_method,'POST'), COALESCE(pause_body_type,''), COALESCE(pause_param_map,''), COALESCE(pause_id_param,'id'),
-		COALESCE(resume_path,''), COALESCE(resume_method,'POST'), COALESCE(resume_body_type,''), COALESCE(resume_param_map,''),
-		change_pass_path, COALESCE(change_pass_method,'POST'), COALESCE(change_pass_body_type,''), COALESCE(change_pass_param_map,''), change_pass_param, change_pass_id_param,
-		resubmit_path, COALESCE(resubmit_method,'POST'), COALESCE(resubmit_body_type,''), COALESCE(resubmit_param_map,''), COALESCE(resubmit_id_param,'id'),
-		log_path, log_method, COALESCE(log_body_type,''), COALESCE(log_param_map,''), log_id_param,
-		COALESCE(balance_path,''), COALESCE(balance_money_field,'money'),
-		COALESCE(balance_method,'POST'), COALESCE(balance_body_type,''), COALESCE(balance_param_map,''), COALESCE(balance_auth_type,''),
-		COALESCE(report_param_style,''), COALESCE(report_auth_type,''), COALESCE(report_path,''), COALESCE(report_method,'POST'), COALESCE(report_body_type,''), COALESCE(report_param_map,''),
-		COALESCE(get_report_path,''), COALESCE(get_report_method,'POST'), COALESCE(get_report_body_type,''), COALESCE(get_report_param_map,''), COALESCE(refresh_path,''),
+		COALESCE(category_path,''), COALESCE(category_method,''), COALESCE(category_body_type,''), COALESCE(category_param_map,''),
+		COALESCE(class_list_path,''), COALESCE(class_list_method,''), COALESCE(class_list_body_type,''), COALESCE(class_list_param_map,''),
+		COALESCE(pause_path,''), COALESCE(pause_method,''), COALESCE(pause_body_type,''), COALESCE(pause_param_map,''), COALESCE(pause_id_param,''),
+		COALESCE(resume_path,''), COALESCE(resume_method,''), COALESCE(resume_body_type,''), COALESCE(resume_param_map,''),
+		COALESCE(change_pass_path,''), COALESCE(change_pass_method,''), COALESCE(change_pass_body_type,''), COALESCE(change_pass_param_map,''), COALESCE(change_pass_param,''), COALESCE(change_pass_id_param,''),
+		COALESCE(resubmit_path,''), COALESCE(resubmit_method,''), COALESCE(resubmit_body_type,''), COALESCE(resubmit_param_map,''), COALESCE(resubmit_id_param,''),
+		COALESCE(log_path,''), COALESCE(log_method,''), COALESCE(log_body_type,''), COALESCE(log_param_map,''), COALESCE(log_id_param,''),
+		COALESCE(balance_path,''), COALESCE(balance_money_field,''),
+		COALESCE(balance_method,''), COALESCE(balance_body_type,''), COALESCE(balance_param_map,''), COALESCE(balance_auth_type,''),
+		COALESCE(report_param_style,''), COALESCE(report_auth_type,''), COALESCE(report_path,''), COALESCE(report_method,''), COALESCE(report_body_type,''), COALESCE(report_param_map,''),
+		COALESCE(get_report_path,''), COALESCE(get_report_method,''), COALESCE(get_report_body_type,''), COALESCE(get_report_param_map,''), COALESCE(refresh_path,''),
 		COALESCE(source_code,''), created_at, updated_at
 		FROM qingka_platform_config ORDER BY pt`)
 	if err != nil {
@@ -448,18 +448,18 @@ func firstNonEmpty(values ...string) string {
 
 func canonicalizePlatformConfigDB(cfg *model.PlatformConfigDB) {
 	if !isCustomQueryDriverValue(cfg.QueryAct) {
-		cfg.QueryPath = firstNonEmpty(cfg.QueryPath, "/api.php?act=get")
+		cfg.QueryPath = firstNonEmpty(cfg.QueryPath)
 		cfg.QueryAct = ""
 	}
-	cfg.OrderPath = firstNonEmpty(cfg.OrderPath, "/api.php?act=add")
-	cfg.ProgressPath = firstNonEmpty(cfg.ProgressPath, "/api.php?act=chadan2")
-	cfg.CategoryPath = firstNonEmpty(cfg.CategoryPath, "/api.php?act=getcate")
-	cfg.ClassListPath = firstNonEmpty(cfg.ClassListPath, "/api.php?act=getclass")
-	cfg.PausePath = firstNonEmpty(cfg.PausePath, "/api.php?act=zt")
+	cfg.OrderPath = firstNonEmpty(cfg.OrderPath)
+	cfg.ProgressPath = firstNonEmpty(cfg.ProgressPath)
+	cfg.CategoryPath = firstNonEmpty(cfg.CategoryPath)
+	cfg.ClassListPath = firstNonEmpty(cfg.ClassListPath)
+	cfg.PausePath = firstNonEmpty(cfg.PausePath)
 	cfg.ResumePath = firstNonEmpty(cfg.ResumePath)
-	cfg.ChangePassPath = firstNonEmpty(cfg.ChangePassPath, "/api.php?act=gaimi")
-	cfg.LogPath = firstNonEmpty(cfg.LogPath, "/api.php?act=xq")
-	cfg.BalancePath = firstNonEmpty(cfg.BalancePath, "/api.php?act=getmoney")
+	cfg.ChangePassPath = firstNonEmpty(cfg.ChangePassPath)
+	cfg.LogPath = firstNonEmpty(cfg.LogPath)
+	cfg.BalancePath = firstNonEmpty(cfg.BalancePath)
 }
 
 func normalizePlatformConfigSaveRequest(req *model.PlatformConfigSaveRequest) {
@@ -470,87 +470,112 @@ func normalizePlatformConfigSaveRequest(req *model.PlatformConfigSaveRequest) {
 		req.SuccessCodes = "0"
 	}
 	if !isCustomQueryDriverValue(req.QueryAct) {
-		req.QueryPath = firstNonEmpty(req.QueryPath, "/api.php?act=get")
+		req.QueryPath = firstNonEmpty(req.QueryPath)
 		req.QueryAct = ""
 	}
-	if req.QueryMethod == "" {
-		req.QueryMethod = "POST"
-	}
-	req.OrderPath = firstNonEmpty(req.OrderPath, "/api.php?act=add")
-	if req.OrderMethod == "" {
-		req.OrderMethod = "POST"
-	}
-	req.ProgressPath = firstNonEmpty(req.ProgressPath, "/api.php?act=chadan2")
-	if req.ProgressMethod == "" {
-		req.ProgressMethod = "POST"
-	}
+	req.QueryMethod = strings.ToUpper(strings.TrimSpace(req.QueryMethod))
+	req.OrderPath = firstNonEmpty(req.OrderPath)
+	req.OrderMethod = strings.ToUpper(strings.TrimSpace(req.OrderMethod))
+	req.ProgressPath = firstNonEmpty(req.ProgressPath)
+	req.ProgressMethod = strings.ToUpper(strings.TrimSpace(req.ProgressMethod))
 	req.ProgressParamMap = strings.TrimSpace(req.ProgressParamMap)
-	req.CategoryPath = firstNonEmpty(req.CategoryPath, "/api.php?act=getcate")
-	if req.CategoryMethod == "" {
-		req.CategoryMethod = "POST"
-	}
-	req.ClassListPath = firstNonEmpty(req.ClassListPath, "/api.php?act=getclass")
-	if req.ClassListMethod == "" {
-		req.ClassListMethod = "POST"
-	}
-	req.PausePath = firstNonEmpty(req.PausePath, "/api.php?act=zt")
-	if req.PauseMethod == "" {
-		req.PauseMethod = "POST"
-	}
-	if req.PauseIDParam == "" {
-		req.PauseIDParam = "id"
-	}
+	req.CategoryPath = firstNonEmpty(req.CategoryPath)
+	req.CategoryMethod = strings.ToUpper(strings.TrimSpace(req.CategoryMethod))
+	req.ClassListPath = firstNonEmpty(req.ClassListPath)
+	req.ClassListMethod = strings.ToUpper(strings.TrimSpace(req.ClassListMethod))
+	req.PausePath = firstNonEmpty(req.PausePath)
+	req.PauseMethod = strings.ToUpper(strings.TrimSpace(req.PauseMethod))
+	req.PauseIDParam = strings.TrimSpace(req.PauseIDParam)
 	req.ResumePath = firstNonEmpty(req.ResumePath)
-	if req.ResumeMethod == "" {
-		req.ResumeMethod = "POST"
-	}
-	req.ChangePassPath = firstNonEmpty(req.ChangePassPath, "/api.php?act=gaimi")
-	if req.ChangePassMethod == "" {
-		req.ChangePassMethod = "POST"
-	}
-	if req.ChangePassParam == "" {
-		req.ChangePassParam = "newPwd"
-	}
-	if req.ChangePassIDParam == "" {
-		req.ChangePassIDParam = "id"
-	}
-	if req.ResubmitMethod == "" {
-		req.ResubmitMethod = "POST"
-	}
-	if req.ResubmitIDParam == "" {
-		req.ResubmitIDParam = "id"
-	}
-	req.ResubmitPath = firstNonEmpty(req.ResubmitPath, "/api.php?act=budan")
-	req.LogPath = firstNonEmpty(req.LogPath, "/api.php?act=xq")
-	if req.LogMethod == "" {
-		req.LogMethod = "POST"
-	}
-	if req.LogIDParam == "" {
-		req.LogIDParam = "id"
-	}
-	req.BalancePath = firstNonEmpty(req.BalancePath, "/api.php?act=getmoney")
-	if req.BalanceMoneyField == "" {
-		req.BalanceMoneyField = "money"
-	}
-	if req.BalanceMethod == "" {
-		req.BalanceMethod = "POST"
-	}
-	if req.ReportMethod == "" {
-		req.ReportMethod = "POST"
-	}
-	if req.GetReportMethod == "" {
-		req.GetReportMethod = "POST"
-	}
+	req.ResumeMethod = strings.ToUpper(strings.TrimSpace(req.ResumeMethod))
+	req.ChangePassPath = firstNonEmpty(req.ChangePassPath)
+	req.ChangePassMethod = strings.ToUpper(strings.TrimSpace(req.ChangePassMethod))
+	req.ChangePassParam = strings.TrimSpace(req.ChangePassParam)
+	req.ChangePassIDParam = strings.TrimSpace(req.ChangePassIDParam)
+	req.ResubmitMethod = strings.ToUpper(strings.TrimSpace(req.ResubmitMethod))
+	req.ResubmitIDParam = strings.TrimSpace(req.ResubmitIDParam)
+	req.ResubmitPath = firstNonEmpty(req.ResubmitPath)
+	req.LogPath = firstNonEmpty(req.LogPath)
+	req.LogMethod = strings.ToUpper(strings.TrimSpace(req.LogMethod))
+	req.LogIDParam = strings.TrimSpace(req.LogIDParam)
+	req.BalancePath = firstNonEmpty(req.BalancePath)
+	req.BalanceMoneyField = strings.TrimSpace(req.BalanceMoneyField)
+	req.BalanceMethod = strings.ToUpper(strings.TrimSpace(req.BalanceMethod))
+	req.ReportParamStyle = strings.TrimSpace(req.ReportParamStyle)
+	req.ReportAuthType = strings.TrimSpace(req.ReportAuthType)
+	req.ReportPath = firstNonEmpty(req.ReportPath)
+	req.ReportMethod = strings.ToUpper(strings.TrimSpace(req.ReportMethod))
+	req.GetReportPath = firstNonEmpty(req.GetReportPath)
+	req.GetReportMethod = strings.ToUpper(strings.TrimSpace(req.GetReportMethod))
 }
 
 func validatePlatformConfigSaveRequest(req *model.PlatformConfigSaveRequest) string {
-	if strings.TrimSpace(req.ProgressParamMap) == "" {
-		return "请填写进度参数映射JSON"
+	validateActionJSON := func(label, path, method, paramMap string, required bool) string {
+		configured := strings.TrimSpace(path) != "" || strings.TrimSpace(method) != "" || strings.TrimSpace(paramMap) != ""
+		if !configured && !required {
+			return ""
+		}
+		if strings.TrimSpace(path) == "" {
+			return "请填写" + label + "路径"
+		}
+		if strings.TrimSpace(method) == "" {
+			return "请填写" + label + "请求方式"
+		}
+		if strings.TrimSpace(paramMap) == "" {
+			return "请填写" + label + "参数映射JSON"
+		}
+
+		var mapped map[string]string
+		if err := json.Unmarshal([]byte(paramMap), &mapped); err != nil {
+			return label + "参数映射JSON格式错误: " + err.Error()
+		}
+		return ""
 	}
 
-	var progressParamMap map[string]string
-	if err := json.Unmarshal([]byte(req.ProgressParamMap), &progressParamMap); err != nil {
-		return "进度参数映射JSON格式错误: " + err.Error()
+	if !isCustomQueryDriverValue(req.QueryAct) {
+		if msg := validateActionJSON("查课", req.QueryPath, req.QueryMethod, req.QueryParamMap, false); msg != "" {
+			return msg
+		}
+	}
+
+	if msg := validateActionJSON("下单", req.OrderPath, req.OrderMethod, req.OrderParamMap, false); msg != "" {
+		return msg
+	}
+	if msg := validateActionJSON("进度", req.ProgressPath, req.ProgressMethod, req.ProgressParamMap, false); msg != "" {
+		return msg
+	}
+	if msg := validateActionJSON("分类", req.CategoryPath, req.CategoryMethod, req.CategoryParamMap, false); msg != "" {
+		return msg
+	}
+	if msg := validateActionJSON("课程列表", req.ClassListPath, req.ClassListMethod, req.ClassListParamMap, false); msg != "" {
+		return msg
+	}
+	if msg := validateActionJSON("暂停", req.PausePath, req.PauseMethod, req.PauseParamMap, false); msg != "" {
+		return msg
+	}
+	if msg := validateActionJSON("恢复", req.ResumePath, req.ResumeMethod, req.ResumeParamMap, false); msg != "" {
+		return msg
+	}
+	if msg := validateActionJSON("改密", req.ChangePassPath, req.ChangePassMethod, req.ChangePassParamMap, false); msg != "" {
+		return msg
+	}
+	if msg := validateActionJSON("补单", req.ResubmitPath, req.ResubmitMethod, req.ResubmitParamMap, false); msg != "" {
+		return msg
+	}
+	if msg := validateActionJSON("日志", req.LogPath, req.LogMethod, req.LogParamMap, false); msg != "" {
+		return msg
+	}
+	if msg := validateActionJSON("余额", req.BalancePath, req.BalanceMethod, req.BalanceParamMap, false); msg != "" {
+		return msg
+	}
+	if strings.TrimSpace(req.BalancePath) != "" && strings.TrimSpace(req.BalanceMoneyField) == "" {
+		return "请填写余额金额字段路径"
+	}
+	if msg := validateActionJSON("提交工单", req.ReportPath, req.ReportMethod, req.ReportParamMap, false); msg != "" {
+		return msg
+	}
+	if msg := validateActionJSON("查询工单", req.GetReportPath, req.GetReportMethod, req.GetReportParamMap, false); msg != "" {
+		return msg
 	}
 	return ""
 }

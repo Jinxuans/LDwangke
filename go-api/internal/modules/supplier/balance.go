@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"go-api/internal/database"
@@ -65,6 +64,12 @@ func (s *Service) QueryBalance(hid int) (map[string]interface{}, error) {
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
+	if err := requireExplicitActionConfig("余额接口", cfg.BalancePath, cfg.BalanceMethod, cfg.BalanceParamMap); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(cfg.BalanceMoneyField) == "" {
+		return nil, fmt.Errorf("余额接口未配置金额字段路径")
+	}
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.BalancePath)
 
 	authType := cfg.BalanceAuthType
@@ -72,91 +77,25 @@ func (s *Service) QueryBalance(hid int) (map[string]interface{}, error) {
 		authType = cfg.AuthType
 	}
 
-	if strings.TrimSpace(cfg.BalanceParamMap) != "" {
-		defaultParams := defaultSupplierAuthParams(sup, authType)
-		execResult, err := s.executeConfiguredAction(
-			sup,
-			apiURL,
-			cfg.BalanceMethod,
-			cfg.BalanceBodyType,
-			cfg.BalanceParamMap,
-			http.MethodPost,
-			"form",
-			defaultParams,
-			map[string]string{},
-		)
-		if err != nil {
-			return nil, fmt.Errorf("请求上游余额接口失败：%v", err)
-		}
-
-		var raw map[string]interface{}
-		if err := json.Unmarshal(execResult.Body, &raw); err != nil {
-			return nil, fmt.Errorf("解析响应失败：%s", string(execResult.Body))
-		}
-
-		money := extractMoneyField(raw, cfg.BalanceMoneyField)
-		result := map[string]interface{}{
-			"code":  200,
-			"money": money,
-			"pt":    sup.PT,
-			"name":  sup.Name,
-			"hid":   hid,
-			"raw":   raw,
-		}
-		if money != "" && money != "<nil>" {
-			database.DB.Exec("UPDATE qingka_wangke_huoyuan SET money = ? WHERE hid = ?", money, hid)
-		}
-		return result, nil
-	}
-
-	var resp *http.Response
-	switch authType {
-	case "bearer_token":
-		req, reqErr := http.NewRequest("GET", apiURL, nil)
-		if reqErr != nil {
-			return nil, fmt.Errorf("构建请求失败：%v", reqErr)
-		}
-		req.Header.Set("Authorization", "Bearer "+sup.Token)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Accept", "*/*")
-		if sup.Cookie != "" {
-			cookieStr := sup.Cookie
-			if !strings.Contains(cookieStr, "=") {
-				cookieStr = "session_id=" + cookieStr
-			}
-			req.Header.Set("Cookie", cookieStr)
-		}
-		resp, err = s.client.Do(req)
-	case "token_only":
-		if cfg.UseJSON {
-			jsonData, _ := json.Marshal(map[string]string{"token": getSupplierToken(sup)})
-			req, _ := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonData)))
-			req.Header.Set("Content-Type", "application/json")
-			resp, err = s.client.Do(req)
-		} else {
-			form := url.Values{}
-			form.Set("token", getSupplierToken(sup))
-			resp, err = s.client.PostForm(apiURL, form)
-		}
-	default:
-		form := url.Values{}
-		form.Set("uid", sup.User)
-		form.Set("key", sup.Pass)
-		resp, err = s.client.PostForm(apiURL, form)
-	}
+	defaultParams := defaultSupplierAuthParams(sup, authType)
+	execResult, err := s.executeConfiguredAction(
+		sup,
+		apiURL,
+		cfg.BalanceMethod,
+		cfg.BalanceBodyType,
+		cfg.BalanceParamMap,
+		http.MethodPost,
+		"form",
+		defaultParams,
+		map[string]string{},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("请求上游余额接口失败：%v", err)
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应失败：%v", err)
-	}
 
 	var raw map[string]interface{}
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("解析响应失败：%s", string(body))
+	if err := json.Unmarshal(execResult.Body, &raw); err != nil {
+		return nil, fmt.Errorf("解析响应失败：%s", string(execResult.Body))
 	}
 
 	money := extractMoneyField(raw, cfg.BalanceMoneyField)
