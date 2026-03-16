@@ -202,6 +202,12 @@ const routes: RouteRecordRaw[] = [
             component: () => import('#/views/admin/sync-monitor.vue'),
             meta: { icon: 'mdi:sync-circle', order: 4, title: '商品同步监控' },
           },
+          {
+            name: 'AdminDockScheduler',
+            path: '/admin/queue',
+            component: () => import('#/views/admin/queue.vue'),
+            meta: { icon: 'mdi:timer-sync-outline', order: 5, title: '待对接调度' },
+          },
         ],
       },
 

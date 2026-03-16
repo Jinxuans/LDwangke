@@ -8,7 +8,7 @@ import (
 
 	"go-api/internal/cache"
 	"go-api/internal/database"
-	"go-api/internal/queue"
+	"go-api/internal/dockscheduler"
 	"go-api/internal/ws"
 )
 
@@ -217,9 +217,22 @@ func (s *OpsService) GetWSStatus() WSStatus {
 	return st
 }
 
-func (s *OpsService) GetQueueStats() map[string]interface{} {
-	if queue.GlobalDockQueue != nil {
-		return queue.GlobalDockQueue.Stats()
+func (s *OpsService) GetDockSchedulerStats() map[string]interface{} {
+	stats := dockscheduler.Snapshot()
+	return map[string]interface{}{
+		"running":       stats.Running,
+		"active":        stats.Active,
+		"pending":       stats.Pending,
+		"interval_sec":  stats.IntervalSec,
+		"batch_limit":   stats.BatchLimit,
+		"last_fetched":  stats.LastFetched,
+		"last_success":  stats.LastSuccess,
+		"last_fail":     stats.LastFail,
+		"total_success": stats.TotalSuccess,
+		"total_fail":    stats.TotalFail,
+		"total_runs":    stats.TotalRuns,
+		"last_run_time": stats.LastRunTime,
+		"last_trigger":  stats.LastTrigger,
+		"last_error":    stats.LastError,
 	}
-	return map[string]interface{}{"running": false}
 }

@@ -22,9 +22,9 @@ import { getUserProfileApi, type UserProfile } from '#/api/user-center';
 import { useAccessStore } from '@vben/stores';
 import {
   getDashboardStatsApi, getPublicAnnouncementsApi,
-  getQueueStatsApi, setQueueConcurrencyApi, getSiteConfigApi,
+  getDockSchedulerStatsApi, runDockSchedulerApi, getSiteConfigApi,
   getTopConsumersApi,
-  type DashboardStats, type AnnouncementItem, type QueueStats, type TopConsumer,
+  type DashboardStats, type AnnouncementItem, type DockSchedulerStats, type TopConsumer,
 } from '#/api/admin';
 import { userCheckinApi, userCheckinStatusApi } from '#/api/checkin';
 
@@ -39,9 +39,8 @@ const loading = ref(false);
 const profile = ref<UserProfile | null>(null);
 const dashStats = ref<DashboardStats | null>(null);
 const announcements = ref<AnnouncementItem[]>([]);
-const queueStats = ref<QueueStats | null>(null);
-const editingConcurrency = ref(false);
-const newConcurrency = ref(5);
+const dockSchedulerStats = ref<DockSchedulerStats | null>(null);
+const dockSchedulerRunning = ref(false);
 const maintenanceMode = ref(false);
 const siteNotice = ref('');
 const checkinEnabled = ref(false);
@@ -94,9 +93,7 @@ async function loadDashboard() {
       dashStats.value = stats;
       announcements.value = ann.list || [];
       try {
-        const qs = await getQueueStatsApi();
-        queueStats.value = qs;
-        newConcurrency.value = queueStats.value?.max_workers || 5;
+        dockSchedulerStats.value = await getDockSchedulerStatsApi();
       } catch {}
     } else {
       const ann = await getPublicAnnouncementsApi(1, 5);
@@ -258,18 +255,18 @@ const quickActions = [
   { label: '充值中心', icon: WalletOutlined, path: '/user/recharge', color: '#ef4444' },
 ];
 
-async function handleSetConcurrency() {
+async function runDockScheduler() {
+  dockSchedulerRunning.value = true;
   try {
-    const res = await setQueueConcurrencyApi(newConcurrency.value);
-    queueStats.value = res;
-    editingConcurrency.value = false;
-  } catch {}
+    dockSchedulerStats.value = await runDockSchedulerApi();
+  } catch {} finally {
+    dockSchedulerRunning.value = false;
+  }
 }
 
-async function refreshQueue() {
+async function refreshDockScheduler() {
   try {
-    const qs = await getQueueStatsApi();
-    queueStats.value = qs;
+    dockSchedulerStats.value = await getDockSchedulerStatsApi();
   } catch {}
 }
 
@@ -452,37 +449,35 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
             </Col>
           </Row>
 
-          <!-- 对接队列状态 (管理员可见) -->
-          <Card class="mt-3" v-if="hasAdminRole && queueStats" size="small">
+          <!-- 待对接订单调度状态 (管理员可见) -->
+          <Card class="mt-3" v-if="hasAdminRole && dockSchedulerStats" size="small">
             <template #title>
               <div class="flex items-center gap-2">
                 <ThunderboltOutlined style="color:#3b82f6" />
-                <span>对接队列</span>
-                <Button type="link" size="small" @click="refreshQueue"><SyncOutlined /> 刷新</Button>
+                <span>待对接订单调度</span>
+                <Button type="link" size="small" @click="refreshDockScheduler"><SyncOutlined /> 刷新</Button>
               </div>
             </template>
             <template #extra>
               <div class="flex items-center gap-2">
-                <span class="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">并发:</span>
-                <template v-if="editingConcurrency">
-                  <input type="number" v-model.number="newConcurrency" min="1" max="100" class="w-14 rounded border px-2 py-0.5 text-sm" />
-                  <Button size="small" type="primary" @click="handleSetConcurrency">确定</Button>
-                  <Button size="small" @click="editingConcurrency = false">取消</Button>
-                </template>
-                <template v-else>
-                  <Tag color="blue">{{ queueStats.max_workers }}</Tag>
-                  <Button type="link" size="small" @click="editingConcurrency = true; newConcurrency = queueStats.max_workers">调整</Button>
-                </template>
+                <Tag color="blue">每轮 {{ dockSchedulerStats.batch_limit }} 单</Tag>
+                <Tag color="cyan">每 {{ dockSchedulerStats.interval_sec }} 秒</Tag>
+                <Button size="small" type="primary" :loading="dockSchedulerRunning" @click="runDockScheduler">立即执行</Button>
               </div>
             </template>
             <Row :gutter="16">
-              <Col :span="4" class="text-center"><Statistic :value="queueStats.active" :value-style="{color:'#3b82f6'}" /><div class="text-xs text-gray-400 dark:text-gray-500">活跃</div></Col>
-              <Col :span="4" class="text-center"><Statistic :value="queueStats.pending" :value-style="{color:'#f59e0b'}" /><div class="text-xs text-gray-400 dark:text-gray-500">排队</div></Col>
-              <Col :span="4" class="text-center"><Statistic :value="queueStats.processing" :value-style="{color:'#06b6d4'}" /><div class="text-xs text-gray-400 dark:text-gray-500">处理</div></Col>
-              <Col :span="4" class="text-center"><Statistic :value="queueStats.completed" :value-style="{color:'#10b981'}" /><div class="text-xs text-gray-400 dark:text-gray-500">完成</div></Col>
-              <Col :span="4" class="text-center"><Statistic :value="queueStats.failed" :value-style="{color:'#ef4444'}" /><div class="text-xs text-gray-400 dark:text-gray-500">失败</div></Col>
-              <Col :span="4" class="text-center"><Statistic :value="`${queueStats.queue_size}/${queueStats.queue_cap}`" :value-style="{color:'#6b7280'}" /><div class="text-xs text-gray-400 dark:text-gray-500">容量</div></Col>
+              <Col :span="4" class="text-center"><Statistic :value="dockSchedulerStats.active" :value-style="{color:'#3b82f6'}" /><div class="text-xs text-gray-400 dark:text-gray-500">运行中</div></Col>
+              <Col :span="4" class="text-center"><Statistic :value="dockSchedulerStats.pending" :value-style="{color:'#f59e0b'}" /><div class="text-xs text-gray-400 dark:text-gray-500">待对接/重试</div></Col>
+              <Col :span="4" class="text-center"><Statistic :value="dockSchedulerStats.last_fetched" :value-style="{color:'#06b6d4'}" /><div class="text-xs text-gray-400 dark:text-gray-500">本轮抓取</div></Col>
+              <Col :span="4" class="text-center"><Statistic :value="dockSchedulerStats.last_success" :value-style="{color:'#10b981'}" /><div class="text-xs text-gray-400 dark:text-gray-500">本轮成功</div></Col>
+              <Col :span="4" class="text-center"><Statistic :value="dockSchedulerStats.last_fail" :value-style="{color:'#ef4444'}" /><div class="text-xs text-gray-400 dark:text-gray-500">本轮失败</div></Col>
+              <Col :span="4" class="text-center"><Statistic :value="dockSchedulerStats.total_runs" :value-style="{color:'#6b7280'}" /><div class="text-xs text-gray-400 dark:text-gray-500">累计轮次</div></Col>
             </Row>
+            <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+              上次执行：{{ dockSchedulerStats.last_run_time || '暂无' }}
+              <span v-if="dockSchedulerStats.last_trigger"> / 来源：{{ dockSchedulerStats.last_trigger }}</span>
+              <span v-if="dockSchedulerStats.last_error"> / 错误：{{ dockSchedulerStats.last_error }}</span>
+            </div>
           </Card>
 
           <!-- 移动端公告 + 排行 (仅小屏显示，大屏走右侧栏) -->
@@ -686,4 +681,3 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
     </Spin>
   </Page>
 </template>
-

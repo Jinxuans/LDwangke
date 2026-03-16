@@ -7,7 +7,6 @@ import (
 	"go-api/internal/database"
 	"go-api/internal/model"
 	suppliermodule "go-api/internal/modules/supplier"
-	"go-api/internal/queue"
 	shared "go-api/internal/shared/db"
 	"log"
 	"math"
@@ -161,7 +160,6 @@ func (r *legacyRepository) AddOrders(uid int, req model.OrderAddRequest) (*model
 	now := time.Now().Format("2006-01-02 15:04:05")
 	successCount := 0
 	var totalDeducted float64
-	var pendingDockOIDs []int64
 	var skippedCount int
 	var skippedDetails []string
 
@@ -200,7 +198,7 @@ func (r *legacyRepository) AddOrders(uid int, req model.OrderAddRequest) (*model
 			dockStatus = 99
 		}
 
-		result, err := tx.Exec(
+		_, err = tx.Exec(
 			"INSERT INTO qingka_wangke_order (uid, cid, hid, ptname, school, name, user, pass, kcid, kcname, courseEndTime, fees, noun, addtime, ip, dockstatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 			uid, cls.CID, dockingID, cls.Name, school, item.UserName, user, pass, kcid, kcname, kcjs, fmt.Sprintf("%.4f", unitPrice), cls.Noun, now, "", dockStatus,
 		)
@@ -213,12 +211,6 @@ func (r *legacyRepository) AddOrders(uid int, req model.OrderAddRequest) (*model
 			"INSERT INTO qingka_wangke_moneylog (uid, type, money, balance, remark, addtime) VALUES (?, '扣费', ?, (SELECT money FROM qingka_wangke_user WHERE uid = ?), ?, ?)",
 			uid, -unitPrice, uid, fmt.Sprintf("%s %s %s %s 扣除%.2f 元", cls.Name, user, pass, kcname, unitPrice), now,
 		)
-
-		if dockStatus == 0 {
-			if oid, e := result.LastInsertId(); e == nil {
-				pendingDockOIDs = append(pendingDockOIDs, oid)
-			}
-		}
 
 		successCount++
 		totalDeducted += unitPrice
@@ -234,9 +226,6 @@ func (r *legacyRepository) AddOrders(uid int, req model.OrderAddRequest) (*model
 	}
 
 	database.DB.Exec("UPDATE qingka_wangke_user SET order_count = order_count + ? WHERE uid = ?", successCount, uid)
-	if len(pendingDockOIDs) > 0 && queue.GlobalDockQueue != nil {
-		queue.GlobalDockQueue.PushBatch(pendingDockOIDs)
-	}
 
 	return &model.OrderAddResult{
 		SuccessCount: successCount,
@@ -304,7 +293,6 @@ func (r *legacyRepository) AddOrdersForMall(bUID, tid, cUID int, retailPrice flo
 	now := time.Now().Format("2006-01-02 15:04:05")
 	successCount := 0
 	var totalDeducted float64
-	var pendingDockOIDs []int64
 	var allOIDs []int64
 	var skippedCount int
 	var skippedDetails []string
@@ -362,9 +350,6 @@ func (r *legacyRepository) AddOrdersForMall(bUID, tid, cUID int, retailPrice flo
 		var insertedOID int64
 		if oid, e := result.LastInsertId(); e == nil {
 			insertedOID = oid
-			if dockStatus == 0 {
-				pendingDockOIDs = append(pendingDockOIDs, oid)
-			}
 		}
 		successCount++
 		totalDeducted += supplyPrice
@@ -379,10 +364,6 @@ func (r *legacyRepository) AddOrdersForMall(bUID, tid, cUID int, retailPrice flo
 
 	if err := tx.Commit(); err != nil {
 		return nil, errors.New("提交订单失败，请重试")
-	}
-
-	if len(pendingDockOIDs) > 0 && queue.GlobalDockQueue != nil {
-		queue.GlobalDockQueue.PushBatch(pendingDockOIDs)
 	}
 
 	return &model.OrderAddResult{

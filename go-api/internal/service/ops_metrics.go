@@ -23,7 +23,7 @@ func (s *OpsService) GetErrorStats() ErrorStats {
 	es := opsErrorStatsSnapshot()
 	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_order WHERE status = '失败' AND DATE(addtime) = CURDATE()").Scan(&es.TodayFailed)
 	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_order WHERE status = '异常' AND DATE(addtime) = CURDATE()").Scan(&es.TodayException)
-	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_order WHERE dockstatus = 0").Scan(&es.PendingDock)
+	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_order WHERE dockstatus IN (0, 2)").Scan(&es.PendingDock)
 	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_order WHERE status = '进行中' AND addtime < NOW() - INTERVAL 24 HOUR").Scan(&es.StuckOrders)
 	return es
 }
@@ -159,29 +159,29 @@ func (s *OpsService) GetTodayHourlyOrders() []HourlyOrder {
 }
 
 type OpsDashboard struct {
-	System       SystemInfo             `json:"system"`
-	DB           DBHealth               `json:"db"`
-	Redis        RedisHealth            `json:"redis"`
-	WS           WSStatus               `json:"ws"`
-	Queue        map[string]interface{} `json:"queue"`
-	Errors       ErrorStats             `json:"errors"`
-	Storage      StorageInfo            `json:"storage"`
-	Tables       []TableSize            `json:"tables"`
-	ErrorOrders  []RecentErrorOrder     `json:"error_orders"`
-	HourlyOrders []HourlyOrder          `json:"hourly_orders"`
+	System        SystemInfo             `json:"system"`
+	DB            DBHealth               `json:"db"`
+	Redis         RedisHealth            `json:"redis"`
+	WS            WSStatus               `json:"ws"`
+	DockScheduler map[string]interface{} `json:"dock_scheduler"`
+	Errors        ErrorStats             `json:"errors"`
+	Storage       StorageInfo            `json:"storage"`
+	Tables        []TableSize            `json:"tables"`
+	ErrorOrders   []RecentErrorOrder     `json:"error_orders"`
+	HourlyOrders  []HourlyOrder          `json:"hourly_orders"`
 }
 
 func (s *OpsService) GetDashboard() OpsDashboard {
 	return OpsDashboard{
-		System:       s.GetSystemInfo(),
-		DB:           s.GetDBHealth(),
-		Redis:        s.GetRedisHealth(),
-		WS:           s.GetWSStatus(),
-		Queue:        s.GetQueueStats(),
-		Errors:       s.GetErrorStats(),
-		Storage:      s.GetStorageInfo(),
-		Tables:       s.GetTableSizes(),
-		ErrorOrders:  s.GetRecentErrorOrders(20),
-		HourlyOrders: s.GetTodayHourlyOrders(),
+		System:        s.GetSystemInfo(),
+		DB:            s.GetDBHealth(),
+		Redis:         s.GetRedisHealth(),
+		WS:            s.GetWSStatus(),
+		DockScheduler: s.GetDockSchedulerStats(),
+		Errors:        s.GetErrorStats(),
+		Storage:       s.GetStorageInfo(),
+		Tables:        s.GetTableSizes(),
+		ErrorOrders:   s.GetRecentErrorOrders(20),
+		HourlyOrders:  s.GetTodayHourlyOrders(),
 	}
 }

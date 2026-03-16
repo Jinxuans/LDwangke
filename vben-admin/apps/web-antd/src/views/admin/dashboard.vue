@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Page } from '@vben/common-ui';
-import { Card, Row, Col, Spin, Table, Tag, Button, Progress, Tooltip, InputNumber, Space } from 'ant-design-vue';
+import { Card, Row, Col, Spin, Table, Tag, Button, Progress, Tooltip } from 'ant-design-vue';
 import {
   UserOutlined, ShoppingCartOutlined, DollarOutlined,
   SyncOutlined, WalletOutlined, BarChartOutlined, ReloadOutlined,
@@ -10,7 +10,7 @@ import {
   ThunderboltOutlined, CloseCircleOutlined, DashboardOutlined,
   SettingOutlined, PauseCircleOutlined,
 } from '@ant-design/icons-vue';
-import { getDashboardStatsApi, getQueueStatsApi, setQueueConcurrencyApi, type QueueStats } from '#/api/admin';
+import { getDashboardStatsApi, getDockSchedulerStatsApi, runDockSchedulerApi, type DockSchedulerStats } from '#/api/admin';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
@@ -20,11 +20,9 @@ const autoRefreshTimer = ref<ReturnType<typeof setInterval> | null>(null);
 const autoRefresh = ref(false);
 const hoveredBar = ref<{ type: string; index: number } | null>(null);
 
-// 队列状态
-const queueStats = ref<QueueStats | null>(null);
-const editingConcurrency = ref(false);
-const newWorkers = ref(5);
-const savingWorkers = ref(false);
+// 待对接订单调度状态
+const dockSchedulerStats = ref<DockSchedulerStats | null>(null);
+const dockSchedulerRunning = ref(false);
 
 const stats = ref<Record<string, any>>({
   user_count: 0,
@@ -76,11 +74,9 @@ async function loadStats() {
     const res = await getDashboardStatsApi() as any;
     stats.value = res?.data ?? res;
     lastRefreshTime.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    // 同时加载队列状态
+    // 同时加载待对接订单调度状态
     try {
-      const qs = await getQueueStatsApi();
-      queueStats.value = qs;
-      if (!editingConcurrency.value) newWorkers.value = queueStats.value?.max_workers || 5;
+      dockSchedulerStats.value = await getDockSchedulerStatsApi();
     } catch {}
   } catch (e) {
     console.error('加载统计失败:', e);
@@ -89,15 +85,12 @@ async function loadStats() {
   }
 }
 
-async function handleSetConcurrency() {
-  if (newWorkers.value < 1 || newWorkers.value > 100) return;
-  savingWorkers.value = true;
+async function runDockScheduler() {
+  dockSchedulerRunning.value = true;
   try {
-    const res = await setQueueConcurrencyApi(newWorkers.value);
-    queueStats.value = res;
-    editingConcurrency.value = false;
+    dockSchedulerStats.value = await runDockSchedulerApi();
   } catch {} finally {
-    savingWorkers.value = false;
+    dockSchedulerRunning.value = false;
   }
 }
 
@@ -415,74 +408,71 @@ onUnmounted(() => {
         </Col>
       </Row>
 
-      <!-- 对接队列 -->
-      <Card class="mt-4" v-if="queueStats">
+      <!-- 待对接订单调度 -->
+      <Card class="mt-4" v-if="dockSchedulerStats">
         <template #title>
           <div class="flex items-center gap-2">
             <ThunderboltOutlined style="color: #1677ff;" />
-            <span>对接队列</span>
+            <span>待对接订单调度</span>
           </div>
         </template>
         <template #extra>
           <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-400 dark:text-gray-500">并发数:</span>
-            <template v-if="editingConcurrency">
-              <InputNumber v-model:value="newWorkers" :min="1" :max="100" size="small" style="width: 80px;" />
-              <Button size="small" type="primary" :loading="savingWorkers" @click="handleSetConcurrency">确定</Button>
-              <Button size="small" @click="editingConcurrency = false">取消</Button>
-            </template>
-            <template v-else>
-              <Tag color="blue">{{ queueStats.max_workers }}</Tag>
-              <Button type="link" size="small" @click="editingConcurrency = true; newWorkers = queueStats.max_workers">调整</Button>
-            </template>
+            <Tag color="blue">每轮 {{ dockSchedulerStats.batch_limit }} 单</Tag>
+            <Tag color="cyan">每 {{ dockSchedulerStats.interval_sec }} 秒</Tag>
+            <Button size="small" type="primary" :loading="dockSchedulerRunning" @click="runDockScheduler">立即执行</Button>
           </div>
         </template>
         <Row :gutter="[12, 12]">
           <Col :xs="12" :sm="8" :lg="4">
             <div class="queue-stat-item">
-              <div class="queue-stat-value" style="color: #1677ff;">{{ queueStats.active }}</div>
-              <div class="queue-stat-label">活跃线程</div>
+              <div class="queue-stat-value" style="color: #1677ff;">{{ dockSchedulerStats.active }}</div>
+              <div class="queue-stat-label">运行中</div>
             </div>
           </Col>
           <Col :xs="12" :sm="8" :lg="4">
             <div class="queue-stat-item">
-              <div class="queue-stat-value" style="color: #fa8c16;">{{ queueStats.pending }}</div>
-              <div class="queue-stat-label">排队中</div>
+              <div class="queue-stat-value" style="color: #fa8c16;">{{ dockSchedulerStats.pending }}</div>
+              <div class="queue-stat-label">待对接/重试</div>
             </div>
           </Col>
           <Col :xs="12" :sm="8" :lg="4">
             <div class="queue-stat-item">
-              <div class="queue-stat-value" style="color: #13c2c2;">{{ queueStats.processing }}</div>
-              <div class="queue-stat-label">处理中</div>
+              <div class="queue-stat-value" style="color: #13c2c2;">{{ dockSchedulerStats.last_fetched }}</div>
+              <div class="queue-stat-label">本轮抓取</div>
             </div>
           </Col>
           <Col :xs="12" :sm="8" :lg="4">
             <div class="queue-stat-item">
-              <div class="queue-stat-value" style="color: #52c41a;">{{ queueStats.completed }}</div>
-              <div class="queue-stat-label">已完成</div>
+              <div class="queue-stat-value" style="color: #52c41a;">{{ dockSchedulerStats.last_success }}</div>
+              <div class="queue-stat-label">本轮成功</div>
             </div>
           </Col>
           <Col :xs="12" :sm="8" :lg="4">
             <div class="queue-stat-item">
-              <div class="queue-stat-value" style="color: #ff4d4f;">{{ queueStats.failed }}</div>
-              <div class="queue-stat-label">失败</div>
+              <div class="queue-stat-value" style="color: #ff4d4f;">{{ dockSchedulerStats.last_fail }}</div>
+              <div class="queue-stat-label">本轮失败</div>
             </div>
           </Col>
           <Col :xs="12" :sm="8" :lg="4">
             <div class="queue-stat-item">
-              <div class="queue-stat-value" style="color: #8c8c8c;">{{ queueStats.queue_size }}/{{ queueStats.queue_cap }}</div>
-              <div class="queue-stat-label">队列容量</div>
+              <div class="queue-stat-value" style="color: #8c8c8c;">{{ dockSchedulerStats.total_runs }}</div>
+              <div class="queue-stat-label">累计轮次</div>
             </div>
           </Col>
         </Row>
         <div class="mt-3">
-          <div class="text-xs text-gray-400 dark:text-gray-500 mb-1">Worker 使用率</div>
+          <div class="text-xs text-gray-400 dark:text-gray-500 mb-1">上次执行 {{ dockSchedulerStats.last_run_time || '暂无' }}</div>
           <Progress
-            :percent="queueStats.max_workers ? Math.round((queueStats.active / queueStats.max_workers) * 100) : 0"
+            :percent="dockSchedulerStats.batch_limit ? Math.round((dockSchedulerStats.last_fetched / dockSchedulerStats.batch_limit) * 100) : 0"
             :stroke-color="'#1677ff'"
             size="small"
             status="active"
           />
+          <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+            来源：{{ dockSchedulerStats.last_trigger || '暂无' }}
+            <span v-if="dockSchedulerStats.last_error"> / 错误：{{ dockSchedulerStats.last_error }}</span>
+          </div>
         </div>
       </Card>
 

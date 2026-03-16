@@ -268,8 +268,12 @@ onUnmounted(() => {
                   <span class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">{{ turbo.profile.redis_pool_size }}</span>
                 </div>
                 <div class="flex flex-col rounded-md bg-gray-50 p-2 dark:bg-[#1f1f1f]">
-                  <span class="mb-0.5 text-[11px] text-gray-500">对接并发</span>
-                  <span class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">{{ turbo.profile.dock_workers }}</span>
+                  <span class="mb-0.5 text-[11px] text-gray-500">待对接批量</span>
+                  <span class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">{{ turbo.profile.dock_batch_limit }}</span>
+                </div>
+                <div class="flex flex-col rounded-md bg-gray-50 p-2 dark:bg-[#1f1f1f]">
+                  <span class="mb-0.5 text-[11px] text-gray-500">待对接间隔</span>
+                  <span class="text-[15px] font-semibold text-gray-800 dark:text-gray-200">{{ turbo.profile.pending_dock_interval_sec }}s</span>
                 </div>
                 <div class="flex flex-col rounded-md bg-gray-50 p-2 dark:bg-[#1f1f1f]">
                   <span class="mb-0.5 text-[11px] text-gray-500">同步间隔</span>
@@ -603,60 +607,64 @@ onUnmounted(() => {
           </Col>
         </Row>
 
-        <!-- 对接队列 + 今日时段分布 -->
+        <!-- 待对接订单调度 + 今日时段分布 -->
         <Row :gutter="[16, 16]" class="mt-4">
           <Col :xs="24" :lg="10">
             <Card :body-style="{ padding: '16px' }">
               <template #title>
                 <div class="flex items-center gap-2">
                   <DashboardOutlined style="color: #1677ff;" />
-                  <span>对接队列</span>
+                  <span>待对接订单调度</span>
                 </div>
               </template>
               <Row :gutter="[8, 8]">
                 <Col :span="8">
                   <div class="flex flex-col items-center justify-center py-2">
-                    <div class="text-2xl font-bold leading-tight" style="color:#1677ff;">{{ dash.queue?.active || 0 }}</div>
-                    <div class="mt-0.5 text-[11px] text-gray-500">活跃</div>
+                    <div class="text-2xl font-bold leading-tight" style="color:#1677ff;">{{ dash.dock_scheduler?.active || 0 }}</div>
+                    <div class="mt-0.5 text-[11px] text-gray-500">运行中</div>
                   </div>
                 </Col>
                 <Col :span="8">
                   <div class="flex flex-col items-center justify-center py-2">
-                    <div class="text-2xl font-bold leading-tight" style="color:#fa8c16;">{{ dash.queue?.pending || 0 }}</div>
-                    <div class="mt-0.5 text-[11px] text-gray-500">排队</div>
+                    <div class="text-2xl font-bold leading-tight" style="color:#fa8c16;">{{ dash.dock_scheduler?.pending || 0 }}</div>
+                    <div class="mt-0.5 text-[11px] text-gray-500">待对接/重试</div>
                   </div>
                 </Col>
                 <Col :span="8">
                   <div class="flex flex-col items-center justify-center py-2">
-                    <div class="text-2xl font-bold leading-tight" style="color:#52c41a;">{{ dash.queue?.completed || 0 }}</div>
-                    <div class="mt-0.5 text-[11px] text-gray-500">完成</div>
+                    <div class="text-2xl font-bold leading-tight" style="color:#52c41a;">{{ dash.dock_scheduler?.last_success || 0 }}</div>
+                    <div class="mt-0.5 text-[11px] text-gray-500">本轮成功</div>
                   </div>
                 </Col>
                 <Col :span="8">
                   <div class="flex flex-col items-center justify-center py-2">
-                    <div class="text-2xl font-bold leading-tight" style="color:#13c2c2;">{{ dash.queue?.processing || 0 }}</div>
-                    <div class="mt-0.5 text-[11px] text-gray-500">处理中</div>
+                    <div class="text-2xl font-bold leading-tight" style="color:#13c2c2;">{{ dash.dock_scheduler?.last_fetched || 0 }}</div>
+                    <div class="mt-0.5 text-[11px] text-gray-500">本轮抓取</div>
                   </div>
                 </Col>
                 <Col :span="8">
                   <div class="flex flex-col items-center justify-center py-2">
-                    <div class="text-2xl font-bold leading-tight" style="color:#ff4d4f;">{{ dash.queue?.failed || 0 }}</div>
-                    <div class="mt-0.5 text-[11px] text-gray-500">失败</div>
+                    <div class="text-2xl font-bold leading-tight" style="color:#ff4d4f;">{{ dash.dock_scheduler?.last_fail || 0 }}</div>
+                    <div class="mt-0.5 text-[11px] text-gray-500">本轮失败</div>
                   </div>
                 </Col>
                 <Col :span="8">
                   <div class="flex flex-col items-center justify-center py-2">
-                    <div class="text-2xl font-bold leading-tight text-gray-500">{{ dash.queue?.queue_size || 0 }}/{{ dash.queue?.queue_cap || 0 }}</div>
-                    <div class="mt-0.5 text-[11px] text-gray-500">容量</div>
+                    <div class="text-2xl font-bold leading-tight text-gray-500">{{ dash.dock_scheduler?.total_runs || 0 }}</div>
+                    <div class="mt-0.5 text-[11px] text-gray-500">累计轮次</div>
                   </div>
                 </Col>
               </Row>
               <div class="mt-3">
-                <div class="text-xs text-gray-400 dark:text-gray-500 mb-1">Worker ({{ dash.queue?.active || 0 }}/{{ dash.queue?.max_workers || 0 }})</div>
+                <div class="text-xs text-gray-400 dark:text-gray-500 mb-1">调度占用 ({{ dash.dock_scheduler?.last_fetched || 0 }}/{{ dash.dock_scheduler?.batch_limit || 0 }})</div>
                 <Progress
-                  :percent="(dash.queue?.max_workers) ? Math.round(((dash.queue?.active || 0) / dash.queue.max_workers) * 100) : 0"
+                  :percent="(dash.dock_scheduler?.batch_limit) ? Math.round(((dash.dock_scheduler?.last_fetched || 0) / dash.dock_scheduler.batch_limit) * 100) : 0"
                   :stroke-color="'#1677ff'" size="small" status="active"
                 />
+                <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                  上次执行 {{ dash.dock_scheduler?.last_run_time || '暂无' }}
+                  <span v-if="dash.dock_scheduler?.last_trigger"> / 来源 {{ dash.dock_scheduler.last_trigger }}</span>
+                </div>
               </div>
             </Card>
           </Col>
