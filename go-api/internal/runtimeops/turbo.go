@@ -47,6 +47,8 @@ type TurboStatus struct {
 type OrderProgressSyncConfig struct {
 	Enabled          bool                       `json:"enabled"`
 	IntervalSec      int                        `json:"interval_sec"`
+	BatchEnabled     bool                       `json:"batch_enabled"`
+	BatchIntervalSec int                        `json:"batch_interval_sec"`
 	SupplierIDs      []int                      `json:"supplier_ids"`
 	ExcludedStatuses []string                   `json:"excluded_statuses"`
 	Rules            []ordermodule.AutoSyncRule `json:"rules"`
@@ -56,6 +58,9 @@ type OrderProgressSyncStatus struct {
 	Enabled          bool                       `json:"enabled"`
 	Running          bool                       `json:"running"`
 	IntervalSec      int                        `json:"interval_sec"`
+	BatchEnabled     bool                       `json:"batch_enabled"`
+	BatchRunning     bool                       `json:"batch_running"`
+	BatchIntervalSec int                        `json:"batch_interval_sec"`
 	SupplierIDs      []int                      `json:"supplier_ids"`
 	ExcludedStatuses []string                   `json:"excluded_statuses"`
 	Rules            []ordermodule.AutoSyncRule `json:"rules"`
@@ -65,11 +70,18 @@ type OrderProgressSyncStatus struct {
 	LastFailed       int                        `json:"last_failed"`
 	TotalRuns        int64                      `json:"total_runs"`
 	LastError        string                     `json:"last_error"`
+	BatchLastRunTime string                     `json:"batch_last_run_time"`
+	BatchNextRunTime string                     `json:"batch_next_run_time"`
+	BatchLastUpdated int                        `json:"batch_last_updated"`
+	BatchLastFailed  int                        `json:"batch_last_failed"`
+	BatchTotalRuns   int64                      `json:"batch_total_runs"`
+	BatchLastError   string                     `json:"batch_last_error"`
 }
 
 type OrderProgressSyncLogEntry struct {
 	ID               int64          `json:"id"`
 	Time             string         `json:"time"`
+	Mode             string         `json:"mode"`
 	Trigger          string         `json:"trigger"`
 	IntervalSec      int            `json:"interval_sec"`
 	SupplierIDs      []int          `json:"supplier_ids"`
@@ -89,13 +101,16 @@ var (
 	turboStatus   TurboStatus
 	turboBaseline TurboProfile
 
-	syncTickerMu   sync.Mutex
-	syncTickerStop chan struct{}
+	syncTickerMu        sync.Mutex
+	syncTickerStop      chan struct{}
+	batchSyncTickerStop chan struct{}
 
 	orderProgressMu     sync.RWMutex
 	orderProgressConfig = OrderProgressSyncConfig{
 		Enabled:          true,
 		IntervalSec:      120,
+		BatchEnabled:     true,
+		BatchIntervalSec: 120,
 		ExcludedStatuses: []string{"已完成", "已退款", "已取消", "失败"},
 		Rules: []ordermodule.AutoSyncRule{
 			{Key: "0_24h", Label: "0-24H", MinAgeHours: 0, MaxAgeHours: 24, IntervalMinutes: 10, Enabled: true},
@@ -109,6 +124,8 @@ var (
 	orderProgressStatus = OrderProgressSyncStatus{
 		Enabled:          true,
 		IntervalSec:      120,
+		BatchEnabled:     true,
+		BatchIntervalSec: 120,
 		ExcludedStatuses: []string{"已完成", "已退款", "已取消", "失败"},
 		Rules: []ordermodule.AutoSyncRule{
 			{Key: "0_24h", Label: "0-24H", MinAgeHours: 0, MaxAgeHours: 24, IntervalMinutes: 10, Enabled: true},
@@ -348,6 +365,15 @@ func normalizeOrderProgressSyncConfig(cfg OrderProgressSyncConfig, fallbackInter
 	if cfg.IntervalSec > 86400 {
 		cfg.IntervalSec = 86400
 	}
+	if cfg.BatchIntervalSec <= 0 {
+		cfg.BatchIntervalSec = cfg.IntervalSec
+	}
+	if cfg.BatchIntervalSec < 10 {
+		cfg.BatchIntervalSec = 10
+	}
+	if cfg.BatchIntervalSec > 86400 {
+		cfg.BatchIntervalSec = 86400
+	}
 	if cfg.ExcludedStatuses == nil {
 		cfg.ExcludedStatuses = []string{"已完成", "已退款", "已取消", "失败"}
 	}
@@ -414,7 +440,7 @@ func normalizeOrderProgressRules(rules []ordermodule.AutoSyncRule) []ordermodule
 }
 
 func loadOrderProgressSyncConfig(fallbackInterval time.Duration) OrderProgressSyncConfig {
-	cfg := normalizeOrderProgressSyncConfig(OrderProgressSyncConfig{Enabled: true}, fallbackInterval)
+	cfg := normalizeOrderProgressSyncConfig(OrderProgressSyncConfig{Enabled: true, BatchEnabled: true}, fallbackInterval)
 	if database.DB == nil {
 		return cfg
 	}
@@ -427,9 +453,15 @@ func loadOrderProgressSyncConfig(fallbackInterval time.Duration) OrderProgressSy
 		return cfg
 	}
 
-	var stored OrderProgressSyncConfig
+	stored := cfg
 	if err := json.Unmarshal([]byte(raw), &stored); err != nil {
 		return cfg
+	}
+	if !strings.Contains(raw, "\"batch_enabled\"") {
+		stored.BatchEnabled = stored.Enabled
+	}
+	if !strings.Contains(raw, "\"batch_interval_sec\"") {
+		stored.BatchIntervalSec = stored.IntervalSec
 	}
 	return normalizeOrderProgressSyncConfig(stored, fallbackInterval)
 }
@@ -454,6 +486,8 @@ func applyOrderProgressSyncConfig(cfg OrderProgressSyncConfig) {
 	orderProgressConfig = cfg
 	orderProgressStatus.Enabled = cfg.Enabled
 	orderProgressStatus.IntervalSec = cfg.IntervalSec
+	orderProgressStatus.BatchEnabled = cfg.BatchEnabled
+	orderProgressStatus.BatchIntervalSec = cfg.BatchIntervalSec
 	orderProgressStatus.SupplierIDs = append([]int(nil), cfg.SupplierIDs...)
 	orderProgressStatus.ExcludedStatuses = append([]string(nil), cfg.ExcludedStatuses...)
 	orderProgressStatus.Rules = append([]ordermodule.AutoSyncRule(nil), cfg.Rules...)
@@ -492,6 +526,7 @@ func UpdateOrderProgressSyncConfig(cfg OrderProgressSyncConfig) (OrderProgressSy
 	applyOrderProgressSyncConfig(cfg)
 	appendOrderProgressLog(OrderProgressSyncLogEntry{
 		Time:             time.Now().Format("2006-01-02 15:04:05"),
+		Mode:             "config",
 		Trigger:          "config",
 		IntervalSec:      cfg.IntervalSec,
 		SupplierIDs:      append([]int(nil), cfg.SupplierIDs...),
@@ -500,24 +535,31 @@ func UpdateOrderProgressSyncConfig(cfg OrderProgressSyncConfig) (OrderProgressSy
 		RuleHits:         summarizeRuleHits(cfg.Rules),
 		SampleErrors:     []string{},
 	})
-	updateSyncInterval(time.Duration(cfg.IntervalSec)*time.Second, cfg.Enabled)
+	updateSyncTickers(cfg)
 	return GetOrderProgressSyncStatus(), nil
 }
 
 func RunOrderProgressSyncNow() (OrderProgressSyncStatus, error) {
 	orderProgressMu.RLock()
 	enabled := orderProgressConfig.Enabled
+	batchEnabled := orderProgressConfig.BatchEnabled
 	running := orderProgressStatus.Running
+	batchRunning := orderProgressStatus.BatchRunning
 	orderProgressMu.RUnlock()
 
-	if !enabled {
-		return GetOrderProgressSyncStatus(), fmt.Errorf("主订单自动同步未启用")
+	if !enabled && !batchEnabled {
+		return GetOrderProgressSyncStatus(), fmt.Errorf("主订单同步未启用")
 	}
-	if running {
-		return GetOrderProgressSyncStatus(), fmt.Errorf("主订单自动同步正在执行")
+	if running || batchRunning {
+		return GetOrderProgressSyncStatus(), fmt.Errorf("主订单同步正在执行")
 	}
 
-	syncPendingOrderProgress("manual")
+	if enabled {
+		syncPendingOrderProgress("manual", "single")
+	}
+	if batchEnabled {
+		syncPendingOrderProgress("manual", "batch")
+	}
 	return GetOrderProgressSyncStatus(), nil
 }
 
@@ -532,9 +574,12 @@ func InitSyncTicker(interval time.Duration) {
 	applyOrderProgressSyncConfig(cfg)
 
 	syncTickerStop = make(chan struct{})
+	batchSyncTickerStop = make(chan struct{})
 	log.Printf("[AutoSync] 主订单自动同步已启动，首次执行延迟 10s，轮询间隔 %s，规则数 %d", time.Duration(cfg.IntervalSec)*time.Second, len(cfg.Rules))
+	log.Printf("[AutoSync] 主订单批量进度同步已启动，首次执行延迟 10s，轮询间隔 %s", time.Duration(cfg.BatchIntervalSec)*time.Second)
 	appendOrderProgressLog(OrderProgressSyncLogEntry{
 		Time:             time.Now().Format("2006-01-02 15:04:05"),
+		Mode:             "single",
 		Trigger:          "system",
 		IntervalSec:      cfg.IntervalSec,
 		SupplierIDs:      append([]int(nil), cfg.SupplierIDs...),
@@ -543,23 +588,35 @@ func InitSyncTicker(interval time.Duration) {
 		RuleHits:         summarizeRuleHits(cfg.Rules),
 		SampleErrors:     []string{},
 	})
-	go runSyncTicker(time.Duration(cfg.IntervalSec)*time.Second, syncTickerStop, cfg.Enabled)
+	appendOrderProgressLog(OrderProgressSyncLogEntry{
+		Time:             time.Now().Format("2006-01-02 15:04:05"),
+		Mode:             "batch",
+		Trigger:          "system",
+		IntervalSec:      cfg.BatchIntervalSec,
+		SupplierIDs:      append([]int(nil), cfg.SupplierIDs...),
+		SupplierNames:    []string{},
+		ExcludedStatuses: append([]string(nil), cfg.ExcludedStatuses...),
+		RuleHits:         map[string]int{},
+		SampleErrors:     []string{},
+	})
+	go runSyncTicker(time.Duration(cfg.IntervalSec)*time.Second, syncTickerStop, cfg.Enabled, "single")
+	go runSyncTicker(time.Duration(cfg.BatchIntervalSec)*time.Second, batchSyncTickerStop, cfg.BatchEnabled, "batch")
 }
 
 // runSyncTicker 的职责很单纯：
 // - 启动 10 秒后先触发一次，避免服务刚起时长时间没有任何自动同步；
 // - 然后按给定 interval 循环执行；
 // - 收到 stop 信号后退出，供 turbo 档位热更新时重建 ticker。
-func runSyncTicker(interval time.Duration, stop chan struct{}, enabled bool) {
+func runSyncTicker(interval time.Duration, stop chan struct{}, enabled bool, mode string) {
 	if !enabled {
-		setOrderProgressNextRun("")
+		setOrderProgressNextRun(mode, "")
 		return
 	}
 
-	setOrderProgressNextRun(time.Now().Add(10 * time.Second).Format("2006-01-02 15:04:05"))
+	setOrderProgressNextRun(mode, time.Now().Add(10*time.Second).Format("2006-01-02 15:04:05"))
 	select {
 	case <-time.After(10 * time.Second):
-		syncPendingOrderProgress("auto")
+		syncPendingOrderProgress("auto", mode)
 	case <-stop:
 		return
 	}
@@ -567,10 +624,10 @@ func runSyncTicker(interval time.Duration, stop chan struct{}, enabled bool) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
-		setOrderProgressNextRun(time.Now().Add(interval).Format("2006-01-02 15:04:05"))
+		setOrderProgressNextRun(mode, time.Now().Add(interval).Format("2006-01-02 15:04:05"))
 		select {
 		case <-ticker.C:
-			syncPendingOrderProgress("auto")
+			syncPendingOrderProgress("auto", mode)
 		case <-stop:
 			return
 		}
@@ -580,7 +637,7 @@ func runSyncTicker(interval time.Duration, stop chan struct{}, enabled bool) {
 // syncPendingOrderProgress 是调度层到订单域的桥接点。
 // 调度层只关心“现在该执行一次了”，至于扫哪些订单、怎么查上游、怎么打日志，
 // 都交给 order 模块内部完成。
-func syncPendingOrderProgress(trigger string) {
+func syncPendingOrderProgress(trigger string, mode string) {
 	if database.DB == nil {
 		log.Printf("[AutoSync] 跳过执行：数据库未初始化")
 		return
@@ -588,46 +645,83 @@ func syncPendingOrderProgress(trigger string) {
 	if trigger == "" {
 		trigger = "auto"
 	}
+	if mode == "" {
+		mode = "single"
+	}
 
 	orderProgressMu.Lock()
-	orderProgressStatus.Running = true
-	orderProgressStatus.LastError = ""
+	switch mode {
+	case "batch":
+		orderProgressStatus.BatchRunning = true
+		orderProgressStatus.BatchLastError = ""
+	default:
+		orderProgressStatus.Running = true
+		orderProgressStatus.LastError = ""
+	}
 	orderProgressMu.Unlock()
 
 	defer func() {
 		orderProgressMu.Lock()
-		orderProgressStatus.Running = false
+		switch mode {
+		case "batch":
+			orderProgressStatus.BatchRunning = false
+		default:
+			orderProgressStatus.Running = false
+		}
 		orderProgressMu.Unlock()
 	}()
 
-	log.Printf("[AutoSync] 开始执行主订单自动同步")
+	if mode == "batch" {
+		log.Printf("[AutoSync] 开始执行主订单批量进度同步")
+	} else {
+		log.Printf("[AutoSync] 开始执行主订单自动同步")
+	}
 	orderProgressMu.RLock()
-	opts := ordermodule.AutoSyncOptions{
-		SupplierHIDs:     append([]int(nil), orderProgressConfig.SupplierIDs...),
-		ExcludedStatuses: append([]string(nil), orderProgressConfig.ExcludedStatuses...),
-		Rules:            append([]ordermodule.AutoSyncRule(nil), orderProgressConfig.Rules...),
+	opts := ordermodule.AutoSyncOptions{SupplierHIDs: append([]int(nil), orderProgressConfig.SupplierIDs...), ExcludedStatuses: append([]string(nil), orderProgressConfig.ExcludedStatuses...)}
+	intervalSec := orderProgressConfig.IntervalSec
+	ruleHits := summarizeRuleHits(orderProgressConfig.Rules)
+	if mode == "batch" {
+		opts.OnlyBatchSuppliers = true
+		opts.IgnoreRules = true
+		intervalSec = orderProgressConfig.BatchIntervalSec
+		ruleHits = map[string]int{}
+	} else {
+		opts.SkipBatchSuppliers = true
+		opts.Rules = append([]ordermodule.AutoSyncRule(nil), orderProgressConfig.Rules...)
 	}
 	orderProgressMu.RUnlock()
 	start := time.Now()
 	updated, failed, err := ordermodule.NewServices().Sync.AutoSyncAllProgress(opts)
 	report := ordermodule.GetLastAutoSyncReport()
 	orderProgressMu.Lock()
-	orderProgressStatus.LastRunTime = time.Now().Format("2006-01-02 15:04:05")
-	orderProgressStatus.LastUpdated = updated
-	orderProgressStatus.LastFailed = failed
-	orderProgressStatus.TotalRuns++
-	if err != nil {
-		orderProgressStatus.LastError = err.Error()
+	switch mode {
+	case "batch":
+		orderProgressStatus.BatchLastRunTime = time.Now().Format("2006-01-02 15:04:05")
+		orderProgressStatus.BatchLastUpdated = updated
+		orderProgressStatus.BatchLastFailed = failed
+		orderProgressStatus.BatchTotalRuns++
+		if err != nil {
+			orderProgressStatus.BatchLastError = err.Error()
+		}
+	default:
+		orderProgressStatus.LastRunTime = time.Now().Format("2006-01-02 15:04:05")
+		orderProgressStatus.LastUpdated = updated
+		orderProgressStatus.LastFailed = failed
+		orderProgressStatus.TotalRuns++
+		if err != nil {
+			orderProgressStatus.LastError = err.Error()
+		}
 	}
 	orderProgressMu.Unlock()
 	appendOrderProgressLog(OrderProgressSyncLogEntry{
 		Time:             time.Now().Format("2006-01-02 15:04:05"),
+		Mode:             mode,
 		Trigger:          trigger,
-		IntervalSec:      optsToIntervalSec(opts),
+		IntervalSec:      intervalSec,
 		SupplierIDs:      append([]int(nil), opts.SupplierHIDs...),
 		SupplierNames:    append([]string(nil), report.SupplierNames...),
 		ExcludedStatuses: append([]string(nil), opts.ExcludedStatuses...),
-		RuleHits:         summarizeRuleHits(opts.Rules),
+		RuleHits:         ruleHits,
 		SampleErrors:     append([]string(nil), report.SampleErrors...),
 		Updated:          updated,
 		Failed:           failed,
@@ -635,33 +729,57 @@ func syncPendingOrderProgress(trigger string) {
 		Error:            pickOrderProgressError(err, report.SampleErrors),
 	})
 	if err != nil {
-		log.Printf("[AutoSync] 查询进行中订单失败: %v", err)
+		if mode == "batch" {
+			log.Printf("[AutoSync] 批量进度同步失败: %v", err)
+		} else {
+			log.Printf("[AutoSync] 查询进行中订单失败: %v", err)
+		}
 		return
 	}
-	log.Printf("[AutoSync] 同步完成，更新 %d 个订单，失败 %d 个", updated, failed)
+	if mode == "batch" {
+		log.Printf("[AutoSync] 批量进度同步完成，更新 %d 个订单，失败 %d 个", updated, failed)
+	} else {
+		log.Printf("[AutoSync] 同步完成，更新 %d 个订单，失败 %d 个", updated, failed)
+	}
 }
 
-func setOrderProgressNextRun(next string) {
+func setOrderProgressNextRun(mode string, next string) {
 	orderProgressMu.Lock()
-	orderProgressStatus.NextRunTime = next
+	switch mode {
+	case "batch":
+		orderProgressStatus.BatchNextRunTime = next
+	default:
+		orderProgressStatus.NextRunTime = next
+	}
 	orderProgressMu.Unlock()
 }
 
-func updateSyncInterval(interval time.Duration, enabled bool) {
+func updateSyncTickers(cfg OrderProgressSyncConfig) {
 	syncTickerMu.Lock()
 	defer syncTickerMu.Unlock()
 
 	if syncTickerStop != nil {
 		close(syncTickerStop)
 	}
-	syncTickerStop = make(chan struct{})
-	if !enabled {
-		log.Printf("[AutoSync] 主订单自动同步已停用")
-		setOrderProgressNextRun("")
-		return
+	if batchSyncTickerStop != nil {
+		close(batchSyncTickerStop)
 	}
-	log.Printf("[AutoSync] 主订单自动同步间隔已更新为 %s", interval)
-	go runSyncTicker(interval, syncTickerStop, true)
+	syncTickerStop = make(chan struct{})
+	batchSyncTickerStop = make(chan struct{})
+	if !cfg.Enabled {
+		log.Printf("[AutoSync] 主订单自动同步已停用")
+		setOrderProgressNextRun("single", "")
+	} else {
+		log.Printf("[AutoSync] 主订单自动同步间隔已更新为 %s", time.Duration(cfg.IntervalSec)*time.Second)
+		go runSyncTicker(time.Duration(cfg.IntervalSec)*time.Second, syncTickerStop, true, "single")
+	}
+	if !cfg.BatchEnabled {
+		log.Printf("[AutoSync] 主订单批量进度同步已停用")
+		setOrderProgressNextRun("batch", "")
+	} else {
+		log.Printf("[AutoSync] 主订单批量进度同步间隔已更新为 %s", time.Duration(cfg.BatchIntervalSec)*time.Second)
+		go runSyncTicker(time.Duration(cfg.BatchIntervalSec)*time.Second, batchSyncTickerStop, true, "batch")
+	}
 }
 
 func appendOrderProgressLog(entry OrderProgressSyncLogEntry) {
@@ -694,12 +812,6 @@ func pickOrderProgressError(err error, sampleErrors []string) string {
 		return sampleErrors[0]
 	}
 	return ""
-}
-
-func optsToIntervalSec(_ ordermodule.AutoSyncOptions) int {
-	orderProgressMu.RLock()
-	defer orderProgressMu.RUnlock()
-	return orderProgressConfig.IntervalSec
 }
 
 func summarizeRuleHits(rules []ordermodule.AutoSyncRule) map[string]int {

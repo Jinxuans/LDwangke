@@ -29,6 +29,10 @@ export interface PlatformConfig {
   progress_method: string;
   progress_body_type: string;
   progress_param_map: string;
+  batch_progress_path: string;
+  batch_progress_method: string;
+  batch_progress_body_type: string;
+  batch_progress_param_map: string;
   category_path: string;
   category_method: string;
   category_body_type: string;

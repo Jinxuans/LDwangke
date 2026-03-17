@@ -1002,6 +1002,90 @@ func TestQueryOrderProgressWithoutYIDStillUsesSingleConfiguredEndpoint(t *testin
 	}
 }
 
+func TestQueryBatchOrderProgressUsesConfiguredEndpoint(t *testing.T) {
+	withRegistryPlatformConfigs(t)
+	dbConfigMu.Lock()
+	dbConfigCache["batch-progress"] = PlatformConfig{
+		AuthType:              "uid_key",
+		SuccessCode:           "0",
+		BatchProgressPath:     "/api.php?act=pljd",
+		BatchProgressMethod:   "POST",
+		BatchProgressParamMap: `{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","count":"{{batch.count}}","yids":"{{batch.yids}}"}`,
+	}
+	dbConfigMu.Unlock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api.php" || r.URL.Query().Get("act") != "pljd" {
+			t.Fatalf("unexpected endpoint: %s", r.URL.String())
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("unexpected method: %s", r.Method)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form failed: %v", err)
+		}
+		if r.Form.Get("uid") != "uid-value" || r.Form.Get("key") != "key-value" {
+			t.Fatalf("unexpected auth form: %#v", r.Form)
+		}
+		if r.Form.Get("count") != "2" || r.Form.Get("yids") != "Y-1,Y-2" {
+			t.Fatalf("unexpected batch form: %#v", r.Form)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"code": 0,
+			"data": []map[string]interface{}{
+				{"id": "Y-1", "cid": "NOUN-1", "status": "进行中", "process": "50%", "remarks": "ok", "ptname": "不应作为课程名"},
+				{"id": "Y-2", "kcname": "课程B", "user": "user-b", "status_text": "已完成", "process": "100%"},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	progress, err := svc.QueryBatchOrderProgress(&model.SupplierFull{PT: "batch-progress", URL: srv.URL, User: "uid-value", Pass: "key-value"}, []model.SupplierBatchProgressRef{
+		{YID: "Y-1", User: "user-a", KCName: "课程A", KCID: "CID-1", Noun: "NOUN-1"},
+		{YID: "Y-2", User: "user-b", KCName: "课程B", KCID: "CID-2", Noun: "NOUN-2"},
+	})
+	if err != nil {
+		t.Fatalf("QueryBatchOrderProgress returned error: %v", err)
+	}
+	if len(progress) != 2 || progress[0].YID != "Y-1" || progress[0].Noun != "NOUN-1" || progress[0].KCName != "" || progress[1].StatusText != "已完成" {
+		t.Fatalf("unexpected batch progress result: %+v", progress)
+	}
+}
+
+func TestQueryBatchOrderProgressTreatsNoUpdateMessageAsEmptySuccess(t *testing.T) {
+	withRegistryPlatformConfigs(t)
+	dbConfigMu.Lock()
+	dbConfigCache["batch-progress-empty"] = PlatformConfig{
+		AuthType:              "uid_key",
+		SuccessCode:           "0",
+		BatchProgressPath:     "/api.php?act=pljd",
+		BatchProgressMethod:   "POST",
+		BatchProgressParamMap: `{"uid":"{{supplier.uid}}","key":"{{supplier.key}}"}`,
+	}
+	dbConfigMu.Unlock()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"code": -1,
+			"msg":  "该时间范围内无可更新进度订单",
+			"data": []map[string]interface{}{},
+		})
+	}))
+	defer srv.Close()
+
+	svc := &Service{client: srv.Client()}
+	progress, err := svc.QueryBatchOrderProgress(&model.SupplierFull{PT: "batch-progress-empty", URL: srv.URL, User: "uid-value", Pass: "key-value"}, []model.SupplierBatchProgressRef{
+		{YID: "Y-1", User: "user-a", KCName: "课程A", KCID: "CID-1", Noun: "NOUN-1"},
+	})
+	if err != nil {
+		t.Fatalf("QueryBatchOrderProgress returned error: %v", err)
+	}
+	if len(progress) != 0 {
+		t.Fatalf("expected empty batch progress result, got %+v", progress)
+	}
+}
+
 func TestCallSupplierOrderUsesConfiguredParamMap(t *testing.T) {
 	withRegistryPlatformConfigs(t)
 	dbConfigMu.Lock()

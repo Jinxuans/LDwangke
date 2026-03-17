@@ -26,7 +26,9 @@ type SecurityConfig struct {
 }
 
 type BootstrapConfig struct {
-	CreateDefaultAdmin *bool `yaml:"create_default_admin"`
+	CreateDefaultAdmin *bool  `yaml:"create_default_admin"`
+	AutoMigrate        *bool  `yaml:"auto_migrate"`
+	MigrationsDir      string `yaml:"migrations_dir"`
 }
 
 type LicenseConfig struct {
@@ -121,6 +123,23 @@ func (c *Config) CreateDefaultAdminEnabled() bool {
 	return false
 }
 
+func (c *Config) AutoMigrateEnabled() bool {
+	if v, ok := envBool("GO_API_BOOTSTRAP_AUTO_MIGRATE"); ok {
+		return v
+	}
+	if c.Bootstrap.AutoMigrate != nil {
+		return *c.Bootstrap.AutoMigrate
+	}
+	return true
+}
+
+func (c *Config) MigrationsDirValue() string {
+	if val, ok := os.LookupEnv("GO_API_BOOTSTRAP_MIGRATIONS_DIR"); ok {
+		return strings.TrimSpace(val)
+	}
+	return strings.TrimSpace(c.Bootstrap.MigrationsDir)
+}
+
 func applyEnvOverrides(cfg *Config) {
 	cfg.Server.Port = envString("GO_API_SERVER_PORT", cfg.Server.Port)
 	cfg.Server.Mode = envString("GO_API_SERVER_MODE", cfg.Server.Mode)
@@ -168,6 +187,10 @@ func applyEnvOverrides(cfg *Config) {
 	if v, ok := envBool("GO_API_BOOTSTRAP_CREATE_DEFAULT_ADMIN"); ok {
 		cfg.Bootstrap.CreateDefaultAdmin = &v
 	}
+	if v, ok := envBool("GO_API_BOOTSTRAP_AUTO_MIGRATE"); ok {
+		cfg.Bootstrap.AutoMigrate = &v
+	}
+	cfg.Bootstrap.MigrationsDir = envString("GO_API_BOOTSTRAP_MIGRATIONS_DIR", cfg.Bootstrap.MigrationsDir)
 }
 
 func envString(key, current string) string {

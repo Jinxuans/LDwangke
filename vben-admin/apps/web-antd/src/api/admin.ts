@@ -527,6 +527,9 @@ export interface OrderProgressSyncStats {
   enabled: boolean;
   running: boolean;
   interval_sec: number;
+  batch_enabled: boolean;
+  batch_running: boolean;
+  batch_interval_sec: number;
   supplier_ids: number[];
   excluded_statuses: string[];
   rules: {
@@ -543,11 +546,18 @@ export interface OrderProgressSyncStats {
   last_failed: number;
   total_runs: number;
   last_error: string;
+  batch_last_run_time: string;
+  batch_next_run_time: string;
+  batch_last_updated: number;
+  batch_last_failed: number;
+  batch_total_runs: number;
+  batch_last_error: string;
 }
 
 export interface OrderProgressSyncLog {
   id: number;
   time: string;
+  mode: string;
   trigger: string;
   interval_sec: number;
   supplier_ids: number[];
@@ -585,7 +595,7 @@ export async function getOrderProgressSyncLogsApi(limit: number = 20) {
   return requestClient.get<OrderProgressSyncLog[]>('/admin/order-progress-sync/logs', { params: { limit } });
 }
 
-export async function updateOrderProgressSyncConfigApi(data: { enabled: boolean; interval_sec: number; supplier_ids: number[]; excluded_statuses: string[]; rules: { key: string; label: string; min_age_hours: number; max_age_hours: number; interval_minutes: number; enabled: boolean }[] }) {
+export async function updateOrderProgressSyncConfigApi(data: { enabled: boolean; interval_sec: number; batch_enabled: boolean; batch_interval_sec: number; supplier_ids: number[]; excluded_statuses: string[]; rules: { key: string; label: string; min_age_hours: number; max_age_hours: number; interval_minutes: number; enabled: boolean }[] }) {
   return requestClient.post<OrderProgressSyncStats>('/admin/order-progress-sync/config', data);
 }
 

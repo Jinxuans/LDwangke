@@ -415,7 +415,8 @@ go-api/
 │   ├── errors/          # 错误处理
 │   ├── logger/          # 日志
 │   └── validator/       # 验证器
-├── migrations/          # 数据库迁移
+├── migrations/
+│   └── core/            # 核心数据库迁移
 ├── docs/                # API 文档
 └── scripts/             # 脚本
 ```

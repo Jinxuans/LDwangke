@@ -34,11 +34,14 @@ type stubRepository struct {
 }
 
 type stubSupplierGateway struct {
-	getSupplierByHID func(hid int) (*model.SupplierFull, error)
-	getClassFull     func(cid int) (*model.ClassFull, error)
-	callOrder        func(sup *model.SupplierFull, cls *model.ClassFull, school, user, pass, kcid, kcname string, extraFields map[string]string) (*model.SupplierOrderResult, error)
-	queryProgress    func(sup *model.SupplierFull, yid string, username string, orderExtra map[string]string) ([]model.SupplierProgressItem, error)
-	resubmitOrder    func(sup *model.SupplierFull, yid string) (int, string, error)
+	getSupplierByHID       func(hid int) (*model.SupplierFull, error)
+	getClassFull           func(cid int) (*model.ClassFull, error)
+	callOrder              func(sup *model.SupplierFull, cls *model.ClassFull, school, user, pass, kcid, kcname string, extraFields map[string]string) (*model.SupplierOrderResult, error)
+	hasBatchProgressForPT  func(pt string) bool
+	hasBatchProgressConfig func(sup *model.SupplierFull) bool
+	queryBatchProgress     func(sup *model.SupplierFull, refs []model.SupplierBatchProgressRef) ([]model.SupplierProgressItem, error)
+	queryProgress          func(sup *model.SupplierFull, yid string, username string, orderExtra map[string]string) ([]model.SupplierProgressItem, error)
+	resubmitOrder          func(sup *model.SupplierFull, yid string) (int, string, error)
 }
 
 func (s *stubSupplierGateway) GetSupplierByHID(hid int) (*model.SupplierFull, error) {
@@ -51,6 +54,27 @@ func (s *stubSupplierGateway) GetClassFull(cid int) (*model.ClassFull, error) {
 
 func (s *stubSupplierGateway) CallSupplierOrder(sup *model.SupplierFull, cls *model.ClassFull, school, user, pass, kcid, kcname string, extraFields map[string]string) (*model.SupplierOrderResult, error) {
 	return s.callOrder(sup, cls, school, user, pass, kcid, kcname, extraFields)
+}
+
+func (s *stubSupplierGateway) HasBatchProgressForPT(pt string) bool {
+	if s.hasBatchProgressForPT == nil {
+		return false
+	}
+	return s.hasBatchProgressForPT(pt)
+}
+
+func (s *stubSupplierGateway) HasBatchProgressConfig(sup *model.SupplierFull) bool {
+	if s.hasBatchProgressConfig == nil {
+		return false
+	}
+	return s.hasBatchProgressConfig(sup)
+}
+
+func (s *stubSupplierGateway) QueryBatchOrderProgress(sup *model.SupplierFull, refs []model.SupplierBatchProgressRef) ([]model.SupplierProgressItem, error) {
+	if s.queryBatchProgress == nil {
+		return nil, errors.New("query batch progress not implemented")
+	}
+	return s.queryBatchProgress(sup, refs)
 }
 
 func (s *stubSupplierGateway) QueryOrderProgress(sup *model.SupplierFull, yid string, username string, orderExtra map[string]string) ([]model.SupplierProgressItem, error) {
@@ -1072,6 +1096,9 @@ func TestLegacyRepositoryManualDockAndSyncSuccessPaths(t *testing.T) {
 	t.Run("SyncProgressUpdatesOrderAndNotifies", func(t *testing.T) {
 		repo := &legacyRepository{
 			sup: &stubSupplierGateway{
+				hasBatchProgressForPT: func(pt string) bool {
+					return false
+				},
 				getSupplierByHID: func(hid int) (*model.SupplierFull, error) {
 					if hid != 9 {
 						t.Fatalf("unexpected supplier hid: %d", hid)
@@ -1143,6 +1170,9 @@ func TestLegacyRepositoryManualDockAndSyncSuccessPaths(t *testing.T) {
 	t.Run("AutoSyncAllProgressUpdatesDockedOrders", func(t *testing.T) {
 		repo := &legacyRepository{
 			sup: &stubSupplierGateway{
+				hasBatchProgressForPT: func(pt string) bool {
+					return pt == "batch-progress"
+				},
 				getSupplierByHID: func(hid int) (*model.SupplierFull, error) {
 					if hid != 9 {
 						t.Fatalf("unexpected supplier hid: %d", hid)
@@ -1174,8 +1204,8 @@ func TestLegacyRepositoryManualDockAndSyncSuccessPaths(t *testing.T) {
 				return nil, fmt.Errorf("unexpected query: %s", query)
 			}
 			return &testRows{
-				columns: []string{"oid", "yid", "hid", "user", "kcname", "noun", "kcid", "addtime", "updatetime"},
-				values:  [][]driver.Value{{int64(70), "Y70", "9", "student", "课程D", "NOUN-70", "KC-70", "2026-03-01 00:00:00", ""}},
+				columns: []string{"oid", "yid", "hid", "pt", "user", "kcname", "noun", "kcid", "status", "addtime", "updatetime"},
+				values:  [][]driver.Value{{int64(70), "Y70", "9", "single-progress", "student", "课程D", "NOUN-70", "KC-70", "进行中", "2026-03-01 00:00:00", ""}},
 			}, nil
 		}
 
@@ -1212,6 +1242,213 @@ func TestLegacyRepositoryManualDockAndSyncSuccessPaths(t *testing.T) {
 		}
 		if want := []string{"70|进行中|80%|同步中"}; !reflect.DeepEqual(notified, want) {
 			t.Fatalf("unexpected notifier calls: got=%v want=%v", notified, want)
+		}
+	})
+
+	t.Run("AutoSyncAllProgressUsesBatchProgressFeedWhenConfigured", func(t *testing.T) {
+		repo := &legacyRepository{
+			sup: &stubSupplierGateway{
+				hasBatchProgressForPT: func(pt string) bool {
+					return pt == "batch-progress"
+				},
+				getSupplierByHID: func(hid int) (*model.SupplierFull, error) {
+					if hid != 9 {
+						t.Fatalf("unexpected supplier hid: %d", hid)
+					}
+					return &model.SupplierFull{HID: 9, PT: "batch-progress"}, nil
+				},
+				hasBatchProgressConfig: func(sup *model.SupplierFull) bool {
+					return sup.PT == "batch-progress"
+				},
+				queryBatchProgress: func(sup *model.SupplierFull, refs []model.SupplierBatchProgressRef) ([]model.SupplierProgressItem, error) {
+					if len(refs) != 2 {
+						t.Fatalf("unexpected batch refs length: %d", len(refs))
+					}
+					if refs[0].YID != "Y71" || refs[1].YID != "Y72" {
+						t.Fatalf("unexpected batch refs: %+v", refs)
+					}
+					return []model.SupplierProgressItem{{
+						YID:        "Y71",
+						StatusText: "已完成",
+						Process:    "100%",
+						Remarks:    "批量完成",
+					}}, nil
+				},
+				queryProgress: func(sup *model.SupplierFull, yid string, username string, orderExtra map[string]string) ([]model.SupplierProgressItem, error) {
+					t.Fatalf("expected batch progress path, got single query for yid=%s", yid)
+					return nil, nil
+				},
+			},
+		}
+
+		changeStatusQueryHook = func(query string, args []driver.NamedValue) (driver.Rows, error) {
+			if !strings.Contains(query, "FROM qingka_wangke_order") || !strings.Contains(query, "WHERE dockstatus = 1") {
+				return nil, fmt.Errorf("unexpected query: %s", query)
+			}
+			return &testRows{
+				columns: []string{"oid", "yid", "hid", "pt", "user", "kcname", "noun", "kcid", "status", "addtime", "updatetime"},
+				values: [][]driver.Value{
+					{int64(71), "Y71", "9", "batch-progress", "student-a", "课程E", "NOUN-71", "KC-71", "进行中", "2026-03-01 00:00:00", ""},
+					{int64(72), "Y72", "9", "batch-progress", "student-b", "课程F", "NOUN-72", "KC-72", "进行中", "2026-03-01 00:00:00", ""},
+				},
+			}, nil
+		}
+
+		var execQueries []string
+		var execArgs [][]string
+		changeStatusExecHook = func(query string, args []driver.NamedValue) error {
+			execQueries = append(execQueries, query)
+			execArgs = append(execArgs, namedValueStrings(args))
+			return nil
+		}
+
+		var notified []string
+		originalNotifier := orderStatusNotifier
+		defer func() { orderStatusNotifier = originalNotifier }()
+		SetOrderStatusNotifier(func(oid int, newStatus string, newProcess string, remarks string) {
+			notified = append(notified, fmt.Sprintf("%d|%s|%s|%s", oid, newStatus, newProcess, remarks))
+		})
+
+		updated, failed, err := repo.AutoSyncAllProgress(AutoSyncOptions{})
+		if err != nil {
+			t.Fatalf("auto sync returned error: %v", err)
+		}
+		if updated != 1 || failed != 0 {
+			t.Fatalf("unexpected auto sync counts: updated=%d failed=%d", updated, failed)
+		}
+		if len(execQueries) != 2 {
+			t.Fatalf("expected two execs, got %d", len(execQueries))
+		}
+		if !strings.Contains(execQueries[0], "UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ?, updatetime = ? WHERE oid = ?") {
+			t.Fatalf("unexpected first exec query: %s", execQueries[0])
+		}
+		if want := []string{"课程E", "Y71", "已完成", "100%", "批量完成"}; !reflect.DeepEqual(execArgs[0][:5], want) {
+			t.Fatalf("unexpected first exec args: %v", execArgs[0])
+		}
+		if got := execArgs[0][10]; got != "71" {
+			t.Fatalf("unexpected updated oid: %s", got)
+		}
+		if !strings.Contains(execQueries[1], "UPDATE qingka_wangke_order SET updatetime = ? WHERE oid = ?") {
+			t.Fatalf("unexpected second exec query: %s", execQueries[1])
+		}
+		if len(execArgs[1]) != 2 || execArgs[1][1] != "72" {
+			t.Fatalf("unexpected touch args: %v", execArgs[1])
+		}
+		if want := []string{"71|已完成|100%|批量完成"}; !reflect.DeepEqual(notified, want) {
+			t.Fatalf("unexpected notifier calls: got=%v want=%v", notified, want)
+		}
+	})
+
+	t.Run("AutoSyncAllProgressBatchEmptyResultIsNotFailure", func(t *testing.T) {
+		repo := &legacyRepository{
+			sup: &stubSupplierGateway{
+				hasBatchProgressForPT: func(pt string) bool {
+					return pt == "batch-progress"
+				},
+				getSupplierByHID: func(hid int) (*model.SupplierFull, error) {
+					if hid != 9 {
+						t.Fatalf("unexpected supplier hid: %d", hid)
+					}
+					return &model.SupplierFull{HID: 9, PT: "batch-progress"}, nil
+				},
+				hasBatchProgressConfig: func(sup *model.SupplierFull) bool {
+					return sup.PT == "batch-progress"
+				},
+				queryBatchProgress: func(sup *model.SupplierFull, refs []model.SupplierBatchProgressRef) ([]model.SupplierProgressItem, error) {
+					return []model.SupplierProgressItem{}, nil
+				},
+				queryProgress: func(sup *model.SupplierFull, yid string, username string, orderExtra map[string]string) ([]model.SupplierProgressItem, error) {
+					t.Fatal("expected batch-only path without single-order fallback")
+					return nil, nil
+				},
+			},
+		}
+
+		changeStatusQueryHook = func(query string, args []driver.NamedValue) (driver.Rows, error) {
+			if !strings.Contains(query, "FROM qingka_wangke_order") || !strings.Contains(query, "WHERE dockstatus = 1") {
+				return nil, fmt.Errorf("unexpected query: %s", query)
+			}
+			return &testRows{
+				columns: []string{"oid", "yid", "hid", "pt", "user", "kcname", "noun", "kcid", "status", "addtime", "updatetime"},
+				values:  [][]driver.Value{{int64(73), "Y73", "9", "batch-progress", "student-c", "课程G", "NOUN-73", "KC-73", "进行中", "2026-03-01 00:00:00", ""}},
+			}, nil
+		}
+
+		execCalled := false
+		changeStatusExecHook = func(query string, args []driver.NamedValue) error {
+			execCalled = true
+			return nil
+		}
+
+		updated, failed, err := repo.AutoSyncAllProgress(AutoSyncOptions{OnlyBatchSuppliers: true, IgnoreRules: true})
+		if err != nil {
+			t.Fatalf("auto sync returned error: %v", err)
+		}
+		if updated != 0 || failed != 0 {
+			t.Fatalf("unexpected auto sync counts: updated=%d failed=%d", updated, failed)
+		}
+		if execCalled {
+			t.Fatal("expected no database update for empty batch result")
+		}
+	})
+
+	t.Run("AutoSyncAllProgressMatchesBatchProgressByNounUserAndKCName", func(t *testing.T) {
+		repo := &legacyRepository{
+			sup: &stubSupplierGateway{
+				getSupplierByHID: func(hid int) (*model.SupplierFull, error) {
+					if hid != 9 {
+						t.Fatalf("unexpected supplier hid: %d", hid)
+					}
+					return &model.SupplierFull{HID: 9, PT: "batch-progress"}, nil
+				},
+				hasBatchProgressConfig: func(sup *model.SupplierFull) bool {
+					return sup.PT == "batch-progress"
+				},
+				queryBatchProgress: func(sup *model.SupplierFull, refs []model.SupplierBatchProgressRef) ([]model.SupplierProgressItem, error) {
+					return []model.SupplierProgressItem{{
+						Noun:    "NOUN-81",
+						User:    "student-c",
+						KCName:  "[2] 改革开放史♢山东·菏泽市",
+						Status:  "平时分",
+						Process: "68.6%",
+						Remarks: "今日已完成",
+					}}, nil
+				},
+			},
+		}
+
+		changeStatusQueryHook = func(query string, args []driver.NamedValue) (driver.Rows, error) {
+			if !strings.Contains(query, "FROM qingka_wangke_order") || !strings.Contains(query, "WHERE dockstatus = 1") {
+				return nil, fmt.Errorf("unexpected query: %s", query)
+			}
+			return &testRows{
+				columns: []string{"oid", "yid", "hid", "pt", "user", "kcname", "noun", "kcid", "status", "addtime", "updatetime"},
+				values:  [][]driver.Value{{int64(81), "", "9", "batch-progress", "student-c", "[2] 改革开放史♢山东·菏泽市", "NOUN-81", "KC-81", "进行中", "2026-03-01 00:00:00", ""}},
+			}, nil
+		}
+
+		execCalled := false
+		changeStatusExecHook = func(query string, args []driver.NamedValue) error {
+			execCalled = true
+			if !strings.Contains(query, "UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ?, updatetime = ? WHERE oid = ?") {
+				return fmt.Errorf("unexpected exec query: %s", query)
+			}
+			got := namedValueStrings(args)
+			if len(got) != 11 || got[0] != "[2] 改革开放史♢山东·菏泽市" || got[2] != "平时分" || got[3] != "68.6%" || got[4] != "今日已完成" || got[10] != "81" {
+				return fmt.Errorf("unexpected exec args: %v", got)
+			}
+			return nil
+		}
+
+		updated, failed, err := repo.AutoSyncAllProgress(AutoSyncOptions{})
+		if err != nil {
+			t.Fatalf("auto sync returned error: %v", err)
+		}
+		if updated != 1 || failed != 0 {
+			t.Fatalf("unexpected auto sync counts: updated=%d failed=%d", updated, failed)
+		}
+		if !execCalled {
+			t.Fatal("expected batch noun+user+kcname match to update order")
 		}
 	})
 

@@ -9,76 +9,80 @@ import (
 
 // PlatformConfig 平台接口差异配置。
 type PlatformConfig struct {
-	AuthType           string
-	QueryAct           string
-	QueryPath          string
-	QueryMethod        string
-	QueryBodyType      string
-	QueryParamMap      string
-	OrderPath          string
-	OrderMethod        string
-	OrderBodyType      string
-	OrderParamMap      string
-	ProgressPath       string
-	ProgressMethod     string
-	ProgressBodyType   string
-	ProgressParamMap   string
-	SuccessCode        string
-	ReturnsYID         bool
-	ExtraParams        bool
-	YIDInDataArray     bool
-	PauseMethod        string
-	PauseBodyType      string
-	PauseParamMap      string
-	PauseIDParam       string
-	ChangePassMethod   string
-	ChangePassBodyType string
-	ChangePassParamMap string
-	PausePath          string
-	ChangePassPath     string
-	UseJSON            bool
-	ResumePath         string
-	ResumeMethod       string
-	ResumeBodyType     string
-	ResumeParamMap     string
-	LogPath            string
-	LogMethod          string
-	LogBodyType        string
-	LogParamMap        string
-	LogIDParam         string
-	ChangePassParam    string
-	ChangePassIDParam  string
-	ResubmitPath       string
-	ResubmitMethod     string
-	ResubmitBodyType   string
-	ResubmitParamMap   string
-	ResubmitIDParam    string
-	BalancePath        string
-	BalanceMoneyField  string
-	BalanceMethod      string
-	BalanceBodyType    string
-	BalanceParamMap    string
-	BalanceAuthType    string
-	ReportPath         string
-	ReportMethod       string
-	ReportBodyType     string
-	ReportParamMap     string
-	GetReportPath      string
-	GetReportMethod    string
-	GetReportBodyType  string
-	GetReportParamMap  string
-	ReportSuccessCode  string
-	ReportParamStyle   string
-	ReportAuthType     string
-	RefreshPath        string
-	CategoryPath       string
-	CategoryMethod     string
-	CategoryBodyType   string
-	CategoryParamMap   string
-	ClassListPath      string
-	ClassListMethod    string
-	ClassListBodyType  string
-	ClassListParamMap  string
+	AuthType              string
+	QueryAct              string
+	QueryPath             string
+	QueryMethod           string
+	QueryBodyType         string
+	QueryParamMap         string
+	OrderPath             string
+	OrderMethod           string
+	OrderBodyType         string
+	OrderParamMap         string
+	ProgressPath          string
+	ProgressMethod        string
+	ProgressBodyType      string
+	ProgressParamMap      string
+	BatchProgressPath     string
+	BatchProgressMethod   string
+	BatchProgressBodyType string
+	BatchProgressParamMap string
+	SuccessCode           string
+	ReturnsYID            bool
+	ExtraParams           bool
+	YIDInDataArray        bool
+	PauseMethod           string
+	PauseBodyType         string
+	PauseParamMap         string
+	PauseIDParam          string
+	ChangePassMethod      string
+	ChangePassBodyType    string
+	ChangePassParamMap    string
+	PausePath             string
+	ChangePassPath        string
+	UseJSON               bool
+	ResumePath            string
+	ResumeMethod          string
+	ResumeBodyType        string
+	ResumeParamMap        string
+	LogPath               string
+	LogMethod             string
+	LogBodyType           string
+	LogParamMap           string
+	LogIDParam            string
+	ChangePassParam       string
+	ChangePassIDParam     string
+	ResubmitPath          string
+	ResubmitMethod        string
+	ResubmitBodyType      string
+	ResubmitParamMap      string
+	ResubmitIDParam       string
+	BalancePath           string
+	BalanceMoneyField     string
+	BalanceMethod         string
+	BalanceBodyType       string
+	BalanceParamMap       string
+	BalanceAuthType       string
+	ReportPath            string
+	ReportMethod          string
+	ReportBodyType        string
+	ReportParamMap        string
+	GetReportPath         string
+	GetReportMethod       string
+	GetReportBodyType     string
+	GetReportParamMap     string
+	ReportSuccessCode     string
+	ReportParamStyle      string
+	ReportAuthType        string
+	RefreshPath           string
+	CategoryPath          string
+	CategoryMethod        string
+	CategoryBodyType      string
+	CategoryParamMap      string
+	ClassListPath         string
+	ClassListMethod       string
+	ClassListBodyType     string
+	ClassListParamMap     string
 }
 
 var (
@@ -106,7 +110,9 @@ func loadDBPlatformConfigs() {
 		COALESCE(order_path,''), COALESCE(order_method,''), COALESCE(order_body_type,''), COALESCE(order_param_map,''),
 		extra_params, returns_yid,
 		COALESCE(progress_path,''), COALESCE(progress_method,''),
-		COALESCE(progress_body_type,''), COALESCE(progress_param_map,''), yid_in_data_array,
+		COALESCE(progress_body_type,''), COALESCE(progress_param_map,''),
+		COALESCE(batch_progress_path,''), COALESCE(batch_progress_method,''),
+		COALESCE(batch_progress_body_type,''), COALESCE(batch_progress_param_map,''), yid_in_data_array,
 		COALESCE(category_path,''), COALESCE(category_method,''), COALESCE(category_body_type,''), COALESCE(category_param_map,''),
 		COALESCE(class_list_path,''), COALESCE(class_list_method,''), COALESCE(class_list_body_type,''), COALESCE(class_list_param_map,''),
 		COALESCE(pause_path,''), COALESCE(pause_method,''), COALESCE(pause_body_type,''), COALESCE(pause_param_map,''), COALESCE(pause_id_param,''),
@@ -139,7 +145,8 @@ func loadDBPlatformConfigs() {
 			&cfg.QueryAct, &cfg.QueryPath, &cfg.QueryMethod, &cfg.QueryBodyType, &cfg.QueryParamMap,
 			&cfg.OrderPath, &cfg.OrderMethod, &cfg.OrderBodyType, &cfg.OrderParamMap,
 			&cfg.ExtraParams, &cfg.ReturnsYID,
-			&cfg.ProgressPath, &cfg.ProgressMethod, &cfg.ProgressBodyType, &cfg.ProgressParamMap, &cfg.YIDInDataArray,
+			&cfg.ProgressPath, &cfg.ProgressMethod, &cfg.ProgressBodyType, &cfg.ProgressParamMap,
+			&cfg.BatchProgressPath, &cfg.BatchProgressMethod, &cfg.BatchProgressBodyType, &cfg.BatchProgressParamMap, &cfg.YIDInDataArray,
 			&cfg.CategoryPath, &cfg.CategoryMethod, &cfg.CategoryBodyType, &cfg.CategoryParamMap,
 			&cfg.ClassListPath, &cfg.ClassListMethod, &cfg.ClassListBodyType, &cfg.ClassListParamMap,
 			&cfg.PausePath, &cfg.PauseMethod, &cfg.PauseBodyType, &cfg.PauseParamMap, &cfg.PauseIDParam,

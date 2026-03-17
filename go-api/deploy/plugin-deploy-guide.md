@@ -90,9 +90,9 @@ go-api/deploy/
 ```
 
 ## 前置条件
-1. 已执行 `013_module_view_url.sql`（加 view_url 字段）
-2. 已执行 `014_pangu_plugin.sql`（建表 + 注册模块）
-3. 已执行 `016_fix_module_paths.sql`（修正为扁平路径）
+1. 已执行 `migrations/core/013_module_view_url.sql`（加 view_url 字段）
+2. 已执行 `migrations/core/014_pangu_plugin.sql`（建表 + 注册模块）
+3. 已执行 `migrations/core/016_fix_module_paths.sql`（修正为扁平路径）
 
 ---
 

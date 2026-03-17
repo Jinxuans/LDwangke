@@ -261,61 +261,7 @@ func (s *Service) QueryOrderProgress(sup *model.SupplierFull, yid string, userna
 	}
 	debugInfo.logResponse(sup, resp.Status, body)
 
-	var raw map[string]interface{}
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("解析响应失败：%s", string(body))
-	}
-
-	// 统一把各种类型的 code 归一化成字符串，兼容 `"1"` / `1` / `1.0` 这类返回。
-	codeVal := ""
-	if codeRaw, ok := raw["code"]; ok {
-		switch v := codeRaw.(type) {
-		case string:
-			codeVal = v
-		case float64:
-			codeVal = fmt.Sprintf("%.0f", v)
-		case int:
-			codeVal = fmt.Sprintf("%d", v)
-		default:
-			codeVal = fmt.Sprintf("%v", v)
-		}
-	}
-	if codeVal != "0" && codeVal != "1" {
-		// 这里返回 error，调用方会把它记成“查询失败”而不是“更新失败”。
-		msg := ""
-		if msgRaw, ok := raw["msg"]; ok {
-			msg = fmt.Sprintf("%v", msgRaw)
-		}
-		if msg == "" {
-			msg = "查询上游进度失败"
-		}
-		return nil, fmt.Errorf("%s", msg)
-	}
-
-	var items []model.SupplierProgressItem
-	if dataArr, ok := raw["data"].([]interface{}); ok {
-		// 这里把平台原始字段转成统一的 SupplierProgressItem，
-		// 后续订单模块只关心统一结构，不再感知具体平台 JSON 形态。
-		for _, item := range dataArr {
-			if m, ok := item.(map[string]interface{}); ok {
-				items = append(items, model.SupplierProgressItem{
-					YID:             toString(m["id"]),
-					KCName:          toString(m["kcname"]),
-					User:            toString(m["user"]),
-					Status:          toString(m["status"]),
-					StatusText:      toString(m["status_text"]),
-					Process:         toString(m["process"]),
-					Remarks:         toString(m["remarks"]),
-					CourseStartTime: toString(m["courseStartTime"]),
-					CourseEndTime:   toString(m["courseEndTime"]),
-					ExamStartTime:   toString(m["examStartTime"]),
-					ExamEndTime:     toString(m["examEndTime"]),
-				})
-			}
-		}
-	}
-
-	return items, nil
+	return parseConfiguredProgressResponse(body)
 }
 
 func (s *Service) PauseOrder(sup *model.SupplierFull, yid string) (int, string, error) {
