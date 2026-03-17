@@ -10,6 +10,7 @@ import (
 	shared "go-api/internal/shared/db"
 	"log"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,6 +32,34 @@ func autoSyncProgressLogStep() int64 {
 	return 1000
 }
 
+func parseOrderTime(value string) (time.Time, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, false
+	}
+	t, err := time.ParseInLocation("2006-01-02 15:04:05", value, time.Local)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return t, true
+}
+
+func matchAutoSyncRule(ageHours float64, rules []AutoSyncRule) (AutoSyncRule, bool) {
+	for _, rule := range rules {
+		if !rule.Enabled || rule.IntervalMinutes <= 0 {
+			continue
+		}
+		if ageHours < float64(rule.MinAgeHours) {
+			continue
+		}
+		if rule.MaxAgeHours > 0 && ageHours >= float64(rule.MaxAgeHours) {
+			continue
+		}
+		return rule, true
+	}
+	return AutoSyncRule{}, false
+}
+
 // Repository 为订单模块提供最小的存取边界，当前先复用旧 service 实现。
 type Repository interface {
 	List(uid int, grade string, req model.OrderListRequest) ([]model.Order, int64, error)
@@ -44,7 +73,7 @@ type Repository interface {
 	ModifyRemarks(oids []int, remarks string) error
 	ManualDockOrders(oids []int) (int, int, error)
 	SyncOrderProgress(oids []int) (int, error)
-	AutoSyncAllProgress() (int, int, error)
+	AutoSyncAllProgress(opts AutoSyncOptions) (int, int, error)
 	BatchSyncOrders(oids []int) (int, error)
 	BatchResendOrders(oids []int) (int, int, error)
 }
@@ -545,6 +574,7 @@ func (r *legacyRepository) SyncOrderProgress(oids []int) (int, error) {
 	updated := 0
 
 	for _, oid := range oids {
+		syncTime := time.Now().Format("2006-01-02 15:04:05")
 		// 先把本地主订单的“查询上游”所需最小字段取出来：
 		// yid/hid 用于定位上游订单和供应商，
 		// user/kcname/noun 用于那些要求附带账号、课程名、上游商品ID 的平台做回退匹配。
@@ -581,7 +611,11 @@ func (r *legacyRepository) SyncOrderProgress(oids []int) (int, error) {
 		}
 		items, err := r.sup.QueryOrderProgress(sup, yidStr, user, orderExtra)
 		if err != nil {
+			database.DB.Exec("UPDATE qingka_wangke_order SET updatetime = ? WHERE oid = ?", syncTime, oid)
 			continue
+		}
+		if len(items) == 0 {
+			database.DB.Exec("UPDATE qingka_wangke_order SET updatetime = ? WHERE oid = ?", syncTime, oid)
 		}
 
 		for _, item := range items {
@@ -594,9 +628,9 @@ func (r *legacyRepository) SyncOrderProgress(oids []int) (int, error) {
 			// 更新时保留了旧系统的匹配条件：oid 是主键定位，
 			// user + kcname 则作为额外保护，避免极端情况下把别的课程结果错写到当前订单上。
 			database.DB.Exec(
-				"UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ? WHERE user = ? AND kcname = ? AND oid = ?",
+				"UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ?, updatetime = ? WHERE user = ? AND kcname = ? AND oid = ?",
 				item.KCName, item.YID, statusText, item.Process, item.Remarks,
-				item.CourseStartTime, item.CourseEndTime, item.ExamStartTime, item.ExamEndTime,
+				item.CourseStartTime, item.CourseEndTime, item.ExamStartTime, item.ExamEndTime, syncTime,
 				item.User, item.KCName, oid,
 			)
 			// 回写后立即通知站内推送/前端状态感知逻辑，
@@ -614,48 +648,109 @@ func (r *legacyRepository) SyncOrderProgress(oids []int) (int, error) {
 // 1. 不接收外部传入 oid，而是自己扫描所有已对接订单；
 // 2. 为了降低上游接口压力，先按供应商 hid 分组，再并发轮询；
 // 3. 会输出较详细的运行日志，便于观察几万单的大批量同步进度。
-func (r *legacyRepository) AutoSyncAllProgress() (int, int, error) {
-	rows, err := database.DB.Query(`
-		SELECT oid, COALESCE(yid,''), COALESCE(hid,'0'), COALESCE(user,''), COALESCE(kcname,''), COALESCE(noun,''), COALESCE(kcid,'')
+func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, error) {
+	query := `
+		SELECT oid, COALESCE(yid,''), COALESCE(hid,'0'), COALESCE(user,''), COALESCE(kcname,''), COALESCE(noun,''), COALESCE(kcid,''), COALESCE(addtime,''), COALESCE(updatetime,'')
 		FROM qingka_wangke_order
-		WHERE dockstatus = 1
-		ORDER BY oid DESC`)
+		WHERE dockstatus = 1`
+	args := make([]interface{}, 0, 8)
+	if opts.RecentHours > 0 {
+		query += " AND addtime >= DATE_SUB(NOW(), INTERVAL ? HOUR)"
+		args = append(args, opts.RecentHours)
+	}
+	if len(opts.SupplierHIDs) > 0 {
+		placeholders := make([]string, 0, len(opts.SupplierHIDs))
+		for _, hid := range opts.SupplierHIDs {
+			if hid <= 0 {
+				continue
+			}
+			placeholders = append(placeholders, "?")
+			args = append(args, hid)
+		}
+		if len(placeholders) > 0 {
+			query += " AND hid IN (" + strings.Join(placeholders, ",") + ")"
+		}
+	}
+	if len(opts.ExcludedStatuses) > 0 {
+		placeholders := make([]string, 0, len(opts.ExcludedStatuses))
+		for _, status := range opts.ExcludedStatuses {
+			status = strings.TrimSpace(status)
+			if status == "" {
+				continue
+			}
+			placeholders = append(placeholders, "?")
+			args = append(args, status)
+		}
+		if len(placeholders) > 0 {
+			query += " AND COALESCE(status,'') NOT IN (" + strings.Join(placeholders, ",") + ")"
+		}
+	}
+	query += " ORDER BY oid DESC"
+
+	rows, err := database.DB.Query(query, args...)
 	if err != nil {
 		return 0, 0, err
 	}
 	defer rows.Close()
 
 	type syncItem struct {
-		OID    int
-		YID    string
-		HID    int
-		User   string
-		KCName string
-		Noun   string
-		KCID   string
+		OID         int
+		YID         string
+		HID         int
+		User        string
+		KCName      string
+		Noun        string
+		KCID        string
+		AddTime     string
+		UpdateTime  string
+		MatchedRule AutoSyncRule
 	}
 
 	// 先把所有待轮询订单按 hid 分组。
 	// 这样后面每个 goroutine 处理一个供应商分组，日志和上游限流都更容易控制。
 	hidGroups := map[int][]syncItem{}
 	totalCount := 0
+	now := time.Now()
 	for rows.Next() {
 		var item syncItem
 		var hidStr string
-		if err := rows.Scan(&item.OID, &item.YID, &hidStr, &item.User, &item.KCName, &item.Noun, &item.KCID); err != nil {
+		if err := rows.Scan(&item.OID, &item.YID, &hidStr, &item.User, &item.KCName, &item.Noun, &item.KCID, &item.AddTime, &item.UpdateTime); err != nil {
 			continue
 		}
 		item.HID, _ = strconv.Atoi(hidStr)
-		if item.HID > 0 {
-			hidGroups[item.HID] = append(hidGroups[item.HID], item)
-			totalCount++
+		if item.HID <= 0 {
+			continue
 		}
+
+		if len(opts.Rules) > 0 {
+			addTime, ok := parseOrderTime(item.AddTime)
+			if !ok {
+				continue
+			}
+			ageHours := now.Sub(addTime).Hours()
+			rule, matched := matchAutoSyncRule(ageHours, opts.Rules)
+			if !matched {
+				continue
+			}
+			if updateTime, ok := parseOrderTime(item.UpdateTime); ok {
+				interval := time.Duration(rule.IntervalMinutes) * time.Minute
+				if now.Sub(updateTime) < interval {
+					continue
+				}
+			}
+			item.MatchedRule = rule
+		}
+
+		hidGroups[item.HID] = append(hidGroups[item.HID], item)
+		totalCount++
 	}
 	if err := rows.Err(); err != nil {
+		setLastAutoSyncReport(AutoSyncReport{})
 		return 0, 0, err
 	}
 	if totalCount == 0 {
 		log.Printf("[AutoSync] 当前没有可同步的已对接订单")
+		setLastAutoSyncReport(AutoSyncReport{})
 		return 0, 0, nil
 	}
 
@@ -667,6 +762,8 @@ func (r *legacyRepository) AutoSyncAllProgress() (int, int, error) {
 	var processedCount int64
 	var sampleErrorMu sync.Mutex
 	var sampleErrors []string
+	var supplierNameMu sync.Mutex
+	supplierNames := map[string]bool{}
 	sem := make(chan struct{}, 5)
 	var wg sync.WaitGroup
 	progressLogStep := autoSyncProgressLogStep()
@@ -679,6 +776,16 @@ func (r *legacyRepository) AutoSyncAllProgress() (int, int, error) {
 		if len(sampleErrors) < sampleErrorLimit {
 			sampleErrors = append(sampleErrors, message)
 		}
+	}
+
+	recordSupplierName := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return
+		}
+		supplierNameMu.Lock()
+		defer supplierNameMu.Unlock()
+		supplierNames[name] = true
 	}
 
 	logProgress := func(delta int64) {
@@ -715,6 +822,7 @@ func (r *legacyRepository) AutoSyncAllProgress() (int, int, error) {
 			sup, err := r.sup.GetSupplierByHID(hid)
 			if err != nil {
 				message := fmt.Sprintf("供应商 hid=%d 查询失败: %v（影响 %d 个订单）", hid, err, len(items))
+				recordSupplierName(fmt.Sprintf("hid=%d", hid))
 				if verboseLogging {
 					log.Printf("[AutoSync] %s", message)
 				}
@@ -723,8 +831,10 @@ func (r *legacyRepository) AutoSyncAllProgress() (int, int, error) {
 				logProgress(int64(len(items)))
 				return
 			}
+			recordSupplierName(sup.Name)
 
 			for _, item := range items {
+				syncTime := time.Now().Format("2006-01-02 15:04:05")
 				// 自动轮询仍然把 kcname 透传给供应商查询层，
 				// 这样与手动同步保持相同的平台兼容行为。
 				orderExtra := map[string]string{
@@ -736,6 +846,7 @@ func (r *legacyRepository) AutoSyncAllProgress() (int, int, error) {
 				}
 				progressItems, err := r.sup.QueryOrderProgress(sup, item.YID, item.User, orderExtra)
 				if err != nil {
+					database.DB.Exec("UPDATE qingka_wangke_order SET updatetime = ? WHERE oid = ?", syncTime, item.OID)
 					message := fmt.Sprintf("oid=%d 查询进度失败(hid=%d yid=%s): %v", item.OID, hid, item.YID, err)
 					if verboseLogging {
 						log.Printf("[AutoSync] %s", message)
@@ -746,6 +857,7 @@ func (r *legacyRepository) AutoSyncAllProgress() (int, int, error) {
 					continue
 				}
 				if len(progressItems) == 0 {
+					database.DB.Exec("UPDATE qingka_wangke_order SET updatetime = ? WHERE oid = ?", syncTime, item.OID)
 					// “接口成功但 data 为空”在业务上也视为失败，
 					// 因为这说明当前订单没有拿到任何可回写的上游进度。
 					message := fmt.Sprintf("oid=%d 未查询到上游进度(hid=%d yid=%s)", item.OID, hid, item.YID)
@@ -767,9 +879,9 @@ func (r *legacyRepository) AutoSyncAllProgress() (int, int, error) {
 					// 自动轮询这里直接按 oid 回写，不再附带 user/kcname 条件。
 					// 因为前面已经先从主订单表扫描出了明确的 oid，自动任务更强调吞吐量和确定性。
 					if _, err := database.DB.Exec(
-						"UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ? WHERE oid = ?",
+						"UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ?, updatetime = ? WHERE oid = ?",
 						progress.KCName, progress.YID, statusText, progress.Process, progress.Remarks,
-						progress.CourseStartTime, progress.CourseEndTime, progress.ExamStartTime, progress.ExamEndTime,
+						progress.CourseStartTime, progress.CourseEndTime, progress.ExamStartTime, progress.ExamEndTime, syncTime,
 						item.OID,
 					); err != nil {
 						message := fmt.Sprintf("oid=%d 更新进度失败(hid=%d yid=%s): %v", item.OID, hid, item.YID, err)
@@ -793,6 +905,16 @@ func (r *legacyRepository) AutoSyncAllProgress() (int, int, error) {
 	if len(sampleErrors) > 0 {
 		log.Printf("[AutoSync] 失败样例: %s", strings.Join(sampleErrors, "；"))
 	}
+	names := make([]string, 0, len(supplierNames))
+	for name := range supplierNames {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	setLastAutoSyncReport(AutoSyncReport{
+		SupplierNames: names,
+		SampleErrors:  append([]string(nil), sampleErrors...),
+		Processed:     totalCount,
+	})
 	return int(updatedCount), int(errorCount), nil
 }
 

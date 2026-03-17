@@ -200,7 +200,7 @@ func (s *stubRepository) SyncOrderProgress(oids []int) (int, error) {
 	return 1, nil
 }
 
-func (s *stubRepository) AutoSyncAllProgress() (int, int, error) {
+func (s *stubRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, error) {
 	s.autoSyncCalled = true
 	return 2, 1, nil
 }
@@ -294,7 +294,7 @@ func TestCommandAndSyncServicesDelegateToRepository(t *testing.T) {
 		t.Fatalf("sync progress delegation failed: count=%d err=%v called=%v", progressCount, err, repo.syncProgressCalled)
 	}
 
-	autoUpdated, autoFailed, err := syncSvc.AutoSyncAllProgress()
+	autoUpdated, autoFailed, err := syncSvc.AutoSyncAllProgress(AutoSyncOptions{})
 	if autoUpdated != 2 || autoFailed != 1 || err != nil || !repo.autoSyncCalled {
 		t.Fatalf("auto sync delegation failed: updated=%d failed=%d err=%v called=%v", autoUpdated, autoFailed, err, repo.autoSyncCalled)
 	}
@@ -1174,20 +1174,21 @@ func TestLegacyRepositoryManualDockAndSyncSuccessPaths(t *testing.T) {
 				return nil, fmt.Errorf("unexpected query: %s", query)
 			}
 			return &testRows{
-				columns: []string{"oid", "yid", "hid", "user", "kcname", "noun", "kcid"},
-				values:  [][]driver.Value{{int64(70), "Y70", "9", "student", "课程D", "NOUN-70", "KC-70"}},
+				columns: []string{"oid", "yid", "hid", "user", "kcname", "noun", "kcid", "addtime", "updatetime"},
+				values:  [][]driver.Value{{int64(70), "Y70", "9", "student", "课程D", "NOUN-70", "KC-70", "2026-03-01 00:00:00", ""}},
 			}, nil
 		}
 
 		execCalled := false
 		changeStatusExecHook = func(query string, args []driver.NamedValue) error {
 			execCalled = true
-			if !strings.Contains(query, "UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ? WHERE oid = ?") {
+			if !strings.Contains(query, "UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ?, updatetime = ? WHERE oid = ?") {
 				return fmt.Errorf("unexpected exec query: %s", query)
 			}
-			want := []string{"课程D", "Y70", "进行中", "80%", "同步中", "2026-03-01", "2026-03-08", "2026-03-09", "2026-03-10", "70"}
-			if got := namedValueStrings(args); !reflect.DeepEqual(got, want) {
-				return fmt.Errorf("unexpected exec args: got=%v want=%v", got, want)
+			got := namedValueStrings(args)
+			wantPrefix := []string{"课程D", "Y70", "进行中", "80%", "同步中", "2026-03-01", "2026-03-08", "2026-03-09", "2026-03-10"}
+			if len(got) != 11 || !reflect.DeepEqual(got[:9], wantPrefix) || got[9] == "" || got[10] != "70" {
+				return fmt.Errorf("unexpected exec args: got=%v", got)
 			}
 			return nil
 		}
@@ -1199,7 +1200,7 @@ func TestLegacyRepositoryManualDockAndSyncSuccessPaths(t *testing.T) {
 			notified = append(notified, fmt.Sprintf("%d|%s|%s|%s", oid, newStatus, newProcess, remarks))
 		})
 
-		updated, failed, err := repo.AutoSyncAllProgress()
+		updated, failed, err := repo.AutoSyncAllProgress(AutoSyncOptions{})
 		if err != nil {
 			t.Fatalf("auto sync returned error: %v", err)
 		}

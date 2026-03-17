@@ -1,35 +1,18 @@
 package admin
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 	"time"
 
+	autosync "go-api/internal/autosync"
 	"go-api/internal/database"
 	suppliermodule "go-api/internal/modules/supplier"
 )
 
-type SyncConfig struct {
-	ID               int                           `json:"id"`
-	SupplierIDs      string                        `json:"supplier_ids"`
-	PriceRates       map[string]float64            `json:"price_rates"`
-	CategoryRates    map[string]map[string]float64 `json:"category_rates"`
-	SyncPrice        bool                          `json:"sync_price"`
-	SyncStatus       bool                          `json:"sync_status"`
-	SyncContent      bool                          `json:"sync_content"`
-	SyncName         bool                          `json:"sync_name"`
-	CloneEnabled     bool                          `json:"clone_enabled"`
-	ForcePriceUp     bool                          `json:"force_price_up"`
-	CloneCategory    bool                          `json:"clone_category"`
-	SkipCategories   []string                      `json:"skip_categories"`
-	NameReplace      map[string]string             `json:"name_replace"`
-	SecretPriceRate  float64                       `json:"secret_price_rate"`
-	AutoSyncEnabled  bool                          `json:"auto_sync_enabled"`
-	AutoSyncInterval int                           `json:"auto_sync_interval"`
-}
+type SyncConfig = autosync.SyncConfig
 
 type SyncDiffItem struct {
 	Action         string  `json:"action"`
@@ -62,86 +45,11 @@ type SyncExecuteResult struct {
 }
 
 func getAdminSyncConfig() (*SyncConfig, error) {
-	row := database.DB.QueryRow(`SELECT id, COALESCE(supplier_ids,''), COALESCE(price_rates,'{}'),
-		COALESCE(category_rates,'{}'), sync_price, sync_status, sync_content, sync_name,
-		clone_enabled, force_price_up,
-		clone_category, COALESCE(skip_categories,'[]'), COALESCE(name_replace,'{}'),
-		secret_price_rate, auto_sync_enabled, auto_sync_interval
-		FROM qingka_wangke_sync_config ORDER BY id DESC LIMIT 1`)
-
-	var cfg SyncConfig
-	var priceRatesJSON, categoryRatesJSON, skipCategoriesJSON, nameReplaceJSON string
-	err := row.Scan(&cfg.ID, &cfg.SupplierIDs, &priceRatesJSON, &categoryRatesJSON,
-		&cfg.SyncPrice, &cfg.SyncStatus, &cfg.SyncContent, &cfg.SyncName,
-		&cfg.CloneEnabled, &cfg.ForcePriceUp,
-		&cfg.CloneCategory, &skipCategoriesJSON, &nameReplaceJSON,
-		&cfg.SecretPriceRate, &cfg.AutoSyncEnabled, &cfg.AutoSyncInterval)
-	if err != nil {
-		return &SyncConfig{
-			PriceRates:       map[string]float64{},
-			CategoryRates:    map[string]map[string]float64{},
-			SkipCategories:   []string{},
-			NameReplace:      map[string]string{},
-			SyncPrice:        true,
-			SyncStatus:       true,
-			SyncContent:      true,
-			AutoSyncInterval: 30,
-		}, nil
-	}
-
-	json.Unmarshal([]byte(priceRatesJSON), &cfg.PriceRates)
-	json.Unmarshal([]byte(categoryRatesJSON), &cfg.CategoryRates)
-	json.Unmarshal([]byte(skipCategoriesJSON), &cfg.SkipCategories)
-	json.Unmarshal([]byte(nameReplaceJSON), &cfg.NameReplace)
-
-	if cfg.PriceRates == nil {
-		cfg.PriceRates = map[string]float64{}
-	}
-	if cfg.CategoryRates == nil {
-		cfg.CategoryRates = map[string]map[string]float64{}
-	}
-	if cfg.SkipCategories == nil {
-		cfg.SkipCategories = []string{}
-	}
-	if cfg.NameReplace == nil {
-		cfg.NameReplace = map[string]string{}
-	}
-	if cfg.AutoSyncInterval <= 0 {
-		cfg.AutoSyncInterval = 30
-	}
-	return &cfg, nil
+	return autosync.GetSyncConfig()
 }
 
 func saveAdminSyncConfig(cfg *SyncConfig) error {
-	priceJSON, _ := json.Marshal(cfg.PriceRates)
-	categoryJSON, _ := json.Marshal(cfg.CategoryRates)
-	skipJSON, _ := json.Marshal(cfg.SkipCategories)
-	nameReplaceJSON, _ := json.Marshal(cfg.NameReplace)
-	if cfg.AutoSyncInterval <= 0 {
-		cfg.AutoSyncInterval = 30
-	}
-
-	tx, err := database.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	tx.Exec("DELETE FROM qingka_wangke_sync_config WHERE 1=1")
-
-	_, err = tx.Exec(`INSERT INTO qingka_wangke_sync_config
-		(supplier_ids, price_rates, category_rates, sync_price, sync_status, sync_content, sync_name,
-		 clone_enabled, force_price_up, clone_category, skip_categories, name_replace,
-		 secret_price_rate, auto_sync_enabled, auto_sync_interval)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		cfg.SupplierIDs, string(priceJSON), string(categoryJSON),
-		cfg.SyncPrice, cfg.SyncStatus, cfg.SyncContent, cfg.SyncName,
-		cfg.CloneEnabled, cfg.ForcePriceUp, cfg.CloneCategory, string(skipJSON), string(nameReplaceJSON),
-		cfg.SecretPriceRate, cfg.AutoSyncEnabled, cfg.AutoSyncInterval)
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
+	return autosync.SaveSyncConfig(cfg)
 }
 
 func loadAdminSyncCategoryNames() map[int]string {

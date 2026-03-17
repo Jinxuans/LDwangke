@@ -208,6 +208,12 @@ const routes: RouteRecordRaw[] = [
             component: () => import('#/views/admin/queue.vue'),
             meta: { icon: 'mdi:timer-sync-outline', order: 5, title: '待对接调度' },
           },
+          {
+            name: 'AdminOrderProgressSync',
+            path: '/admin/order-progress-sync',
+            component: () => import('#/views/admin/order-progress-sync.vue'),
+            meta: { icon: 'mdi:progress-clock', order: 6, title: '主订单同步' },
+          },
         ],
       },
 
