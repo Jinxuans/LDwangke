@@ -379,30 +379,14 @@ func (s *classService) MiJiaList(req model.MiJiaListRequest) ([]model.MiJia, int
 }
 
 func (s *classService) MiJiaSave(req model.MiJiaSaveRequest) error {
-	if req.Mode == "" {
-		req.Mode = "0"
+	mode, err := normalizeMiJiaMode(req.Mode, "0")
+	if err != nil {
+		return err
 	}
 	if req.MID > 0 {
-		_, err := database.DB.Exec(
-			"UPDATE qingka_wangke_mijia SET uid=?, cid=?, mode=?, price=? WHERE mid=?",
-			req.UID, req.CID, req.Mode, req.Price, req.MID,
-		)
-		return err
+		return updateMiJiaRecord(req.MID, req.UID, req.CID, mode, req.Price)
 	}
-	var cnt int
-	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_mijia WHERE uid=? AND cid=?", req.UID, req.CID).Scan(&cnt)
-	if cnt > 0 {
-		_, err := database.DB.Exec(
-			"UPDATE qingka_wangke_mijia SET mode=?, price=? WHERE uid=? AND cid=?",
-			req.Mode, req.Price, req.UID, req.CID,
-		)
-		return err
-	}
-	_, err := database.DB.Exec(
-		"INSERT INTO qingka_wangke_mijia (uid, cid, mode, price, addtime) VALUES (?, ?, ?, ?, NOW())",
-		req.UID, req.CID, req.Mode, req.Price,
-	)
-	return err
+	return saveMiJiaRecord(req.UID, req.CID, mode, req.Price)
 }
 
 func (s *classService) MiJiaDelete(mids []int) error {
@@ -420,39 +404,37 @@ func (s *classService) MiJiaDelete(mids []int) error {
 }
 
 func (s *classService) MiJiaBatch(req model.MiJiaBatchRequest) (int, error) {
-	if req.Mode == "" {
-		req.Mode = "0"
+	mode, err := normalizeMiJiaMode(req.Mode, "0")
+	if err != nil {
+		return 0, err
 	}
-	rows, err := database.DB.Query("SELECT cid, price FROM qingka_wangke_class WHERE fenlei = ?", req.Fenlei)
+	rows, err := database.DB.Query("SELECT cid FROM qingka_wangke_class WHERE fenlei = ?", req.Fenlei)
 	if err != nil {
 		return 0, err
 	}
 	defer rows.Close()
 
-	count := 0
+	var cids []int
 	for rows.Next() {
 		var cid int
-		var origPrice string
-		rows.Scan(&cid, &origPrice)
-
-		finalPrice := req.Price
-		finalMode := req.Mode
-		if req.Mode == "4" {
-			var op, pp float64
-			fmt.Sscanf(origPrice, "%f", &op)
-			fmt.Sscanf(req.Price, "%f", &pp)
-			finalPrice = fmt.Sprintf("%.2f", op*pp)
-			finalMode = "2"
-		}
-
-		var cnt int
-		database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_mijia WHERE uid=? AND cid=?", req.UID, cid).Scan(&cnt)
-		if cnt > 0 {
-			database.DB.Exec("UPDATE qingka_wangke_mijia SET price=?, mode=? WHERE uid=? AND cid=?", finalPrice, finalMode, req.UID, cid)
-		} else {
-			database.DB.Exec("INSERT INTO qingka_wangke_mijia (uid, cid, mode, price, addtime) VALUES (?, ?, ?, ?, NOW())", req.UID, cid, finalMode, finalPrice)
-		}
-		count++
+		rows.Scan(&cid)
+		cids = append(cids, cid)
 	}
-	return count, nil
+
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	for _, cid := range cids {
+		if err := upsertMiJiaRecordTx(tx, req.UID, cid, mode, req.Price); err != nil {
+			return 0, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return len(cids), nil
 }

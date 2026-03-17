@@ -2,7 +2,6 @@ package class
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 
 	"go-api/internal/database"
@@ -63,35 +62,10 @@ func (s *classService) ListClasses(uid int, req model.ClassListRequest) ([]model
 		cids = append(cids, c.CID)
 	}
 
-	mijiaMap := map[int]struct {
-		mode  int
-		price float64
-	}{}
+	mijiaMap := map[int]MiJiaRule{}
 	if len(cids) > 0 {
-		placeholders := ""
-		mijiaArgs := []interface{}{uid}
-		for i, cid := range cids {
-			if i > 0 {
-				placeholders += ","
-			}
-			placeholders += "?"
-			mijiaArgs = append(mijiaArgs, cid)
-		}
-		mijiaRows, err := database.DB.Query(
-			fmt.Sprintf("SELECT cid, COALESCE(mode,0), COALESCE(price,0) FROM qingka_wangke_mijia WHERE uid = ? AND cid IN (%s)", placeholders),
-			mijiaArgs...,
-		)
-		if err == nil {
-			defer mijiaRows.Close()
-			for mijiaRows.Next() {
-				var cid, mode int
-				var price float64
-				mijiaRows.Scan(&cid, &mode, &price)
-				mijiaMap[cid] = struct {
-					mode  int
-					price float64
-				}{mode, price}
-			}
+		if loaded, err := LoadMiJiaMap(uid, cids); err == nil {
+			mijiaMap = loaded
 		}
 	}
 
@@ -100,33 +74,14 @@ func (s *classService) ListClasses(uid int, req model.ClassListRequest) ([]model
 		c := item.c
 		basePrice, _ := strconv.ParseFloat(c.Price, 64)
 
-		var price float64
-		if item.yunsuan == "+" {
-			price = math.Round((basePrice+addprice)*100) / 100
-		} else {
-			price = math.Round((basePrice*addprice)*100) / 100
-		}
-		originalPrice := price
+		price := ComputeClassBasePrice(basePrice, addprice, item.yunsuan, 4)
 
 		if mj, ok := mijiaMap[c.CID]; ok {
-			switch mj.mode {
-			case 0:
-				price = math.Round((price-mj.price)*100) / 100
-			case 1:
-				price = math.Round(((basePrice-mj.price)*addprice)*100) / 100
-			case 2:
-				price = mj.price
-			case 4:
-				price = math.Round((basePrice*mj.price)*100) / 100
+			adjustedPrice, _, applied := ApplyMiJia(basePrice, addprice, item.yunsuan, mj.Mode, mj.Price, 4)
+			price = adjustedPrice
+			if applied {
+				c.Name = "【密价】" + c.Name
 			}
-			if price <= 0 {
-				price = 0
-			}
-			c.Name = "【质押】" + c.Name
-		}
-
-		if price > originalPrice {
-			price = originalPrice
 		}
 
 		c.Price = fmt.Sprintf("%.2f", price)
