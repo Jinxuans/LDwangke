@@ -215,7 +215,11 @@ class UserController
     {
         $db = Database::getInstance();
         $list = $db->getAll(
-            "SELECT m.*, c.name as class_name FROM qingka_wangke_mijia m LEFT JOIN qingka_wangke_class c ON m.cid = c.cid WHERE m.uid = ?",
+            "SELECT m.mid, m.uid, m.cid, COALESCE(m.mode, 2) AS mode, m.price, m.addtime, c.name as class_name
+             FROM qingka_wangke_mijia m
+             LEFT JOIN qingka_wangke_class c ON m.cid = c.cid
+             WHERE m.uid = ?
+             ORDER BY m.mid DESC",
             [$this->uid()]
         );
         Response::success($list);
@@ -230,21 +234,29 @@ class UserController
             Response::badRequest('缺少课程 ID 或价格');
         }
 
-        // 检查是否已存在
+        $mode = (string)($input['mode'] ?? '2');
+        if (!in_array($mode, ['0', '1', '2', '4'], true)) {
+            Response::badRequest('不支持的密价模式');
+        }
+
         $existing = $db->getRow(
-            "SELECT id FROM qingka_wangke_mijia WHERE uid = ? AND cid = ?",
+            "SELECT mid FROM qingka_wangke_mijia WHERE uid = ? AND cid = ? ORDER BY mid ASC LIMIT 1",
             [$this->uid(), $input['cid']]
         );
 
         if ($existing) {
             $db->execute(
-                "UPDATE qingka_wangke_mijia SET price = ? WHERE uid = ? AND cid = ?",
-                [$input['price'], $this->uid(), $input['cid']]
+                "UPDATE qingka_wangke_mijia SET mode = ?, price = ? WHERE mid = ?",
+                [(int)$mode, $input['price'], $existing['mid']]
+            );
+            $db->execute(
+                "DELETE FROM qingka_wangke_mijia WHERE uid = ? AND cid = ? AND mid <> ?",
+                [$this->uid(), $input['cid'], $existing['mid']]
             );
         } else {
             $db->insert(
-                "INSERT INTO qingka_wangke_mijia (uid, cid, price) VALUES (?, ?, ?)",
-                [$this->uid(), $input['cid'], $input['price']]
+                "INSERT INTO qingka_wangke_mijia (uid, cid, mode, price, addtime) VALUES (?, ?, ?, ?, NOW())",
+                [$this->uid(), $input['cid'], (int)$mode, $input['price']]
             );
         }
 

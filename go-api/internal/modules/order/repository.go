@@ -6,6 +6,7 @@ import (
 	"go-api/internal/config"
 	"go-api/internal/database"
 	"go-api/internal/model"
+	classmodule "go-api/internal/modules/class"
 	suppliermodule "go-api/internal/modules/supplier"
 	shared "go-api/internal/shared/db"
 	"log"
@@ -257,23 +258,8 @@ func (r *legacyRepository) AddOrders(uid int, req model.OrderAddRequest) (*model
 		unitPrice = math.Round((clsPrice*addprice)*10000) / 10000
 	}
 
-	var mijiaPrice float64
-	var mijiaMode int
-	err = database.DB.QueryRow("SELECT COALESCE(price,0), COALESCE(mode,0) FROM qingka_wangke_mijia WHERE uid = ? AND cid = ?", uid, req.CID).Scan(&mijiaPrice, &mijiaMode)
-	if err == nil {
-		switch mijiaMode {
-		case 0:
-			unitPrice = math.Round((unitPrice-mijiaPrice)*10000) / 10000
-		case 1:
-			unitPrice = math.Round(((clsPrice-mijiaPrice)*addprice)*10000) / 10000
-		case 2:
-			unitPrice = mijiaPrice
-		case 4:
-			unitPrice = math.Round((clsPrice*mijiaPrice)*10000) / 10000
-		}
-		if unitPrice < 0 {
-			unitPrice = 0
-		}
+	if mijia, ok, err := classmodule.LoadMiJia(uid, req.CID); err == nil && ok {
+		unitPrice, _, _ = classmodule.ApplyMiJia(clsPrice, addprice, cls.Yunsuan, mijia.Mode, mijia.Price, 4)
 	}
 
 	var pledgeDiscount float64

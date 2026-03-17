@@ -1,13 +1,12 @@
 package openapi
 
 import (
-	"database/sql"
 	"fmt"
 	"go-api/internal/database"
 	"go-api/internal/model"
+	classmodule "go-api/internal/modules/class"
 	ordermodule "go-api/internal/modules/order"
 	suppliermodule "go-api/internal/modules/supplier"
-	"math"
 	"strconv"
 	"strings"
 
@@ -162,35 +161,47 @@ func compatClass(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var data []gin.H
+	type compatClassItem struct {
+		cid       int
+		sort      int
+		status    int
+		name      string
+		content   string
+		yunsuan   string
+		basePrice float64
+	}
+
+	var items []compatClassItem
+	var cids []int
 	for rows.Next() {
-		var cid, sort, status int
-		var name, content, priceStr, yunsuan string
-		rows.Scan(&cid, &sort, &name, &content, &status, &priceStr, &yunsuan)
+		var item compatClassItem
+		var priceStr string
+		rows.Scan(&item.cid, &item.sort, &item.name, &item.content, &item.status, &priceStr, &item.yunsuan)
+		item.basePrice, _ = strconv.ParseFloat(priceStr, 64)
+		items = append(items, item)
+		cids = append(cids, item.cid)
+	}
 
-		basePrice, _ := strconv.ParseFloat(priceStr, 64)
-		var userPrice float64
-		if yunsuan == "+" {
-			userPrice = math.Round((basePrice+addprice)*100) / 100
-		} else {
-			userPrice = math.Round((basePrice*addprice)*100) / 100
-		}
+	mijiaMap := map[int]classmodule.MiJiaRule{}
+	if loaded, err := classmodule.LoadMiJiaMap(uid, cids); err == nil {
+		mijiaMap = loaded
+	}
 
-		// 检查密价
-		var mijia sql.NullFloat64
-		database.DB.QueryRow("SELECT price FROM qingka_wangke_mijia WHERE uid=? AND cid=?", uid, cid).Scan(&mijia)
-		if mijia.Valid {
-			userPrice = mijia.Float64
+	var data []gin.H
+	for _, item := range items {
+		userPrice := classmodule.ComputeClassBasePrice(item.basePrice, addprice, item.yunsuan, 4)
+		if mj, ok := mijiaMap[item.cid]; ok {
+			userPrice, _, _ = classmodule.ApplyMiJia(item.basePrice, addprice, item.yunsuan, mj.Mode, mj.Price, 4)
 		}
 
 		data = append(data, gin.H{
-			"sort":    sort,
-			"cid":     cid,
-			"name":    name,
-			"content": content,
-			"status":  status,
-			"price":   fmt.Sprintf("%.2f", basePrice),
-			"price5":  fmt.Sprintf("%.2f", basePrice+0.5),
+			"sort":    item.sort,
+			"cid":     item.cid,
+			"name":    item.name,
+			"content": item.content,
+			"status":  item.status,
+			"price":   fmt.Sprintf("%.2f", item.basePrice),
+			"price5":  fmt.Sprintf("%.2f", item.basePrice+0.5),
 			"jiage":   fmt.Sprintf("%.2f", userPrice),
 		})
 	}
@@ -633,32 +644,43 @@ func compatGetClass(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var data []gin.H
+	type compatGetClassItem struct {
+		cid       int
+		status    int
+		name      string
+		yunsuan   string
+		fenlei    string
+		basePrice float64
+	}
+
+	var items []compatGetClassItem
+	var cids []int
 	for rows.Next() {
-		var cid, status int
-		var name, priceStr, yunsuan, fl string
-		rows.Scan(&cid, &name, &priceStr, &yunsuan, &fl, &status)
+		var item compatGetClassItem
+		var priceStr string
+		rows.Scan(&item.cid, &item.name, &priceStr, &item.yunsuan, &item.fenlei, &item.status)
+		item.basePrice, _ = strconv.ParseFloat(priceStr, 64)
+		items = append(items, item)
+		cids = append(cids, item.cid)
+	}
 
-		basePrice, _ := strconv.ParseFloat(priceStr, 64)
-		var userPrice float64
-		if yunsuan == "+" {
-			userPrice = math.Round((basePrice+addprice)*100) / 100
-		} else {
-			userPrice = math.Round((basePrice*addprice)*100) / 100
-		}
+	mijiaMap := map[int]classmodule.MiJiaRule{}
+	if loaded, err := classmodule.LoadMiJiaMap(uid, cids); err == nil {
+		mijiaMap = loaded
+	}
 
-		// 密价
-		var mijia sql.NullFloat64
-		database.DB.QueryRow("SELECT price FROM qingka_wangke_mijia WHERE uid=? AND cid=?", uid, cid).Scan(&mijia)
-		if mijia.Valid {
-			userPrice = mijia.Float64
+	var data []gin.H
+	for _, item := range items {
+		userPrice := classmodule.ComputeClassBasePrice(item.basePrice, addprice, item.yunsuan, 4)
+		if mj, ok := mijiaMap[item.cid]; ok {
+			userPrice, _, _ = classmodule.ApplyMiJia(item.basePrice, addprice, item.yunsuan, mj.Mode, mj.Price, 4)
 		}
 
 		data = append(data, gin.H{
-			"cid":    cid,
-			"name":   name,
+			"cid":    item.cid,
+			"name":   item.name,
 			"price":  fmt.Sprintf("%.2f", userPrice),
-			"fenlei": fl,
+			"fenlei": item.fenlei,
 		})
 	}
 	if data == nil {
