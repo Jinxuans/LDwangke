@@ -82,6 +82,9 @@ type supplierGateway interface {
 	GetSupplierByHID(hid int) (*model.SupplierFull, error)
 	GetClassFull(cid int) (*model.ClassFull, error)
 	CallSupplierOrder(sup *model.SupplierFull, cls *model.ClassFull, school, user, pass, kcid, kcname string, extraFields map[string]string) (*model.SupplierOrderResult, error)
+	HasBatchProgressForPT(pt string) bool
+	HasBatchProgressConfig(sup *model.SupplierFull) bool
+	QueryBatchOrderProgress(sup *model.SupplierFull, refs []model.SupplierBatchProgressRef) ([]model.SupplierProgressItem, error)
 	QueryOrderProgress(sup *model.SupplierFull, yid string, username string, orderExtra map[string]string) ([]model.SupplierProgressItem, error)
 	ResubmitOrder(sup *model.SupplierFull, yid string) (int, string, error)
 }
@@ -91,11 +94,129 @@ type legacyRepository struct {
 	sup    supplierGateway
 }
 
+type autoSyncItem struct {
+	OID        int
+	YID        string
+	HID        int
+	PT         string
+	User       string
+	KCName     string
+	Noun       string
+	KCID       string
+	Status     string
+	AddTime    string
+	UpdateTime string
+
+	MatchedRule AutoSyncRule
+}
+
 func NewRepository() Repository {
 	return &legacyRepository{
 		orders: shared.NewOrderRepo(),
 		sup:    suppliermodule.SharedService(),
 	}
+}
+
+func autoSyncUserCourseKey(user string, kcname string) string {
+	user = strings.TrimSpace(user)
+	kcname = strings.TrimSpace(kcname)
+	if user == "" || kcname == "" {
+		return ""
+	}
+	return user + "\x00" + kcname
+}
+
+func autoSyncNounUserCourseKey(noun string, user string, kcname string) string {
+	noun = strings.TrimSpace(noun)
+	user = strings.TrimSpace(user)
+	kcname = strings.TrimSpace(kcname)
+	if noun == "" || user == "" || kcname == "" {
+		return ""
+	}
+	return noun + "\x00" + user + "\x00" + kcname
+}
+
+func buildBatchProgressRefs(items []autoSyncItem) []model.SupplierBatchProgressRef {
+	refs := make([]model.SupplierBatchProgressRef, 0, len(items))
+	for _, item := range items {
+		refs = append(refs, model.SupplierBatchProgressRef{
+			YID:    item.YID,
+			User:   item.User,
+			KCName: item.KCName,
+			KCID:   item.KCID,
+			Noun:   item.Noun,
+		})
+	}
+	return refs
+}
+
+func indexAutoSyncItems(items []autoSyncItem) (map[string][]autoSyncItem, map[string][]autoSyncItem) {
+	byYID := make(map[string][]autoSyncItem, len(items))
+	byNounUserCourse := make(map[string][]autoSyncItem, len(items))
+	for _, item := range items {
+		if yid := strings.TrimSpace(item.YID); yid != "" {
+			byYID[yid] = append(byYID[yid], item)
+		}
+		if key := autoSyncNounUserCourseKey(item.Noun, item.User, item.KCName); key != "" {
+			byNounUserCourse[key] = append(byNounUserCourse[key], item)
+		}
+	}
+	return byYID, byNounUserCourse
+}
+
+func matchAutoSyncItems(progress model.SupplierProgressItem, byYID map[string][]autoSyncItem, byNounUserCourse map[string][]autoSyncItem) []autoSyncItem {
+	if yid := strings.TrimSpace(progress.YID); yid != "" {
+		if items := byYID[yid]; len(items) > 0 {
+			return items
+		}
+	}
+	if key := autoSyncNounUserCourseKey(progress.Noun, progress.User, progress.KCName); key != "" {
+		if items := byNounUserCourse[key]; len(items) > 0 {
+			return items
+		}
+	}
+	return nil
+}
+
+func mergeAutoSyncProgress(item autoSyncItem, progress model.SupplierProgressItem) model.SupplierProgressItem {
+	if strings.TrimSpace(progress.YID) == "" {
+		progress.YID = item.YID
+	}
+	if strings.TrimSpace(progress.KCName) == "" {
+		progress.KCName = item.KCName
+	}
+	if strings.TrimSpace(progress.User) == "" {
+		progress.User = item.User
+	}
+	if strings.TrimSpace(progress.Status) == "" {
+		progress.Status = item.Status
+	}
+	if strings.TrimSpace(progress.StatusText) == "" {
+		progress.StatusText = progress.Status
+	}
+	return progress
+}
+
+func touchAutoSyncOrder(oid int, syncTime string) {
+	database.DB.Exec("UPDATE qingka_wangke_order SET updatetime = ? WHERE oid = ?", syncTime, oid)
+}
+
+func applyAutoSyncProgressUpdate(item autoSyncItem, progress model.SupplierProgressItem, syncTime string) error {
+	progress = mergeAutoSyncProgress(item, progress)
+	statusText := progress.Status
+	if progress.StatusText != "" {
+		statusText = progress.StatusText
+	}
+	if _, err := database.DB.Exec(
+		"UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ?, updatetime = ? WHERE oid = ?",
+		progress.KCName, progress.YID, statusText, progress.Process, progress.Remarks,
+		progress.CourseStartTime, progress.CourseEndTime, progress.ExamStartTime, progress.ExamEndTime, syncTime,
+		item.OID,
+	); err != nil {
+		return err
+	}
+	orderStatusNotifier(item.OID, statusText, progress.Process, progress.Remarks)
+	return nil
 }
 
 func (r *legacyRepository) List(uid int, grade string, req model.OrderListRequest) ([]model.Order, int64, error) {
@@ -650,7 +771,9 @@ func (r *legacyRepository) SyncOrderProgress(oids []int) (int, error) {
 // 3. 会输出较详细的运行日志，便于观察几万单的大批量同步进度。
 func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, error) {
 	query := `
-		SELECT oid, COALESCE(yid,''), COALESCE(hid,'0'), COALESCE(user,''), COALESCE(kcname,''), COALESCE(noun,''), COALESCE(kcid,''), COALESCE(addtime,''), COALESCE(updatetime,'')
+		SELECT oid, COALESCE(yid,''), COALESCE(hid,'0'),
+			COALESCE((SELECT pt FROM qingka_wangke_huoyuan WHERE hid = qingka_wangke_order.hid LIMIT 1),''),
+			COALESCE(user,''), COALESCE(kcname,''), COALESCE(noun,''), COALESCE(kcid,''), COALESCE(status,''), COALESCE(addtime,''), COALESCE(updatetime,'')
 		FROM qingka_wangke_order
 		WHERE dockstatus = 1`
 	args := make([]interface{}, 0, 8)
@@ -693,36 +816,30 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 	}
 	defer rows.Close()
 
-	type syncItem struct {
-		OID         int
-		YID         string
-		HID         int
-		User        string
-		KCName      string
-		Noun        string
-		KCID        string
-		AddTime     string
-		UpdateTime  string
-		MatchedRule AutoSyncRule
-	}
-
 	// 先把所有待轮询订单按 hid 分组。
 	// 这样后面每个 goroutine 处理一个供应商分组，日志和上游限流都更容易控制。
-	hidGroups := map[int][]syncItem{}
+	hidGroups := map[int][]autoSyncItem{}
 	totalCount := 0
 	now := time.Now()
 	for rows.Next() {
-		var item syncItem
+		var item autoSyncItem
 		var hidStr string
-		if err := rows.Scan(&item.OID, &item.YID, &hidStr, &item.User, &item.KCName, &item.Noun, &item.KCID, &item.AddTime, &item.UpdateTime); err != nil {
+		if err := rows.Scan(&item.OID, &item.YID, &hidStr, &item.PT, &item.User, &item.KCName, &item.Noun, &item.KCID, &item.Status, &item.AddTime, &item.UpdateTime); err != nil {
 			continue
 		}
 		item.HID, _ = strconv.Atoi(hidStr)
 		if item.HID <= 0 {
 			continue
 		}
+		hasBatchProgress := r.sup.HasBatchProgressForPT(item.PT)
+		if opts.OnlyBatchSuppliers && !hasBatchProgress {
+			continue
+		}
+		if opts.SkipBatchSuppliers && hasBatchProgress {
+			continue
+		}
 
-		if len(opts.Rules) > 0 {
+		if !opts.IgnoreRules && len(opts.Rules) > 0 {
 			addTime, ok := parseOrderTime(item.AddTime)
 			if !ok {
 				continue
@@ -811,7 +928,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 		sem <- struct{}{}
 		wg.Add(1)
 
-		go func(hid int, items []syncItem) {
+		go func(hid int, items []autoSyncItem) {
 			// 使用固定大小的信号量限制供应商并发，避免同时打爆太多上游。
 			defer func() {
 				<-sem
@@ -833,6 +950,66 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 			}
 			recordSupplierName(sup.Name)
 
+			if r.sup.HasBatchProgressConfig(sup) {
+				syncTime := time.Now().Format("2006-01-02 15:04:05")
+				progressItems, err := r.sup.QueryBatchOrderProgress(sup, buildBatchProgressRefs(items))
+				if err != nil {
+					message := fmt.Sprintf("hid=%d 批量进度接口失败，回退逐单同步: %v", hid, err)
+					if opts.OnlyBatchSuppliers {
+						message = fmt.Sprintf("hid=%d 批量进度接口失败: %v", hid, err)
+					}
+					if verboseLogging {
+						log.Printf("[AutoSync] %s", message)
+					}
+					recordSampleError(message)
+					if opts.OnlyBatchSuppliers {
+						atomic.AddInt64(&errorCount, int64(len(items)))
+						logProgress(int64(len(items)))
+						return
+					}
+				} else {
+					byYID, byNounUserCourse := indexAutoSyncItems(items)
+					updatedOIDs := map[int]bool{}
+
+					for _, progress := range progressItems {
+						matchedItems := matchAutoSyncItems(progress, byYID, byNounUserCourse)
+						if len(matchedItems) == 0 {
+							if verboseLogging {
+								log.Printf("[AutoSync] hid=%d 批量进度项未匹配本地订单: yid=%s noun=%s user=%s kcname=%s", hid, progress.YID, progress.Noun, progress.User, progress.KCName)
+							}
+							continue
+						}
+						for _, item := range matchedItems {
+							if err := applyAutoSyncProgressUpdate(item, progress, syncTime); err != nil {
+								message := fmt.Sprintf("oid=%d 批量更新进度失败(hid=%d yid=%s): %v", item.OID, hid, item.YID, err)
+								if verboseLogging {
+									log.Printf("[AutoSync] %s", message)
+								}
+								recordSampleError(message)
+								atomic.AddInt64(&errorCount, 1)
+								continue
+							}
+							updatedOIDs[item.OID] = true
+							atomic.AddInt64(&updatedCount, 1)
+						}
+					}
+
+					if !opts.OnlyBatchSuppliers {
+						for _, item := range items {
+							if updatedOIDs[item.OID] {
+								continue
+							}
+							touchAutoSyncOrder(item.OID, syncTime)
+						}
+					}
+					if verboseLogging {
+						log.Printf("[AutoSync] hid=%d 批量进度同步完成，返回 %d 条变更，命中 %d 个订单", hid, len(progressItems), len(updatedOIDs))
+					}
+					logProgress(int64(len(items)))
+					return
+				}
+			}
+
 			for _, item := range items {
 				syncTime := time.Now().Format("2006-01-02 15:04:05")
 				// 自动轮询仍然把 kcname 透传给供应商查询层，
@@ -846,7 +1023,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 				}
 				progressItems, err := r.sup.QueryOrderProgress(sup, item.YID, item.User, orderExtra)
 				if err != nil {
-					database.DB.Exec("UPDATE qingka_wangke_order SET updatetime = ? WHERE oid = ?", syncTime, item.OID)
+					touchAutoSyncOrder(item.OID, syncTime)
 					message := fmt.Sprintf("oid=%d 查询进度失败(hid=%d yid=%s): %v", item.OID, hid, item.YID, err)
 					if verboseLogging {
 						log.Printf("[AutoSync] %s", message)
@@ -857,7 +1034,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 					continue
 				}
 				if len(progressItems) == 0 {
-					database.DB.Exec("UPDATE qingka_wangke_order SET updatetime = ? WHERE oid = ?", syncTime, item.OID)
+					touchAutoSyncOrder(item.OID, syncTime)
 					// “接口成功但 data 为空”在业务上也视为失败，
 					// 因为这说明当前订单没有拿到任何可回写的上游进度。
 					message := fmt.Sprintf("oid=%d 未查询到上游进度(hid=%d yid=%s)", item.OID, hid, item.YID)
@@ -871,19 +1048,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 				}
 
 				for _, progress := range progressItems {
-					// 归一化上游状态字段，优先用 status_text 显示更接近用户视角的状态。
-					statusText := progress.Status
-					if progress.StatusText != "" {
-						statusText = progress.StatusText
-					}
-					// 自动轮询这里直接按 oid 回写，不再附带 user/kcname 条件。
-					// 因为前面已经先从主订单表扫描出了明确的 oid，自动任务更强调吞吐量和确定性。
-					if _, err := database.DB.Exec(
-						"UPDATE qingka_wangke_order SET name = ?, yid = ?, status = ?, process = ?, remarks = ?, courseStartTime = ?, courseEndTime = ?, examStartTime = ?, examEndTime = ?, updatetime = ? WHERE oid = ?",
-						progress.KCName, progress.YID, statusText, progress.Process, progress.Remarks,
-						progress.CourseStartTime, progress.CourseEndTime, progress.ExamStartTime, progress.ExamEndTime, syncTime,
-						item.OID,
-					); err != nil {
+					if err := applyAutoSyncProgressUpdate(item, progress, syncTime); err != nil {
 						message := fmt.Sprintf("oid=%d 更新进度失败(hid=%d yid=%s): %v", item.OID, hid, item.YID, err)
 						if verboseLogging {
 							log.Printf("[AutoSync] %s", message)
@@ -892,8 +1057,6 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 						atomic.AddInt64(&errorCount, 1)
 						continue
 					}
-					// 自动轮询更新后同样走统一通知器，确保消息推送和状态广播与手动同步一致。
-					orderStatusNotifier(item.OID, statusText, progress.Process, progress.Remarks)
 					atomic.AddInt64(&updatedCount, 1)
 				}
 				logProgress(1)

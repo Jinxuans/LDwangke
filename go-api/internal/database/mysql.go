@@ -46,11 +46,14 @@ func Connect(cfg config.DatabaseConfig) *sql.DB {
 
 	DB = db
 	log.Println("MySQL 连接成功")
-	autoMigrate(db)
+	if err := runConfiguredMigrations(db); err != nil {
+		log.Fatalf("数据库迁移失败: %v", err)
+	}
+	bootstrapDefaultAdmin(db)
 	return db
 }
 
-func autoMigrate(db *sql.DB) {
+func runLegacySchemaPatches(db *sql.DB) {
 	var count int
 	db.QueryRow("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='qingka_wangke_user' AND COLUMN_NAME='pass2'").Scan(&count)
 	if count == 0 {
@@ -100,7 +103,9 @@ func autoMigrate(db *sql.DB) {
 		db.Exec("ALTER TABLE `qingka_wangke_moneylog` ADD COLUMN `mark` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '备注(别名)' AFTER `remark`, ADD COLUMN `remarks` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '备注(别名2)' AFTER `mark`")
 		log.Println("[AutoMigrate] 已添加 moneylog.mark/remarks 列")
 	}
+}
 
+func bootstrapDefaultAdmin(db *sql.DB) {
 	// 默认管理员改为显式开关控制，避免启动期产生隐式高权限账号。
 	var adminCount int
 	db.QueryRow("SELECT COUNT(*) FROM qingka_wangke_user WHERE grade='3'").Scan(&adminCount)

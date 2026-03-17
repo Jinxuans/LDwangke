@@ -121,6 +121,8 @@ func AdminOrderProgressSyncConfig(c *gin.Context) {
 	var body struct {
 		Enabled          bool     `json:"enabled"`
 		IntervalSec      int      `json:"interval_sec"`
+		BatchEnabled     bool     `json:"batch_enabled"`
+		BatchIntervalSec int      `json:"batch_interval_sec"`
 		SupplierIDs      []int    `json:"supplier_ids"`
 		ExcludedStatuses []string `json:"excluded_statuses"`
 		Rules            []struct {
@@ -150,6 +152,8 @@ func AdminOrderProgressSyncConfig(c *gin.Context) {
 	status, err := runtimeops.UpdateOrderProgressSyncConfig(runtimeops.OrderProgressSyncConfig{
 		Enabled:          body.Enabled,
 		IntervalSec:      body.IntervalSec,
+		BatchEnabled:     body.BatchEnabled,
+		BatchIntervalSec: body.BatchIntervalSec,
 		SupplierIDs:      body.SupplierIDs,
 		ExcludedStatuses: body.ExcludedStatuses,
 		Rules:            rules,

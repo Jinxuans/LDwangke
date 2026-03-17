@@ -14,10 +14,13 @@ type AutoSyncRule struct {
 }
 
 type AutoSyncOptions struct {
-	RecentHours      int
-	SupplierHIDs     []int
-	ExcludedStatuses []string
-	Rules            []AutoSyncRule
+	RecentHours        int
+	SupplierHIDs       []int
+	ExcludedStatuses   []string
+	Rules              []AutoSyncRule
+	OnlyBatchSuppliers bool
+	SkipBatchSuppliers bool
+	IgnoreRules        bool
 }
 
 // NewSyncService 只负责装配同步相关用例，不承载业务逻辑。

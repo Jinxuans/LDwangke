@@ -51,6 +51,8 @@ const queryParamHelp = `查课动作变量：{{action.school}} {{action.user}} {
 const orderParamMapExample = formatJsonTemplate('{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","platform":"{{order.noun}}","school":"{{order.school}}","user":"{{order.user}}","pass":"{{order.pass}}","kcid":"{{order.kcid}}","kcname":"{{order.kcname}}"}');
 const orderParamHelp = `下单对接发生在本地订单入库之后，所以上游下单映射应使用订单字段：{{order.noun}} {{order.school}} {{order.user}} {{order.pass}} {{order.kcid}} {{order.kcname}}。默认模板：${orderParamMapExample}`;
 const progressParamMapExample = formatJsonTemplate('{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","username":"{{order.user}}","kcname":"{{order.kcname}}","cid":"{{order.noun}}","yid":"{{order.yid}}"}');
+const batchProgressParamMapExample = formatJsonTemplate('{"uid":"{{supplier.uid}}","key":"{{supplier.key}}"}');
+const batchProgressParamHelp = '批量进度接口是供应商级增量拉取，只用于自动同步，不会逐单携带订单参数主动请求。常用模板只需要 {{supplier.uid}} {{supplier.key}}；如果上游要求批次上下文，也可以使用 {{batch.count}} {{batch.yids}} {{batch.users}}。';
 const categoryParamMapExample = formatJsonTemplate('{"uid":"{{supplier.uid}}","key":"{{supplier.key}}"}');
 const classListParamMapExample = formatJsonTemplate('{"uid":"{{supplier.uid}}","key":"{{supplier.key}}"}');
 const pauseParamMapExample = formatJsonTemplate('{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","id":"{{order.yid}}"}');
@@ -123,6 +125,7 @@ function openAdd() {
     query_path: '', query_method: '', query_body_type: '', query_param_map: '',
     order_path: '', order_method: '', order_body_type: '', order_param_map: '',
     progress_path: '', progress_method: '', progress_body_type: '', progress_param_map: '',
+    batch_progress_path: '', batch_progress_method: '', batch_progress_body_type: '', batch_progress_param_map: '',
     category_path: '', category_method: '', category_body_type: '', category_param_map: '',
     class_list_path: '', class_list_method: '', class_list_body_type: '', class_list_param_map: '',
     pause_path: '', pause_method: '', pause_body_type: '', pause_param_map: '',
@@ -143,6 +146,7 @@ function openEdit(row: PlatformConfig) {
   editForm.value = {
     ...row,
     progress_param_map: row.progress_param_map || '',
+    batch_progress_param_map: row.batch_progress_param_map || '',
   };
   editVisible.value = true;
 }
@@ -196,6 +200,10 @@ function applyPHPResult() {
     progress_method: r.progress_method || 'POST',
     progress_body_type: '',
     progress_param_map: '',
+    batch_progress_path: '',
+    batch_progress_method: '',
+    batch_progress_body_type: '',
+    batch_progress_param_map: '',
     category_path: '/api.php?act=getcate', category_method: 'POST', category_body_type: '', category_param_map: '',
     class_list_path: '/api.php?act=getclass', class_list_method: 'POST', class_list_body_type: '', class_list_param_map: '',
     pause_path: firstPath(r.pause_path, '/api.php?act=zt'), pause_method: 'POST', pause_body_type: '', pause_param_map: '',
@@ -267,6 +275,10 @@ function applyDetectResult() {
     progress_method: cfg.progress_method || 'POST',
     progress_body_type: cfg.progress_body_type || '',
     progress_param_map: cfg.progress_param_map || '',
+    batch_progress_path: firstPath(cfg.batch_progress_path),
+    batch_progress_method: cfg.batch_progress_method || '',
+    batch_progress_body_type: cfg.batch_progress_body_type || '',
+    batch_progress_param_map: cfg.batch_progress_param_map || '',
     category_path: firstPath(cfg.category_path, '/api.php?act=getcate'), category_method: cfg.category_method || 'POST', category_body_type: cfg.category_body_type || '', category_param_map: cfg.category_param_map || '',
     class_list_path: firstPath(cfg.class_list_path, '/api.php?act=getclass'), class_list_method: cfg.class_list_method || 'POST', class_list_body_type: cfg.class_list_body_type || '', class_list_param_map: cfg.class_list_param_map || '',
     pause_path: firstPath(cfg.pause_path, '/api.php?act=zt'), pause_method: cfg.pause_method || 'POST', pause_body_type: cfg.pause_body_type || '', pause_param_map: cfg.pause_param_map || '',
@@ -348,6 +360,7 @@ onMounted(loadData);
             <Tag v-if="record.need_proxy" color="red" :bordered="false">代理</Tag>
             <Tag v-if="record.returns_yid" color="green" :bordered="false">返YID</Tag>
             <Tag v-if="record.progress_path" color="cyan" :bordered="false">自定义进度路径</Tag>
+            <Tag v-if="record.batch_progress_path" color="geekblue" :bordered="false">批量进度</Tag>
             <Tag v-if="record.pause_path" color="cyan" :bordered="false">自定义暂停路径</Tag>
             <Tag v-if="record.change_pass_path" color="cyan" :bordered="false">自定义改密路径</Tag>
             <Tag v-if="record.extra_params" color="gold" :bordered="false">额外参数</Tag>
@@ -478,6 +491,31 @@ onMounted(loadData);
             </div>
             <FormItem label="参数映射JSON">
               <Input.TextArea v-model:value="editForm.progress_param_map" :rows="4" :placeholder="progressParamMapExample" />
+            </FormItem>
+            <Typography.Text type="secondary" class="mb-2 mt-3 block">批量进度（自动同步增量拉取）</Typography.Text>
+            <Alert class="mb-3" type="info" show-icon :message="batchProgressParamHelp" />
+            <div class="grid grid-cols-2 gap-x-4">
+              <FormItem label="批量进度路径"><Input v-model:value="editForm.batch_progress_path" placeholder="如 /api.php?act=pljd" /></FormItem>
+              <FormItem label="请求方式">
+                <Select v-model:value="editForm.batch_progress_method" allow-clear placeholder="留空=未配置">
+                  <SelectOption value="">未配置</SelectOption>
+                  <SelectOption value="POST">POST</SelectOption>
+                  <SelectOption value="GET">GET</SelectOption>
+                </Select>
+              </FormItem>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4">
+              <FormItem label="Body类型">
+                <Select v-model:value="editForm.batch_progress_body_type" allow-clear placeholder="留空=自动">
+                  <SelectOption value="">自动</SelectOption>
+                  <SelectOption value="form">form</SelectOption>
+                  <SelectOption value="json">json</SelectOption>
+                  <SelectOption value="query">query</SelectOption>
+                </Select>
+              </FormItem>
+            </div>
+            <FormItem label="参数映射JSON">
+              <Input.TextArea v-model:value="editForm.batch_progress_param_map" :rows="3" :placeholder="batchProgressParamMapExample" />
             </FormItem>
           </TabPane>
           <TabPane key="catalog" tab="分类/课程列表">

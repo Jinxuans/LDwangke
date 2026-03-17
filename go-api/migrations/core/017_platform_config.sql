@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS `qingka_platform_config` (
   `progress_method` varchar(10) NOT NULL DEFAULT 'POST' COMMENT '进度请求方式',
   `progress_body_type` varchar(16) NOT NULL DEFAULT '' COMMENT '进度请求体类型: form/json/query',
   `progress_param_map` text COMMENT '进度参数映射JSON',
+  `batch_progress_path` varchar(200) NOT NULL DEFAULT '' COMMENT '批量进度路径',
+  `batch_progress_method` varchar(10) NOT NULL DEFAULT 'POST' COMMENT '批量进度请求方式',
+  `batch_progress_body_type` varchar(16) NOT NULL DEFAULT '' COMMENT '批量进度请求体类型: form/json/query',
+  `batch_progress_param_map` text COMMENT '批量进度参数映射JSON',
 
   -- 分类/课程列表配置
   `category_path` varchar(200) NOT NULL DEFAULT '/api.php?act=getcate' COMMENT '获取分类路径',

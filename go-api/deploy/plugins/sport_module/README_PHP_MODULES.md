@@ -15,7 +15,7 @@
 ## 部署步骤
 
 ### 1. 导入数据库
-执行 `go-api/migrations/036_php_modules.sql`，创建所有表并注册到动态模块系统。
+执行 `go-api/migrations/core/036_php_modules.sql`，创建所有表并注册到动态模块系统。
 
 ### 2. 部署 PHP 文件
 

@@ -381,43 +381,22 @@
 
 ---
 
-## 四、迁移脚本执行顺序
+## 四、初始化与迁移规则
 
-```
-migrations/
-├── 003_create_mail_table.sql         # 站内信
-├── 004_create_dynamic_module_table.sql # 动态模块
-├── 004_seed.sql                       # 模块种子数据
-├── 005_category_switches.sql          # 分类开关字段
-├── 005_create_ticket_table.sql        # 工单
-├── 005_expand_dynamic_module.sql      # 模块扩展字段
-├── 006_create_moneylog_table.sql      # 资金日志
-├── 007_create_chat_tables.sql         # 聊天
-├── 008_seed_mock_orders.sql           # ⚠ 测试数据，生产跳过
-├── 009_chat_archive.sql               # 聊天归档
-├── 010_email_log.sql                  # 邮箱验证日志
-├── 011_ticket_enhance.sql             # 工单增强
-├── 012_flash_sdxy.sql                 # 闪电插件表
-├── 013_module_view_url.sql            # 模块 view_url 字段
-├── 014_pangu_plugin.sql               # 盘古插件表
-├── 015_module_enhance.sql             # 模块 description/price
-├── 016_fix_module_paths.sql           # 修复模块路径
-├── 017_platform_config.sql            # 平台接口配置
-├── 018_platform_balance.sql           # 平台余额字段
-├── 019_sync_monitor.sql               # 同步监控
-├── 020_category_supplier_report.sql   # 分类供应商上报
-├── 021_email_pool.sql                 # 邮箱池
-├── 021b_seed_config.sql               # 配置种子
-├── 022_email_templates.sql            # 邮件模板
-└── 022b_fix_templates.sql             # 修复模板
-```
+项目同时保留两类数据库资产：
 
-执行方法：
-```bash
-cd /www/wwwroot/go-api/migrations
-# 跳过 008（测试数据）
-for f in 003*.sql 004*.sql 005*.sql 006*.sql 007*.sql 009*.sql 01*.sql 02*.sql; do
-  echo "执行: $f"
-  mysql -u用户 -p 7777 < "$f"
-done
-```
+- `deploy/init_db.sql`
+  - 当前整库初始化快照，给全新空库使用。
+- `migrations/core/*.sql`
+  - 历史增量迁移，给已有数据库升级使用。
+
+当前规则：
+
+1. 新建空库时，先导入 `deploy/init_db.sql`。
+2. 旧库升级时，不要重导 `init_db.sql`，只走 `migrations/core/*.sql`。
+3. Go 服务启动时默认会自动执行新的 migration，并在 `qingka_schema_migration` 记录执行结果。
+4. 新增数据库结构时，先新增一个新的 migration 文件，再把最终结构同步回 `deploy/init_db.sql`。
+
+详见：
+
+- [MIGRATION_POLICY.md](/D:/Code/29-colnt-com/go-api/docs/database/MIGRATION_POLICY.md)

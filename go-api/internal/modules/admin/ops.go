@@ -354,6 +354,8 @@ func AdminPlatformConfigList(c *gin.Context) {
 		COALESCE(order_path,''), COALESCE(order_method,''), COALESCE(order_body_type,''), COALESCE(order_param_map,''), yid_in_data_array,
 		COALESCE(progress_path,''), COALESCE(progress_method,''),
 		COALESCE(progress_body_type,''), COALESCE(progress_param_map,''),
+		COALESCE(batch_progress_path,''), COALESCE(batch_progress_method,''),
+		COALESCE(batch_progress_body_type,''), COALESCE(batch_progress_param_map,''),
 		COALESCE(category_path,''), COALESCE(category_method,''), COALESCE(category_body_type,''), COALESCE(category_param_map,''),
 		COALESCE(class_list_path,''), COALESCE(class_list_method,''), COALESCE(class_list_body_type,''), COALESCE(class_list_param_map,''),
 		COALESCE(pause_path,''), COALESCE(pause_method,''), COALESCE(pause_body_type,''), COALESCE(pause_param_map,''), COALESCE(pause_id_param,''),
@@ -382,6 +384,7 @@ func AdminPlatformConfigList(c *gin.Context) {
 			&cfg.QueryAct, &cfg.QueryPath, &cfg.QueryMethod, &cfg.QueryBodyType, &cfg.QueryParamStyle, &cfg.QueryParamMap, &cfg.QueryPolling, &cfg.QueryMaxAttempts, &cfg.QueryInterval, &cfg.QueryResponseMap,
 			&cfg.OrderPath, &cfg.OrderMethod, &cfg.OrderBodyType, &cfg.OrderParamMap, &cfg.YIDInDataArray,
 			&cfg.ProgressPath, &cfg.ProgressMethod, &cfg.ProgressBodyType, &cfg.ProgressParamMap,
+			&cfg.BatchProgressPath, &cfg.BatchProgressMethod, &cfg.BatchProgressBodyType, &cfg.BatchProgressParamMap,
 			&cfg.CategoryPath, &cfg.CategoryMethod, &cfg.CategoryBodyType, &cfg.CategoryParamMap,
 			&cfg.ClassListPath, &cfg.ClassListMethod, &cfg.ClassListBodyType, &cfg.ClassListParamMap,
 			&cfg.PausePath, &cfg.PauseMethod, &cfg.PauseBodyType, &cfg.PauseParamMap, &cfg.PauseIDParam,
@@ -453,6 +456,7 @@ func canonicalizePlatformConfigDB(cfg *model.PlatformConfigDB) {
 	}
 	cfg.OrderPath = firstNonEmpty(cfg.OrderPath)
 	cfg.ProgressPath = firstNonEmpty(cfg.ProgressPath)
+	cfg.BatchProgressPath = firstNonEmpty(cfg.BatchProgressPath)
 	cfg.CategoryPath = firstNonEmpty(cfg.CategoryPath)
 	cfg.ClassListPath = firstNonEmpty(cfg.ClassListPath)
 	cfg.PausePath = firstNonEmpty(cfg.PausePath)
@@ -479,6 +483,9 @@ func normalizePlatformConfigSaveRequest(req *model.PlatformConfigSaveRequest) {
 	req.ProgressPath = firstNonEmpty(req.ProgressPath)
 	req.ProgressMethod = strings.ToUpper(strings.TrimSpace(req.ProgressMethod))
 	req.ProgressParamMap = strings.TrimSpace(req.ProgressParamMap)
+	req.BatchProgressPath = firstNonEmpty(req.BatchProgressPath)
+	req.BatchProgressMethod = strings.ToUpper(strings.TrimSpace(req.BatchProgressMethod))
+	req.BatchProgressParamMap = strings.TrimSpace(req.BatchProgressParamMap)
 	req.CategoryPath = firstNonEmpty(req.CategoryPath)
 	req.CategoryMethod = strings.ToUpper(strings.TrimSpace(req.CategoryMethod))
 	req.ClassListPath = firstNonEmpty(req.ClassListPath)
@@ -544,6 +551,9 @@ func validatePlatformConfigSaveRequest(req *model.PlatformConfigSaveRequest) str
 	if msg := validateActionJSON("进度", req.ProgressPath, req.ProgressMethod, req.ProgressParamMap, false); msg != "" {
 		return msg
 	}
+	if msg := validateActionJSON("批量进度", req.BatchProgressPath, req.BatchProgressMethod, req.BatchProgressParamMap, false); msg != "" {
+		return msg
+	}
 	if msg := validateActionJSON("分类", req.CategoryPath, req.CategoryMethod, req.CategoryParamMap, false); msg != "" {
 		return msg
 	}
@@ -587,6 +597,7 @@ func upsertAdminPlatformConfig(req model.PlatformConfigSaveRequest) error {
 		req.QueryAct, req.QueryPath, req.QueryMethod, req.QueryBodyType, req.QueryParamStyle, req.QueryParamMap, req.QueryPolling, req.QueryMaxAttempts, req.QueryInterval, req.QueryResponseMap,
 		req.OrderPath, req.OrderMethod, req.OrderBodyType, req.OrderParamMap, req.YIDInDataArray,
 		req.ProgressPath, req.ProgressMethod, req.ProgressBodyType, req.ProgressParamMap,
+		req.BatchProgressPath, req.BatchProgressMethod, req.BatchProgressBodyType, req.BatchProgressParamMap,
 		req.CategoryPath, req.CategoryMethod, req.CategoryBodyType, req.CategoryParamMap,
 		req.ClassListPath, req.ClassListMethod, req.ClassListBodyType, req.ClassListParamMap,
 		req.PausePath, req.PauseMethod, req.PauseBodyType, req.PauseParamMap, req.PauseIDParam,
@@ -606,6 +617,7 @@ func upsertAdminPlatformConfig(req model.PlatformConfigSaveRequest) error {
 		query_act, query_path, query_method, query_body_type, query_param_style, query_param_map, query_polling, query_max_attempts, query_interval, query_response_map,
 		order_path, order_method, order_body_type, order_param_map, yid_in_data_array,
 		progress_path, progress_method, progress_body_type, progress_param_map,
+		batch_progress_path, batch_progress_method, batch_progress_body_type, batch_progress_param_map,
 		category_path, category_method, category_body_type, category_param_map,
 		class_list_path, class_list_method, class_list_body_type, class_list_param_map,
 		pause_path, pause_method, pause_body_type, pause_param_map, pause_id_param,
@@ -630,6 +642,8 @@ func upsertAdminPlatformConfig(req model.PlatformConfigSaveRequest) error {
 		order_body_type=VALUES(order_body_type), order_param_map=VALUES(order_param_map), yid_in_data_array=VALUES(yid_in_data_array),
 		progress_path=VALUES(progress_path), progress_method=VALUES(progress_method),
 		progress_body_type=VALUES(progress_body_type), progress_param_map=VALUES(progress_param_map),
+		batch_progress_path=VALUES(batch_progress_path), batch_progress_method=VALUES(batch_progress_method),
+		batch_progress_body_type=VALUES(batch_progress_body_type), batch_progress_param_map=VALUES(batch_progress_param_map),
 		category_path=VALUES(category_path), category_method=VALUES(category_method),
 		category_body_type=VALUES(category_body_type), category_param_map=VALUES(category_param_map),
 		class_list_path=VALUES(class_list_path), class_list_method=VALUES(class_list_method),

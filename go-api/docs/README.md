@@ -12,7 +12,7 @@ documents are no longer mixed together in one flat list.
 - `plugins/`
   - Plugin catalog, runtime ownership matrix, and plugin-side governance.
 - `database/`
-  - Database schema references.
+  - Database schema references and migration policy.
 - `operations/`
   - Operational notes and optimization checklists.
 - `archive/`
@@ -34,6 +34,7 @@ documents are no longer mixed together in one flat list.
 ## High-Value References
 
 - `database/DB-SCHEMA.md`
+- `database/MIGRATION_POLICY.md`
 - `operations/OPTIMIZATION.md`
 - `architecture/LEGACY_SURFACE.md`
 - `architecture/RUNTIME_BOUNDARIES.md`

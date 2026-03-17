@@ -11,6 +11,9 @@ func TestConfigSecurityDefaults(t *testing.T) {
 	if cfg.CreateDefaultAdminEnabled() {
 		t.Fatalf("expected default admin bootstrap to be disabled by default")
 	}
+	if !cfg.AutoMigrateEnabled() {
+		t.Fatalf("expected auto migration to be enabled by default")
+	}
 }
 
 func TestApplyEnvOverrides(t *testing.T) {
@@ -18,6 +21,8 @@ func TestApplyEnvOverrides(t *testing.T) {
 	t.Setenv("GO_API_DATABASE_PORT", "3307")
 	t.Setenv("GO_API_SECURITY_ALLOW_LEGACY_PLAINTEXT_PASSWORDS", "false")
 	t.Setenv("GO_API_BOOTSTRAP_CREATE_DEFAULT_ADMIN", "true")
+	t.Setenv("GO_API_BOOTSTRAP_AUTO_MIGRATE", "false")
+	t.Setenv("GO_API_BOOTSTRAP_MIGRATIONS_DIR", "custom-migrations")
 
 	cfg := &Config{}
 	applyEnvOverrides(cfg)
@@ -33,5 +38,11 @@ func TestApplyEnvOverrides(t *testing.T) {
 	}
 	if !cfg.CreateDefaultAdminEnabled() {
 		t.Fatalf("expected default admin bootstrap to be enabled by env override")
+	}
+	if cfg.AutoMigrateEnabled() {
+		t.Fatalf("expected auto migration to be disabled by env override")
+	}
+	if cfg.MigrationsDirValue() != "custom-migrations" {
+		t.Fatalf("expected migrations dir override, got %q", cfg.MigrationsDirValue())
 	}
 }

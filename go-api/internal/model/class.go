@@ -83,6 +83,7 @@ type SupplierOrderResult struct {
 // SupplierProgressItem 上游供应商进度查询响应项 (按 PHP jdjk.php processCx 返回的 data 数组元素)
 type SupplierProgressItem struct {
 	YID             string `json:"id"`
+	Noun            string `json:"noun"`
 	KCName          string `json:"kcname"`
 	User            string `json:"user"`
 	Status          string `json:"status"`
@@ -93,4 +94,13 @@ type SupplierProgressItem struct {
 	CourseEndTime   string `json:"courseEndTime"`
 	ExamStartTime   string `json:"examStartTime"`
 	ExamEndTime     string `json:"examEndTime"`
+}
+
+// SupplierBatchProgressRef 为供应商级批量进度拉取提供最小订单上下文。
+type SupplierBatchProgressRef struct {
+	YID    string `json:"yid"`
+	User   string `json:"user"`
+	KCName string `json:"kcname"`
+	KCID   string `json:"kcid"`
+	Noun   string `json:"noun"`
 }
