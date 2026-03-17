@@ -7,7 +7,9 @@ import (
 	"go-api/internal/dockscheduler"
 	"go-api/internal/model"
 	chatmodule "go-api/internal/modules/chat"
+	ordermodule "go-api/internal/modules/order"
 	"go-api/internal/response"
+	"go-api/internal/runtimeops"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,6 +22,10 @@ func registerDashboardRoutes(admin *gin.RouterGroup) {
 	admin.GET("/dock-scheduler/logs", AdminDockSchedulerLogs)
 	admin.POST("/dock-scheduler/config", AdminDockSchedulerConfig)
 	admin.POST("/dock-scheduler/run", AdminDockSchedulerRunNow)
+	admin.GET("/order-progress-sync/stats", AdminOrderProgressSyncStats)
+	admin.GET("/order-progress-sync/logs", AdminOrderProgressSyncLogs)
+	admin.POST("/order-progress-sync/config", AdminOrderProgressSyncConfig)
+	admin.POST("/order-progress-sync/run", AdminOrderProgressSyncRunNow)
 	admin.GET("/rank/suppliers", AdminSupplierRanking)
 	admin.GET("/rank/agent-products", AdminAgentProductRanking)
 	admin.GET("/chat/sessions", AdminChatSessions)
@@ -100,6 +106,68 @@ func AdminDockSchedulerRunNow(c *gin.Context) {
 		return
 	}
 	response.Success(c, stats)
+}
+
+func AdminOrderProgressSyncStats(c *gin.Context) {
+	response.Success(c, runtimeops.GetOrderProgressSyncStatus())
+}
+
+func AdminOrderProgressSyncLogs(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	response.Success(c, runtimeops.GetOrderProgressSyncLogs(limit))
+}
+
+func AdminOrderProgressSyncConfig(c *gin.Context) {
+	var body struct {
+		Enabled          bool     `json:"enabled"`
+		IntervalSec      int      `json:"interval_sec"`
+		SupplierIDs      []int    `json:"supplier_ids"`
+		ExcludedStatuses []string `json:"excluded_statuses"`
+		Rules            []struct {
+			Key             string `json:"key"`
+			Label           string `json:"label"`
+			MinAgeHours     int    `json:"min_age_hours"`
+			MaxAgeHours     int    `json:"max_age_hours"`
+			IntervalMinutes int    `json:"interval_minutes"`
+			Enabled         bool   `json:"enabled"`
+		} `json:"rules"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+	rules := make([]ordermodule.AutoSyncRule, 0, len(body.Rules))
+	for _, rule := range body.Rules {
+		rules = append(rules, ordermodule.AutoSyncRule{
+			Key:             rule.Key,
+			Label:           rule.Label,
+			MinAgeHours:     rule.MinAgeHours,
+			MaxAgeHours:     rule.MaxAgeHours,
+			IntervalMinutes: rule.IntervalMinutes,
+			Enabled:         rule.Enabled,
+		})
+	}
+	status, err := runtimeops.UpdateOrderProgressSyncConfig(runtimeops.OrderProgressSyncConfig{
+		Enabled:          body.Enabled,
+		IntervalSec:      body.IntervalSec,
+		SupplierIDs:      body.SupplierIDs,
+		ExcludedStatuses: body.ExcludedStatuses,
+		Rules:            rules,
+	})
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+	response.Success(c, status)
+}
+
+func AdminOrderProgressSyncRunNow(c *gin.Context) {
+	status, err := runtimeops.RunOrderProgressSyncNow()
+	if err != nil {
+		response.BusinessError(c, 1001, err.Error())
+		return
+	}
+	response.Success(c, status)
 }
 
 func AdminSupplierRanking(c *gin.Context) {

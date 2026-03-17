@@ -523,6 +523,44 @@ export interface DockSchedulerLog {
   duration_ms: number;
 }
 
+export interface OrderProgressSyncStats {
+  enabled: boolean;
+  running: boolean;
+  interval_sec: number;
+  supplier_ids: number[];
+  excluded_statuses: string[];
+  rules: {
+    key: string;
+    label: string;
+    min_age_hours: number;
+    max_age_hours: number;
+    interval_minutes: number;
+    enabled: boolean;
+  }[];
+  last_run_time: string;
+  next_run_time: string;
+  last_updated: number;
+  last_failed: number;
+  total_runs: number;
+  last_error: string;
+}
+
+export interface OrderProgressSyncLog {
+  id: number;
+  time: string;
+  trigger: string;
+  interval_sec: number;
+  supplier_ids: number[];
+  supplier_names: string[];
+  excluded_statuses: string[];
+  rule_hits: Record<string, number>;
+  sample_errors: string[];
+  updated: number;
+  failed: number;
+  duration_ms: number;
+  error: string;
+}
+
 export async function getDockSchedulerStatsApi() {
   return requestClient.get<DockSchedulerStats>('/admin/dock-scheduler/stats');
 }
@@ -537,6 +575,22 @@ export async function updateDockSchedulerConfigApi(data: { interval_sec: number;
 
 export async function runDockSchedulerApi() {
   return requestClient.post<DockSchedulerStats>('/admin/dock-scheduler/run');
+}
+
+export async function getOrderProgressSyncStatsApi() {
+  return requestClient.get<OrderProgressSyncStats>('/admin/order-progress-sync/stats');
+}
+
+export async function getOrderProgressSyncLogsApi(limit: number = 20) {
+  return requestClient.get<OrderProgressSyncLog[]>('/admin/order-progress-sync/logs', { params: { limit } });
+}
+
+export async function updateOrderProgressSyncConfigApi(data: { enabled: boolean; interval_sec: number; supplier_ids: number[]; excluded_statuses: string[]; rules: { key: string; label: string; min_age_hours: number; max_age_hours: number; interval_minutes: number; enabled: boolean }[] }) {
+  return requestClient.post<OrderProgressSyncStats>('/admin/order-progress-sync/config', data);
+}
+
+export async function runOrderProgressSyncApi() {
+  return requestClient.post<OrderProgressSyncStats>('/admin/order-progress-sync/run');
 }
 
 // ===== 货源排行 =====

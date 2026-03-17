@@ -29,9 +29,47 @@ type SyncConfig struct {
 	AutoSyncInterval int                           `json:"auto_sync_interval"`
 }
 
+func ensureSyncConfigColumns() error {
+	if database.DB == nil {
+		return nil
+	}
+
+	patchCols := []struct {
+		name string
+		ddl  string
+	}{
+		{"clone_category", "ADD COLUMN `clone_category` tinyint(1) NOT NULL DEFAULT 0 COMMENT '克隆时同步分类' AFTER `clone_enabled`"},
+		{"skip_categories", "ADD COLUMN `skip_categories` text COMMENT '跳过的上游分类ID JSON数组，如[\"3\",\"5\"]' AFTER `clone_category`"},
+		{"name_replace", "ADD COLUMN `name_replace` text COMMENT '名称替换规则JSON，如{\"旧词\":\"新词\"}' AFTER `skip_categories`"},
+		{"secret_price_rate", "ADD COLUMN `secret_price_rate` decimal(10,4) NOT NULL DEFAULT 0 COMMENT '密价倍率，0表示不设密价' AFTER `name_replace`"},
+		{"auto_sync_enabled", "ADD COLUMN `auto_sync_enabled` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否开启自动定时同步' AFTER `secret_price_rate`"},
+		{"auto_sync_interval", "ADD COLUMN `auto_sync_interval` int(11) NOT NULL DEFAULT 30 COMMENT '自动同步间隔（分钟）' AFTER `auto_sync_enabled`"},
+	}
+
+	for _, col := range patchCols {
+		var cnt int
+		err := database.DB.QueryRow(
+			"SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='qingka_wangke_sync_config' AND COLUMN_NAME=?",
+			col.name,
+		).Scan(&cnt)
+		if err != nil {
+			return err
+		}
+		if cnt == 0 {
+			if _, err := database.DB.Exec("ALTER TABLE `qingka_wangke_sync_config` " + col.ddl); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func GetSyncConfig() (*SyncConfig, error) {
 	if database.DB == nil {
 		return defaultSyncConfig(), nil
+	}
+	if err := ensureSyncConfigColumns(); err != nil {
+		return nil, err
 	}
 
 	row := database.DB.QueryRow(`SELECT id, COALESCE(supplier_ids,''), COALESCE(price_rates,'{}'),
@@ -77,6 +115,9 @@ func GetSyncConfig() (*SyncConfig, error) {
 func SaveSyncConfig(cfg *SyncConfig) error {
 	if database.DB == nil {
 		return fmt.Errorf("database not initialized")
+	}
+	if err := ensureSyncConfigColumns(); err != nil {
+		return err
 	}
 
 	priceJSON, _ := json.Marshal(cfg.PriceRates)
