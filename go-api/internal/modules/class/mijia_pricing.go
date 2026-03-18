@@ -13,7 +13,8 @@ const (
 	MiJiaModeSubtractFromFinal  = 0
 	MiJiaModeSubtractBeforeRate = 1
 	MiJiaModeDirectPrice        = 2
-	MiJiaModeMultiplier         = 4
+	// 2026-03 枚举重排后，按倍率定价统一使用 3。
+	MiJiaModeMultiplier = 3
 )
 
 type MiJiaRule struct {
@@ -47,7 +48,8 @@ func ApplyMiJia(basePrice, addprice float64, yunsuan string, mode int, secretPri
 		finalPrice = RoundPrice((basePrice-secretPrice)*addprice, scale)
 	case MiJiaModeDirectPrice:
 		finalPrice = secretPrice
-	case MiJiaModeMultiplier:
+	// 兼容尚未执行迁移的旧数据：旧版按倍率定价曾使用 4。
+	case MiJiaModeMultiplier, 4:
 		finalPrice = RoundPrice(basePrice*secretPrice, scale)
 	default:
 		return originalPrice, originalPrice, false

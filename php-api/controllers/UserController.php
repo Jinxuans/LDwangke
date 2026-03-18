@@ -235,7 +235,8 @@ class UserController
         }
 
         $mode = (string)($input['mode'] ?? '2');
-        if (!in_array($mode, ['0', '1', '2', '4'], true)) {
+        // 新枚举只允许 0/1/2/3，4 只保留给旧数据迁移使用。
+        if (!in_array($mode, ['0', '1', '2', '3'], true)) {
             Response::badRequest('不支持的密价模式');
         }
 
