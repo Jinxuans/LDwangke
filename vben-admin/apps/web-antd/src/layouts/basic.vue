@@ -263,10 +263,8 @@ onMounted(async () => {
     }
     // 上级迁移开关
     migrateEnabled.value = cfg?.sjqykg === '1';
-    // 水印：sykg 未设置或为 '1' 时默认开启
-    if (!cfg?.sykg || cfg.sykg === '1') {
-      updatePreferences({ app: { watermark: true } });
-    }
+    // 水印只在显式开启时展示，避免缺省值和后台开关显示不一致。
+    updatePreferences({ app: { watermark: cfg?.sykg === '1' } });
     // SEO meta 标签
     if (cfg?.keywords) {
       let el = document.querySelector('meta[name="keywords"]') as HTMLMetaElement;
@@ -278,7 +276,7 @@ onMounted(async () => {
       if (!el) { el = document.createElement('meta'); el.name = 'description'; document.head.appendChild(el); }
       el.content = cfg.description;
     }
-    // 反调试保护
+    // 反调试默认开启：只有显式配置为 0 时才关闭。
     if (cfg?.anti_debug !== '0' && !document.getElementById('__anti_debug')) {
       const s = document.createElement('script');
       s.id = '__anti_debug';

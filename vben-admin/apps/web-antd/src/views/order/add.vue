@@ -161,9 +161,12 @@ async function loadClassData() {
     // 加载分类配置
     try {
       const cfg = await getSiteConfigApi();
+      // 分类开关默认开启：只有显式配置为 0 时才关闭。
       showCategory.value = cfg?.flkg !== '0';
-      categoryType.value = Number(cfg?.fllx) || 0;
-      xdsmopen.value = cfg?.xdsmopen === '1';
+      // 分类类型默认使用 1（下单页面选择框分类）。
+      categoryType.value = Number(cfg?.fllx ?? '1') || 1;
+      // 下单说明默认开启：只有显式配置为 0 时才关闭。
+      xdsmopen.value = cfg?.xdsmopen !== '0';
       // 加载推荐渠道
       if (cfg?.recommend_channels) {
         try {

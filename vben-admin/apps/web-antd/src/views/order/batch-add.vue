@@ -117,8 +117,10 @@ async function loadClassData() {
   try {
     try {
       const cfg = await getSiteConfigApi();
+      // 分类开关默认开启：只有显式配置为 0 时才关闭。
       showCategory.value = cfg?.flkg !== '0';
-      categoryType.value = Number(cfg?.fllx) || 0;
+      // 分类类型默认使用 1（下单页面选择框分类）。
+      categoryType.value = Number(cfg?.fllx ?? '1') || 1;
     } catch { /* ignore */ }
 
     const [classesRaw, categoriesRaw] = await Promise.all([

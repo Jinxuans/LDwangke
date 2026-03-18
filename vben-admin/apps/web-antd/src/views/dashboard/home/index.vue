@@ -44,6 +44,7 @@ const dockSchedulerRunning = ref(false);
 const maintenanceMode = ref(false);
 const siteNotice = ref('');
 const checkinEnabled = ref(false);
+const showConsumerRank = ref(false);
 const dailyQuote = ref('欢迎回来，开始您一天的工作吧！');
 
 // 消费排行榜
@@ -53,6 +54,10 @@ const rankList = ref<TopConsumer[]>([]);
 const rankLoading = ref(false);
 
 async function loadRankList() {
+  if (!showConsumerRank.value) {
+    rankList.value = [];
+    return;
+  }
   rankLoading.value = true;
   try {
     rankList.value = await getTopConsumersApi(rankPeriod.value);
@@ -74,8 +79,10 @@ async function loadDashboard() {
       const cfg = await getSiteConfigApi();
       maintenanceMode.value = cfg?.bz === '1';
       checkinEnabled.value = cfg?.checkin_enabled === '1';
-      // qd_notice_open: 渠道公告开关，关闭时不显示 notice
-      siteNotice.value = (cfg?.qd_notice_open !== '0' && cfg?.notice) ? cfg.notice : '';
+      // 消费排行榜默认关闭：只有显式配置为 1 时才展示。
+      showConsumerRank.value = cfg?.top_consumers_open === '1';
+      // 首页渠道公告改用独立配置键，避免和登录页弹窗公告共用 notice。
+      siteNotice.value = cfg?.qd_notice_open === '1' ? (cfg?.qd_notice || '') : '';
       if (cfg?.tcgonggao) {
         Modal.info({ title: '系统公告', content: h('div', { innerHTML: cfg.tcgonggao }), okText: '我知道了', width: 'min(90vw, 400px)' });
       }
@@ -510,7 +517,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
                 <span>暂无公告</span>
               </div>
             </Card>
-            <Card size="small" :body-style="{ padding: '8px 12px' }">
+            <Card v-if="showConsumerRank" size="small" :body-style="{ padding: '8px 12px' }">
               <template #title>
                 <div class="flex items-center gap-2">
                   <CrownOutlined style="color:#f59e0b" /><span>消费排行</span>
@@ -637,7 +644,7 @@ onMounted(() => { loadDashboard(); loadCheckinStatus(); fetchDailyQuote(); });
           </Card>
 
           <!-- 消费排行榜（所有用户可见） -->
-          <Card size="small" :body-style="{ padding: '8px 12px' }" class="flex-1 flex flex-col" style="min-height: 400px;">
+          <Card v-if="showConsumerRank" size="small" :body-style="{ padding: '8px 12px' }" class="flex-1 flex flex-col" style="min-height: 400px;">
             <template #title>
               <div class="flex items-center gap-2">
                 <CrownOutlined style="color:#f59e0b" /><span>消费排行</span>
