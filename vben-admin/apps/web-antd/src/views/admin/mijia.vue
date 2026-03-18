@@ -36,7 +36,8 @@ const modeText = (mode: string) => {
     '0': '价格的基础上扣除',
     '1': '倍数的基础上扣除',
     '2': '直接定价',
-    '3': '已废弃模式',
+    '3': '按倍率定价',
+    // 兼容未迁移的旧记录：旧版倍率模式曾使用 4。
     '4': '按倍率定价',
   };
   return map[String(mode)] || '未知类型';
@@ -49,13 +50,13 @@ const addForm = reactive({
   setType: 'single' as 'batch' | 'single',
   cid: undefined as number | undefined,
   fenlei: undefined as number | undefined,
-  mode: '2' as '0' | '1' | '2' | '4',
+  mode: '2' as '0' | '1' | '2' | '3',
   priceValue: '',
   multiplier: '',
 });
 
 const selectedProductPrice = ref(0);
-const isAddMultiplierMode = computed(() => addForm.mode === '4');
+const isAddMultiplierMode = computed(() => addForm.mode === '3');
 const addValueLabel = computed(() => {
   switch (addForm.mode) {
     case '0': {
@@ -222,11 +223,13 @@ async function submitAdd() {
 
 // ===== 编辑 =====
 function openEdit(item: MiJiaItem) {
+  const currentMode = String(item.mode ?? '2');
   Object.assign(editForm, {
     mid: item.mid,
     uid: String(item.uid),
     cid: item.cid,
-    mode: String(item.mode ?? '2'),
+    // 兼容开发库里尚未迁移的数据，把旧 4 映射成新的 3。
+    mode: currentMode === '4' ? '3' : currentMode,
     price: String(item.price ?? ''),
   });
   editVisible.value = true;
@@ -545,7 +548,7 @@ onMounted(async () => {
             <Radio value="0">价格的基础上扣除</Radio>
             <Radio value="1">倍数的基础上扣除</Radio>
             <Radio value="2">直接定价</Radio>
-            <Radio value="4">按倍率定价</Radio>
+            <Radio value="3">按倍率定价</Radio>
           </RadioGroup>
         </div>
 
@@ -668,8 +671,7 @@ onMounted(async () => {
             <SelectOption value="0">价格的基础上扣除</SelectOption>
             <SelectOption value="1">倍数的基础上扣除</SelectOption>
             <SelectOption value="2">直接定价</SelectOption>
-            <SelectOption disabled value="3">已废弃模式（请改为其他模式）</SelectOption>
-            <SelectOption value="4">按倍率定价</SelectOption>
+            <SelectOption value="3">按倍率定价</SelectOption>
           </Select>
         </div>
 

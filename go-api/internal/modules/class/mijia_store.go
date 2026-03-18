@@ -14,8 +14,9 @@ func normalizeMiJiaMode(mode string, defaultMode string) (string, error) {
 		value = defaultMode
 	}
 
+	// 新枚举只保留 0/1/2/3，4 只在读取旧数据时做兼容解释。
 	switch value {
-	case "0", "1", "2", "4":
+	case "0", "1", "2", "3":
 		return value, nil
 	default:
 		return "", fmt.Errorf("unsupported mijia mode: %s", mode)

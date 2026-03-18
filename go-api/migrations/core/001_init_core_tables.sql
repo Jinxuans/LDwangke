@@ -233,7 +233,7 @@ CREATE TABLE IF NOT EXISTS `qingka_wangke_mijia` (
   `mid` int(11) NOT NULL AUTO_INCREMENT,
   `uid` int(11) NOT NULL,
   `cid` int(11) NOT NULL,
-  `mode` int(11) NOT NULL DEFAULT 2 COMMENT '0.价格的基础上扣除 1.倍数的基础上扣除 2.直接定价 4.按倍率定价',
+  `mode` int(11) NOT NULL DEFAULT 2 COMMENT '0.价格的基础上扣除 1.倍数的基础上扣除 2.直接定价 3.按倍率定价',
   `price` varchar(100) NOT NULL DEFAULT '0',
   `addtime` varchar(100) NOT NULL DEFAULT '',
   `expire_time` datetime DEFAULT NULL COMMENT '到期时间',

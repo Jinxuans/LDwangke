@@ -17,10 +17,11 @@ func TestApplyMiJiaModes(t *testing.T) {
 		{name: "subtract before rate", basePrice: 10, addprice: 2, yunsuan: "*", mode: MiJiaModeSubtractBeforeRate, secret: 3, want: 14, applied: true},
 		{name: "direct price", basePrice: 10, addprice: 2, yunsuan: "*", mode: MiJiaModeDirectPrice, secret: 12, want: 12, applied: true},
 		{name: "multiplier", basePrice: 10, addprice: 2, yunsuan: "*", mode: MiJiaModeMultiplier, secret: 1.5, want: 15, applied: true},
+		{name: "legacy multiplier mode 4", basePrice: 10, addprice: 2, yunsuan: "*", mode: 4, secret: 1.5, want: 15, applied: true},
 		{name: "cap at original price", basePrice: 10, addprice: 2, yunsuan: "*", mode: MiJiaModeMultiplier, secret: 3, want: 20, applied: true},
 		{name: "plus formula", basePrice: 10, addprice: 2, yunsuan: "+", mode: MiJiaModeSubtractFromFinal, secret: 1, want: 11, applied: true},
 		{name: "mode one still uses multiplier logic", basePrice: 10, addprice: 2, yunsuan: "+", mode: MiJiaModeSubtractBeforeRate, secret: 1, want: 12, applied: true},
-		{name: "unsupported mode", basePrice: 10, addprice: 2, yunsuan: "*", mode: 3, secret: 5, want: 20, applied: false},
+		{name: "unsupported mode", basePrice: 10, addprice: 2, yunsuan: "*", mode: 5, secret: 5, want: 20, applied: false},
 		{name: "floor at zero", basePrice: 10, addprice: 2, yunsuan: "*", mode: MiJiaModeSubtractFromFinal, secret: 30, want: 0, applied: true},
 	}
 
