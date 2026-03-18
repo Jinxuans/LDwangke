@@ -13,7 +13,11 @@ import (
 var publicConfigKeys = map[string]bool{
 	"sitename": true, "logo": true, "hlogo": true,
 	"sykg": true, "bz": true, "notice": true, "tcgonggao": true,
-	"flkg": true, "fllx": true, "fontsZDY": true, "fontsFamily": true,
+	// 独立的首页渠道公告内容，避免和登录弹窗公告共用同一个键。
+	"qd_notice": true,
+	// 消费排行榜开关：默认关闭，只有显式为 1 时才开启。
+	"top_consumers_open": true,
+	"flkg":               true, "fllx": true, "fontsZDY": true, "fontsFamily": true,
 	"qd_notice_open": true, "xdsmopen": true, "anti_debug": true,
 	"version": true, "onlineStore_trdltz": true, "sjqykg": true,
 	"user_yqzc": true, "login_slider_verify": true, "login_email_verify": true,
@@ -132,6 +136,14 @@ func listPublicAnnouncements(uid int, page, limit int) ([]model.Announcement, in
 }
 
 func TopConsumers(c *gin.Context) {
+	// 消费排行榜默认关闭：只有显式配置为 1 时才返回排行数据。
+	var rankingEnabled string
+	_ = database.DB.QueryRow("SELECT COALESCE(`k`,'') FROM qingka_wangke_config WHERE `v` = ?", "top_consumers_open").Scan(&rankingEnabled)
+	if rankingEnabled != "1" {
+		response.Success(c, []map[string]interface{}{})
+		return
+	}
+
 	period := c.DefaultQuery("period", "day")
 	response.Success(c, getTopConsumers(period))
 }

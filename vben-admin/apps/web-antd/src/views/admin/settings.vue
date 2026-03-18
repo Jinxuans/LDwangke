@@ -30,6 +30,8 @@ async function loadAll() {
     const [cRes, pRes] = await Promise.all([getConfigApi(), getPayDataApi()]);
     config.value = cRes;
     payData.value = pRes;
+    // 设置页加载完成后立即按后台配置同步当前前端状态，避免残留本地偏好造成显示错位。
+    applyConfig();
     backup.value = {
       config: JSON.parse(JSON.stringify(config.value)),
       payData: JSON.parse(JSON.stringify(payData.value)),
@@ -65,11 +67,8 @@ function applyConfig() {
     updatePreferences({ app: { name: c.sitename } });
     document.title = c.sitename;
   }
-  if (c.sykg === '1') {
-    updatePreferences({ app: { watermark: true } });
-  } else if (c.sykg === '0') {
-    updatePreferences({ app: { watermark: false } });
-  }
+  // sykg 只在显式为 1 时开启，其余情况一律视为关闭，保证和设置页开关语义一致。
+  updatePreferences({ app: { watermark: c.sykg === '1' } });
   if (c.hlogo) {
     updatePreferences({ logo: { source: c.hlogo } });
   } else if (c.logo) {
@@ -636,7 +635,8 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                       <label class="field-label !mb-0">防调试模式</label>
                       <div class="text-xs text-gray-400 dark:text-gray-500">开启后禁用F12和右键等开发者工具</div>
                     </div>
-                    <Switch :checked="getVal('anti_debug', '0') === '1'" @change="(v: any) => setVal('anti_debug', v ? '1' : '0')" />
+                    <!-- 反调试默认开启：缺省值按 1 处理。 -->
+                    <Switch :checked="getVal('anti_debug', '1') === '1'" @change="(v: any) => setVal('anti_debug', v ? '1' : '0')" />
                   </div>
                 </Col>
                 <Col :xs="24" :lg="8">
@@ -683,7 +683,8 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                       <label class="field-label !mb-0">下单说明展示</label>
                       <div class="text-xs text-gray-400 dark:text-gray-500">在商品下单页面显示下单说明模块</div>
                     </div>
-                    <Switch :checked="getVal('xdsmopen', '0') === '1'" @change="(v: any) => setVal('xdsmopen', v ? '1' : '0')" />
+                    <!-- 下单说明默认开启：缺省值按 1 处理。 -->
+                    <Switch :checked="getVal('xdsmopen', '1') === '1'" @change="(v: any) => setVal('xdsmopen', v ? '1' : '0')" />
                   </div>
                 </Col>
                 <Col :xs="24" :lg="12">
@@ -694,6 +695,21 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                     </div>
                     <Switch :checked="getVal('qd_notice_open', '0') === '1'" @change="(v: any) => setVal('qd_notice_open', v ? '1' : '0')" />
                   </div>
+                </Col>
+                <Col :xs="24" :lg="12">
+                  <div class="switch-row">
+                    <div>
+                      <label class="field-label !mb-0">消费排行榜</label>
+                      <div class="text-xs text-gray-400 dark:text-gray-500">开启后，控制台右侧会显示用户消费排行榜</div>
+                    </div>
+                    <!-- 消费排行榜默认关闭：缺省值按 0 处理，只有显式设为 1 才开启。 -->
+                    <Switch :checked="getVal('top_consumers_open', '0') === '1'" @change="(v: any) => setVal('top_consumers_open', v ? '1' : '0')" />
+                  </div>
+                </Col>
+                <Col :span="24">
+                  <label class="field-label">首页渠道公告内容</label>
+                  <Input.TextArea :value="getVal('qd_notice')" @update:value="(v: string) => setVal('qd_notice', v)" :rows="4" placeholder="仅在主页渠道公告区域显示，不再与登录页公告共用" />
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">和登录页弹窗公告分离，避免一个配置改动影响两个展示位置。</div>
                 </Col>
                 <Col :span="24">
                   <label class="field-label">自定义代码(底部)</label>
@@ -715,12 +731,14 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                       <label class="field-label !mb-0">分类开关</label>
                       <div class="text-xs text-gray-400 dark:text-gray-500">开启后在前台显示商品分类</div>
                     </div>
-                    <Switch :checked="getVal('flkg', '0') === '1'" @change="(v: any) => setVal('flkg', v ? '1' : '0')" />
+                    <!-- 分类开关默认开启：缺省值按 1 处理。 -->
+                    <Switch :checked="getVal('flkg', '1') === '1'" @change="(v: any) => setVal('flkg', v ? '1' : '0')" />
                   </div>
                 </Col>
                 <Col :xs="24" :lg="12">
                   <label class="field-label">分类类型</label>
-                  <Select :value="getVal('fllx', '0')" @change="(v: any) => setVal('fllx', String(v))" class="w-full">
+                  <!-- 分类类型默认使用“下单页面选择框分类”，对应值 1。 -->
+                  <Select :value="getVal('fllx', '1')" @change="(v: any) => setVal('fllx', String(v))" class="w-full">
                     <SelectOption value="0">侧边栏分类</SelectOption>
                     <SelectOption value="1">下单页面选择框分类</SelectOption>
                     <SelectOption value="2">下单页面单选框分类</SelectOption>
@@ -863,23 +881,6 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                   <label class="field-label">同步价格倍率</label>
                   <Input :value="getVal('auto_sync_rate', '5')" @update:value="(v: string) => setVal('auto_sync_rate', v)" placeholder="5" />
                   <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">上游价格 × 此倍率 = 本站售价</div>
-                </Col>
-              </Row>
-            </div>
-          </TabPane>
-
-          <!-- 其他设置 -->
-          <TabPane key="qtpz2">
-            <template #tab><SettingOutlined class="mr-1" />其他设置</template>
-            <div class="tab-body">
-              <Row :gutter="[24, 16]">
-                <Col :xs="24" :lg="12">
-                  <label class="field-label">反调试保护（F12/DevTools检测）</label>
-                  <Select :value="getVal('anti_debug', '1')" @change="(v: any) => setVal('anti_debug', String(v))" class="w-full">
-                    <SelectOption value="1">开启</SelectOption>
-                    <SelectOption value="0">关闭</SelectOption>
-                  </Select>
-                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">关闭后移动端将不再因误判而自动跳转，PC端也不再拦截开发者工具</div>
                 </Col>
               </Row>
             </div>

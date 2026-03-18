@@ -116,11 +116,8 @@ function setupAccessGuard(router: Router) {
         updatePreferences({ app: { name: siteConfig.sitename } });
         document.title = siteConfig.sitename;
       }
-      if (siteConfig?.sykg === '0') {
-        updatePreferences({ app: { watermark: false } });
-      } else {
-        updatePreferences({ app: { watermark: true } });
-      }
+      // 水印只在显式开启时展示，缺省值按关闭处理，和系统设置页保持一致。
+      updatePreferences({ app: { watermark: siteConfig?.sykg === '1' } });
       if (siteConfig?.hlogo) {
         updatePreferences({ logo: { source: siteConfig.hlogo } });
       } else if (siteConfig?.logo) {
