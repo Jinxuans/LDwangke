@@ -1,14 +1,32 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { useDebounceFn } from '@vueuse/core';
+import { computed, onActivated, onMounted, ref, watch } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
 import {
-  DeleteOutlined, HeartFilled, SendOutlined, UploadOutlined,
+  DeleteOutlined,
+  HeartFilled,
+  SendOutlined,
+  UploadOutlined,
 } from '@ant-design/icons-vue';
 import {
-  Alert, Button, Card, Col, Input, message, Row, Space,
-  Spin, Statistic, Switch, Table, Tag, Tooltip,
+  Alert,
+  Button,
+  Card,
+  Col,
+  Input,
+  message,
+  Row,
+  Space,
+  Select,
+  SelectOption,
+  Spin,
+  Statistic,
+  Switch,
+  Table,
+  Tag,
+  Tooltip,
 } from 'ant-design-vue';
 
 import { useVbenForm } from '#/adapter/form';
@@ -18,14 +36,18 @@ import {
   type ClassCategory,
   type ClassItem,
   getClassCategoriesApi,
-  getClassListApi,
+  getClassListPagedApi,
 } from '#/api/class';
 import { getFavoritesApi } from '#/api/user-center';
 import { aiReviseMultiline } from '#/utils/ai-revise';
 
 // ===== 开关状态（持久化到 localStorage） =====
 function loadSwitch(key: string, def: boolean): boolean {
-  try { return JSON.parse(localStorage.getItem(key) ?? String(def)); } catch { return def; }
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? String(def));
+  } catch {
+    return def;
+  }
 }
 function saveSwitch(key: string, val: boolean) {
   localStorage.setItem(key, JSON.stringify(val));
@@ -38,7 +60,14 @@ const classLoading = ref(false);
 const classList = ref<ClassItem[]>([]);
 const categoryList = ref<ClassCategory[]>([]);
 const activeCateId = ref<string>('');
+const classKeyword = ref('');
+const classHasMore = ref(false);
+const classPage = ref(1);
+const classPageSize = 20;
+const classPagingLoading = ref(false);
+const classPagingMoreLoading = ref(false);
 const selectedClassId = ref<number | undefined>(undefined);
+const selectedClassCache = ref<ClassItem | null>(null);
 const submitLoading = ref(false);
 const showCategory = ref(true);
 const categoryType = ref(0);
@@ -48,6 +77,11 @@ const favoriteCourses = ref<string[]>([]);
 
 // 用户输入
 const rawText = ref('');
+
+function parseCategoryType(raw?: string) {
+  const parsed = Number(raw ?? '1');
+  return [0, 1, 2].includes(parsed) ? parsed : 1;
+}
 
 interface ParsedLine {
   key: number;
@@ -60,22 +94,31 @@ interface ParsedLine {
 
 const parsedLines = ref<ParsedLine[]>([]);
 
-const filteredClassList = computed(() => {
-  let list = classList.value;
-  if (activeCateId.value === 'collect') {
-    list = list.filter((item) => favoriteCourses.value.includes(String(item.cid)));
-  } else if (activeCateId.value) {
-    list = list.filter((item) => String(item.fenlei) === activeCateId.value);
-  }
-  return list;
-});
-
 const selectedClass = computed(() => {
   if (!selectedClassId.value) return null;
-  return classList.value.find((item) => item.cid === selectedClassId.value);
+  return (
+    classList.value.find((item) => item.cid === selectedClassId.value) ??
+    selectedClassCache.value
+  );
 });
 
-const validCount = computed(() => parsedLines.value.filter((l) => l.valid).length);
+const classOptions = computed(() => {
+  const list = [...classList.value];
+  if (
+    selectedClassCache.value &&
+    !list.some((item) => item.cid === selectedClassCache.value?.cid)
+  ) {
+    list.unshift(selectedClassCache.value);
+  }
+  return list.map((item) => ({
+    label: `${item.name}（¥${item.price}）`,
+    value: item.cid,
+  }));
+});
+
+const validCount = computed(
+  () => parsedLines.value.filter((l) => l.valid).length,
+);
 const totalCost = computed(() => {
   if (!selectedClass.value) return 0;
   return validCount.value * Number(selectedClass.value.price);
@@ -94,17 +137,30 @@ const [BatchForm, batchFormApi] = useVbenForm({
       fieldName: 'classId',
       label: '选择课程',
       componentProps: () => ({
-        options: filteredClassList.value.map(item => ({
-          label: `${item.name}（¥${item.price}）`,
-          value: item.cid,
-        })),
+        options: classOptions.value,
         showSearch: true,
         allowClear: true,
-        filterOption: (input: string, option: any) =>
-          option.label?.toLowerCase().includes(input.toLowerCase()),
+        filterOption: false,
+        loading: classPagingLoading.value || classPagingMoreLoading.value,
+        notFoundContent: classPagingLoading.value
+          ? '课程加载中...'
+          : '暂无课程',
+        onDropdownVisibleChange: (open: boolean) => {
+          if (
+            open &&
+            classList.value.length === 0 &&
+            !classPagingLoading.value
+          ) {
+            void refreshClassList();
+          }
+        },
+        onPopupScroll: handleClassPopupScroll,
+        onSearch: handleClassSearch,
         placeholder: '请选择课程',
         onChange: (val: number) => {
           selectedClassId.value = val;
+          selectedClassCache.value =
+            classList.value.find((item) => item.cid === val) || null;
         },
       }),
     },
@@ -112,29 +168,138 @@ const [BatchForm, batchFormApi] = useVbenForm({
   wrapperClass: 'grid-cols-1',
 });
 
+async function loadSiteConfig() {
+  try {
+    const cfg = await getSiteConfigApi();
+    // 分类开关默认开启：只有显式配置为 0 时才关闭。
+    showCategory.value = cfg?.flkg !== '0';
+    // 分类类型允许 0/1/2，缺省或异常时才回退到 1。
+    categoryType.value = parseCategoryType(cfg?.fllx);
+  } catch {
+    /* ignore */
+  }
+}
+
+function buildClassListParams(page: number) {
+  const params: Record<string, number | string> = {
+    limit: classPageSize,
+    page,
+  };
+  const keyword = classKeyword.value.trim();
+  if (keyword) {
+    params.search = keyword;
+  }
+  if (activeCateId.value === 'collect') {
+    params.favorite = 1;
+  } else if (activeCateId.value) {
+    const fenlei = Number(activeCateId.value);
+    if (!Number.isNaN(fenlei) && fenlei > 0) {
+      params.fenlei = fenlei;
+    }
+  }
+  return params;
+}
+
+function mergeClasses(existing: ClassItem[], incoming: ClassItem[]) {
+  const seen = new Set(existing.map((item) => item.cid));
+  const merged = [...existing];
+  for (const item of incoming) {
+    if (!seen.has(item.cid)) {
+      merged.push(item);
+      seen.add(item.cid);
+    }
+  }
+  return merged;
+}
+
+async function fetchClassPage(page: number, append = false) {
+  if (append) {
+    if (
+      classPagingLoading.value ||
+      classPagingMoreLoading.value ||
+      !classHasMore.value
+    ) {
+      return;
+    }
+    classPagingMoreLoading.value = true;
+  } else {
+    classPagingLoading.value = true;
+  }
+  try {
+    const result = await getClassListPagedApi(buildClassListParams(page));
+    const list = Array.isArray(result?.list) ? result.list : [];
+    classList.value = append ? mergeClasses(classList.value, list) : list;
+    classPage.value = result?.pagination?.page ?? page;
+    classHasMore.value = Boolean(result?.pagination?.has_more);
+    const currentSelected = classList.value.find(
+      (item) => item.cid === selectedClassId.value,
+    );
+    if (currentSelected) {
+      selectedClassCache.value = currentSelected;
+    }
+  } catch (error) {
+    console.error('加载课程失败:', error);
+  } finally {
+    classPagingLoading.value = false;
+    classPagingMoreLoading.value = false;
+  }
+}
+
+async function refreshClassList() {
+  classPage.value = 1;
+  classHasMore.value = false;
+  await fetchClassPage(1, false);
+}
+
+function resetSelectedClass() {
+  selectedClassId.value = undefined;
+  selectedClassCache.value = null;
+  void batchFormApi.setFieldValue('classId', undefined);
+}
+
+async function loadMoreClasses() {
+  if (!classHasMore.value) {
+    return;
+  }
+  await fetchClassPage(classPage.value + 1, true);
+}
+
+const debouncedHandleClassSearch = useDebounceFn((keyword: string) => {
+  classKeyword.value = keyword.trim();
+  resetSelectedClass();
+  void refreshClassList();
+}, 300);
+
+function handleClassSearch(keyword: string) {
+  debouncedHandleClassSearch(keyword);
+}
+
+function handleClassPopupScroll(event: Event) {
+  const target = event.target as HTMLElement | null;
+  if (!target) {
+    return;
+  }
+  if (target.scrollTop + target.clientHeight >= target.scrollHeight - 24) {
+    void loadMoreClasses();
+  }
+}
+
 async function loadClassData() {
   classLoading.value = true;
   try {
-    try {
-      const cfg = await getSiteConfigApi();
-      // 分类开关默认开启：只有显式配置为 0 时才关闭。
-      showCategory.value = cfg?.flkg !== '0';
-      // 分类类型默认使用 1（下单页面选择框分类）。
-      categoryType.value = Number(cfg?.fllx ?? '1') || 1;
-    } catch { /* ignore */ }
+    await loadSiteConfig();
 
-    const [classesRaw, categoriesRaw] = await Promise.all([
-      getClassListApi(),
-      getClassCategoriesApi(),
-    ]);
-    classList.value = Array.isArray(classesRaw) ? classesRaw : [];
+    const categoriesRaw = await getClassCategoriesApi();
     categoryList.value = Array.isArray(categoriesRaw) ? categoriesRaw : [];
 
     // 加载收藏
     try {
       const favs = await getFavoritesApi();
       favoriteCourses.value = (Array.isArray(favs) ? favs : []).map(String);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
+    await refreshClassList();
   } catch (error) {
     console.error('加载课程失败:', error);
   } finally {
@@ -168,11 +333,32 @@ function handleParse() {
   parsedLines.value = lines.map((line, idx) => {
     const parts = line.split(/\s+/);
     if (parts.length >= 3) {
-      return { key: idx, school: parts[0]!, user: parts[1]!, pass: parts[2]!, raw: line, valid: true };
+      return {
+        key: idx,
+        school: parts[0]!,
+        user: parts[1]!,
+        pass: parts[2]!,
+        raw: line,
+        valid: true,
+      };
     } else if (parts.length === 2) {
-      return { key: idx, school: '自动识别', user: parts[0]!, pass: parts[1]!, raw: line, valid: true };
+      return {
+        key: idx,
+        school: '自动识别',
+        user: parts[0]!,
+        pass: parts[1]!,
+        raw: line,
+        valid: true,
+      };
     }
-    return { key: idx, school: '', user: '', pass: '', raw: line, valid: false };
+    return {
+      key: idx,
+      school: '',
+      user: '',
+      pass: '',
+      raw: line,
+      valid: false,
+    };
   });
 }
 
@@ -217,6 +403,13 @@ async function handleSubmit() {
 }
 
 onMounted(loadClassData);
+onActivated(loadSiteConfig);
+
+watch(activeCateId, async () => {
+  classKeyword.value = '';
+  resetSelectedClass();
+  await refreshClassList();
+});
 
 const tableColumns = [
   { title: '#', key: 'index', width: 50, align: 'center' as const },
@@ -233,35 +426,69 @@ const tableColumns = [
     <Spin :spinning="classLoading">
       <Card class="mb-4">
         <!-- 顶部开关栏 -->
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-base font-semibold m-0">批量交单</h3>
+        <div class="mb-4 flex items-center justify-between">
+          <h3 class="m-0 text-base font-semibold">批量交单</h3>
           <Space>
             <Tooltip title="显示/隐藏分类选择">
-              <Switch v-model:checked="showCategoryToggle" checked-children="分类" un-checked-children="隐藏" @change="(v: any) => saveSwitch('batch_show_cate', v)" />
+              <Switch
+                v-model:checked="showCategoryToggle"
+                checked-children="分类"
+                un-checked-children="隐藏"
+                @change="(v: any) => saveSwitch('batch_show_cate', v)"
+              />
             </Tooltip>
             <Tooltip title="若校正有误，请关闭此功能">
-              <Switch v-model:checked="aiFlag" checked-children="AI校正" un-checked-children="关闭" @change="(v: any) => saveSwitch('batch_ai_flag', v)" />
+              <Switch
+                v-model:checked="aiFlag"
+                checked-children="AI校正"
+                un-checked-children="关闭"
+                @change="(v: any) => saveSwitch('batch_ai_flag', v)"
+              />
             </Tooltip>
           </Space>
         </div>
 
         <!-- 分类选择 -->
-        <template v-if="showCategory && showCategoryToggle && categoryList.length > 0">
+        <template
+          v-if="showCategory && showCategoryToggle && categoryList.length > 0"
+        >
           <div class="mb-4">
-            <label class="block text-sm text-gray-500 mb-2">选择分类</label>
-            <div class="flex flex-wrap gap-2">
+            <label class="mb-2 block text-sm text-gray-500">选择分类</label>
+            <div v-if="categoryType === 1">
+              <Select
+                :value="activeCateId || undefined"
+                allow-clear
+                placeholder="选择分类"
+                style="width: 200px"
+                @change="(v: any) => (activeCateId = v ? String(v) : '')"
+              >
+                <SelectOption value="collect">收藏课程</SelectOption>
+                <SelectOption
+                  v-for="cat in categoryList"
+                  :key="cat.id"
+                  :value="String(cat.id)"
+                >
+                  {{ cat.name }}
+                </SelectOption>
+              </Select>
+            </div>
+            <div v-else class="flex flex-wrap gap-2">
               <Button
                 :type="activeCateId === '' ? 'primary' : 'default'"
                 size="small"
                 @click="activeCateId = ''"
+                >全部课程</Button
               >
-全部课程
-</Button>
               <Button
-                :style="{ borderColor: '#eb2f96', color: activeCateId === 'collect' ? '' : '#eb2f96' }"
+                :style="{
+                  borderColor: '#eb2f96',
+                  color: activeCateId === 'collect' ? '' : '#eb2f96',
+                }"
                 :type="activeCateId === 'collect' ? 'primary' : 'default'"
                 size="small"
-                @click="activeCateId = activeCateId === 'collect' ? '' : 'collect'"
+                @click="
+                  activeCateId = activeCateId === 'collect' ? '' : 'collect'
+                "
               >
                 <template #icon><HeartFilled /></template>
                 收藏课程
@@ -269,13 +496,20 @@ const tableColumns = [
               <Button
                 v-for="cat in categoryList"
                 :key="cat.id"
-                :style="cat.recommend ? { borderColor: '#722ed1', color: activeCateId === String(cat.id) ? '' : '#722ed1', fontWeight: '600' } : {}"
+                :style="
+                  cat.recommend
+                    ? {
+                        borderColor: '#722ed1',
+                        color: activeCateId === String(cat.id) ? '' : '#722ed1',
+                        fontWeight: '600',
+                      }
+                    : {}
+                "
                 :type="activeCateId === String(cat.id) ? 'primary' : 'default'"
                 size="small"
                 @click="activeCateId = String(cat.id)"
+                >{{ cat.name }}</Button
               >
-{{ cat.name }}
-</Button>
             </div>
           </div>
         </template>
@@ -293,9 +527,14 @@ const tableColumns = [
 
         <!-- 批量下单信息 -->
         <div class="mb-4">
-          <div class="flex items-center justify-between mb-1">
-            <label class="text-sm font-medium text-gray-700">批量下单信息</label>
-            <div class="flex items-center gap-1.5 cursor-help" title="开启后自动修正输入格式（如符号和多余空格）">
+          <div class="mb-1 flex items-center justify-between">
+            <label class="text-sm font-medium text-gray-700"
+              >批量下单信息</label
+            >
+            <div
+              class="flex cursor-help items-center gap-1.5"
+              title="开启后自动修正输入格式（如符号和多余空格）"
+            >
               <Switch v-model:checked="aiFlag" size="small" />
               <span class="text-xs text-gray-500">AI纠错</span>
             </div>
@@ -308,17 +547,24 @@ const tableColumns = [
           />
         </div>
 
-        <div class="flex gap-2 items-center">
-          <Button class="bg-blue-600 hover:bg-blue-500 flex-1" size="large" type="primary" @click="handleParse">
+        <div class="flex items-center gap-2">
+          <Button
+            class="flex-1 bg-blue-600 hover:bg-blue-500"
+            size="large"
+            type="primary"
+            @click="handleParse"
+          >
             <template #icon><UploadOutlined /></template>
             解析数据
           </Button>
-          <Button v-if="parsedLines.length > 0" size="large" @click="clearAll">清空</Button>
+          <Button v-if="parsedLines.length > 0" size="large" @click="clearAll"
+            >清空</Button
+          >
         </div>
       </Card>
 
       <!-- 解析结果预览 -->
-      <Card v-if="parsedLines.length > 0" class="shadow-sm mb-4" size="small">
+      <Card v-if="parsedLines.length > 0" class="mb-4 shadow-sm" size="small">
         <template #title>
           <Space>
             <span>数据预览</span>
@@ -346,7 +592,12 @@ const tableColumns = [
               </Tag>
             </template>
             <template v-if="column.key === 'action'">
-              <Button danger size="small" type="link" @click="removeLine(record.key)">
+              <Button
+                danger
+                size="small"
+                type="link"
+                @click="removeLine(record.key)"
+              >
                 <template #icon><DeleteOutlined /></template>
               </Button>
             </template>
@@ -359,15 +610,20 @@ const tableColumns = [
               <Statistic :value="validCount" class="mr-8" title="有效条数" />
             </Col>
             <Col v-if="selectedClass">
-              <Statistic :precision="2" :value="totalCost" prefix="¥" title="预估费用" />
+              <Statistic
+                :precision="2"
+                :value="totalCost"
+                prefix="¥"
+                title="预估费用"
+              />
             </Col>
           </Row>
 
           <Button
             :disabled="validCount === 0 || !selectedClassId"
             :loading="submitLoading"
-            class="bg-green-600 border-green-600 hover:bg-green-500"
-            size="large"  
+            class="border-green-600 bg-green-600 hover:bg-green-500"
+            size="large"
             type="primary"
             @click="handleSubmit"
           >

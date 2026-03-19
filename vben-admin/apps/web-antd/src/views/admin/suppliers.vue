@@ -381,8 +381,8 @@ onMounted(async () => {
           <Switch v-model:checked="cloneForm.clone_category" checked-children="开启" un-checked-children="关闭" />
         </div>
         <div>
-          <label class="block text-sm font-medium mb-1">跳过的分类ID（逗号分隔）</label>
-          <Input v-model:value="cloneForm.skip_categories" placeholder="如：1,2,3" />
+          <label class="block text-sm font-medium mb-1">跳过的上游分类ID（逗号分隔）</label>
+          <Input v-model:value="cloneForm.skip_categories" placeholder="如：上游分类ID 1,2,3" />
         </div>
       </div>
       <template #footer>

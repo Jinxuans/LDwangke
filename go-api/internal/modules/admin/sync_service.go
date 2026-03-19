@@ -110,6 +110,30 @@ func getAdminMonitoredSuppliers(supplierIDs string) ([]map[string]interface{}, e
 			ptName = mapped
 		}
 
+		// 分类倍率面板只展示该货源下实际存在商品命中的本地分类，避免出现无关分类。
+		categories := []map[string]interface{}{}
+		categoryRows, categoryErr := database.DB.Query(
+			`SELECT DISTINCT f.id, COALESCE(f.name,'')
+			 FROM qingka_wangke_class c
+			 JOIN qingka_wangke_fenlei f ON f.id = c.fenlei
+			 WHERE c.docking = ?
+			 ORDER BY f.sort ASC, f.id ASC`,
+			hid,
+		)
+		if categoryErr == nil {
+			for categoryRows.Next() {
+				var categoryID int
+				var categoryName string
+				if err := categoryRows.Scan(&categoryID, &categoryName); err == nil {
+					categories = append(categories, map[string]interface{}{
+						"id":   categoryID,
+						"name": categoryName,
+					})
+				}
+			}
+			categoryRows.Close()
+		}
+
 		list = append(list, map[string]interface{}{
 			"hid":          hid,
 			"name":         name,
@@ -120,6 +144,7 @@ func getAdminMonitoredSuppliers(supplierIDs string) ([]map[string]interface{}, e
 			"local_count":  localCount,
 			"active_count": activeCount,
 			"url":          rawURL,
+			"categories":   categories,
 		})
 	}
 	return list, nil
@@ -156,9 +181,12 @@ func adminSyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, er
 		}
 	}
 
-	skipSet := map[string]bool{}
+	// 已存在本地商品按本地分类跳过；克隆新商品按上游分类跳过。
+	skipSet := map[int]bool{}
 	for _, id := range cfg.SkipCategories {
-		skipSet[id] = true
+		if parsed, err := strconv.Atoi(strings.TrimSpace(id)); err == nil && parsed > 0 {
+			skipSet[parsed] = true
+		}
 	}
 
 	localRows, err := database.DB.Query(
@@ -210,9 +238,6 @@ func adminSyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, er
 	newCategorySet := map[string]string{}
 	if cfg.CloneCategory {
 		for _, up := range upstreamClasses {
-			if skipSet[up.Fenlei] {
-				continue
-			}
 			if !localCategoryIDs[up.Fenlei] && up.CategoryName != "" {
 				newCategorySet[up.Fenlei] = up.CategoryName
 			}
@@ -230,10 +255,6 @@ func adminSyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, er
 
 	upstreamNounSet := map[string]bool{}
 	for _, up := range upstreamClasses {
-		if skipSet[up.Fenlei] {
-			continue
-		}
-
 		upstreamNounSet[up.CID] = true
 		displayName := up.Name
 		for oldValue, newValue := range cfg.NameReplace {
@@ -241,11 +262,33 @@ func adminSyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, er
 		}
 
 		local, exists := localMap[up.CID]
+		if exists && skipSet[local.Fenlei] {
+			continue
+		}
 		if !exists {
 			if cfg.CloneEnabled {
+				targetFenlei := 0
+				if diffFenlei, err := strconv.Atoi(up.Fenlei); err == nil && diffFenlei > 0 {
+					targetFenlei = diffFenlei
+				} else if up.CategoryName != "" {
+					for id, name := range categoryNames {
+						if name == up.CategoryName {
+							targetFenlei = id
+							break
+						}
+					}
+				}
+				if targetFenlei > 0 && skipSet[targetFenlei] {
+					continue
+				}
+
 				calcRate := rate
 				if categoryRates != nil {
-					if categoryRate, ok := categoryRates[up.Fenlei]; ok {
+					if targetFenlei > 0 {
+						if categoryRate, ok := categoryRates[strconv.Itoa(targetFenlei)]; ok {
+							calcRate = categoryRate
+						}
+					} else if categoryRate, ok := categoryRates[up.Fenlei]; ok {
 						calcRate = categoryRate
 					}
 				}

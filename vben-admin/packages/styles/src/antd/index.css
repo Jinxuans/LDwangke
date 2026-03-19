@@ -60,3 +60,18 @@
 .ant-card-body {
   overflow-x: auto;
 }
+
+/* 移动端下拉弹层允许独立惯性滚动，避免和页面滚动抢触摸事件导致抖动。 */
+.ant-select-dropdown {
+  overscroll-behavior: contain;
+}
+
+.ant-select-dropdown .rc-virtual-list-holder,
+.ant-select-dropdown .rc-virtual-list-holder-inner,
+.ant-select-dropdown .ant-select-item-option-content {
+  -webkit-overflow-scrolling: touch;
+}
+
+.ant-select-dropdown .rc-virtual-list-holder {
+  touch-action: pan-y;
+}

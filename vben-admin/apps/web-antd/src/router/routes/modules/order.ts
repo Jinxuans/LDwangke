@@ -24,6 +24,15 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        name: 'OrderMobileAdd',
+        path: '/order/mobile-add',
+        component: () => import('#/views/order/mobile-add.vue'),
+        meta: {
+          icon: 'lucide:smartphone',
+          title: '手机下单',
+        },
+      },
+      {
         name: 'OrderBatchAdd',
         path: '/order/batch-add',
         component: () => import('#/views/order/batch-add.vue'),

@@ -35,9 +35,12 @@ type CategoryListRequest struct {
 }
 
 type ClassListRequest struct {
-	Fenlei int    `form:"fenlei"`
-	Status int    `form:"status"`
-	Search string `form:"search"`
+	Fenlei   int    `form:"fenlei"`
+	Status   int    `form:"status"`
+	Search   string `form:"search"`
+	Page     int    `form:"page"`
+	Limit    int    `form:"limit"`
+	Favorite int    `form:"favorite"`
 }
 
 // ===== 查课/下单相关 =====

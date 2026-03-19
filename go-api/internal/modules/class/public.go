@@ -64,6 +64,30 @@ func List(c *gin.Context) {
 	response.Success(c, list)
 }
 
+func ListPaged(c *gin.Context) {
+	var req model.ClassListRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		req = model.ClassListRequest{}
+	}
+
+	uid := c.GetInt("uid")
+	list, total, page, limit, err := classes.ListClassesPaged(uid, req)
+	if err != nil {
+		response.ServerError(c, "查询课程失败")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"list": list,
+		"pagination": gin.H{
+			"page":     page,
+			"limit":    limit,
+			"total":    total,
+			"has_more": int64(page*limit) < total,
+		},
+	})
+}
+
 func Search(c *gin.Context) {
 	keyword := c.Query("keyword")
 	if keyword == "" {

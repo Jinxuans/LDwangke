@@ -54,6 +54,7 @@ export interface MonitoredSupplier {
   status: string;
   local_count: number;
   active_count: number;
+  categories?: Array<{ id: number; name: string }>;
 }
 
 export interface SyncLogItem {
