@@ -150,9 +150,12 @@ func SyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, error) 
 		}
 	}
 
-	skipSet := map[string]bool{}
+	// 已存在本地商品按本地分类跳过；克隆新商品按上游分类跳过。
+	skipSet := map[int]bool{}
 	for _, id := range cfg.SkipCategories {
-		skipSet[id] = true
+		if parsed, err := strconv.Atoi(strings.TrimSpace(id)); err == nil && parsed > 0 {
+			skipSet[parsed] = true
+		}
 	}
 
 	localRows, err := database.DB.Query(
@@ -204,9 +207,6 @@ func SyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, error) 
 
 	if cfg.CloneCategory {
 		for _, up := range upstreamClasses {
-			if skipSet[up.Fenlei] {
-				continue
-			}
 			if !localCategoryIDs[up.Fenlei] && up.CategoryName != "" {
 				newCategorySet[up.Fenlei] = up.CategoryName
 			}
@@ -224,10 +224,6 @@ func SyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, error) 
 
 	upstreamNounSet := map[string]bool{}
 	for _, up := range upstreamClasses {
-		if skipSet[up.Fenlei] {
-			continue
-		}
-
 		upstreamNounSet[up.CID] = true
 		displayName := up.Name
 		for oldValue, newValue := range cfg.NameReplace {
@@ -235,11 +231,33 @@ func SyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, error) 
 		}
 
 		local, exists := localMap[up.CID]
+		if exists && skipSet[local.Fenlei] {
+			continue
+		}
 		if !exists {
 			if cfg.CloneEnabled {
+				targetFenlei := 0
+				if diffFenlei, err := strconv.Atoi(up.Fenlei); err == nil && diffFenlei > 0 {
+					targetFenlei = diffFenlei
+				} else if up.CategoryName != "" {
+					for id, name := range categoryNames {
+						if name == up.CategoryName {
+							targetFenlei = id
+							break
+						}
+					}
+				}
+				if targetFenlei > 0 && skipSet[targetFenlei] {
+					continue
+				}
+
 				calcRate := rate
 				if categoryRates != nil {
-					if categoryRate, ok := categoryRates[up.Fenlei]; ok {
+					if targetFenlei > 0 {
+						if categoryRate, ok := categoryRates[strconv.Itoa(targetFenlei)]; ok {
+							calcRate = categoryRate
+						}
+					} else if categoryRate, ok := categoryRates[up.Fenlei]; ok {
 						calcRate = categoryRate
 					}
 				}

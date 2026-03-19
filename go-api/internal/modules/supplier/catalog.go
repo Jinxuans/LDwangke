@@ -119,7 +119,7 @@ func (s *Service) GetSupplierClasses(sup *model.SupplierFull) ([]SupplierClassIt
 			}
 		}
 		catName := ""
-		for _, ck := range []string{"category_name", "fenleiName", "fenlei_name", "catname", "typeName", "type_name", "catName"} {
+		for _, ck := range []string{"fenleiname", "category_name", "fenleiName", "fenlei_name", "catname", "typeName", "type_name", "catName"} {
 			if cn, ok := d[ck]; ok {
 				str := fmt.Sprintf("%v", cn)
 				if str != "" && str != "<nil>" {

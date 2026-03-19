@@ -60,6 +60,62 @@ function onSupplierChange(val: number[]) {
   });
 }
 
+function ensureSupplierCategoryRates(hid: number) {
+  if (!config.value.category_rates) {
+    config.value.category_rates = {};
+  }
+  const hidKey = String(hid);
+  if (!config.value.category_rates[hidKey]) {
+    config.value.category_rates[hidKey] = {};
+  }
+  return config.value.category_rates[hidKey]!;
+}
+
+function getSupplierCategoryRateIDs(hid: number) {
+  return Object.keys(config.value.category_rates?.[String(hid)] || {});
+}
+
+function updateSupplierCategorySelection(hid: number, ids: string[]) {
+  const hidKey = String(hid);
+  const current = ensureSupplierCategoryRates(hid);
+  const next: Record<string, number> = {};
+
+  // 分类倍率统一按本地分类ID保存，命中后会覆盖货源倍率。
+  ids.forEach((id) => {
+    next[id] = current[id] ?? 1;
+  });
+
+  config.value.category_rates = {
+    ...(config.value.category_rates || {}),
+    [hidKey]: next,
+  };
+}
+
+function updateSupplierCategoryRate(hid: number, categoryID: string, value: number | null) {
+  const hidKey = String(hid);
+  const current = ensureSupplierCategoryRates(hid);
+  current[categoryID] = value ?? 1;
+  config.value.category_rates = {
+    ...(config.value.category_rates || {}),
+    [hidKey]: { ...current },
+  };
+}
+
+function removeSupplierCategoryRate(hid: number, categoryID: string) {
+  const hidKey = String(hid);
+  const current = { ...(config.value.category_rates?.[hidKey] || {}) };
+  delete current[categoryID];
+  config.value.category_rates = {
+    ...(config.value.category_rates || {}),
+    [hidKey]: current,
+  };
+}
+
+function getSupplierLocalCategories(hid: number) {
+  // 分类倍率只展示该货源下本地已存在商品的分类，避免选到与当前货源无关的分类。
+  return monitored.value.find((sup) => sup.hid === hid)?.categories || [];
+}
+
 async function saveConfig() {
   try {
     await saveSyncConfigApi(config.value);
@@ -95,6 +151,7 @@ function addSkipCategory() {
   }
   newSkipCat.value = '';
 }
+
 function removeSkipCategory(id: string) {
   if (config.value.skip_categories) {
     config.value.skip_categories = config.value.skip_categories.filter(s => s !== id);
@@ -385,6 +442,65 @@ onMounted(() => {
                 </div>
               </Card>
 
+              <Card size="small" class="mb-4" v-if="selectedHIDs.length">
+                <template #title>
+                  分类倍率
+                  <Tooltip title="按本地分类覆盖货源倍率。命中分类倍率时优先使用分类倍率；未配置时自动回退货源倍率">
+                    <QuestionCircleOutlined class="ml-1 text-gray-400" />
+                  </Tooltip>
+                </template>
+                <Collapse ghost>
+                  <CollapsePanel v-for="hid in selectedHIDs" :key="String(hid)">
+                    <template #header>
+                      {{ allSuppliers.find(s => s.hid === hid)?.name || `HID:${hid}` }}
+                    </template>
+                    <div class="space-y-3">
+                      <div class="text-xs text-gray-500">
+                        选择本地分类后，该货源下命中这些分类的商品会优先使用这里的倍率。
+                      </div>
+                      <Select
+                        mode="multiple"
+                        :value="getSupplierCategoryRateIDs(hid)"
+                        @change="(vals: string[]) => updateSupplierCategorySelection(hid, vals)"
+                        placeholder="选择要覆盖倍率的本地分类"
+                        style="width: 100%"
+                        option-filter-prop="label"
+                        :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+                      >
+                        <SelectOption
+                          v-for="cat in getSupplierLocalCategories(hid)"
+                          :key="cat.id"
+                          :value="String(cat.id)"
+                          :label="cat.name"
+                        >
+                          {{ cat.name }}
+                        </SelectOption>
+                      </Select>
+
+                      <div v-if="getSupplierCategoryRateIDs(hid).length" class="space-y-2">
+                        <div v-for="catID in getSupplierCategoryRateIDs(hid)" :key="catID" class="flex items-center gap-3">
+                          <span class="w-40 truncate font-medium">
+                            {{ getSupplierLocalCategories(hid).find(cat => String(cat.id) === String(catID))?.name || `分类ID:${catID}` }}
+                          </span>
+                          <span class="text-gray-500 text-xs">上游价 ×</span>
+                          <InputNumber
+                            :value="config.category_rates?.[String(hid)]?.[catID] ?? 1"
+                            @update:value="(v: number | null) => updateSupplierCategoryRate(hid, catID, v)"
+                            :min="0.01" :max="100" :step="0.1" :precision="2"
+                            style="width: 100px"
+                          />
+                          <span class="text-gray-400 dark:text-gray-500 text-xs">= 本地售价</span>
+                          <Button size="small" danger type="text" @click="removeSupplierCategoryRate(hid, catID)">删除</Button>
+                        </div>
+                      </div>
+                      <div v-else class="text-xs text-gray-400">
+                        当前未设置分类倍率，将自动回退到上方的货源倍率。
+                      </div>
+                    </div>
+                  </CollapsePanel>
+                </Collapse>
+              </Card>
+
               <Card title="同步开关" size="small" class="mb-4">
                 <div class="grid grid-cols-2 gap-y-3 gap-x-6">
                   <div class="flex items-center justify-between">
@@ -438,15 +554,15 @@ onMounted(() => {
               <Card size="small" class="mb-4" v-if="config.skip_categories || true">
                 <template #title>
                   跳过分类
-                  <Tooltip title="填入上游分类ID，这些分类的商品不参与同步"><QuestionCircleOutlined class="ml-1 text-gray-400" /></Tooltip>
+                  <Tooltip title="按本地分类ID跳过已有本地商品的同步"><QuestionCircleOutlined class="ml-1 text-gray-400" /></Tooltip>
                 </template>
                 <div class="flex flex-wrap gap-2 mb-2" v-if="config.skip_categories?.length">
                   <Tag v-for="id in config.skip_categories" :key="id" closable @close="removeSkipCategory(id)" color="red">
-                    分类ID: {{ id }}
+                    本地分类ID: {{ id }}
                   </Tag>
                 </div>
                 <div class="flex items-center gap-2">
-                  <input v-model="newSkipCat" placeholder="上游分类ID" class="ant-input" style="width: 160px" @keyup.enter="addSkipCategory" />
+                  <input v-model="newSkipCat" placeholder="本地分类ID" class="ant-input" style="width: 160px" @keyup.enter="addSkipCategory" />
                   <Button size="small" @click="addSkipCategory">添加</Button>
                 </div>
               </Card>
