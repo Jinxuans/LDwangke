@@ -61,7 +61,10 @@ Environment overrides:
 
 To avoid replaying old historical seed/fix scripts into long-running production databases, the first automatic migration run treats existing business databases as already baselined through migration `046`, then only auto-applies newer migrations from that point forward.
 
+If the database is missing key tables introduced by later milestones such as `qingka_dynamic_module`, `qingka_platform_config`, `qingka_wangke_sync_config`, `qingka_tenant`, `qingka_ext_menu`, or `qingka_wangke_yfdk_projects`, the auto-baseline is lowered to the last safe version before those tables were introduced so the missing schema can be backfilled automatically.
+
 This means:
 
 - Old live databases are protected from historical reseeding.
 - New migrations like `047_*`, `048_*` continue to auto-apply normally.
+- Partially upgraded legacy databases can still backfill missing milestone tables before later `ALTER TABLE` migrations run.

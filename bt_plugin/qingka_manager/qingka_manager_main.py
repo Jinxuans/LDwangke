@@ -8,6 +8,8 @@ import public
 class qingka_manager_main:
     __plugin_path = '/www/server/panel/plugin/qingka_manager'
     __site_dir = '/www/wwwroot/qingka'
+    __admin_dir = '/www/wwwroot/qingka/admin'
+    __mall_dir = '/www/wwwroot/qingka/mall'
     __go_dir = '/www/wwwroot/qingka/go-api'
     __bin_name = 'server'
     __log_file = '/www/wwwroot/qingka/go-api/go-api.log'
@@ -27,13 +29,10 @@ class qingka_manager_main:
         pass
 
     def _get_site_root(self):
-        domain = self._get_domain()
-        if domain:
-            return '/www/wwwroot/' + domain
-        return '/www/wwwroot/qingka/admin'
+        return self.__admin_dir
 
     def _get_mall_root(self):
-        return self._get_site_root() + '/mall'
+        return self.__mall_dir
 
     # ==================== 输入校验 ====================
 
@@ -794,20 +793,22 @@ WantedBy=multi-user.target
         if not re.match(r'^[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+$', domain) or len(domain) > 253:
             return public.returnMsg(False, '域名格式不正确')
 
-        site_root = '/www/wwwroot/' + domain
+        site_root = self._get_site_root()
+        mall_root = self._get_mall_root()
+        site_base = self.__site_dir
         conf_dir = '/www/server/panel/vhost/nginx'
         conf_file = os.path.join(conf_dir, '%s.conf' % domain)
 
-        # 创建站点目录
-        os.makedirs(site_root, exist_ok=True)
-        os.makedirs(site_root + '/mall', exist_ok=True)
-        public.ExecShell('chmod -R 755 ' + site_root)
-        public.ExecShell('chown -R www:www ' + site_root)
+        # 创建统一部署目录
+        for d in (site_base, site_root, mall_root):
+            os.makedirs(d, exist_ok=True)
+        public.ExecShell('chmod -R 755 ' + site_base)
+        public.ExecShell('chown -R www:www ' + site_base)
 
         # 注册到宝塔面板数据库
         if not public.M('sites').where('name=?', (domain,)).count():
             pid = public.M('sites').add('name,path,status,ps,type_id,addtime,project_type',
-                (domain, site_root, '1', '青卡管理系统', 0, time.strftime('%Y-%m-%d %H:%M:%S'), 'PHP'))
+                (domain, site_base, '1', '青卡管理系统', 0, time.strftime('%Y-%m-%d %H:%M:%S'), 'PHP'))
             public.M('domain').add('pid,name,port,addtime',
                 (pid, domain, 80, time.strftime('%Y-%m-%d %H:%M:%S')))
 
@@ -845,6 +846,7 @@ WantedBy=multi-user.target
 
     # 商城 H5
     location /mall/ {
+        alias %s/;
         try_files $uri $uri/ /mall/index.html;
     }
 
@@ -916,7 +918,7 @@ WantedBy=multi-user.target
 
     access_log /www/wwwlogs/%s.log;
     error_log /www/wwwlogs/%s.error.log;
-}''' % (domain, site_root, domain, domain, domain)
+}''' % (domain, site_root, domain, mall_root.rstrip('/'), domain, domain)
 
         public.writeFile(conf_file, nginx_conf)
 
@@ -1264,8 +1266,9 @@ WantedBy=multi-user.target
             return public.returnMsg(False, '数据库连接失败，请检查用户名和密码。错误: %s' % test_output[:200])
 
         try:
-            site_root = '/www/wwwroot/' + domain
-            for d in [self.__go_dir + '/config', site_root, site_root + '/mall']:
+            site_root = self._get_site_root()
+            mall_root = self._get_mall_root()
+            for d in [self.__go_dir + '/config', site_root, mall_root]:
                 os.makedirs(d, exist_ok=True)
             # 写入 client_secret（与授权站一致）
             secret_file = os.path.join(self.__site_dir, '.client_secret')
@@ -1279,7 +1282,7 @@ WantedBy=multi-user.target
             base = self.__update_server + '/update'
             self._download_and_extract(base + '/backend.tar.gz', self.__go_dir)
             self._download_and_extract(base + '/frontend.tar.gz', site_root)
-            self._download_and_extract(base + '/mall.tar.gz', site_root + '/mall')
+            self._download_and_extract(base + '/mall.tar.gz', mall_root)
             # 验证前端文件是否存在
             if not os.path.isfile(os.path.join(site_root, 'index.html')):
                 return public.returnMsg(False, '前端文件下载失败，请检查网络连接')
@@ -1418,11 +1421,8 @@ WantedBy=multi-user.target
             domain = self._get_domain()
             if domain:
                 self.remove_domain(args)
-            # 清理站点目录（remove_domain 已删除宝塔DB和nginx配置）
-            site_root = '/www/wwwroot/' + domain if domain else None
-            dirs_to_clean = [self.__go_dir, self.__php_dir]
-            if site_root and os.path.isdir(site_root):
-                dirs_to_clean.append(site_root)
+            # 清理统一部署目录（remove_domain 已删除宝塔DB和nginx配置）
+            dirs_to_clean = [self.__go_dir, self.__php_dir, self._get_site_root(), self._get_mall_root()]
             for d in dirs_to_clean:
                 if os.path.isdir(d):
                     public.ExecShell('rm -rf %s' % d)
