@@ -24,6 +24,20 @@ const autoMigrationBaselineVersion = 46
 
 var migrationFilePattern = regexp.MustCompile(`^\d+[A-Za-z0-9_]*\.sql$`)
 
+type autoBaselineCheckpoint struct {
+	table           string
+	baselineVersion int
+}
+
+var autoBaselineCheckpoints = []autoBaselineCheckpoint{
+	{table: "qingka_dynamic_module", baselineVersion: 3},
+	{table: "qingka_platform_config", baselineVersion: 16},
+	{table: "qingka_wangke_sync_config", baselineVersion: 18},
+	{table: "qingka_tenant", baselineVersion: 28},
+	{table: "qingka_ext_menu", baselineVersion: 40},
+	{table: "qingka_wangke_yfdk_projects", baselineVersion: 41},
+}
+
 func runConfiguredMigrations(db *sql.DB) error {
 	if config.Global != nil && !config.Global.AutoMigrateEnabled() {
 		log.Println("[Migration] 已通过配置关闭自动迁移")
@@ -65,14 +79,22 @@ func runSQLMigrations(db *sql.DB) error {
 			return fmt.Errorf("检测数据库基线状态失败: %w", err)
 		}
 		if existing {
-			if err := baselineHistoricalMigrations(db, files, autoMigrationBaselineVersion); err != nil {
+			baselineVersion, missingTables, err := determineAutoBaselineVersion(db)
+			if err != nil {
+				return fmt.Errorf("计算自动迁移基线失败: %w", err)
+			}
+			if err := baselineHistoricalMigrations(db, files, baselineVersion); err != nil {
 				return fmt.Errorf("写入历史迁移基线失败: %w", err)
 			}
 			applied, err = loadAppliedMigrations(db)
 			if err != nil {
 				return fmt.Errorf("刷新迁移记录失败: %w", err)
 			}
-			log.Printf("[Migration] 检测到已有业务数据库，已将历史迁移基线化到 %03d，仅自动执行后续新迁移", autoMigrationBaselineVersion)
+			if len(missingTables) > 0 {
+				log.Printf("[Migration] 检测到已有业务数据库，但缺少关键表 %s，历史迁移基线调整到 %03d，将自动补执行后续迁移", strings.Join(missingTables, ", "), baselineVersion)
+			} else {
+				log.Printf("[Migration] 检测到已有业务数据库，已将历史迁移基线化到 %03d，仅自动执行后续新迁移", baselineVersion)
+			}
 		}
 	}
 
@@ -233,6 +255,79 @@ func isExistingBusinessDatabase(db *sql.DB) (bool, error) {
 		return false, err
 	}
 	return count > 0, nil
+}
+
+func determineAutoBaselineVersion(db *sql.DB) (int, []string, error) {
+	tableNames := make([]string, 0, len(autoBaselineCheckpoints))
+	for _, checkpoint := range autoBaselineCheckpoints {
+		tableNames = append(tableNames, checkpoint.table)
+	}
+
+	existingTables, err := loadExistingTables(db, tableNames)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return calculateAutoBaselineVersion(existingTables), collectMissingCheckpointTables(existingTables), nil
+}
+
+func loadExistingTables(db *sql.DB, tableNames []string) (map[string]bool, error) {
+	if len(tableNames) == 0 {
+		return map[string]bool{}, nil
+	}
+
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(tableNames)), ",")
+	args := make([]any, 0, len(tableNames))
+	for _, tableName := range tableNames {
+		args = append(args, tableName)
+	}
+
+	query := fmt.Sprintf(
+		"SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (%s)",
+		placeholders,
+	)
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	existingTables := make(map[string]bool, len(tableNames))
+	for rows.Next() {
+		var tableName string
+		if err := rows.Scan(&tableName); err != nil {
+			return nil, err
+		}
+		existingTables[tableName] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return existingTables, nil
+}
+
+func calculateAutoBaselineVersion(existingTables map[string]bool) int {
+	baselineVersion := autoMigrationBaselineVersion
+	for _, checkpoint := range autoBaselineCheckpoints {
+		if existingTables[checkpoint.table] {
+			continue
+		}
+		if checkpoint.baselineVersion < baselineVersion {
+			baselineVersion = checkpoint.baselineVersion
+		}
+	}
+	return baselineVersion
+}
+
+func collectMissingCheckpointTables(existingTables map[string]bool) []string {
+	missingTables := make([]string, 0, len(autoBaselineCheckpoints))
+	for _, checkpoint := range autoBaselineCheckpoints {
+		if existingTables[checkpoint.table] {
+			continue
+		}
+		missingTables = append(missingTables, checkpoint.table)
+	}
+	return missingTables
 }
 
 func baselineHistoricalMigrations(db *sql.DB, files []string, maxVersion int) error {
