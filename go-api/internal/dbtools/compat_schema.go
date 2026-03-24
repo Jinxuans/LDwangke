@@ -13,6 +13,8 @@ func (s *DBCompatService) getExpectedSchema() []TableDef {
 				{Name: "name", Type: "VARCHAR(255)", NotNull: false, Default: "''"},
 				{Name: "money", Type: "DECIMAL(12,4)", NotNull: false, Default: "0"},
 				{Name: "grade", Type: "VARCHAR(10)", NotNull: false, Default: "'0'"},
+				{Name: "grade_id", Type: "INT(11)", NotNull: false, Default: "NULL"},
+				{Name: "invite_grade_id", Type: "INT(11)", NotNull: false, Default: "NULL"},
 				{Name: "active", Type: "VARCHAR(10)", NotNull: false, Default: "'1'"},
 				{Name: "addprice", Type: "DECIMAL(10,2)", NotNull: false, Default: "1"},
 				{Name: "key", Type: "VARCHAR(255)", NotNull: false, Default: "''"},

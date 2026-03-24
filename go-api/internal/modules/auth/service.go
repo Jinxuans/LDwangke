@@ -17,6 +17,7 @@ import (
 	"go-api/internal/database"
 	"go-api/internal/middleware"
 	"go-api/internal/model"
+	classmodule "go-api/internal/modules/class"
 	commonmodule "go-api/internal/modules/common"
 	shared "go-api/internal/shared/db"
 
@@ -163,12 +164,18 @@ func (s *Service) Register(req RegisterRequest) error {
 	}
 
 	parentUID := 1
+	inviteGradeID := 0
 	addPrice := 1.0
 	if req.Invite != "" {
-		err := database.DB.QueryRow("SELECT uid, addprice FROM qingka_wangke_user WHERE yqm = ?", req.Invite).Scan(&parentUID, &addPrice)
+		err := database.DB.QueryRow("SELECT uid, COALESCE(invite_grade_id,0) FROM qingka_wangke_user WHERE yqm = ?", req.Invite).Scan(&parentUID, &inviteGradeID)
 		if err != nil {
 			return errors.New("邀请码无效")
 		}
+		record, err := classmodule.Classes().GetGradeByID(inviteGradeID, true)
+		if err != nil {
+			return errors.New("邀请码暂未配置邀请等级")
+		}
+		addPrice = record.Rate
 	} else if s.adminConfigEnabled("user_yqzc") {
 		return errors.New("请输入邀请码")
 	}
@@ -179,8 +186,8 @@ func (s *Service) Register(req RegisterRequest) error {
 	}
 
 	_, err = database.DB.Exec(
-		"INSERT INTO qingka_wangke_user (uuid, name, user, pass, email, addprice, addtime, active, grade, money) VALUES (?, ?, ?, ?, ?, ?, NOW(), '1', '0', 0)",
-		parentUID, req.Nickname, req.Username, string(hashedPass), req.Email, addPrice,
+		"INSERT INTO qingka_wangke_user (uuid, name, user, pass, email, grade_id, invite_grade_id, addprice, addtime, active, grade, money) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), '1', '0', 0)",
+		parentUID, req.Nickname, req.Username, string(hashedPass), req.Email, inviteGradeID, inviteGradeID, addPrice,
 	)
 	if err != nil {
 		return fmt.Errorf("注册失败: %v", err)

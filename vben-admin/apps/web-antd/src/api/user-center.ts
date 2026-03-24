@@ -14,12 +14,16 @@ export interface UserProfile {
   name: string;
   money: number;
   cdmoney: number;
+  grade: string;
+  grade_id: number;
   addprice: number;
   grade_name: string;
+  invite_grade_id: number;
+  invite_grade_name: string;
+  invite_addprice: number;
   khcz: number;
   key: string;
   yqm: string;
-  yqprice: string;
   email: string;
   phone: string;
   push_token: string;
@@ -169,8 +173,8 @@ export async function getUserGradeListApi() {
   return requestClient.get<GradeOption[]>('/user/grades');
 }
 
-export async function setMyGradeApi(addprice: number) {
-  return requestClient.post('/user/set-grade', { addprice });
+export async function setMyGradeApi(gradeId: number) {
+  return requestClient.post('/user/set-grade', { gradeId });
 }
 
 // ===== 设置邀请码 =====
@@ -178,9 +182,9 @@ export async function setInviteCodeApi(yqm: string) {
   return requestClient.post('/user/invite-code', { yqm });
 }
 
-// ===== 邀请费率 =====
-export async function setInviteRateApi(yqprice: number) {
-  return requestClient.post('/user/invite-rate', { yqprice });
+// ===== 邀请等级 =====
+export async function setInviteRateApi(gradeId: number) {
+  return requestClient.post('/user/invite-rate', { gradeId });
 }
 
 // ===== API密钥管理 =====

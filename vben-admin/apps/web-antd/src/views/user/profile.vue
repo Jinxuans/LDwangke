@@ -26,7 +26,7 @@ const profile = ref<UserProfile | null>(null);
 const gradeVisible = ref(false);
 const gradeLoading = ref(false);
 const gradeOptions = ref<GradeOption[]>([]);
-const selectedGrade = ref(0);
+const selectedGrade = ref<number | undefined>(undefined);
 
 // 邀请链接
 const inviteUrl = computed(() => {
@@ -52,7 +52,7 @@ const newPass2Confirm = ref('');
 // 邀请费率
 const rateVisible = ref(false);
 const rateLoading = ref(false);
-const inviteRate = ref(1);
+const inviteGradeId = ref<number | undefined>(undefined);
 
 // 邀请码设置
 const yqmVisible = ref(false);
@@ -71,12 +71,20 @@ const migrateLoading = ref(false);
 const migrateUid = ref<number | null>(null);
 const migrateYqm = ref('');
 
+function formatGradeDisplay(name?: string, rate?: number | null, emptyText: string = '-') {
+  if (!name) return emptyText;
+  if (typeof rate === 'number' && Number.isFinite(rate)) {
+    return `${name}（费率 ${rate.toFixed(2)}）`;
+  }
+  return name;
+}
+
 async function loadProfile() {
   loading.value = true;
   try {
     const raw = await getUserProfileApi();
     profile.value = raw;
-    inviteRate.value = Number(profile.value.yqprice) || profile.value.addprice;
+    inviteGradeId.value = profile.value.invite_grade_id || profile.value.grade_id || undefined;
     // 检查上级迁移开关
     try {
       const cfg = await getSiteConfigApi();
@@ -117,9 +125,10 @@ async function handleChangePass2() {
 }
 
 async function handleSetRate() {
+  if (!inviteGradeId.value) { message.warning('请选择邀请等级'); return; }
   rateLoading.value = true;
   try {
-    await setInviteRateApi(inviteRate.value);
+    await setInviteRateApi(inviteGradeId.value);
     message.success('设置成功');
     rateVisible.value = false;
     loadProfile();
@@ -170,11 +179,22 @@ async function openGradeModal() {
     const data = raw;
     gradeOptions.value = Array.isArray(data) ? data : [];
   } catch (e) {}
-  selectedGrade.value = profile.value?.addprice || 1;
+  selectedGrade.value = profile.value?.grade_id || undefined;
   gradeVisible.value = true;
 }
 
+async function openInviteGradeModal() {
+  try {
+    const raw = await getUserGradeListApi();
+    const data = raw;
+    gradeOptions.value = Array.isArray(data) ? data : [];
+  } catch (e) {}
+  inviteGradeId.value = profile.value?.invite_grade_id || profile.value?.grade_id || undefined;
+  rateVisible.value = true;
+}
+
 async function handleSetGrade() {
+  if (!selectedGrade.value) { message.warning('请选择等级'); return; }
   gradeLoading.value = true;
   try {
     await setMyGradeApi(selectedGrade.value);
@@ -250,8 +270,8 @@ onMounted(loadProfile);
             <DescriptionsItem label="上级">{{ profile.sjuser || '无' }}</DescriptionsItem>
             <DescriptionsItem label="邮箱">{{ profile.email || '-' }}</DescriptionsItem>
             <DescriptionsItem label="我的等级">
-              <Tag color="blue">{{ profile.grade_name || profile.addprice }}</Tag>
-              <Button type="link" size="small" @click="openGradeModal">设置</Button>
+              <Tag color="blue">{{ formatGradeDisplay(profile.grade_name, profile.addprice, `费率 ${Number(profile.addprice || 0).toFixed(2)}`) }}</Tag>
+              <Button v-if="profile.grade === '2' || profile.grade === '3'" type="link" size="small" @click="openGradeModal">设置</Button>
             </DescriptionsItem>
             <DescriptionsItem label="邀请码">
               <div class="flex items-center gap-1 flex-wrap">
@@ -261,9 +281,9 @@ onMounted(loadProfile);
                 <Button type="link" size="small" @click="yqmInput = profile.yqm || ''; yqmVisible = true">{{ profile.yqm ? '修改' : '设置' }}</Button>
               </div>
             </DescriptionsItem>
-            <DescriptionsItem label="邀请费率">
-              {{ profile.yqprice || '未设置' }}
-              <Button type="link" size="small" @click="rateVisible = true">设置</Button>
+            <DescriptionsItem label="邀请等级">
+              {{ formatGradeDisplay(profile.invite_grade_name, profile.invite_addprice, '未设置') }}
+              <Button type="link" size="small" @click="openInviteGradeModal">设置</Button>
             </DescriptionsItem>
             <DescriptionsItem label="邀请链接">
               <div v-if="inviteUrl" class="flex items-center gap-1 flex-wrap">
@@ -327,7 +347,8 @@ onMounted(loadProfile);
           <Space wrap>
             <Button type="primary" @click="passVisible = true"><KeyOutlined /> 修改密码</Button>
             <Button v-if="profile?.grade === '3'" type="primary" ghost @click="pass2Visible = true"><KeyOutlined /> 二级密码</Button>
-            <Button @click="rateVisible = true"><TeamOutlined /> 设置邀请费率</Button>
+            <Button @click="openInviteGradeModal"><TeamOutlined /> 设置邀请等级</Button>
+            <Button v-if="profile?.grade === '2' || profile?.grade === '3'" @click="openGradeModal">设置我的等级</Button>
             <Button v-if="migrateEnabled" @click="migrateVisible = true"><LinkOutlined /> 上级迁移</Button>
           </Space>
         </Card>
@@ -353,10 +374,19 @@ onMounted(loadProfile);
       </div>
     </Modal>
 
-    <!-- 邀请费率弹窗 -->
-    <Modal v-model:open="rateVisible" title="设置邀请费率" :confirm-loading="rateLoading" @ok="handleSetRate" ok-text="保存">
-      <Alert message="邀请费率必须≥自身加价率，且为0.05的倍数" type="info" show-icon class="mb-4" />
-      <InputNumber v-model:value="inviteRate" :min="0.05" :max="100" :step="0.05" :precision="2" style="width: 100%" />
+    <!-- 邀请等级弹窗 -->
+    <Modal v-model:open="rateVisible" title="设置邀请等级" :confirm-loading="rateLoading" @ok="handleSetRate" ok-text="保存">
+      <Alert message="受邀用户注册后会使用这里选定的等级费率" type="info" show-icon class="mb-4" />
+      <Select v-model:value="inviteGradeId" style="width: 100%" show-search :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())">
+        <SelectOption
+          v-for="g in gradeOptions"
+          :key="g.id"
+          :value="g.id"
+          :label="`${g.name}（${g.rate}）`"
+        >
+          {{ g.name }}（费率 {{ g.rate }}）
+        </SelectOption>
+      </Select>
     </Modal>
 
     <!-- 邀请码弹窗 -->
@@ -387,7 +417,7 @@ onMounted(loadProfile);
         <SelectOption
           v-for="g in gradeOptions"
           :key="g.id"
-          :value="Number(g.rate)"
+          :value="g.id"
           :label="`${g.name}（${g.rate}）`"
         >
           {{ g.name }}（费率 {{ g.rate }}）

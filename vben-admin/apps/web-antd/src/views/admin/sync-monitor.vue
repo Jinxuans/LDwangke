@@ -20,7 +20,7 @@ import {
   type SyncConfig, type SyncPreviewResult, type SyncLogItem, type MonitoredSupplier,
   type AutoSyncStatus, type LonglongToolConfig, type LonglongToolStatus, type LonglongCLICheck,
 } from '#/api/sync-monitor';
-import { getSupplierListApi, type SupplierItem } from '#/api/admin';
+import { getSupplierListApi, getCategoryListApi, type SupplierItem, type CategoryItem } from '#/api/admin';
 
 const activeTab = ref('dashboard');
 
@@ -34,15 +34,17 @@ const config = ref<Partial<SyncConfig>>({
 });
 const configLoading = ref(false);
 const allSuppliers = ref<SupplierItem[]>([]);
+const allCategories = ref<CategoryItem[]>([]);
 const selectedHIDs = ref<number[]>([]);
 
 async function loadConfig() {
   configLoading.value = true;
   try {
-    const [cfgRes, supRes] = await Promise.all([getSyncConfigApi(), getSupplierListApi()]);
+    const [cfgRes, supRes, catRes] = await Promise.all([getSyncConfigApi(), getSupplierListApi(), getCategoryListApi()]);
     const cfg = cfgRes;
     Object.assign(config.value, cfg);
     allSuppliers.value = (supRes) || [];
+    allCategories.value = (catRes) || [];
     selectedHIDs.value = (cfg.supplier_ids || '').split(',').filter((s: string) => s).map(Number);
   } catch (e) { console.error(e); }
   finally { configLoading.value = false; }
@@ -113,7 +115,13 @@ function removeSupplierCategoryRate(hid: number, categoryID: string) {
 
 function getSupplierLocalCategories(hid: number) {
   // 分类倍率只展示该货源下本地已存在商品的分类，避免选到与当前货源无关的分类。
-  return monitored.value.find((sup) => sup.hid === hid)?.categories || [];
+  const categories = monitored.value.find((sup) => sup.hid === hid)?.categories || [];
+  if (categories.length) {
+    return categories;
+  }
+  return allCategories.value
+    .filter(cat => String(cat.status ?? '1') === '1')
+    .map(cat => ({ id: cat.id, name: cat.name }));
 }
 
 async function saveConfig() {
@@ -139,17 +147,6 @@ function removeNameReplace(key: string) {
     delete config.value.name_replace[key];
     config.value.name_replace = { ...config.value.name_replace };
   }
-}
-
-// ===== 跳过分类管理 =====
-const newSkipCat = ref('');
-function addSkipCategory() {
-  if (!newSkipCat.value) return;
-  if (!config.value.skip_categories) config.value.skip_categories = [];
-  if (!config.value.skip_categories.includes(newSkipCat.value)) {
-    config.value.skip_categories.push(newSkipCat.value);
-  }
-  newSkipCat.value = '';
 }
 
 function removeSkipCategory(id: string) {
@@ -404,14 +401,16 @@ onMounted(() => {
         <TabPane key="settings">
           <template #tab><SettingOutlined /> 同步设置</template>
           <Spin :spinning="configLoading">
-            <div class="max-w-3xl">
+            <div class="max-w-3xl sync-monitor-settings">
               <Card title="监听货源" size="small" class="mb-4">
                 <Select
                   mode="multiple"
-                  :value="selectedHIDs"
+                  v-model:value="selectedHIDs"
                   @change="onSupplierChange"
                   placeholder="选择要监听的货源"
                   style="width: 100%"
+                  :dropdown-match-select-width="false"
+                  :dropdown-style="{ minWidth: '320px' }"
                   :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
                 >
                   <SelectOption v-for="sup in allSuppliers" :key="sup.hid" :value="sup.hid" :label="`${sup.name} (HID:${sup.hid})`">
@@ -558,13 +557,28 @@ onMounted(() => {
                 </template>
                 <div class="flex flex-wrap gap-2 mb-2" v-if="config.skip_categories?.length">
                   <Tag v-for="id in config.skip_categories" :key="id" closable @close="removeSkipCategory(id)" color="red">
-                    本地分类ID: {{ id }}
+                    {{ allCategories.find(cat => String(cat.id) === String(id))?.name || `本地分类ID: ${id}` }}
                   </Tag>
                 </div>
-                <div class="flex items-center gap-2">
-                  <input v-model="newSkipCat" placeholder="本地分类ID" class="ant-input" style="width: 160px" @keyup.enter="addSkipCategory" />
-                  <Button size="small" @click="addSkipCategory">添加</Button>
-                </div>
+                <Select
+                  mode="multiple"
+                  v-model:value="config.skip_categories"
+                  placeholder="选择要跳过的本地分类"
+                  style="width: 100%"
+                  option-filter-prop="label"
+                  :dropdown-match-select-width="false"
+                  :dropdown-style="{ minWidth: '320px' }"
+                  :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+                >
+                  <SelectOption
+                    v-for="cat in allCategories"
+                    :key="cat.id"
+                    :value="String(cat.id)"
+                    :label="cat.name"
+                  >
+                    {{ cat.name }}
+                  </SelectOption>
+                </Select>
               </Card>
 
               <Card size="small" class="mb-4">
@@ -881,3 +895,14 @@ onMounted(() => {
     </Modal>
   </Page>
 </template>
+
+<style scoped>
+.sync-monitor-settings :deep(.ant-card),
+.sync-monitor-settings :deep(.ant-card-body),
+.sync-monitor-settings :deep(.ant-collapse),
+.sync-monitor-settings :deep(.ant-collapse-content),
+.sync-monitor-settings :deep(.ant-collapse-content-box),
+.sync-monitor-settings :deep(.ant-spin-container) {
+  overflow: visible;
+}
+</style>

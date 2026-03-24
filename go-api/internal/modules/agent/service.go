@@ -232,8 +232,8 @@ func (s *agentService) AgentCreate(operatorUID int, operatorGrade string, operat
 
 	now := time.Now().Format("2006-01-02 15:04:05")
 	_, err = database.DB.Exec(
-		"INSERT INTO qingka_wangke_user (uuid, user, pass, name, addprice, addtime, active, grade, money) VALUES (?, ?, ?, ?, ?, ?, '1', '0', 0)",
-		operatorUID, req.User, req.Pass, req.Nickname, gradeRate, now,
+		"INSERT INTO qingka_wangke_user (uuid, user, pass, name, grade_id, invite_grade_id, addprice, addtime, active, grade, money) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '1', '0', 0)",
+		operatorUID, req.User, req.Pass, req.Nickname, req.GradeID, req.GradeID, gradeRate, now,
 	)
 	if err != nil {
 		return "", fmt.Errorf("添加失败: %v", err)
@@ -371,7 +371,7 @@ func (s *agentService) AgentChangeGrade(operatorUID int, operatorGrade string, o
 	if operatorUID != 1 {
 		database.DB.Exec("UPDATE qingka_wangke_user SET money = money - 3 WHERE uid = ?", operatorUID)
 	}
-	database.DB.Exec("UPDATE qingka_wangke_user SET money = ?, addprice = ? WHERE uid = ?", newMoney, newRate, req.UID)
+	database.DB.Exec("UPDATE qingka_wangke_user SET money = ?, grade_id = ?, addprice = ? WHERE uid = ?", newMoney, req.GradeID, newRate, req.UID)
 
 	var operatorName string
 	database.DB.QueryRow("SELECT COALESCE(name,'') FROM qingka_wangke_user WHERE uid = ?", operatorUID).Scan(&operatorName)

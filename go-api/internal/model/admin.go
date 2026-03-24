@@ -5,6 +5,7 @@ type UserManage struct {
 	User      string  `json:"user"`
 	Name      string  `json:"name"`
 	Grade     string  `json:"grade"`
+	GradeID   int     `json:"grade_id"`
 	AddPrice  float64 `json:"addprice"`
 	GradeName string  `json:"grade_name"`
 	Balance   float64 `json:"balance"`

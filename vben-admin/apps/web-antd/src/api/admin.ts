@@ -76,6 +76,7 @@ export interface UserItem {
   user: string;
   name: string;
   grade: string;
+  grade_id: number;
   addprice: number;
   grade_name: string;
   balance: number;
@@ -102,8 +103,8 @@ export async function setUserBalanceApi(uid: number, balance: number) {
   return requestClient.post('/admin/user/balance', { uid, balance });
 }
 
-export async function setUserGradeApi(uid: number, addprice: number) {
-  return requestClient.post('/admin/user/grade', { uid, addprice });
+export async function setUserGradeApi(uid: number, gradeId: number) {
+  return requestClient.post('/admin/user/grade', { uid, gradeId });
 }
 
 // ===== 分类管理 =====

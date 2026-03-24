@@ -555,10 +555,10 @@ func RunOrderProgressSyncNow() (OrderProgressSyncStatus, error) {
 	}
 
 	if enabled {
-		syncPendingOrderProgress("manual", "single")
+		syncPendingOrderProgress("manual", "single", true)
 	}
 	if batchEnabled {
-		syncPendingOrderProgress("manual", "batch")
+		syncPendingOrderProgress("manual", "batch", false)
 	}
 	return GetOrderProgressSyncStatus(), nil
 }
@@ -616,7 +616,7 @@ func runSyncTicker(interval time.Duration, stop chan struct{}, enabled bool, mod
 	setOrderProgressNextRun(mode, time.Now().Add(10*time.Second).Format("2006-01-02 15:04:05"))
 	select {
 	case <-time.After(10 * time.Second):
-		syncPendingOrderProgress("auto", mode)
+		syncPendingOrderProgress("auto", mode, false)
 	case <-stop:
 		return
 	}
@@ -627,7 +627,7 @@ func runSyncTicker(interval time.Duration, stop chan struct{}, enabled bool, mod
 		setOrderProgressNextRun(mode, time.Now().Add(interval).Format("2006-01-02 15:04:05"))
 		select {
 		case <-ticker.C:
-			syncPendingOrderProgress("auto", mode)
+			syncPendingOrderProgress("auto", mode, false)
 		case <-stop:
 			return
 		}
@@ -637,7 +637,7 @@ func runSyncTicker(interval time.Duration, stop chan struct{}, enabled bool, mod
 // syncPendingOrderProgress 是调度层到订单域的桥接点。
 // 调度层只关心“现在该执行一次了”，至于扫哪些订单、怎么查上游、怎么打日志，
 // 都交给 order 模块内部完成。
-func syncPendingOrderProgress(trigger string, mode string) {
+func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 	if database.DB == nil {
 		log.Printf("[AutoSync] 跳过执行：数据库未初始化")
 		return
@@ -652,9 +652,19 @@ func syncPendingOrderProgress(trigger string, mode string) {
 	orderProgressMu.Lock()
 	switch mode {
 	case "batch":
+		if orderProgressStatus.BatchRunning {
+			orderProgressMu.Unlock()
+			log.Printf("[AutoSync] 跳过执行：批量同步已在进行中")
+			return
+		}
 		orderProgressStatus.BatchRunning = true
 		orderProgressStatus.BatchLastError = ""
 	default:
+		if orderProgressStatus.Running {
+			orderProgressMu.Unlock()
+			log.Printf("[AutoSync] 跳过执行：单条同步已在进行中")
+			return
+		}
 		orderProgressStatus.Running = true
 		orderProgressStatus.LastError = ""
 	}
@@ -687,7 +697,11 @@ func syncPendingOrderProgress(trigger string, mode string) {
 		ruleHits = map[string]int{}
 	} else {
 		opts.SkipBatchSuppliers = true
-		opts.Rules = append([]ordermodule.AutoSyncRule(nil), orderProgressConfig.Rules...)
+		if ignoreRules {
+			opts.IgnoreRules = true
+		} else {
+			opts.Rules = append([]ordermodule.AutoSyncRule(nil), orderProgressConfig.Rules...)
+		}
 	}
 	orderProgressMu.RUnlock()
 	start := time.Now()

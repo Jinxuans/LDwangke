@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS `qingka_wangke_user` (
   `cdmoney` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '冻结余额',
   `zcz` varchar(10) COLLATE utf8_unicode_ci NOT NULL DEFAULT '0',
   `addprice` decimal(10,2) NOT NULL DEFAULT '1.00' COMMENT '加价',
+  `grade_id` int(11) DEFAULT NULL COMMENT '费率等级ID',
+  `invite_grade_id` int(11) DEFAULT NULL COMMENT '邀请等级ID',
   `key` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   `yqm` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   `yqprice` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '0',

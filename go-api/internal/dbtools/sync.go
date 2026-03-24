@@ -103,6 +103,7 @@ type syncTableDef struct {
 	matchRules   []syncMatchRule
 	mergeByMatch bool
 	remapRefs    []syncReferenceDef
+	columnMap    map[string]string
 	copySourcePK bool
 }
 
@@ -127,10 +128,10 @@ type syncConfirmation struct {
 }
 
 type syncExecutionContext struct {
-	idMaps          map[string]map[string]string
-	localIDCache    map[string]map[string]struct{}
-	sourceIDCache   map[string]map[string]struct{}
-	localPKNameByTB map[string]string
+	idMaps           map[string]map[string]string
+	localIDCache     map[string]map[string]struct{}
+	sourceIDCache    map[string]map[string]struct{}
+	localPKNameByTB  map[string]string
 	sourcePKNameByTB map[string]string
 }
 
@@ -163,9 +164,13 @@ var (
 			aliases:      []string{"love_learn_user"},
 			matchRules:   []syncMatchRule{{name: "user", columns: []string{"user"}}},
 			mergeByMatch: false,
+			copySourcePK: true,
 			remapRefs: []syncReferenceDef{
 				{column: "grade", refTable: "qingka_wangke_dengji"},
 				{column: "uuid", refTable: "qingka_wangke_user", deferSync: true},
+			},
+			columnMap: map[string]string{
+				"grade": "grade_id",
 			},
 		},
 		{
@@ -266,10 +271,10 @@ func ExecuteDBSync(req SyncRequest) (*SyncResult, error) {
 
 func newSyncExecutionContext() *syncExecutionContext {
 	return &syncExecutionContext{
-		idMaps:          make(map[string]map[string]string),
-		localIDCache:    make(map[string]map[string]struct{}),
-		sourceIDCache:   make(map[string]map[string]struct{}),
-		localPKNameByTB: make(map[string]string),
+		idMaps:           make(map[string]map[string]string),
+		localIDCache:     make(map[string]map[string]struct{}),
+		sourceIDCache:    make(map[string]map[string]struct{}),
+		localPKNameByTB:  make(map[string]string),
 		sourcePKNameByTB: make(map[string]string),
 	}
 }
@@ -437,7 +442,7 @@ func (s *DBSyncService) getPrimaryKey(db *sql.DB, tableName string) string {
 	return pk
 }
 
-func (s *DBSyncService) findMissingLocalColumns(sourceCols, localCols []string) []string {
+func (s *DBSyncService) findMissingLocalColumns(table syncTableDef, sourceCols, localCols []string) []string {
 	localSet := make(map[string]struct{}, len(localCols))
 	for _, col := range localCols {
 		localSet[strings.ToLower(col)] = struct{}{}
@@ -445,12 +450,77 @@ func (s *DBSyncService) findMissingLocalColumns(sourceCols, localCols []string) 
 
 	missing := make([]string, 0)
 	for _, col := range sourceCols {
-		if _, ok := localSet[strings.ToLower(col)]; ok {
+		targetCol := table.targetColumnName(col)
+		if targetCol == "" {
 			continue
 		}
-		missing = append(missing, col)
+		if _, ok := localSet[strings.ToLower(targetCol)]; ok {
+			continue
+		}
+		missing = append(missing, targetCol)
 	}
 	return missing
+}
+
+func (t syncTableDef) sourceColumnIsReferenced(col string) bool {
+	key := strings.ToLower(strings.TrimSpace(col))
+	if key == "" {
+		return false
+	}
+	for _, ref := range t.remapRefs {
+		if strings.EqualFold(ref.column, key) {
+			return true
+		}
+	}
+	return false
+}
+
+func (t syncTableDef) sourceColumnUsedInMatchRules(col string) bool {
+	key := strings.ToLower(strings.TrimSpace(col))
+	if key == "" {
+		return false
+	}
+	for _, rule := range t.matchRules {
+		for _, ruleCol := range rule.columns {
+			if strings.EqualFold(ruleCol, key) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (t syncTableDef) filterSyncColumns(sourceCols []string, targetColumnMeta map[string]syncColumnMeta, sourcePK string) ([]string, []string, []string) {
+	filteredSourceCols := make([]string, 0, len(sourceCols))
+	filteredTargetCols := make([]string, 0, len(sourceCols))
+	ignoredSourceCols := make([]string, 0)
+
+	for _, sourceCol := range sourceCols {
+		targetCol := t.targetColumnName(sourceCol)
+		targetKey := strings.ToLower(strings.TrimSpace(targetCol))
+		include := false
+
+		switch {
+		case strings.EqualFold(sourceCol, sourcePK):
+			include = true
+		case t.sourceColumnIsReferenced(sourceCol):
+			include = true
+		case t.sourceColumnUsedInMatchRules(sourceCol):
+			include = true
+		case targetKey != "":
+			_, include = targetColumnMeta[targetKey]
+		}
+
+		if include {
+			filteredSourceCols = append(filteredSourceCols, sourceCol)
+			filteredTargetCols = append(filteredTargetCols, targetCol)
+			continue
+		}
+
+		ignoredSourceCols = append(ignoredSourceCols, sourceCol)
+	}
+
+	return filteredSourceCols, filteredTargetCols, ignoredSourceCols
 }
 
 func (t syncTableDef) sourceCandidates() []string {
@@ -509,6 +579,16 @@ func collectSyncRuleColumns(rules []syncMatchRule) []string {
 
 func (t syncTableDef) hasMatchRules() bool {
 	return len(t.matchRules) > 0
+}
+
+func (t syncTableDef) targetColumnName(sourceCol string) string {
+	if t.columnMap == nil {
+		return sourceCol
+	}
+	if mapped, ok := t.columnMap[strings.ToLower(strings.TrimSpace(sourceCol))]; ok && strings.TrimSpace(mapped) != "" {
+		return mapped
+	}
+	return sourceCol
 }
 
 func findSyncColumnIndex(cols []string, target string) int {
@@ -908,11 +988,25 @@ func (s *DBSyncService) buildPrecheck(extDB *sql.DB, req SyncRequest, issueToken
 			if count, err := s.countTableRows(database.DB, table.name); err == nil {
 				check.LocalCount = count
 			}
-			missing := s.findMissingLocalColumns(sourceCols, localCols)
+			targetColumnMeta, err := s.getTableColumnMeta(database.DB, table.name)
+			if err != nil {
+				check.Message = appendSyncMessage(check.Message, "读取当前系统字段信息失败")
+				result.Ready = false
+				break
+			}
+			sourcePK := s.getPrimaryKey(extDB, sourceTable)
+			if sourcePK == "" && len(sourceCols) > 0 {
+				sourcePK = sourceCols[0]
+			}
+			filteredSourceCols, _, ignoredSourceCols := table.filterSyncColumns(sourceCols, targetColumnMeta, sourcePK)
+			missing := s.findMissingLocalColumns(table, filteredSourceCols, localCols)
 			if len(missing) > 0 {
 				check.MissingLocalColumns = missing
 				check.Message = appendSyncMessage(check.Message, fmt.Sprintf("当前系统缺少 %d 个字段", len(missing)))
 				result.Ready = false
+			}
+			if len(ignoredSourceCols) > 0 {
+				check.Message = appendSyncMessage(check.Message, fmt.Sprintf("已忽略 %d 个源库冗余字段", len(ignoredSourceCols)))
 			}
 		}
 
@@ -1110,6 +1204,17 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, table syncTableDef, sour
 		return nil, fmt.Errorf("读取目标表字段元数据失败: %v", err)
 	}
 
+	filteredSrcCols, filteredTargetCols, ignoredSourceCols := table.filterSyncColumns(srcCols, targetColumnMeta, pk)
+	if len(filteredSrcCols) == 0 {
+		return nil, fmt.Errorf("源表 %s 无可同步字段", sourceTableName)
+	}
+	if len(ignoredSourceCols) > 0 {
+		info.Message = appendSyncMessage(info.Message, fmt.Sprintf("已忽略 %d 个源库冗余字段", len(ignoredSourceCols)))
+	}
+
+	srcCols = filteredSrcCols
+	targetCols := filteredTargetCols
+
 	pkIdx := 0
 	for i, col := range srcCols {
 		if strings.EqualFold(col, pk) {
@@ -1124,15 +1229,15 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, table syncTableDef, sour
 	}
 	colList := strings.Join(selectParts, ", ")
 
-	insertColsWithPK := append([]string{}, srcCols...)
+	insertColsWithPK := append([]string{}, targetCols...)
 	insertIndexesWithPK := make([]int, len(srcCols))
 	for i := range srcCols {
 		insertIndexesWithPK[i] = i
 	}
 	insertColsWithoutPK := make([]string, 0, len(srcCols))
 	insertIndexesWithoutPK := make([]int, 0, len(srcCols))
-	for i, col := range srcCols {
-		if strings.EqualFold(col, pk) {
+	for i, col := range targetCols {
+		if strings.EqualFold(col, targetPK) {
 			continue
 		}
 		insertColsWithoutPK = append(insertColsWithoutPK, col)
@@ -1140,9 +1245,11 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, table syncTableDef, sour
 	}
 
 	nonTargetPKCols := make([]string, 0, len(srcCols)-1)
-	for _, col := range srcCols {
+	nonTargetPKIndexes := make([]int, 0, len(srcCols)-1)
+	for i, col := range targetCols {
 		if !strings.EqualFold(col, targetPK) {
 			nonTargetPKCols = append(nonTargetPKCols, col)
+			nonTargetPKIndexes = append(nonTargetPKIndexes, i)
 		}
 	}
 
@@ -1174,7 +1281,7 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, table syncTableDef, sour
 			strings.Join(setParts, ", "),
 			targetPK,
 		)
-		if updateExisting {
+		if updateExisting || table.copySourcePK {
 			updateStmt, err = database.DB.Prepare(updateSQL)
 			if err != nil {
 				return nil, err
@@ -1252,20 +1359,23 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, table syncTableDef, sour
 
 			insertArgsWithPK := make([]interface{}, 0, len(insertIndexesWithPK))
 			for _, idx := range insertIndexesWithPK {
-				columnName := strings.ToLower(srcCols[idx])
-				insertArgsWithPK = append(insertArgsWithPK, normalizeSyncWriteValue(valueMap[columnName], targetColumnMeta[columnName]))
+				sourceColumnName := strings.ToLower(srcCols[idx])
+				targetColumnName := strings.ToLower(targetCols[idx])
+				insertArgsWithPK = append(insertArgsWithPK, normalizeSyncWriteValue(valueMap[sourceColumnName], targetColumnMeta[targetColumnName]))
 			}
 
 			insertArgsWithoutPK := make([]interface{}, 0, len(insertIndexesWithoutPK))
 			for _, idx := range insertIndexesWithoutPK {
-				columnName := strings.ToLower(srcCols[idx])
-				insertArgsWithoutPK = append(insertArgsWithoutPK, normalizeSyncWriteValue(valueMap[columnName], targetColumnMeta[columnName]))
+				sourceColumnName := strings.ToLower(srcCols[idx])
+				targetColumnName := strings.ToLower(targetCols[idx])
+				insertArgsWithoutPK = append(insertArgsWithoutPK, normalizeSyncWriteValue(valueMap[sourceColumnName], targetColumnMeta[targetColumnName]))
 			}
 
 			updateArgs := make([]interface{}, 0, len(nonTargetPKCols)+1)
-			for _, col := range nonTargetPKCols {
-				columnName := strings.ToLower(col)
-				updateArgs = append(updateArgs, normalizeSyncWriteValue(valueMap[columnName], targetColumnMeta[columnName]))
+			for _, idx := range nonTargetPKIndexes {
+				sourceColumnName := strings.ToLower(srcCols[idx])
+				targetColumnName := strings.ToLower(targetCols[idx])
+				updateArgs = append(updateArgs, normalizeSyncWriteValue(valueMap[sourceColumnName], targetColumnMeta[targetColumnName]))
 			}
 
 			row := syncBatchRow{
@@ -1347,11 +1457,22 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, table syncTableDef, sour
 				insertArgs = row.insertArgsWithPK
 			}
 			insertResult, err := insertStmt.Exec(insertArgs...)
+			owasOverwrite := false
 			if err != nil {
-				if row.insertWithPK && !table.copySourcePK && isSyncDuplicatePrimaryError(err) {
-					insertResult, err = insertStmtWithoutPK.Exec(row.insertArgsWithoutPK...)
-					if err == nil {
-						row.insertWithPK = false
+				if row.insertWithPK && isSyncDuplicatePrimaryError(err) {
+					if table.copySourcePK && updateStmt != nil {
+						// copySourcePK 模式：PK 冲突时用源数据覆盖本地记录
+						updateArgs := append(append([]interface{}{}, row.updateArgs...), row.sourcePK)
+						_, err = updateStmt.Exec(updateArgs...)
+						if err == nil {
+							owasOverwrite = true
+							insertResult = nil
+						}
+					} else if !table.copySourcePK {
+						insertResult, err = insertStmtWithoutPK.Exec(row.insertArgsWithoutPK...)
+						if err == nil {
+							row.insertWithPK = false
+						}
 					}
 				}
 			}
@@ -1359,9 +1480,13 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, table syncTableDef, sour
 				info.Failed++
 				errorSamples.add(fmt.Sprintf("source pk=%s 插入失败: %v", row.sourcePK, err))
 			} else {
-				info.Inserted++
+				if owasOverwrite {
+					info.Updated++
+				} else {
+					info.Inserted++
+				}
 				targetPKValue = row.sourcePK
-				if !row.insertWithPK {
+				if !row.insertWithPK && insertResult != nil {
 					if insertID, idErr := insertResult.LastInsertId(); idErr == nil {
 						targetPKValue = strconv.FormatInt(insertID, 10)
 					}
@@ -1583,6 +1708,10 @@ func (s *DBSyncService) Execute(req SyncRequest) (*SyncResult, error) {
 				result.Errors = append(result.Errors, fmt.Sprintf("%s关联修复失败: %v", table.label, err))
 				log.Printf("[DBSync] %s关联修复失败: %v", table.label, err)
 			}
+			if err := s.syncImportedInviteGradeRefs(); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("%s邀请等级修复失败: %v", table.label, err))
+				log.Printf("[DBSync] %s邀请等级修复失败: %v", table.label, err)
+			}
 		}
 	}
 
@@ -1601,4 +1730,40 @@ func (s *DBSyncService) Execute(req SyncRequest) (*SyncResult, error) {
 		result.Summary += fmt.Sprintf("，%d 项出错", len(result.Errors))
 	}
 	return result, nil
+}
+
+func (s *DBSyncService) syncImportedInviteGradeRefs() error {
+	// 步骤1：用 addprice 数值匹配等级费率，回填 grade_id（解决旧系统 grade 字段未使用的问题）
+	_, err := database.DB.Exec(`
+UPDATE qingka_wangke_user u
+JOIN qingka_wangke_dengji g
+  ON CAST(g.rate AS DECIMAL(10,2)) = CAST(u.addprice AS DECIMAL(10,2))
+  AND g.status = '1'
+SET u.grade_id = g.id
+WHERE (u.grade_id IS NULL OR u.grade_id = 0)
+  AND u.addprice IS NOT NULL
+  AND CAST(u.addprice AS DECIMAL(10,2)) NOT IN (0, 1)`)
+	if err != nil {
+		return err
+	}
+	// 步骤2：用 yqprice 数值匹配等级费率，回填 invite_grade_id（CAST 解决精度不一致问题）
+	_, err = database.DB.Exec(`
+UPDATE qingka_wangke_user u
+JOIN qingka_wangke_dengji g
+  ON CAST(g.rate AS DECIMAL(10,2)) = CAST(u.yqprice AS DECIMAL(10,2))
+  AND g.status = '1'
+SET u.invite_grade_id = g.id
+WHERE (u.invite_grade_id IS NULL OR u.invite_grade_id = 0)
+  AND COALESCE(u.yqprice, '') NOT IN ('', '0')`)
+	if err != nil {
+		return err
+	}
+	// 步骤3：invite_grade_id 仍为空时，退化使用 grade_id
+	_, err = database.DB.Exec(`
+UPDATE qingka_wangke_user
+SET invite_grade_id = grade_id
+WHERE (invite_grade_id IS NULL OR invite_grade_id = 0)
+  AND grade_id IS NOT NULL
+  AND grade_id > 0`)
+	return err
 }
