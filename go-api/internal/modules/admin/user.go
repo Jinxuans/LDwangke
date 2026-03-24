@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"database/sql"
+	"errors"
 	"log"
 	"strconv"
 
@@ -79,19 +81,23 @@ func AdminUserSetBalance(c *gin.Context) {
 
 func AdminUserSetGrade(c *gin.Context) {
 	var body struct {
-		UID      int     `json:"uid" binding:"required"`
-		AddPrice float64 `json:"addprice"`
+		UID     int `json:"uid" binding:"required"`
+		GradeID int `json:"gradeId" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.BadRequest(c, "参数错误")
 		return
 	}
-	if body.AddPrice < 0.01 {
-		response.BadRequest(c, "费率不能小于0.01")
+	if body.GradeID <= 0 {
+		response.BadRequest(c, "请选择有效的等级")
 		return
 	}
 
-	if err := usermodule.User().SetGrade(body.UID, body.AddPrice); err != nil {
+	if err := usermodule.User().SetGrade(body.UID, body.GradeID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			response.BadRequest(c, "请选择有效的等级")
+			return
+		}
 		response.ServerError(c, "设置等级失败")
 		return
 	}

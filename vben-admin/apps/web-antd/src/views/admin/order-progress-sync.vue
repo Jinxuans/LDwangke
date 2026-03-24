@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { Page } from '@vben/common-ui';
 import {
   Card, Button, Row, Col, Statistic, Tag, Spin, InputNumber, Switch, Select, SelectOption, Table, message,
@@ -34,22 +34,38 @@ const excludedStatuses = ref<string[]>(['已完成', '已退款', '已取消', '
 const rules = ref<OrderProgressSyncStats['rules']>([]);
 
 const statusOptions = ['已完成', '已退款', '已取消', '失败', '异常'];
+
+function formatLogLines(log: OrderProgressSyncLog): string[] {
+  const t = log.time;
+  const tag = '[AutoSync]';
+  const modeLabel = log.mode === 'batch' ? '主订单批量进度同步' : '主订单自动同步';
+  const lines: string[] = [];
+  lines.push(`${t} ${tag} 开始执行${modeLabel}`);
+  if (log.updated === 0 && log.failed === 0 && !log.error) {
+    lines.push(`${t} ${tag} 当前没有可同步的已对接订单`);
+  } else {
+    if (log.failed > 0 && log.sample_errors?.length) {
+      for (const err of log.sample_errors) {
+        lines.push(`${t} ${tag} 失败样例: ${err}`);
+      }
+    }
+    if (log.error) {
+      lines.push(`${t} ${tag} 错误: ${log.error}`);
+    }
+  }
+  const completeLabel = log.mode === 'batch' ? '批量进度同步完成' : '同步完成';
+  lines.push(`${t} ${tag} ${completeLabel}，更新 ${log.updated} 个订单，失败 ${log.failed} 个（耗时 ${log.duration_ms}ms）`);
+  return lines;
+}
+
+const logText = computed(() => {
+  return [...logs.value].reverse().flatMap(formatLogLines).join('\n');
+});
 const ruleColumns = [
   { title: '时间区间', dataIndex: 'label', key: 'label', width: 120 },
   { title: '启用', dataIndex: 'enabled', key: 'enabled', width: 90 },
   { title: '同步间隔(分钟)', dataIndex: 'interval_minutes', key: 'interval_minutes', width: 160 },
   { title: '规则说明', key: 'desc' },
-];
-const logColumns = [
-  { title: '时间', dataIndex: 'time', key: 'time', width: 160 },
-  { title: '模式', dataIndex: 'mode', key: 'mode', width: 90 },
-  { title: '来源', dataIndex: 'trigger', key: 'trigger', width: 90 },
-  { title: '命中货源', dataIndex: 'supplier_names', key: 'supplier_names', width: 220 },
-  { title: '命中规则', dataIndex: 'rule_hits', key: 'rule_hits', width: 260 },
-  { title: '结果', key: 'result', width: 120 },
-  { title: '耗时', dataIndex: 'duration_ms', key: 'duration_ms', width: 90 },
-  { title: '失败样例', dataIndex: 'sample_errors', key: 'sample_errors', width: 260 },
-  { title: '错误', dataIndex: 'error', key: 'error', width: 220, ellipsis: true },
 ];
 
 async function loadData() {
@@ -326,62 +342,7 @@ onMounted(loadData);
       </Row>
 
       <Card title="最近日志" size="small" class="mt-4">
-        <Table
-          :columns="logColumns"
-          :data-source="logs"
-          :pagination="false"
-          size="small"
-          row-key="id"
-          :scroll="{ x: 1080 }"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'mode'">
-              <Tag :color="record.mode === 'batch' ? 'cyan' : record.mode === 'config' ? 'purple' : 'blue'">
-                {{ record.mode || 'single' }}
-              </Tag>
-            </template>
-            <template v-if="column.key === 'trigger'">
-              <Tag :color="record.trigger === 'manual' ? 'gold' : record.trigger === 'config' ? 'cyan' : record.trigger === 'system' ? 'purple' : 'blue'">
-                {{ record.trigger }}
-              </Tag>
-            </template>
-            <template v-else-if="column.key === 'rule_hits'">
-              <div class="flex flex-wrap gap-1">
-                <Tag v-for="(minutes, label) in record.rule_hits" :key="label" color="blue">
-                  {{ label }} / {{ minutes }}m
-                </Tag>
-                <span v-if="!record.rule_hits || !Object.keys(record.rule_hits).length">-</span>
-              </div>
-            </template>
-            <template v-else-if="column.key === 'supplier_names'">
-              <div class="flex flex-wrap gap-1">
-                <Tag v-for="name in record.supplier_names" :key="name" color="cyan">
-                  {{ name }}
-                </Tag>
-                <span v-if="!record.supplier_names || !record.supplier_names.length">-</span>
-              </div>
-            </template>
-            <template v-else-if="column.key === 'sample_errors'">
-              <div class="text-xs leading-5">
-                <div v-for="(msg, idx) in record.sample_errors" :key="idx">
-                  {{ msg }}
-                </div>
-                <span v-if="!record.sample_errors || !record.sample_errors.length">-</span>
-              </div>
-            </template>
-            <template v-else-if="column.key === 'result'">
-              <span class="text-green-600">更新 {{ record.updated }}</span>
-              <span class="mx-1 text-gray-300">/</span>
-              <span class="text-red-500">失败 {{ record.failed }}</span>
-            </template>
-            <template v-else-if="column.key === 'duration_ms'">
-              {{ record.duration_ms }} ms
-            </template>
-            <template v-else-if="column.key === 'error'">
-              {{ record.error || '-' }}
-            </template>
-          </template>
-        </Table>
+        <pre class="m-0 overflow-auto rounded bg-gray-950 p-3 text-xs leading-6 text-green-400" style="max-height:480px">{{ logText || '暂无日志' }}</pre>
       </Card>
     </Spin>
   </Page>

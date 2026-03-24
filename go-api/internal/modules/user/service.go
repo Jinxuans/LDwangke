@@ -14,6 +14,7 @@ import (
 
 	"go-api/internal/database"
 	"go-api/internal/model"
+	classmodule "go-api/internal/modules/class"
 	commonmodule "go-api/internal/modules/common"
 
 	"golang.org/x/crypto/bcrypt"
@@ -35,9 +36,9 @@ func (s *Service) Profile(uid int, grade string) (*model.UserProfile, error) {
 	var p model.UserProfile
 	var uuid int
 	err := database.DB.QueryRow(
-		"SELECT uid, COALESCE(uuid,0), user, COALESCE(name,''), COALESCE(money,0), COALESCE(addprice,1), COALESCE(`key`,''), COALESCE(yqm,''), COALESCE(yqprice,'0'), COALESCE(email,''), COALESCE(tuisongtoken,''), COALESCE(zcz,0) FROM qingka_wangke_user WHERE uid = ?",
+		"SELECT uid, COALESCE(uuid,0), user, COALESCE(name,''), COALESCE(money,0), COALESCE(grade,'0'), COALESCE(grade_id,0), COALESCE(addprice,1), COALESCE(invite_grade_id,0), COALESCE(`key`,''), COALESCE(yqm,''), COALESCE(email,''), COALESCE(tuisongtoken,''), COALESCE(zcz,0) FROM qingka_wangke_user WHERE uid = ?",
 		uid,
-	).Scan(&p.UID, &uuid, &p.User, &p.Name, &p.Money, &p.AddPrice, &p.Key, &p.YQM, &p.YQPrice, &p.Email, &p.PushToken, &p.ZCZ)
+	).Scan(&p.UID, &uuid, &p.User, &p.Name, &p.Money, &p.Grade, &p.GradeID, &p.AddPrice, &p.InviteGradeID, &p.Key, &p.YQM, &p.Email, &p.PushToken, &p.ZCZ)
 	if err == nil {
 		database.DB.QueryRow("SELECT COALESCE(cdmoney,0) FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&p.CDMoney)
 		if commonmodule.CrossRechargeAllowed(uid) {
@@ -53,19 +54,19 @@ func (s *Service) Profile(uid int, grade string) (*model.UserProfile, error) {
 		p.AddPrice = 1
 	}
 
-	rateFormats := []string{
-		fmt.Sprintf("%.2f", p.AddPrice),
-		fmt.Sprintf("%g", p.AddPrice),
-		fmt.Sprintf("%.1f", p.AddPrice),
-	}
-	for _, rf := range rateFormats {
-		database.DB.QueryRow("SELECT COALESCE(name,'') FROM qingka_wangke_dengji WHERE rate = ? AND status = '1' LIMIT 1", rf).Scan(&p.GradeName)
-		if p.GradeName != "" {
-			break
+	if p.GradeID > 0 {
+		if record, err := classmodule.Classes().GetGradeByID(p.GradeID, true); err == nil {
+			p.GradeName = record.Name
 		}
 	}
 	if p.GradeName == "" {
 		p.GradeName = fmt.Sprintf("费率%g", p.AddPrice)
+	}
+	if p.InviteGradeID > 0 {
+		if record, err := classmodule.Classes().GetGradeByID(p.InviteGradeID, true); err == nil {
+			p.InviteGradeName = record.Name
+			p.InviteAddPrice = record.Rate
+		}
 	}
 
 	todayStart := time.Now().Format("2006-01-02") + " 00:00:00"
@@ -611,26 +612,25 @@ func (s *Service) SetInviteCode(uid int, yqm string) error {
 	return err
 }
 
-func (s *Service) SetInviteRate(uid int, yqprice float64, addprice float64) error {
-	if yqprice < addprice {
-		return errors.New("下级默认费率不能比你低")
+func (s *Service) SetInviteGrade(uid int, gradeID int, addprice float64) error {
+	record, err := classmodule.Classes().GetGradeByID(gradeID, true)
+	if err != nil {
+		return errors.New("请选择有效的邀请等级")
 	}
-	if yqprice > 100 {
-		return errors.New("邀请费率不能超过100")
+	if record.Rate < addprice {
+		return errors.New("邀请等级费率不能比自己低")
 	}
-	if int(yqprice*100)%5 != 0 {
-		return errors.New("邀请费率必须为0.05的倍数")
-	}
-
 	var yqm string
-	database.DB.QueryRow("SELECT COALESCE(yqm,'') FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&yqm)
+	if err := database.DB.QueryRow("SELECT COALESCE(yqm,'') FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&yqm); err != nil {
+		return err
+	}
 	if yqm == "" {
 		yqm = fmt.Sprintf("%05d", time.Now().UnixNano()%100000)
-		database.DB.Exec("UPDATE qingka_wangke_user SET yqm = ?, yqprice = ? WHERE uid = ?", yqm, yqprice, uid)
-	} else {
-		database.DB.Exec("UPDATE qingka_wangke_user SET yqprice = ? WHERE uid = ?", yqprice, uid)
+		_, err = database.DB.Exec("UPDATE qingka_wangke_user SET yqm = ?, invite_grade_id = ? WHERE uid = ?", yqm, gradeID, uid)
+		return err
 	}
-	return nil
+	_, err = database.DB.Exec("UPDATE qingka_wangke_user SET invite_grade_id = ? WHERE uid = ?", gradeID, uid)
+	return err
 }
 
 func (s *Service) ChangeSecretKey(uid int, keyType int, money float64) (string, error) {

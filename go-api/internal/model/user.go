@@ -88,28 +88,32 @@ type RefreshRequest struct {
 
 // 用户中心 (按 PHP info case)
 type UserProfile struct {
-	UID         int         `json:"uid"`
-	User        string      `json:"user"`
-	Name        string      `json:"name"`
-	Money       float64     `json:"money"`
-	CDMoney     float64     `json:"cdmoney"`
-	AddPrice    float64     `json:"addprice"`
-	GradeName   string      `json:"grade_name"`
-	KHCZ        int         `json:"khcz"`
-	Key         string      `json:"key"`
-	YQM         string      `json:"yqm"`
-	YQPrice     string      `json:"yqprice"`
-	Email       string      `json:"email"`
-	Phone       string      `json:"phone"`
-	PushToken   string      `json:"push_token"`
-	ZCZ         float64     `json:"zcz"`
-	OrderTotal  int         `json:"order_total"`
-	TodayOrders int         `json:"today_orders"`
-	TodaySpend  float64     `json:"today_spend"`
-	Notice      string      `json:"notice"`
-	SJUser      string      `json:"sjuser"`
-	SJNotice    string      `json:"sjnotice"`
-	AgentStats  *AgentStats `json:"dailitongji,omitempty"`
+	UID             int         `json:"uid"`
+	User            string      `json:"user"`
+	Name            string      `json:"name"`
+	Money           float64     `json:"money"`
+	CDMoney         float64     `json:"cdmoney"`
+	Grade           string      `json:"grade"`
+	GradeID         int         `json:"grade_id"`
+	AddPrice        float64     `json:"addprice"`
+	GradeName       string      `json:"grade_name"`
+	InviteGradeID   int         `json:"invite_grade_id"`
+	InviteGradeName string      `json:"invite_grade_name"`
+	InviteAddPrice  float64     `json:"invite_addprice"`
+	KHCZ            int         `json:"khcz"`
+	Key             string      `json:"key"`
+	YQM             string      `json:"yqm"`
+	Email           string      `json:"email"`
+	Phone           string      `json:"phone"`
+	PushToken       string      `json:"push_token"`
+	ZCZ             float64     `json:"zcz"`
+	OrderTotal      int         `json:"order_total"`
+	TodayOrders     int         `json:"today_orders"`
+	TodaySpend      float64     `json:"today_spend"`
+	Notice          string      `json:"notice"`
+	SJUser          string      `json:"sjuser"`
+	SJNotice        string      `json:"sjnotice"`
+	AgentStats      *AgentStats `json:"dailitongji,omitempty"`
 }
 
 // 代理统计 (按 PHP dailitongji)

@@ -2,12 +2,16 @@ package user
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"go-api/internal/database"
 	"go-api/internal/model"
+	classmodule "go-api/internal/modules/class"
 )
+
+type gradeLookupMaps struct {
+	byID map[int]string
+}
 
 func (s *Service) UserList(req model.UserListRequest) ([]model.UserManage, int64, error) {
 	if req.Page <= 0 {
@@ -28,12 +32,12 @@ func (s *Service) UserList(req model.UserListRequest) ([]model.UserManage, int64
 	var total int64
 	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_user WHERE "+where, args...).Scan(&total)
 
-	gradeNameMap := s.loadGradeNameMap()
+	gradeNames := s.loadGradeNameMap()
 
 	offset := (req.Page - 1) * req.Limit
 	args2 := append(args, req.Limit, offset)
 	rows, err := database.DB.Query(
-		fmt.Sprintf("SELECT uid, user, COALESCE(name,''), COALESCE(grade,''), COALESCE(addprice,1), COALESCE(money,0), COALESCE(yqm,''), COALESCE(addtime,''), COALESCE(active,1) FROM qingka_wangke_user WHERE %s ORDER BY uid DESC LIMIT ? OFFSET ?", where),
+		fmt.Sprintf("SELECT uid, user, COALESCE(name,''), COALESCE(grade,''), COALESCE(grade_id,0), COALESCE(addprice,1), COALESCE(money,0), COALESCE(yqm,''), COALESCE(addtime,''), COALESCE(active,1) FROM qingka_wangke_user WHERE %s ORDER BY uid DESC LIMIT ? OFFSET ?", where),
 		args2...,
 	)
 	if err != nil {
@@ -44,8 +48,10 @@ func (s *Service) UserList(req model.UserListRequest) ([]model.UserManage, int64
 	var users []model.UserManage
 	for rows.Next() {
 		var u model.UserManage
-		rows.Scan(&u.UID, &u.User, &u.Name, &u.Grade, &u.AddPrice, &u.Balance, &u.YQM, &u.AddTime, &u.Status)
-		u.GradeName = gradeNameMap[fmt.Sprintf("%.2f", u.AddPrice)]
+		rows.Scan(&u.UID, &u.User, &u.Name, &u.Grade, &u.GradeID, &u.AddPrice, &u.Balance, &u.YQM, &u.AddTime, &u.Status)
+		if u.GradeID > 0 {
+			u.GradeName = gradeNames.byID[u.GradeID]
+		}
 		if u.GradeName == "" {
 			u.GradeName = fmt.Sprintf("费率%.2f", u.AddPrice)
 		}
@@ -57,23 +63,22 @@ func (s *Service) UserList(req model.UserListRequest) ([]model.UserManage, int64
 	return users, total, nil
 }
 
-func (s *Service) loadGradeNameMap() map[string]string {
-	m := map[string]string{}
-	rows, err := database.DB.Query("SELECT COALESCE(rate,''), COALESCE(name,'') FROM qingka_wangke_dengji WHERE status = '1' ORDER BY sort ASC")
+func (s *Service) loadGradeNameMap() gradeLookupMaps {
+	maps := gradeLookupMaps{
+		byID: map[int]string{},
+	}
+	rows, err := database.DB.Query("SELECT id, COALESCE(rate,''), COALESCE(name,'') FROM qingka_wangke_dengji WHERE status = '1' ORDER BY sort ASC")
 	if err != nil {
-		return m
+		return maps
 	}
 	defer rows.Close()
 	for rows.Next() {
+		var id int
 		var rate, name string
-		rows.Scan(&rate, &name)
-		m[rate] = name
-		if f, err := strconv.ParseFloat(rate, 64); err == nil {
-			m[fmt.Sprintf("%.2f", f)] = name
-			m[fmt.Sprintf("%g", f)] = name
-		}
+		rows.Scan(&id, &rate, &name)
+		maps.byID[id] = name
 	}
-	return m
+	return maps
 }
 
 func (s *Service) ResetPassword(uid int, newPass string) error {
@@ -103,7 +108,11 @@ func (s *Service) SetBalance(uid int, balance float64) error {
 	return nil
 }
 
-func (s *Service) SetGrade(uid int, addprice float64) error {
-	_, err := database.DB.Exec("UPDATE qingka_wangke_user SET addprice = ? WHERE uid = ?", addprice, uid)
+func (s *Service) SetGrade(uid int, gradeID int) error {
+	record, err := classmodule.Classes().ResolveSelectedGrade(gradeID, true)
+	if err != nil {
+		return err
+	}
+	_, err = database.DB.Exec("UPDATE qingka_wangke_user SET grade_id = ?, addprice = ? WHERE uid = ?", record.ID, record.Rate, uid)
 	return err
 }

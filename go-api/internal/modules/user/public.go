@@ -6,6 +6,7 @@ import (
 
 	"go-api/internal/database"
 	"go-api/internal/model"
+	classmodule "go-api/internal/modules/class"
 	"go-api/internal/response"
 	"go-api/internal/ws"
 
@@ -13,7 +14,7 @@ import (
 )
 
 func loadGradeList() ([]model.Grade, error) {
-	rows, err := database.DB.Query("SELECT id, COALESCE(sort,'0'), COALESCE(name,''), COALESCE(rate,'1'), COALESCE(money,'0'), COALESCE(addkf,'1'), COALESCE(gjkf,'1'), COALESCE(status,'1'), CASE WHEN time IS NOT NULL AND time != '' AND time != '0' THEN FROM_UNIXTIME(CAST(time AS UNSIGNED), '%Y-%m-%d %H:%i') ELSE '' END FROM qingka_wangke_dengji ORDER BY sort ASC, id ASC")
+	rows, err := database.DB.Query("SELECT id, COALESCE(sort,'0'), COALESCE(name,''), COALESCE(rate,'1'), COALESCE(money,'0'), COALESCE(addkf,'1'), COALESCE(gjkf,'1'), COALESCE(status,'1'), CASE WHEN time IS NOT NULL AND time != '' AND time != '0' THEN FROM_UNIXTIME(CAST(time AS UNSIGNED), '%Y-%m-%d %H:%i') ELSE '' END FROM qingka_wangke_dengji WHERE status = '1' ORDER BY sort ASC, id ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -366,13 +367,18 @@ func UserSetMyGrade(c *gin.Context) {
 		return
 	}
 	var body struct {
-		AddPrice float64 `json:"addprice"`
+		GradeID int `json:"gradeId"`
 	}
-	if err := c.ShouldBindJSON(&body); err != nil || body.AddPrice < 0.01 {
+	if err := c.ShouldBindJSON(&body); err != nil {
 		response.BadRequest(c, "请选择有效的等级")
 		return
 	}
-	_, err := database.DB.Exec("UPDATE qingka_wangke_user SET addprice = ? WHERE uid = ?", body.AddPrice, uid)
+	record, err := classmodule.Classes().ResolveSelectedGrade(body.GradeID, true)
+	if err != nil {
+		response.BadRequest(c, "请选择有效的等级")
+		return
+	}
+	_, err = database.DB.Exec("UPDATE qingka_wangke_user SET grade_id = ?, addprice = ? WHERE uid = ?", record.ID, record.Rate, uid)
 	if err != nil {
 		response.ServerError(c, "设置失败")
 		return
@@ -383,7 +389,7 @@ func UserSetMyGrade(c *gin.Context) {
 func UserSetInviteRate(c *gin.Context) {
 	uid := c.GetInt("uid")
 	var body struct {
-		YQPrice float64 `json:"yqprice"`
+		GradeID int `json:"gradeId"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.BadRequest(c, "参数错误")
@@ -392,7 +398,7 @@ func UserSetInviteRate(c *gin.Context) {
 	var addprice float64
 	database.DB.QueryRow("SELECT COALESCE(addprice,1) FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&addprice)
 
-	if err := userService.SetInviteRate(uid, body.YQPrice, addprice); err != nil {
+	if err := userService.SetInviteGrade(uid, body.GradeID, addprice); err != nil {
 		response.BusinessError(c, 1010, err.Error())
 		return
 	}

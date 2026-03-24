@@ -63,7 +63,6 @@ import {
 } from '#/api/order';
 import { createTicketApi } from '#/api/user-center';
 import { getCategorySwitchesApi } from '#/api/class';
-import { getOrderTicketCountsApi } from '#/api/admin-ticket';
 import { useUserStore } from '@vben/stores';
 
 const userStore = useUserStore();
@@ -354,20 +353,11 @@ async function handleRefundSingle(oid: number) {
 }
 
 // 订单详情
-const detailTicketCount = ref(0);
 const catSwitches = ref<{ log: number; ticket: number; changepass: number; allowpause: number }>({ log: 0, ticket: 0, changepass: 1, allowpause: 0 });
 function showDetail(record: OrderItem) {
   detailOrder.value = record;
-  detailTicketCount.value = 0;
   catSwitches.value = { log: 0, ticket: 0, changepass: 1, allowpause: 0 };
   detailVisible.value = true;
-  // 异步加载工单数
-  if (record.oid > 0) {
-    getOrderTicketCountsApi([record.oid]).then((raw: any) => {
-      const res = raw;
-      detailTicketCount.value = res?.[record.oid] || 0;
-    }).catch(() => {});
-  }
   // 异步加载分类开关
   if (record.cid > 0) {
     getCategorySwitchesApi(record.cid).then((raw: any) => {
@@ -510,19 +500,16 @@ async function handlePupLogin(oid: number) {
 // 表格列
 const columns = computed(() => {
   const cols: any[] = [
-    { title: '订单ID', dataIndex: 'oid', key: 'oid', width: 65, fixed: 'left', align: 'center' },
-    { title: '平台', dataIndex: 'ptname', key: 'ptname', width: 90, ellipsis: true },
-    { title: '学校', dataIndex: 'school', key: 'school', width: 100, ellipsis: true },
-    { title: '账号', dataIndex: 'user', key: 'user', width: 110, ellipsis: true },
-    { title: '密码', dataIndex: 'pass', key: 'pass', width: 90, ellipsis: true },
-    { title: '课程名称', dataIndex: 'kcname', key: 'kcname', width: 150, ellipsis: true },
+    { title: '订单/平台', key: 'order_info', width: 110},
+    { title: '账号信息', key: 'account_info', width: 160 },
+    { title: '课程名称', dataIndex: 'kcname', key: 'kcname', width: 160 },
     {
       title: '状态', dataIndex: 'status', key: 'status', width: 85, align: 'center',
       customRender: ({ text }: { text: string }) => text,
     },
-    { title: '进度', dataIndex: 'process', key: 'process', width: 120 },
-    { title: '推送', key: 'push', width: 70, align: 'center' },
-    { title: '备注', dataIndex: 'remarks', key: 'remarks', width: 130, ellipsis: true },
+    { title: '进度', dataIndex: 'process', key: 'process', width: 130 },
+    { title: '推送', key: 'push', width: 60, align: 'center' },
+    { title: '备注', dataIndex: 'remarks', key: 'remarks', width: 140 },
     { title: '金额', dataIndex: 'fees', key: 'fees', width: 70, align: 'right' },
     { title: '时间', dataIndex: 'addtime', key: 'addtime', width: 130 },
   ];
@@ -573,45 +560,48 @@ onMounted(() => {
       </Col>
     </Row>
 
-    <!-- 快捷搜索 + 折叠筛选 -->
-    <Card class="mb-3" size="small" :body-style="{ padding: '8px 12px' }">
-      <div class="flex flex-wrap items-center gap-2 mb-0">
-        <Input v-model:value="search.search" placeholder="搜索账号/学校/课程/订单ID" allow-clear size="small" style="max-width: 280px; min-width: 140px; flex: 1" @pressEnter="handleSearch" />
-        <Select v-model:value="search.status_text" placeholder="任务状态" allow-clear size="small" style="max-width: 120px; min-width: 90px">
+    <!-- 核心工作区 (搜索 + 操作 + 表格 合并) -->
+    <Card class="mb-3 shadow-sm" :bordered="false" :body-style="{ padding: '16px' }">
+      <!-- 快捷搜索 + 折叠筛选 -->
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <Input v-model:value="search.search" placeholder="搜索账号/学校/课程/订单ID" allow-clear size="small" class="w-full sm:w-auto flex-1 min-w-[150px] sm:max-w-[280px]" @pressEnter="handleSearch" />
+        <Select v-model:value="search.status_text" placeholder="任务状态" allow-clear size="small" class="w-2/5 sm:w-auto min-w-[90px] sm:max-w-[120px]">
           <SelectOption v-for="s in statusOptions" :key="s" :value="s">{{ s }}</SelectOption>
         </Select>
-        <Button type="primary" size="small" @click="handleSearch">
-          <template #icon><SearchOutlined /></template>
-          搜索
-        </Button>
-        <Button size="small" @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-        </Button>
-        <Button size="small" @click="searchExpanded = searchExpanded.length ? [] : ['filter']">
-          <template #icon><FilterOutlined /></template>
-          筛选
-        </Button>
+        <div class="flex items-center gap-2 ml-auto sm:ml-0">
+          <Button type="primary" size="small" @click="handleSearch">
+            <template #icon><SearchOutlined /></template>
+            搜索
+          </Button>
+          <Button size="small" @click="handleReset">
+            <template #icon><ReloadOutlined /></template>
+          </Button>
+          <Button size="small" @click="searchExpanded = searchExpanded.length ? [] : ['filter']">
+            <template #icon><FilterOutlined /></template>
+            筛选
+          </Button>
+        </div>
       </div>
       <Collapse v-model:activeKey="searchExpanded" :bordered="false" ghost class="mt-2" style="margin: 0 -12px">
         <CollapsePanel key="filter" :show-arrow="false" style="border: none; padding-bottom: 0">
           <Row :gutter="[8, 8]" class="px-3">
-            <Col :xs="12" :sm="8" :md="6">
+            <Col :xs="24" :sm="12" :md="6">
               <Input v-model:value="search.user" placeholder="账号" allow-clear size="small" @pressEnter="handleSearch" />
             </Col>
-            <Col :xs="12" :sm="8" :md="6">
+            <Col :xs="24" :sm="12" :md="6">
               <Input v-model:value="search.school" placeholder="学校" allow-clear size="small" @pressEnter="handleSearch" />
             </Col>
-            <Col :xs="12" :sm="8" :md="6">
+            <Col :xs="24" :sm="12" :md="6">
               <Input v-model:value="search.kcname" placeholder="课程名称" allow-clear size="small" @pressEnter="handleSearch" />
             </Col>
-            <Col :xs="12" :sm="8" :md="6">
+            <Col :xs="24" :sm="12" :md="6">
               <Input v-model:value="search.oid" placeholder="订单ID" allow-clear size="small" @pressEnter="handleSearch" />
             </Col>
-            <Col :xs="12" :sm="8" :md="6">
+            <Col :xs="24" :sm="12" :md="6">
               <Input v-model:value="search.cid" placeholder="CID" allow-clear size="small" @pressEnter="handleSearch" />
             </Col>
-            <Col :xs="12" :sm="8" :md="6" v-if="isAdmin">
-              <Select v-model:value="search.dock" placeholder="处理状态" allow-clear size="small" style="width: 100%">
+            <Col :xs="24" :sm="12" :md="6" v-if="isAdmin">
+              <Select v-model:value="search.dock" placeholder="处理状态" allow-clear size="small" class="w-full">
                 <SelectOption value="0">待处理</SelectOption>
                 <SelectOption value="1">已完成</SelectOption>
                 <SelectOption value="2">处理失败</SelectOption>
@@ -619,18 +609,17 @@ onMounted(() => {
                 <SelectOption value="99">自营</SelectOption>
               </Select>
             </Col>
-            <Col :xs="12" :sm="8" :md="6" v-if="isAdmin">
+            <Col :xs="24" :sm="12" :md="6" v-if="isAdmin">
               <Input v-model:value="search.uid" placeholder="用户UID" allow-clear size="small" @pressEnter="handleSearch" />
             </Col>
           </Row>
         </CollapsePanel>
       </Collapse>
-    </Card>
 
-    <!-- 批量操作 -->
-    <Card class="mb-3" size="small" :body-style="{ padding: '8px 12px' }" v-if="selectedRowKeys.length > 0">
-      <Space wrap size="small">
-        <span class="text-sm font-medium">已选 <span class="text-blue-600">{{ selectedRowKeys.length }}</span> 项</span>
+      <!-- 批量操作 -->
+      <div v-if="selectedRowKeys.length > 0" class="mb-3 p-2 bg-blue-50/50 border border-blue-100 rounded-lg flex items-center justify-between transition-all">
+        <Space wrap size="small">
+          <span class="text-sm font-medium px-2">已选 <span class="text-blue-600">{{ selectedRowKeys.length }}</span> 项</span>
 
         <Dropdown v-if="isAdmin">
           <Button size="small">任务状态 <DownOutlined /></Button>
@@ -678,12 +667,12 @@ onMounted(() => {
         <Popconfirm v-if="isAdmin" title="确定要退款吗？" @confirm="handleRefund">
           <Button danger size="small">退款</Button>
         </Popconfirm>
-      </Space>
-    </Card>
+        </Space>
+      </div>
 
-    <!-- 订单表格 -->
-    <Card size="small" :body-style="{ padding: '0' }">
-      <Table
+      <!-- 订单表格 -->
+      <div class="border border-gray-100 rounded-lg overflow-hidden">
+        <Table
         :columns="columns"
         :data-source="tableData"
         :loading="loading"
@@ -695,37 +684,35 @@ onMounted(() => {
         bordered
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'oid'">
-            <span class="text-xs text-gray-500">{{ record.oid }}</span>
+          <template v-if="column.key === 'order_info'">
+            <div class="flex flex-col">
+              <span class="text-sm font-semibold text-gray-700">#{{ record.oid }}</span>
+              <span class="text-xs text-gray-400 mt-0.5">{{ record.ptname }}</span>
+            </div>
           </template>
-          <template v-else-if="column.key === 'ptname'">
-            <span class="text-sm">{{ record.ptname }}</span>
-          </template>
-          <template v-else-if="column.key === 'school'">
-            <span class="text-sm">{{ record.school }}</span>
-          </template>
-          <template v-else-if="column.key === 'user'">
-            <span class="text-sm font-medium">{{ record.user }}</span>
-          </template>
-          <template v-else-if="column.key === 'pass'">
-            <span class="text-xs text-gray-500">{{ record.pass }}</span>
+          <template v-else-if="column.key === 'account_info'">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs text-gray-500 truncate" :title="record.school">{{ record.school || '-' }}</span>
+              <span class="text-sm font-medium text-blue-600 truncate" :title="record.user">{{ record.user }}</span>
+              <span class="text-[10px] text-gray-400 truncate">密码: {{ record.pass }}</span>
+            </div>
           </template>
           <template v-else-if="column.key === 'kcname'">
-            <span class="text-sm" :title="record.kcname">{{ record.kcname }}</span>
+            <span class="text-sm whitespace-normal break-words" :title="record.kcname">{{ record.kcname }}</span>
           </template>
           <template v-else-if="column.key === 'status'">
-            <Tag :color="statusColor(record.status)" class="!mr-0 text-xs">{{ record.status || '待处理' }}</Tag>
+            <Tag :color="statusColor(record.status)" :bordered="false" class="!mr-0 text-xs px-2 py-0.5 rounded-md">{{ record.status || '待处理' }}</Tag>
           </template>
           <template v-else-if="column.key === 'process'">
-            <Progress :percent="progressPercent(record.process)" size="small" :show-info="true" class="text-xs" />
+            <Progress :percent="progressPercent(record.process)" size="small" :show-info="true" class="text-xs" :stroke-width="6" />
           </template>
           <template v-else-if="column.key === 'dockstatus'">
-            <Tag :color="dockStatusMap[record.dockstatus]?.color || 'default'" class="!mr-0 text-xs">
+            <Tag :color="dockStatusMap[record.dockstatus]?.color || 'default'" :bordered="false" class="!mr-0 text-xs px-2 py-0.5 rounded-md">
               {{ dockStatusMap[record.dockstatus]?.text || '未知' }}
             </Tag>
           </template>
           <template v-else-if="column.key === 'remarks'">
-            <span class="text-xs text-gray-500 line-clamp-2" :title="record.remarks">{{ record.remarks || '-' }}</span>
+            <span class="text-xs text-gray-500 whitespace-normal break-words" :title="record.remarks">{{ record.remarks || '-' }}</span>
           </template>
           <template v-else-if="column.key === 'addtime'">
             <span class="text-xs text-gray-400">{{ record.addtime }}</span>
@@ -734,12 +721,12 @@ onMounted(() => {
             <span class="font-semibold text-green-600 text-sm">¥{{ record.fees }}</span>
           </template>
           <template v-else-if="column.key === 'push'">
-            <Space :size="2" direction="vertical" class="w-full text-center">
-              <Tag v-if="record.pushUid" :color="record.pushStatus === '成功' ? 'green' : record.pushStatus === '失败' ? 'red' : 'blue'" class="!mr-0 text-[10px] leading-tight px-1 py-0">微{{ record.pushStatus === '成功' ? '成' : '绑' }}</Tag>
-              <Tag v-if="record.pushEmail" :color="record.pushEmailStatus === '成功' ? 'green' : record.pushEmailStatus === '失败' ? 'red' : 'blue'" class="!mr-0 text-[10px] leading-tight px-1 py-0">邮{{ record.pushEmailStatus === '成功' ? '成' : '绑' }}</Tag>
-              <Tag v-if="record.showdoc_push_url" :color="record.pushShowdocStatus === '成功' ? 'green' : record.pushShowdocStatus === '失败' ? 'red' : 'blue'" class="!mr-0 text-[10px] leading-tight px-1 py-0">SD</Tag>
-              <span v-if="!record.pushUid && !record.pushEmail && !record.showdoc_push_url" class="text-[10px] text-gray-400">-</span>
-            </Space>
+            <div class="flex flex-col items-center text-[10px] leading-tight gap-0.5">
+              <span v-if="record.pushUid" :class="record.pushStatus === '成功' ? 'text-green-500' : record.pushStatus === '失败' ? 'text-red-500' : 'text-blue-500'" title="微信推送">微:{{ record.pushStatus === '成功' ? '√' : '绑' }}</span>
+              <span v-if="record.pushEmail" :class="record.pushEmailStatus === '成功' ? 'text-green-500' : record.pushEmailStatus === '失败' ? 'text-red-500' : 'text-blue-500'" title="邮件推送">邮:{{ record.pushEmailStatus === '成功' ? '√' : '绑' }}</span>
+              <span v-if="record.showdoc_push_url" :class="record.pushShowdocStatus === '成功' ? 'text-green-500' : record.pushShowdocStatus === '失败' ? 'text-red-500' : 'text-blue-500'" title="ShowDoc推送">SD</span>
+              <span v-if="!record.pushUid && !record.pushEmail && !record.showdoc_push_url" class="text-gray-300">-</span>
+            </div>
           </template>
           <template v-else-if="column.key === 'action'">
             <Space :size="2">
@@ -765,84 +752,112 @@ onMounted(() => {
           @showSizeChange="handleSizeChange"
         />
       </div>
-    </Card>
+    </div>
+  </Card>
 
     <!-- 订单详情弹窗 -->
     <Modal v-model:open="detailVisible" title="订单详情" :width="720" style="max-width: 95vw" :footer="null">
-      <Descriptions v-if="detailOrder" bordered :column="{ xs: 1, sm: 2 }" size="small">
-        <DescriptionsItem label="订单ID">{{ detailOrder.oid }}</DescriptionsItem>
-        <DescriptionsItem label="用户UID" v-if="isAdmin">{{ detailOrder.uid }}</DescriptionsItem>
-        <DescriptionsItem label="平台名称">{{ detailOrder.ptname }}</DescriptionsItem>
-        <DescriptionsItem label="学校">{{ detailOrder.school }}</DescriptionsItem>
-        <DescriptionsItem label="账号">{{ detailOrder.user }}</DescriptionsItem>
-        <DescriptionsItem label="密码">{{ detailOrder.pass }}</DescriptionsItem>
-        <DescriptionsItem label="课程名称">{{ detailOrder.kcname }}</DescriptionsItem>
-        <DescriptionsItem label="课程ID">{{ detailOrder.kcid || '-' }}</DescriptionsItem>
-        <DescriptionsItem label="上游订单号">{{ detailOrder.yid || '-' }}</DescriptionsItem>
-        <DescriptionsItem label="任务状态">
-          <Tag :color="statusColor(detailOrder.status)">{{ detailOrder.status || '待处理' }}</Tag>
-        </DescriptionsItem>
-        <DescriptionsItem label="处理状态">
-          <Tag :color="dockStatusMap[detailOrder.dockstatus]?.color || 'default'">
-            {{ dockStatusMap[detailOrder.dockstatus]?.text || '未知' }}
-          </Tag>
-        </DescriptionsItem>
-        <DescriptionsItem label="进度">
-          <Progress :percent="progressPercent(detailOrder.process)" size="small" />
-          <div class="text-xs text-gray-500 mt-1" v-if="detailOrder.process">{{ detailOrder.process }}</div>
-        </DescriptionsItem>
-        <DescriptionsItem label="金额">
-          <span class="font-bold text-green-600">¥{{ Number(detailOrder.fees).toFixed(2) }}</span>
-        </DescriptionsItem>
-        <DescriptionsItem label="提交时间">{{ detailOrder.addtime }}</DescriptionsItem>
-        <DescriptionsItem label="详情/备注" v-if="detailOrder.remarks">
-          <div class="whitespace-pre-wrap text-sm">{{ detailOrder.remarks }}</div>
-        </DescriptionsItem>
-        <DescriptionsItem label="推送状态">
-          <Space>
-            <Tag v-if="detailOrder.pushUid" :color="detailOrder.pushStatus === '成功' ? 'green' : detailOrder.pushStatus === '失败' ? 'red' : 'blue'">微信{{ detailOrder.pushStatus || '已绑' }}</Tag>
-            <Tag v-if="detailOrder.pushEmail" :color="detailOrder.pushEmailStatus === '成功' ? 'green' : detailOrder.pushEmailStatus === '失败' ? 'red' : 'blue'">邮箱{{ detailOrder.pushEmailStatus || '已绑' }}</Tag>
-            <Tag v-if="detailOrder.showdoc_push_url" :color="detailOrder.pushShowdocStatus === '成功' ? 'green' : detailOrder.pushShowdocStatus === '失败' ? 'red' : 'blue'">ShowDoc{{ detailOrder.pushShowdocStatus || '已绑' }}</Tag>
-            <span v-if="!detailOrder.pushUid && !detailOrder.pushEmail && !detailOrder.showdoc_push_url" class="text-gray-400">未绑定</span>
-          </Space>
-        </DescriptionsItem>
-      </Descriptions>
+      <div v-if="detailOrder" class="flex flex-col gap-4">
+        <!-- 基础信息 -->
+        <div>
+          <div class="text-sm font-semibold text-gray-800 mb-2 border-l-4 border-blue-500 pl-2">基础信息</div>
+          <Descriptions :column="{ xs: 1, sm: 2 }" size="small" :labelStyle="{ width: '90px', color: '#6b7280' }">
+            <DescriptionsItem label="订单ID">{{ detailOrder.oid }} <span v-if="isAdmin" class="text-gray-400 text-xs ml-1">(UID: {{ detailOrder.uid }})</span></DescriptionsItem>
+            <DescriptionsItem label="提交时间">{{ detailOrder.addtime }}</DescriptionsItem>
+            <DescriptionsItem label="账号"><span class="font-medium text-blue-600">{{ detailOrder.user }}</span></DescriptionsItem>
+            <DescriptionsItem label="密码"><span class="bg-gray-100 px-2 py-0.5 rounded text-gray-600 text-xs font-mono">{{ detailOrder.pass }}</span></DescriptionsItem>
+            <DescriptionsItem label="平台名称">{{ detailOrder.ptname }}</DescriptionsItem>
+            <DescriptionsItem label="学校">{{ detailOrder.school }}</DescriptionsItem>
+          </Descriptions>
+        </div>
+
+        <!-- 课程与进度 -->
+        <div class="bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+          <div class="text-sm font-semibold text-gray-800 mb-2 border-l-4 border-green-500 pl-2">课程与状态</div>
+          <Descriptions :column="{ xs: 1, sm: 2 }" size="small" :labelStyle="{ width: '90px', color: '#6b7280' }">
+            <DescriptionsItem label="课程名称" :span="2"><span class="font-medium text-gray-900">{{ detailOrder.kcname }}</span> <span class="text-gray-400 text-xs ml-2">(ID: {{ detailOrder.kcid || '-' }})</span></DescriptionsItem>
+            <DescriptionsItem label="任务状态">
+              <Tag :color="statusColor(detailOrder.status)" :bordered="false" class="rounded-md">{{ detailOrder.status || '待处理' }}</Tag>
+            </DescriptionsItem>
+            <DescriptionsItem label="进度">
+              <div class="flex items-center gap-2">
+                <Progress :percent="progressPercent(detailOrder.process)" :show-info="false" size="small" class="m-0" style="width: 100px" :stroke-width="6" />
+                <span class="text-xs text-gray-500">{{ detailOrder.process }}</span>
+              </div>
+            </DescriptionsItem>
+            <DescriptionsItem v-if="isAdmin" label="处理状态">
+              <Tag :color="dockStatusMap[detailOrder.dockstatus]?.color || 'default'" :bordered="false" class="rounded-md">
+                {{ dockStatusMap[detailOrder.dockstatus]?.text || '未知' }}
+              </Tag>
+              <div class="text-xs text-gray-400 mt-1" v-if="detailOrder.yid">上游单号: {{ detailOrder.yid }}</div>
+            </DescriptionsItem>
+            <DescriptionsItem label="订单金额"><span class="font-bold text-green-600 text-lg">¥{{ Number(detailOrder.fees).toFixed(2) }}</span></DescriptionsItem>
+          </Descriptions>
+        </div>
+
+        <!-- 附加信息 -->
+        <div>
+          <div class="text-sm font-semibold text-gray-800 mb-2 border-l-4 border-purple-500 pl-2">附加信息</div>
+          <Descriptions :column="{ xs: 1, sm: 2 }" size="small" :labelStyle="{ width: '90px', color: '#6b7280' }">
+            <DescriptionsItem label="推送状态" :span="2">
+              <Space>
+                <Tag v-if="detailOrder.pushUid" :bordered="false" :color="detailOrder.pushStatus === '成功' ? 'success' : detailOrder.pushStatus === '失败' ? 'error' : 'processing'">微信{{ detailOrder.pushStatus || '已绑' }}</Tag>
+                <Tag v-if="detailOrder.pushEmail" :bordered="false" :color="detailOrder.pushEmailStatus === '成功' ? 'success' : detailOrder.pushEmailStatus === '失败' ? 'error' : 'processing'">邮箱{{ detailOrder.pushEmailStatus || '已绑' }}</Tag>
+                <Tag v-if="detailOrder.showdoc_push_url" :bordered="false" :color="detailOrder.pushShowdocStatus === '成功' ? 'success' : detailOrder.pushShowdocStatus === '失败' ? 'error' : 'processing'">ShowDoc{{ detailOrder.pushShowdocStatus || '已绑' }}</Tag>
+                <span v-if="!detailOrder.pushUid && !detailOrder.pushEmail && !detailOrder.showdoc_push_url" class="text-gray-400 text-xs">未绑定</span>
+              </Space>
+            </DescriptionsItem>
+            <DescriptionsItem label="详情备注" :span="2" v-if="detailOrder.remarks">
+              <div class="bg-amber-50/50 p-2.5 rounded text-sm text-gray-700 whitespace-pre-wrap border border-amber-100/50 leading-relaxed">{{ detailOrder.remarks }}</div>
+            </DescriptionsItem>
+          </Descriptions>
+        </div>
+      </div>
 
       <!-- 操作按钮 -->
-      <div v-if="detailOrder" class="mt-4 flex gap-2 justify-end flex-wrap">
-        <Popconfirm v-if="catSwitches.allowpause" title="确定暂停/恢复此订单？" @confirm="() => { handlePause(detailOrder!.oid); }">
-          <Button size="small" class="bg-purple-50 border-purple-300 text-purple-600">暂停/恢复</Button>
-        </Popconfirm>
-        <Button v-if="catSwitches.changepass" size="small" class="bg-cyan-50 border-cyan-300 text-cyan-600" @click="openChangePwd(detailOrder!.oid)">修改密码</Button>
-        <Popconfirm title="确定补刷此订单？" @confirm="() => { handleResubmit(detailOrder!.oid); }">
-          <Button size="small" class="bg-orange-50 border-orange-300 text-orange-600">补单</Button>
-        </Popconfirm>
-        <Button v-if="catSwitches.log" size="small" class="bg-green-50 border-green-300 text-green-600" @click="openLogs(detailOrder!.oid)">日志</Button>
-        <Button v-if="catSwitches.ticket" size="small" class="bg-yellow-50 border-yellow-300 text-yellow-700" @click="openTicket(detailOrder!.oid)">
-          <template #icon><MessageOutlined /></template>
-          反馈
-          <Tag v-if="detailTicketCount > 0" color="orange" class="ml-1" style="margin-right:0">{{ detailTicketCount }}</Tag>
-        </Button>
-        <Button v-if="detailOrder!.yid && detailOrder!.supplier_pt === 'pup'" size="small" class="bg-purple-50 border-purple-300 text-purple-600" @click="handlePupLogin(detailOrder!.oid)">
-          <template #icon><LoginOutlined /></template>
-          Pup登录
-        </Button>
-        <Dropdown v-if="detailOrder!.yid && detailOrder!.supplier_pt === 'pup'">
-          <Button size="small" class="bg-indigo-50 border-indigo-300 text-indigo-600">PUP重置 <DownOutlined /></Button>
-          <template #overlay>
-            <Menu>
-              <MenuItem key="score" @click="openReset(detailOrder!.oid, 'score')">重置分数</MenuItem>
-              <MenuItem key="duration" @click="openReset(detailOrder!.oid, 'duration')">重置时长</MenuItem>
-              <MenuItem key="period" @click="openReset(detailOrder!.oid, 'period')">重置周期</MenuItem>
-            </Menu>
+      <div v-if="detailOrder" class="mt-6 pt-4 border-t border-gray-100 flex justify-between items-center flex-wrap gap-4">
+        <!-- 常规操作区 -->
+        <div class="flex gap-2 flex-wrap flex-1">
+          <Popconfirm v-if="catSwitches.allowpause" title="确定暂停/恢复此订单？" @confirm="() => { handlePause(detailOrder!.oid); }">
+            <Button size="small" class="bg-purple-50 border-purple-200 text-purple-600 hover:bg-purple-100 shadow-none">暂停/恢复</Button>
+          </Popconfirm>
+          <Button v-if="catSwitches.changepass" size="small" class="bg-cyan-50 border-cyan-200 text-cyan-600 hover:bg-cyan-100 shadow-none" @click="openChangePwd(detailOrder!.oid)">修改密码</Button>
+          <Popconfirm title="确定补刷此订单？" @confirm="() => { handleResubmit(detailOrder!.oid); }">
+            <Button size="small" class="bg-orange-50 border-orange-200 text-orange-600 hover:bg-orange-100 shadow-none">补单</Button>
+          </Popconfirm>
+          <Button v-if="catSwitches.log" size="small" class="bg-green-50 border-green-200 text-green-600 hover:bg-green-100 shadow-none" @click="openLogs(detailOrder!.oid)">日志</Button>
+          <Button v-if="catSwitches.ticket" size="small" class="bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100 shadow-none" @click="openTicket(detailOrder!.oid)">
+            <template #icon><MessageOutlined /></template>
+            反馈
+          </Button>
+          
+          <template v-if="detailOrder!.yid && detailOrder!.supplier_pt === 'pup'">
+            <Button size="small" class="bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100 shadow-none" @click="handlePupLogin(detailOrder!.oid)">
+              <template #icon><LoginOutlined /></template>
+              Pup登录
+            </Button>
+            <Dropdown>
+              <Button size="small" class="bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100 shadow-none">PUP重置 <DownOutlined /></Button>
+              <template #overlay>
+                <Menu>
+                  <MenuItem key="score" @click="openReset(detailOrder!.oid, 'score')">重置分数</MenuItem>
+                  <MenuItem key="duration" @click="openReset(detailOrder!.oid, 'duration')">重置时长</MenuItem>
+                  <MenuItem key="period" @click="openReset(detailOrder!.oid, 'period')">重置周期</MenuItem>
+                </Menu>
+              </template>
+            </Dropdown>
           </template>
-        </Dropdown>
-        <Popconfirm title="确定取消此订单？" @confirm="() => { handleCancel(detailOrder!.oid); }">
-          <Button size="small">取消订单</Button>
-        </Popconfirm>
-        <Popconfirm v-if="isAdmin" title="确定退款？" @confirm="() => { handleRefundSingle(detailOrder!.oid); }">
-          <Button danger size="small">退款</Button>
-        </Popconfirm>
+        </div>
+        
+        <!-- 危险操作区 -->
+        <div class="flex gap-2">
+          <Popconfirm title="确定取消此订单？" @confirm="() => { handleCancel(detailOrder!.oid); }">
+            <Button size="small" danger>取消订单</Button>
+          </Popconfirm>
+          <Popconfirm v-if="isAdmin" title="确定退款？退款后状态不可逆！" @confirm="() => { handleRefundSingle(detailOrder!.oid); }">
+            <Button type="primary" danger size="small">退款</Button>
+          </Popconfirm>
+        </div>
       </div>
     </Modal>
 

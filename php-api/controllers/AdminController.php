@@ -267,10 +267,14 @@ class AdminController
     {
         $db = Database::getInstance();
         $input = json_decode(file_get_contents('php://input'), true);
+        $rate = $input['rate'] ?? $input['discount'] ?? 1;
+        $money = $input['money'] ?? 0;
+        $status = $input['status'] ?? 1;
+        $sort = $input['sort'] ?? 0;
 
         $id = $db->insert(
-            "INSERT INTO qingka_wangke_dengji (name, discount) VALUES (?, ?)",
-            [$input['name'] ?? '', $input['discount'] ?? 100]
+            "INSERT INTO qingka_wangke_dengji (sort, name, rate, money, status, time) VALUES (?, ?, ?, ?, ?, UNIX_TIMESTAMP())",
+            [$sort, $input['name'] ?? '', $rate, $money, $status]
         );
 
         Response::success(['id' => $id], '添加成功');
@@ -284,11 +288,15 @@ class AdminController
 
         $fields = [];
         $values = [];
-        foreach (['name', 'discount'] as $field) {
+        foreach (['sort', 'name', 'rate', 'money', 'status'] as $field) {
             if (isset($input[$field])) {
                 $fields[] = "$field = ?";
                 $values[] = $input[$field];
             }
+        }
+        if (isset($input['discount']) && !isset($input['rate'])) {
+            $fields[] = "rate = ?";
+            $values[] = $input['discount'];
         }
         $values[] = $id;
 

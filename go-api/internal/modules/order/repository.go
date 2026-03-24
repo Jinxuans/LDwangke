@@ -27,10 +27,7 @@ func autoSyncVerboseLogging() bool {
 }
 
 func autoSyncProgressLogStep() int64 {
-	if autoSyncVerboseLogging() {
-		return 200
-	}
-	return 1000
+	return 100
 }
 
 func parseOrderTime(value string) (time.Time, bool) {
@@ -38,11 +35,22 @@ func parseOrderTime(value string) (time.Time, bool) {
 	if value == "" {
 		return time.Time{}, false
 	}
-	t, err := time.ParseInLocation("2006-01-02 15:04:05", value, time.Local)
-	if err != nil {
-		return time.Time{}, false
+	// 兼容旧系统带时区噪音的格式，如 "2024-12-17 13:40:53--506400"，截取前19字符
+	if len(value) > 19 && value[10] == ' ' {
+		value = value[:19]
 	}
-	return t, true
+	if t, err := time.ParseInLocation("2006-01-02 15:04:05", value, time.Local); err == nil {
+		return t, true
+	}
+	// 兼容 ISO 8601 格式，如 "2025-10-08T18:39:57Z"
+	if t, err := time.Parse(time.RFC3339, value); err == nil {
+		return t.In(time.Local), true
+	}
+	// 兼容旧系统 Unix 时间戳格式
+	if ts, err := strconv.ParseInt(value, 10, 64); err == nil && ts > 0 {
+		return time.Unix(ts, 0), true
+	}
+	return time.Time{}, false
 }
 
 func matchAutoSyncRule(ageHours float64, rules []AutoSyncRule) (AutoSyncRule, bool) {

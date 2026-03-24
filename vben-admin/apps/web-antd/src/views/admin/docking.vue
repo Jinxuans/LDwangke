@@ -344,7 +344,8 @@ onMounted(loadBase);
         <Select
           v-model:value="selectedHid"
           placeholder="选择货源"
-          style="width: 220px"
+          style="min-width: 220px; max-width: 380px"
+          :dropdown-match-select-width="false"
           show-search
           allow-clear
           :filter-option="(input: string, option: any) => String(option.label || '').toLowerCase().includes(input.toLowerCase())"
@@ -722,3 +723,10 @@ onMounted(loadBase);
     </Modal>
   </Page>
 </template>
+
+<style>
+/* 货源选择器弹出框溢出父容器 overflow:hidden 限制 */
+.ant-select-dropdown {
+  z-index: 9999 !important;
+}
+</style>

@@ -29,7 +29,7 @@ const gradeOptions = ref<GradeItem[]>([]);
 const editVisible = ref(false);
 const editUser = ref<UserItem | null>(null);
 const editBalance = ref(0);
-const editAddPrice = ref(1);
+const editGradeId = ref<number | undefined>(undefined);
 
 async function loadGrades() {
   try {
@@ -61,7 +61,7 @@ async function loadUsers(page = 1) {
 function openEdit(user: UserItem) {
   editUser.value = { ...user };
   editBalance.value = user.balance;
-  editAddPrice.value = user.addprice;
+  editGradeId.value = user.grade_id || undefined;
   editVisible.value = true;
 }
 
@@ -90,9 +90,13 @@ async function handleResetPass(uid: number) {
 
 async function handleSaveEdit() {
   if (!editUser.value) return;
+  if (!editGradeId.value) {
+    message.warning('请选择等级');
+    return;
+  }
   try {
     await setUserBalanceApi(editUser.value.uid, editBalance.value);
-    await setUserGradeApi(editUser.value.uid, editAddPrice.value);
+    await setUserGradeApi(editUser.value.uid, editGradeId.value);
     message.success('保存成功');
     editVisible.value = false;
     loadUsers(pagination.page);
@@ -215,11 +219,11 @@ onMounted(async () => {
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">等级（费率）</label>
-          <Select v-model:value="editAddPrice" style="width: 100%" show-search :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())">
+          <Select v-model:value="editGradeId" style="width: 100%" show-search :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())">
             <SelectOption
               v-for="g in gradeOptions"
               :key="g.id"
-              :value="Number(g.rate)"
+              :value="g.id"
               :label="`${g.name}（${g.rate}）`"
             >
               {{ g.name }}（费率 {{ g.rate }}）
