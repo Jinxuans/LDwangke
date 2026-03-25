@@ -93,6 +93,7 @@ type OrderProgressSyncLogEntry struct {
 	Failed           int            `json:"failed"`
 	DurationMs       int64          `json:"duration_ms"`
 	Error            string         `json:"error"`
+	Lines            []string       `json:"lines"`
 }
 
 var (
@@ -704,6 +705,21 @@ func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 		}
 	}
 	orderProgressMu.RUnlock()
+
+	var collectedLines []string
+	var collectedMu sync.Mutex
+	logTime := time.Now().Format("2006-01-02 15:04:05")
+	if mode == "batch" {
+		collectedLines = append(collectedLines, logTime+" [AutoSync] 开始执行主订单批量进度同步")
+	} else {
+		collectedLines = append(collectedLines, logTime+" [AutoSync] 开始执行主订单自动同步")
+	}
+	opts.LogCollector = func(line string) {
+		collectedMu.Lock()
+		collectedLines = append(collectedLines, time.Now().Format("2006-01-02 15:04:05")+" [AutoSync] "+line)
+		collectedMu.Unlock()
+	}
+
 	start := time.Now()
 	updated, failed, err := ordermodule.NewServices().Sync.AutoSyncAllProgress(opts)
 	report := ordermodule.GetLastAutoSyncReport()
@@ -727,8 +743,25 @@ func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 		}
 	}
 	orderProgressMu.Unlock()
+
+	// 收集完成行
+	finishTime := time.Now().Format("2006-01-02 15:04:05")
+	if err != nil {
+		if mode == "batch" {
+			collectedLines = append(collectedLines, finishTime+" [AutoSync] 批量进度同步失败: "+err.Error())
+		} else {
+			collectedLines = append(collectedLines, finishTime+" [AutoSync] 查询进行中订单失败: "+err.Error())
+		}
+	} else {
+		if mode == "batch" {
+			collectedLines = append(collectedLines, fmt.Sprintf("%s [AutoSync] 批量进度同步完成，更新 %d 个订单，失败 %d 个", finishTime, updated, failed))
+		} else {
+			collectedLines = append(collectedLines, fmt.Sprintf("%s [AutoSync] 同步完成，更新 %d 个订单，失败 %d 个", finishTime, updated, failed))
+		}
+	}
+
 	appendOrderProgressLog(OrderProgressSyncLogEntry{
-		Time:             time.Now().Format("2006-01-02 15:04:05"),
+		Time:             logTime,
 		Mode:             mode,
 		Trigger:          trigger,
 		IntervalSec:      intervalSec,
@@ -741,6 +774,7 @@ func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 		Failed:           failed,
 		DurationMs:       time.Since(start).Milliseconds(),
 		Error:            pickOrderProgressError(err, report.SampleErrors),
+		Lines:            collectedLines,
 	})
 	if err != nil {
 		if mode == "batch" {

@@ -21,6 +21,7 @@ type AutoSyncOptions struct {
 	OnlyBatchSuppliers bool
 	SkipBatchSuppliers bool
 	IgnoreRules        bool
+	LogCollector       func(string)
 }
 
 // NewSyncService 只负责装配同步相关用例，不承载业务逻辑。

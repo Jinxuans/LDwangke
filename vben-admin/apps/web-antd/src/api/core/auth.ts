@@ -40,7 +40,7 @@ export async function loginApi(data: AuthApi.LoginParams) {
  * 注册
  */
 export async function registerApi(data: AuthApi.RegisterParams) {
-  return baseRequestClient.post('/auth/register', data);
+  return requestClient.post('/auth/register', data);
 }
 
 /**

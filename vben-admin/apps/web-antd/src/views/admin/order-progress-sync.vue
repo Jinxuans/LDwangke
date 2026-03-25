@@ -36,6 +36,10 @@ const rules = ref<OrderProgressSyncStats['rules']>([]);
 const statusOptions = ['已完成', '已退款', '已取消', '失败', '异常'];
 
 function formatLogLines(log: OrderProgressSyncLog): string[] {
+  if (log.lines && log.lines.length > 0) {
+    return log.lines;
+  }
+  // fallback for older log entries without lines
   const t = log.time;
   const tag = '[AutoSync]';
   const modeLabel = log.mode === 'batch' ? '主订单批量进度同步' : '主订单自动同步';
