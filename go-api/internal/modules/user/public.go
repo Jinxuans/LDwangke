@@ -13,6 +13,32 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// UserPayNotify 处理易支付异步回调。
+// 说明：
+// 1. 回调不带登录态，因此必须挂在公开路由；
+// 2. 以商户订单号 out_trade_no 作为本地订单定位依据；
+// 3. 处理成功后必须返回纯文本 success，平台才会停止重试。
+func UserPayNotify(c *gin.Context) {
+	params := make(map[string]string)
+	for k, v := range c.Request.URL.Query() {
+		if len(v) > 0 {
+			params[k] = v[0]
+		}
+	}
+	_ = c.Request.ParseForm()
+	for k, v := range c.Request.PostForm {
+		if len(v) > 0 {
+			params[k] = v[0]
+		}
+	}
+
+	if err := userService.ConfirmPayOrderByNotify(params); err != nil {
+		c.String(200, "fail")
+		return
+	}
+	c.String(200, "success")
+}
+
 func loadGradeList() ([]model.Grade, error) {
 	rows, err := database.DB.Query("SELECT id, COALESCE(sort,'0'), COALESCE(name,''), COALESCE(rate,'1'), COALESCE(money,'0'), COALESCE(addkf,'1'), COALESCE(gjkf,'1'), COALESCE(status,'1'), CASE WHEN time IS NOT NULL AND time != '' AND time != '0' THEN FROM_UNIXTIME(CAST(time AS UNSIGNED), '%Y-%m-%d %H:%i') ELSE '' END FROM qingka_wangke_dengji WHERE status = '1' ORDER BY sort ASC, id ASC")
 	if err != nil {
