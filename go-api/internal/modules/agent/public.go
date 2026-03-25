@@ -202,6 +202,29 @@ func AgentMigrateSuperior(c *gin.Context) {
 	response.SuccessMsg(c, fmt.Sprintf("迁移成功,您已迁移至[UID%d]的名下", body.UID))
 }
 
+func AgentAdminChangeSuperior(c *gin.Context) {
+	operatorUID := c.GetInt("uid")
+	operatorGrade := c.GetString("grade")
+
+	var body struct {
+		UID         int `json:"uid"`
+		SuperiorUID int `json:"superiorUid"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+
+	// 管理员代理页可以单独调整某个用户的上级归属。
+	err := agents.AgentAdminChangeSuperior(operatorUID, operatorGrade, body.UID, body.SuperiorUID)
+	if err != nil {
+		response.BusinessError(c, 1001, err.Error())
+		return
+	}
+
+	response.SuccessMsg(c, fmt.Sprintf("调整成功,该用户已迁移至[UID%d]的名下", body.SuperiorUID))
+}
+
 func AgentCrossRechargeCheck(c *gin.Context) {
 	uid := c.GetInt("uid")
 	allowed := agents.CrossRechargeAllowed(uid)

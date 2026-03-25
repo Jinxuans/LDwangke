@@ -593,6 +593,71 @@ func (s *agentService) AgentMigrateSuperior(currentUID int, targetUID int, yqm s
 	return nil
 }
 
+func (s *agentService) AgentAdminChangeSuperior(operatorUID int, operatorGrade string, targetUID int, superiorUID int) error {
+	if operatorUID != 1 && operatorGrade != "2" && operatorGrade != "3" {
+		return errors.New("无权限")
+	}
+	if targetUID <= 0 || superiorUID <= 0 {
+		return errors.New("用户UID和上级UID不能为空")
+	}
+	if targetUID == superiorUID {
+		return errors.New("上级UID不能填写自己")
+	}
+
+	var targetName string
+	var currentSuperiorUID int
+	var targetGrade string
+	err := database.DB.QueryRow(
+		"SELECT COALESCE(name,''), COALESCE(uuid,0), COALESCE(grade,'0') FROM qingka_wangke_user WHERE uid = ?",
+		targetUID,
+	).Scan(&targetName, &currentSuperiorUID, &targetGrade)
+	if err != nil {
+		return errors.New("目标用户不存在")
+	}
+	if targetGrade == "2" || targetGrade == "3" {
+		return errors.New("管理员账号不允许调整上级")
+	}
+	if currentSuperiorUID == superiorUID {
+		return errors.New("该用户已经在该上级名下")
+	}
+
+	var superiorName string
+	err = database.DB.QueryRow(
+		"SELECT COALESCE(name,'') FROM qingka_wangke_user WHERE uid = ?",
+		superiorUID,
+	).Scan(&superiorName)
+	if err != nil {
+		return errors.New("新上级不存在")
+	}
+
+	// 防止把用户迁移到自己的下级名下，避免代理树出现环。
+	checkUID := superiorUID
+	for depth := 0; depth < 100 && checkUID > 0; depth++ {
+		if checkUID == targetUID {
+			return errors.New("禁止迁移到自己的下级名下")
+		}
+
+		var nextUID int
+		err = database.DB.QueryRow("SELECT COALESCE(uuid,0) FROM qingka_wangke_user WHERE uid = ?", checkUID).Scan(&nextUID)
+		if err != nil || nextUID <= 0 || nextUID == checkUID {
+			break
+		}
+		checkUID = nextUID
+	}
+
+	_, err = database.DB.Exec("UPDATE qingka_wangke_user SET uuid = ? WHERE uid = ?", superiorUID, targetUID)
+	if err != nil {
+		return errors.New("调整上级失败")
+	}
+
+	wlog(operatorUID, "调整上级", fmt.Sprintf("将用户[%s](UID:%d)的上级调整为[%s](UID:%d)", targetName, targetUID, superiorName, superiorUID), 0)
+	wlog(targetUID, "调整上级", fmt.Sprintf("管理员已将你的上级调整为[%s](UID:%d)", superiorName, superiorUID), 0)
+	if currentSuperiorUID > 0 && currentSuperiorUID != superiorUID {
+		wlog(currentSuperiorUID, "下级迁移", fmt.Sprintf("用户[%s](UID:%d)已被管理员迁移至[%s](UID:%d)名下", targetName, targetUID, superiorName, superiorUID), 0)
+	}
+	return nil
+}
+
 func (s *agentService) AgentSetInviteCode(operatorUID int, targetUID int, yqm string) error {
 	if len(yqm) < 4 {
 		return errors.New("邀请码最少4位")
