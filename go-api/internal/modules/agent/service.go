@@ -9,6 +9,8 @@ import (
 
 	"go-api/internal/database"
 	commonmodule "go-api/internal/modules/common"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type agentService struct{}
@@ -445,8 +447,12 @@ func (s *agentService) AgentResetPassword(operatorUID int, targetUID int) (strin
 	}
 
 	newPass := "123456"
-	database.DB.Exec("UPDATE qingka_wangke_user SET pass = ? WHERE uid = ?", newPass, targetUID)
-	wlog(targetUID, "重置密码", fmt.Sprintf("成功重置UID为%d的密码为%s", targetUID, newPass), 0)
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(newPass), bcrypt.DefaultCost)
+	if err != nil {
+		return "", errors.New("密码加密失败")
+	}
+	database.DB.Exec("UPDATE qingka_wangke_user SET pass = ? WHERE uid = ?", string(hashedPass), targetUID)
+	wlog(targetUID, "重置密码", fmt.Sprintf("成功重置UID为%d的密码", targetUID), 0)
 	return fmt.Sprintf("成功重置密码为%s", newPass), nil
 }
 

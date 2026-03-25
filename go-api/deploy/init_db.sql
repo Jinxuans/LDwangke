@@ -1035,7 +1035,7 @@ CREATE TABLE IF NOT EXISTS `qingka_ext_menu` (
 
 -- 默认管理员账号
 INSERT INTO `qingka_wangke_user` (uuid, user, pass, name, qq_openid, nickname, faceimg, money, zcz, addprice, `key`, yqm, yqprice, notice, addtime, endtime, ip, grade, active, ck, xd, jd, bs, ck1, xd1, jd1, bs1, fldata, cldata, czAuth)
-SELECT 1, 'admin', 'admin123', 'Admin', '', '', '', 0, '0', 1, '', '', '', '', NOW(), '', '', '3', '1', 0, 0, 0, 0, 0, 0, 0, 0, '', '', '0'
+SELECT 1, 'admin', '$2a$10$z1vr0ZcV9pETlTuVruDSHe1I.dRF68pbMDlUi.aYoIUo.M5QRgtZG', 'Admin', '', '', '', 0, '0', 1, '', '', '', '', NOW(), '', '', '3', '1', 0, 0, 0, 0, 0, 0, 0, 0, '', '', '0'
 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `qingka_wangke_user` WHERE grade='3');
 
 -- 默认系统配置

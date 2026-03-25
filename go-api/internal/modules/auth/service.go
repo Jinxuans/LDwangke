@@ -96,11 +96,11 @@ func (s *Service) Login(req LoginRequest) (*model.VbenLoginResponse, string, err
 		}
 	}
 
-	accessToken, err := s.generateToken(user, config.Global.JWT.AccessTTL)
+	accessToken, err := s.generateToken(user, config.Global.JWT.AccessTTL, "access")
 	if err != nil {
 		return nil, "", errors.New("生成 Token 失败")
 	}
-	refreshToken, err := s.generateToken(user, config.Global.JWT.RefreshTTL)
+	refreshToken, err := s.generateToken(user, config.Global.JWT.RefreshTTL, "refresh")
 	if err != nil {
 		return nil, "", errors.New("生成 RefreshToken 失败")
 	}
@@ -199,7 +199,7 @@ func (s *Service) SendResetCode(email string) error {
 	var count int
 	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_user WHERE email = ?", email).Scan(&count)
 	if count == 0 {
-		return errors.New("该邮箱未绑定任何账号")
+		return nil
 	}
 
 	if err := commonmodule.CheckVerificationRateLimit("reset_pwd", email); err != nil {
@@ -308,11 +308,18 @@ func (s *Service) RefreshAccessToken(refreshToken string) (string, string, error
 		return "", "", errors.New("用户不存在")
 	}
 
-	newAccessToken, err := s.generateToken(user, config.Global.JWT.AccessTTL)
+	if user.Active != "1" {
+		return "", "", errors.New("账号已被禁用")
+	}
+	if claims.TokenType != "refresh" {
+		return "", "", errors.New("RefreshToken 类型无效")
+	}
+
+	newAccessToken, err := s.generateToken(user, config.Global.JWT.AccessTTL, "access")
 	if err != nil {
 		return "", "", errors.New("生成 Token 失败")
 	}
-	newRefreshToken, err := s.generateToken(user, config.Global.JWT.RefreshTTL)
+	newRefreshToken, err := s.generateToken(user, config.Global.JWT.RefreshTTL, "refresh")
 	if err != nil {
 		return "", "", errors.New("生成 RefreshToken 失败")
 	}
@@ -352,7 +359,14 @@ func (s *Service) GetAccessCodes(grade string) []string {
 	return codes
 }
 
-func (s *Service) Impersonate(targetUID int) (*model.VbenLoginResponse, string, error) {
+func (s *Service) Impersonate(operatorUID int, operatorGrade string, targetUID int, clientIP string) (*model.VbenLoginResponse, string, error) {
+	if operatorGrade != "3" {
+		return nil, "", errors.New("需要超级管理员权限")
+	}
+	if targetUID <= 0 {
+		return nil, "", errors.New("目标用户不存在")
+	}
+
 	var user model.User
 	err := database.DB.QueryRow(
 		"SELECT uid, uuid, user, pass, name, money, grade, active FROM qingka_wangke_user WHERE uid = ?",
@@ -361,15 +375,22 @@ func (s *Service) Impersonate(targetUID int) (*model.VbenLoginResponse, string, 
 	if err != nil {
 		return nil, "", errors.New("目标用户不存在")
 	}
+	if user.Active != "1" {
+		return nil, "", errors.New("目标用户已被禁用")
+	}
+	if user.Grade == "3" {
+		return nil, "", errors.New("禁止伪装超级管理员账号")
+	}
 
-	accessToken, err := s.generateToken(user, config.Global.JWT.AccessTTL)
+	accessToken, err := s.generateToken(user, config.Global.JWT.AccessTTL, "access")
 	if err != nil {
 		return nil, "", errors.New("生成 Token 失败")
 	}
-	refreshToken, err := s.generateToken(user, config.Global.JWT.RefreshTTL)
+	refreshToken, err := s.generateToken(user, config.Global.JWT.RefreshTTL, "refresh")
 	if err != nil {
 		return nil, "", errors.New("生成 RefreshToken 失败")
 	}
+	s.logImpersonation(operatorUID, targetUID, clientIP)
 
 	return &model.VbenLoginResponse{
 		AccessToken: accessToken,
@@ -397,11 +418,12 @@ func (s *Service) getSiteName() string {
 	return siteName
 }
 
-func (s *Service) generateToken(user model.User, ttl int) (string, error) {
+func (s *Service) generateToken(user model.User, ttl int, tokenType string) (string, error) {
 	claims := middleware.Claims{
-		UID:   user.UID,
-		User:  user.User,
-		Grade: user.Grade,
+		UID:       user.UID,
+		User:      user.User,
+		Grade:     user.Grade,
+		TokenType: tokenType,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(ttl) * time.Second)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -410,6 +432,18 @@ func (s *Service) generateToken(user model.User, ttl int) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(config.Global.JWT.Secret))
+}
+
+func (s *Service) logImpersonation(operatorUID, targetUID int, clientIP string) {
+	if database.DB == nil {
+		return
+	}
+	_, _ = database.DB.Exec(
+		"INSERT INTO qingka_wangke_log (uid, type, text, money, smoney, ip, addtime) VALUES (?, '管理员代登录', ?, '0', '', ?, NOW())",
+		operatorUID,
+		fmt.Sprintf("代登录目标UID=%d", targetUID),
+		clientIP,
+	)
 }
 
 // SetRefreshTokenCookie 设置 refresh_token 到 cookie。
