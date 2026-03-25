@@ -16,9 +16,10 @@ import (
 var lastTimeCache sync.Map
 
 type Claims struct {
-	UID   int    `json:"uid"`
-	User  string `json:"user"`
-	Grade string `json:"grade"`
+	UID       int    `json:"uid"`
+	User      string `json:"user"`
+	Grade     string `json:"grade"`
+	TokenType string `json:"token_type,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -49,6 +50,11 @@ func JWTAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		if claims.TokenType != "" && claims.TokenType != "access" {
+			response.Unauthorized(c, "Token 类型无效")
+			c.Abort()
+			return
+		}
 
 		c.Set("uid", claims.UID)
 		c.Set("username", claims.User)
@@ -68,6 +74,13 @@ func WSAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := c.Query("token")
 		if tokenStr == "" {
+			authHeader := c.GetHeader("Authorization")
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				tokenStr = parts[1]
+			}
+		}
+		if tokenStr == "" {
 			response.Unauthorized(c, "缺少认证信息")
 			c.Abort()
 			return
@@ -80,6 +93,11 @@ func WSAuth() gin.HandlerFunc {
 
 		if err != nil || !token.Valid {
 			response.Unauthorized(c, "Token 无效或已过期")
+			c.Abort()
+			return
+		}
+		if claims.TokenType != "" && claims.TokenType != "access" {
+			response.Unauthorized(c, "Token 类型无效")
 			c.Abort()
 			return
 		}
@@ -96,6 +114,17 @@ func AdminOnly() gin.HandlerFunc {
 		grade, exists := c.Get("grade")
 		if !exists || (grade.(string) != "2" && grade.(string) != "3") {
 			response.Forbidden(c, "需要管理员权限")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+func SuperAdminOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.GetString("grade") != "3" {
+			response.Forbidden(c, "需要超级管理员权限")
 			c.Abort()
 			return
 		}

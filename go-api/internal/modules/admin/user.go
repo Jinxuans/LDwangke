@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 
+	"go-api/internal/middleware"
 	"go-api/internal/model"
 	authmodule "go-api/internal/modules/auth"
 	classmodule "go-api/internal/modules/class"
@@ -16,7 +17,7 @@ import (
 )
 
 func registerUserRoutes(admin *gin.RouterGroup) {
-	admin.POST("/impersonate", authmodule.Impersonate)
+	admin.POST("/impersonate", middleware.SuperAdminOnly(), authmodule.Impersonate)
 	admin.GET("/users", AdminUserList)
 	admin.POST("/user/reset-pass", AdminUserResetPass)
 	admin.POST("/user/balance", AdminUserSetBalance)

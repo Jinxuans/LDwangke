@@ -7,6 +7,8 @@ import (
 	"go-api/internal/database"
 	"go-api/internal/model"
 	classmodule "go-api/internal/modules/class"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type gradeLookupMaps struct {
@@ -85,7 +87,11 @@ func (s *Service) ResetPassword(uid int, newPass string) error {
 	if newPass == "" {
 		newPass = "123456"
 	}
-	_, err := database.DB.Exec("UPDATE qingka_wangke_user SET pass = ? WHERE uid = ?", newPass, uid)
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(newPass), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	_, err = database.DB.Exec("UPDATE qingka_wangke_user SET pass = ? WHERE uid = ?", string(hashedPass), uid)
 	return err
 }
 

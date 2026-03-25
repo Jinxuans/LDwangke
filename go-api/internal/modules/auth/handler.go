@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"go-api/internal/config"
 	"go-api/internal/response"
@@ -23,6 +24,10 @@ func Login(c *gin.Context) {
 	if err != nil {
 		if err.Error() == "NEED_ADMIN_AUTH" {
 			response.BusinessError(c, 5, "需要管理员二次验证")
+			return
+		}
+		if isGenericLoginError(err.Error()) {
+			response.BusinessError(c, 1001, "用户名或密码错误")
 			return
 		}
 		response.BusinessError(c, 1001, err.Error())
@@ -162,7 +167,7 @@ func Impersonate(c *gin.Context) {
 		return
 	}
 
-	result, refreshToken, err := authService.Impersonate(body.UID)
+	result, refreshToken, err := authService.Impersonate(c.GetInt("uid"), c.GetString("grade"), body.UID, c.ClientIP())
 	if err != nil {
 		response.BusinessError(c, 1001, err.Error())
 		return
@@ -170,4 +175,17 @@ func Impersonate(c *gin.Context) {
 
 	SetRefreshTokenCookie(c.Writer, refreshToken, config.Global.JWT.RefreshTTL)
 	response.Success(c, result)
+}
+
+func isGenericLoginError(msg string) bool {
+	switch {
+	case strings.Contains(msg, "用户不存在"):
+		return true
+	case strings.Contains(msg, "密码错误"):
+		return true
+	case strings.Contains(msg, "账号已被禁用"):
+		return true
+	default:
+		return false
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"go-api/internal/config"
@@ -128,4 +129,72 @@ func bootstrapDefaultAdmin(db *sql.DB) {
 			log.Println("[AutoMigrate] 已按显式开关创建默认管理员账号 admin/admin123")
 		}
 	}
+}
+
+func NormalizeLegacyUserPasswords(db *sql.DB) (int, int, error) {
+	rows, err := db.Query("SELECT uid, COALESCE(pass,''), COALESCE(pass2,'') FROM qingka_wangke_user")
+	if err != nil {
+		return 0, 0, err
+	}
+	defer rows.Close()
+
+	var passMigrated int
+	var pass2Migrated int
+
+	for rows.Next() {
+		var uid int
+		var pass string
+		var pass2 string
+		if err := rows.Scan(&uid, &pass, &pass2); err != nil {
+			log.Printf("[PasswordMigration] 读取用户密码失败: %v", err)
+			continue
+		}
+
+		newPass := pass
+		newPass2 := pass2
+		updatePass := false
+		updatePass2 := false
+
+		if pass != "" && !isBcryptHash(pass) {
+			hashed, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+			if err != nil {
+				log.Printf("[PasswordMigration] 加密 uid=%d 的登录密码失败: %v", uid, err)
+			} else {
+				newPass = string(hashed)
+				updatePass = true
+				passMigrated++
+			}
+		}
+
+		if pass2 != "" && !isBcryptHash(pass2) {
+			hashed, err := bcrypt.GenerateFromPassword([]byte(pass2), bcrypt.DefaultCost)
+			if err != nil {
+				log.Printf("[PasswordMigration] 加密 uid=%d 的二级密码失败: %v", uid, err)
+			} else {
+				newPass2 = string(hashed)
+				updatePass2 = true
+				pass2Migrated++
+			}
+		}
+
+		switch {
+		case updatePass && updatePass2:
+			if _, err := db.Exec("UPDATE qingka_wangke_user SET pass = ?, pass2 = ? WHERE uid = ?", newPass, newPass2, uid); err != nil {
+				log.Printf("[PasswordMigration] 更新 uid=%d 的密码字段失败: %v", uid, err)
+			}
+		case updatePass:
+			if _, err := db.Exec("UPDATE qingka_wangke_user SET pass = ? WHERE uid = ?", newPass, uid); err != nil {
+				log.Printf("[PasswordMigration] 更新 uid=%d 的登录密码失败: %v", uid, err)
+			}
+		case updatePass2:
+			if _, err := db.Exec("UPDATE qingka_wangke_user SET pass2 = ? WHERE uid = ?", newPass2, uid); err != nil {
+				log.Printf("[PasswordMigration] 更新 uid=%d 的二级密码失败: %v", uid, err)
+			}
+		}
+	}
+	return passMigrated, pass2Migrated, nil
+}
+
+func isBcryptHash(value string) bool {
+	return strings.HasPrefix(value, "$2a$") || strings.HasPrefix(value, "$2b$") || strings.HasPrefix(value, "$2y$")
 }

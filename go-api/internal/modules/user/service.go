@@ -108,14 +108,25 @@ func (s *Service) ChangePassword(uid int, oldPass, newPass string) error {
 		return errors.New("用户不存在")
 	}
 
-	if oldPass != dbPass {
-		return errors.New("旧密码错误")
-	}
 	if len(newPass) < 6 {
 		return errors.New("新密码至少6位")
 	}
+	if strings.HasPrefix(dbPass, "$2a$") || strings.HasPrefix(dbPass, "$2b$") {
+		if err := bcrypt.CompareHashAndPassword([]byte(dbPass), []byte(oldPass)); err != nil {
+			return errors.New("旧密码错误")
+		}
+	} else {
+		if dbPass != oldPass {
+			return errors.New("旧密码错误")
+		}
+	}
 
-	_, err = database.DB.Exec("UPDATE qingka_wangke_user SET pass = ? WHERE uid = ?", newPass, uid)
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(newPass), bcrypt.DefaultCost)
+	if err != nil {
+		return errors.New("密码加密失败")
+	}
+
+	_, err = database.DB.Exec("UPDATE qingka_wangke_user SET pass = ? WHERE uid = ?", string(hashedPass), uid)
 	if err != nil {
 		return err
 	}

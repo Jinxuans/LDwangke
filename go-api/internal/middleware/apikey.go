@@ -11,8 +11,12 @@ import (
 // PHP: 通过 uid + key 参数验证身份（对应 apisub.php 的密钥校验逻辑）
 func APIKeyAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		uid := c.Query("uid")
-		key := c.Query("key")
+		uid := c.GetHeader("X-API-UID")
+		key := c.GetHeader("X-API-Key")
+		if uid == "" || key == "" {
+			uid = c.Query("uid")
+			key = c.Query("key")
+		}
 		if uid == "" || key == "" {
 			// 也支持 POST form
 			uid = c.PostForm("uid")

@@ -1712,6 +1712,15 @@ func (s *DBSyncService) Execute(req SyncRequest) (*SyncResult, error) {
 				result.Errors = append(result.Errors, fmt.Sprintf("%s邀请等级修复失败: %v", table.label, err))
 				log.Printf("[DBSync] %s邀请等级修复失败: %v", table.label, err)
 			}
+			passMigrated, pass2Migrated, err := database.NormalizeLegacyUserPasswords(database.DB)
+			if err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("%s密码迁移失败: %v", table.label, err))
+				log.Printf("[DBSync] %s密码迁移失败: %v", table.label, err)
+			} else if passMigrated > 0 || pass2Migrated > 0 {
+				msg := fmt.Sprintf("密码已规范化：登录密码 %d 个，二级密码 %d 个", passMigrated, pass2Migrated)
+				info.Message = appendSyncMessage(info.Message, msg)
+				log.Printf("[DBSync] %s%s", table.label, msg)
+			}
 		}
 	}
 

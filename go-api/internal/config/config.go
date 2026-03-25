@@ -110,7 +110,7 @@ func (c *Config) AllowLegacyPlaintextPasswords() bool {
 	if c.Security.AllowLegacyPlaintextPasswords != nil {
 		return *c.Security.AllowLegacyPlaintextPasswords
 	}
-	return true
+	return false
 }
 
 func (c *Config) CreateDefaultAdminEnabled() bool {

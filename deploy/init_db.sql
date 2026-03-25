@@ -1647,9 +1647,9 @@ CREATE TABLE `qingka_wangke_zhiya_records` (
 
 SET FOREIGN_KEY_CHECKS = 1;
 
--- Admin: admin / admin123 (grade=3), uid=1, uuid=1
+-- Admin: admin / admin123 (bcrypt hash, grade=3), uid=1, uuid=1
 INSERT IGNORE INTO qingka_wangke_user (uid, uuid, user, pass, name, qq_openid, nickname, faceimg, money, zcz, addprice, `key`, yqm, yqprice, notice, addtime, endtime, ip, grade, active, ck, xd, jd, bs, ck1, xd1, jd1, bs1, fldata, cldata, czAuth)
-VALUES (1, 1, 'admin', 'admin123', 'Admin', '', '', '', 0, '0', 1, '', '', '', '', NOW(), '', '', '3', '1', 0, 0, 0, 0, 0, 0, 0, 0, '', '', '0');
+VALUES (1, 1, 'admin', '$2a$10$z1vr0ZcV9pETlTuVruDSHe1I.dRF68pbMDlUi.aYoIUo.M5QRgtZG', 'Admin', '', '', '', 0, '0', 1, '', '', '', '', NOW(), '', '', '3', '1', 0, 0, 0, 0, 0, 0, 0, 0, '', '', '0');
 
 -- System config
 INSERT IGNORE INTO qingka_wangke_config (v, k) VALUES
