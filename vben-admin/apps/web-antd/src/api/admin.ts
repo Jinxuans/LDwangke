@@ -570,6 +570,7 @@ export interface OrderProgressSyncLog {
   failed: number;
   duration_ms: number;
   error: string;
+  lines?: string[];
 }
 
 export async function getDockSchedulerStatsApi() {

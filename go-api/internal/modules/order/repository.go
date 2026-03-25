@@ -764,6 +764,13 @@ func (r *legacyRepository) SyncOrderProgress(oids []int) (int, error) {
 // 2. 为了降低上游接口压力，先按供应商 hid 分组，再并发轮询；
 // 3. 会输出较详细的运行日志，便于观察几万单的大批量同步进度。
 func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, error) {
+	logf := func(format string, args ...interface{}) {
+		msg := fmt.Sprintf(format, args...)
+		log.Printf("[AutoSync] %s", msg)
+		if opts.LogCollector != nil {
+			opts.LogCollector(msg)
+		}
+	}
 	query := `
 		SELECT oid, COALESCE(yid,''), COALESCE(hid,'0'),
 			COALESCE((SELECT pt FROM qingka_wangke_huoyuan WHERE hid = qingka_wangke_order.hid LIMIT 1),''),
@@ -860,12 +867,12 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 		return 0, 0, err
 	}
 	if totalCount == 0 {
-		log.Printf("[AutoSync] 当前没有可同步的已对接订单")
+		logf("当前没有可同步的已对接订单")
 		setLastAutoSyncReport(AutoSyncReport{})
 		return 0, 0, nil
 	}
 
-	log.Printf("[AutoSync] 开始同步 %d 个已对接订单（%d 个供应商）", totalCount, len(hidGroups))
+	logf("开始同步 %d 个已对接订单（%d 个供应商）", totalCount, len(hidGroups))
 
 	verboseLogging := autoSyncVerboseLogging()
 	var updatedCount int64
@@ -908,8 +915,8 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 		current := atomic.AddInt64(&processedCount, delta)
 		previous := current - delta
 		if current == int64(totalCount) || current/progressLogStep != previous/progressLogStep {
-			log.Printf(
-				"[AutoSync] 进度 %d/%d，已更新 %d，失败 %d",
+			logf(
+				"进度 %d/%d，已更新 %d，失败 %d",
 				current,
 				totalCount,
 				atomic.LoadInt64(&updatedCount),
@@ -1060,7 +1067,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 
 	wg.Wait()
 	if len(sampleErrors) > 0 {
-		log.Printf("[AutoSync] 失败样例: %s", strings.Join(sampleErrors, "；"))
+		logf("失败样例: %s", strings.Join(sampleErrors, "；"))
 	}
 	names := make([]string, 0, len(supplierNames))
 	for name := range supplierNames {
