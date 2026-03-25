@@ -14,7 +14,7 @@ import {
   getAgentListApi, agentCreateApi, agentRechargeApi, agentDeductApi,
   agentChangeGradeApi, agentChangeStatusApi, agentResetPasswordApi,
   agentOpenKeyApi, agentSetInviteCodeApi, adminImpersonateApi,
-  agentCrossRechargeCheckApi, agentCrossRechargeApi,
+  agentCrossRechargeCheckApi, agentCrossRechargeApi, agentAdminChangeSuperiorApi,
 } from '#/api/admin';
 import { useAccessStore } from '@vben/stores';
 import { getAccessCodesApi, getUserInfoApi } from '#/api';
@@ -316,6 +316,49 @@ function handleSetInviteCode(uid: number) {
   });
 }
 
+// ===== 管理员调整上级 =====
+const superiorVisible = ref(false);
+const superiorLoading = ref(false);
+const superiorForm = ref({
+  uid: 0,
+  targetName: '',
+  currentSuperiorUid: 0,
+  superiorUid: undefined as number | undefined,
+});
+
+function openChangeSuperior(record: AgentListItem) {
+  superiorForm.value = {
+    uid: record.uid,
+    targetName: record.name || record.user,
+    currentSuperiorUid: record.uuid || 0,
+    superiorUid: record.uuid || undefined,
+  };
+  superiorVisible.value = true;
+}
+
+async function handleChangeSuperiorByAdmin() {
+  if (!superiorForm.value.superiorUid || superiorForm.value.superiorUid <= 0) {
+    message.error('请输入有效的上级UID');
+    return;
+  }
+
+  superiorLoading.value = true;
+  try {
+    // 管理员在代理列表里可以直接调整某个用户的上级归属。
+    await agentAdminChangeSuperiorApi({
+      uid: superiorForm.value.uid,
+      superiorUid: superiorForm.value.superiorUid,
+    });
+    message.success('调整上级成功');
+    superiorVisible.value = false;
+    loadData();
+  } catch (e: any) {
+    message.error(e?.message || '调整上级失败');
+  } finally {
+    superiorLoading.value = false;
+  }
+}
+
 // ===== 跨户充值 =====
 const crossRechargeAllowed = ref(false);
 const crossVisible = ref(false);
@@ -467,6 +510,7 @@ onMounted(() => {
               <Space :size="2" wrap>
                 <Button size="small" class="action-btn" @click="openChangeGrade(record.uid)">改价</Button>
                 <Button size="small" class="action-btn" @click="handleRecharge(record.uid)">充值</Button>
+                <Button v-if="isAdmin" size="small" class="action-btn" @click="openChangeSuperior(record)">迁上级</Button>
                 <Button v-if="isAdmin" size="small" class="action-btn" danger @click="handleDeduct(record.uid)">扣款</Button>
                 <Button v-if="isAdmin" size="small" class="action-btn" @click="handleResetPassword(record.uid)">重置</Button>
                 <Button v-if="isAdmin" size="small" class="action-btn" type="primary" @click="handleImpersonate(record.uid)">进入</Button>
@@ -541,6 +585,38 @@ onMounted(() => {
             {{ g.name }} - {{ g.rate }} - {{ g.money }}元
           </SelectOption>
         </Select>
+      </div>
+    </Modal>
+
+    <!-- 调整上级弹窗 -->
+    <Modal
+      v-model:open="superiorVisible"
+      title="迁移上级"
+      @ok="handleChangeSuperiorByAdmin"
+      :confirm-loading="superiorLoading"
+      ok-text="确认调整"
+    >
+      <div class="space-y-3 py-2">
+        <div>
+          <label class="mb-1 block text-sm font-medium">目标用户</label>
+          <Input :value="`${superiorForm.targetName} (UID:${superiorForm.uid})`" disabled />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium">当前上级 UID</label>
+          <InputNumber :value="superiorForm.currentSuperiorUid || 0" disabled style="width: 100%" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium">新上级 UID</label>
+          <InputNumber
+            v-model:value="superiorForm.superiorUid"
+            :min="1"
+            placeholder="请输入新的上级UID"
+            style="width: 100%"
+          />
+        </div>
+        <div class="rounded bg-orange-50 p-3 text-xs text-orange-600 dark:bg-orange-900/20 dark:text-orange-400">
+          提示：该操作会直接修改该用户的上级归属，请确认新的上级UID无误。
+        </div>
       </div>
     </Modal>
   </Page>

@@ -16,6 +16,7 @@ func RegisterRoutes(api *gin.RouterGroup) {
 		agent.POST("/open-key", AgentOpenSecretKey)
 		agent.POST("/set-invite-code", AgentSetInviteCode)
 		agent.POST("/migrate-superior", AgentMigrateSuperior)
+		agent.POST("/admin-change-superior", AgentAdminChangeSuperior)
 		agent.GET("/cross-recharge-check", AgentCrossRechargeCheck)
 		agent.POST("/cross-recharge", AgentCrossRecharge)
 	}

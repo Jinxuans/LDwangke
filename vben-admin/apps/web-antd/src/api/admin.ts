@@ -483,6 +483,10 @@ export async function agentSetInviteCodeApi(data: { uid: number; yqm: string }) 
   return requestClient.post('/agent/set-invite-code', data);
 }
 
+export async function agentAdminChangeSuperiorApi(data: { uid: number; superiorUid: number }) {
+  return requestClient.post('/agent/admin-change-superior', data);
+}
+
 // ===== 跨户充值 =====
 export async function agentCrossRechargeCheckApi() {
   return requestClient.get<{ allowed: boolean }>('/agent/cross-recharge-check');
