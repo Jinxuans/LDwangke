@@ -2,12 +2,14 @@ package user
 
 import (
 	"crypto/md5"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -260,6 +262,15 @@ func (s *Service) CreatePayOrder(uid int, money float64, payType string, domain 
 	if parentUID != 1 && !s.adminConfigEnabled("non_direct_recharge_enable") {
 		return nil, errors.New("请您根据上面的信息联系上家充值")
 	}
+	// 充值金额必须为正数，且最多保留两位小数。
+	if money <= 0 {
+		return nil, errors.New("充值金额必须大于 0")
+	}
+	money = math.Round(money*100) / 100
+	// 支付方式必须来自当前已启用的渠道列表，避免提交无效渠道值。
+	if !s.isAllowedPayType(payData, payType) {
+		return nil, errors.New("支付方式不可用")
+	}
 	if zdpay := s.getAdminConfigValue("zdpay"); zdpay != "" {
 		var minPay float64
 		fmt.Sscanf(zdpay, "%f", &minPay)
@@ -444,6 +455,12 @@ func (s *Service) CheckPayStatus(uid int, outTradeNo string) (bool, string, erro
 	case string:
 		fmt.Sscanf(v, "%d", &epayStatus)
 	}
+	payResultText := stringifyMap(payResult)
+
+	// 查询接口返回成功时，至少核对商户号、商户订单号和金额，避免串单误入账。
+	if !s.matchPayQueryResult(payResultText, epayPID, outTradeNo, moneyStr) {
+		return false, "", errors.New("支付结果校验失败")
+	}
 
 	if epayStatus == 1 {
 		now := time.Now().Format("2006-01-02 15:04:05")
@@ -459,27 +476,21 @@ func (s *Service) CheckPayStatus(uid int, outTradeNo string) (bool, string, erro
 			return true, "订单已支付", nil
 		}
 
-		bonus, _, _ := s.calcRechargeBonus(money)
-		total := money + bonus
-
-		if _, err := tx.Exec("UPDATE qingka_wangke_user SET money = money + ?, zcz = zcz + ? WHERE uid = ?", total, money, uid); err != nil {
-			return false, "", fmt.Errorf("余额更新失败，请联系客服")
+		if _, err := tx.Exec(
+			"UPDATE qingka_wangke_pay SET trade_no = ?, type = ?, payUser = ?, money2 = ? WHERE out_trade_no = ?",
+			payResultText["trade_no"], payResultText["type"], payResultText["buyer"], payResultText["money"], outTradeNo,
+		); err != nil {
+			return false, "", errors.New("更新支付信息失败")
 		}
-
-		tx.Exec(
-			"INSERT INTO qingka_wangke_moneylog (uid, type, money, balance, remark, addtime) VALUES (?, '充值', ?, (SELECT money FROM qingka_wangke_user WHERE uid = ?), ?, ?)",
-			uid, money, uid, fmt.Sprintf("在线充值%.2f元[%s]", money, outTradeNo), now,
-		)
-		if bonus > 0 {
-			tx.Exec(
-				"INSERT INTO qingka_wangke_moneylog (uid, type, money, balance, remark, addtime) VALUES (?, '充值赠送', ?, (SELECT money FROM qingka_wangke_user WHERE uid = ?), ?, ?)",
-				uid, bonus, uid, fmt.Sprintf("充值%.2f元赠送%.2f元", money, bonus), now,
-			)
+		if err := s.creditRechargeTx(tx, uid, money, outTradeNo, now); err != nil {
+			return false, "", err
 		}
 
 		if err := tx.Commit(); err != nil {
 			return false, "", errors.New("到账失败，请联系客服")
 		}
+		bonus, _, _ := s.calcRechargeBonus(money)
+		total := money + bonus
 		msg := fmt.Sprintf("支付成功，已到账 ¥%.2f", money)
 		if bonus > 0 {
 			msg = fmt.Sprintf("支付成功，充值 ¥%.2f + 赠送 ¥%.2f = 到账 ¥%.2f", money, bonus, total)
@@ -822,8 +833,10 @@ func (s *Service) buildEpayURL(payData map[string]string, outTradeNo, name, mone
 		return ""
 	}
 
-	notifyURL := "https://" + domain + "/epay/notify_url.php"
-	returnURL := "https://" + domain + "/epay/return_url.php"
+	// 支付通知统一切到 Go 层处理，保证签名校验、到账和幂等逻辑在同一处完成。
+	notifyURL := "https://" + domain + "/api/v1/pay/notify"
+	// 同步跳转直接回到充值页，由前端在页面内自动检测到账并清理支付参数。
+	returnURL := "https://" + domain + "/#/user/recharge"
 
 	params := map[string]string{
 		"pid":          pid,
@@ -851,7 +864,177 @@ func (s *Service) buildEpayURL(payData map[string]string, outTradeNo, name, mone
 	signStr := strings.Join(parts, "&")
 	sign := fmt.Sprintf("%x", md5.Sum([]byte(signStr+key)))
 
-	return fmt.Sprintf("%s/submit.php?%s&sign=%s&sign_type=MD5", epayAPI, signStr, sign)
+	// 文档要求签名时不要做 URL 编码，但最终跳转 URL 仍需要标准编码输出，避免中文和特殊字符截断参数。
+	query := url.Values{}
+	for _, k := range keys {
+		query.Set(k, params[k])
+	}
+	query.Set("sign", sign)
+	query.Set("sign_type", "MD5")
+	return fmt.Sprintf("%s/submit.php?%s", epayAPI, query.Encode())
+}
+
+// ConfirmPayOrderByNotify 处理易支付异步回调并完成到账。
+// 说明：
+// 1. 先按商户订单号查本地单；
+// 2. 再用所属商户密钥验签；
+// 3. 最后在事务里更新支付单、用户余额和资金流水，确保幂等。
+func (s *Service) ConfirmPayOrderByNotify(params map[string]string) error {
+	outTradeNo := strings.TrimSpace(params["out_trade_no"])
+	tradeNo := strings.TrimSpace(params["trade_no"])
+	tradeStatus := strings.TrimSpace(params["trade_status"])
+	if outTradeNo == "" {
+		return errors.New("缺少商户订单号")
+	}
+	if tradeStatus != "TRADE_SUCCESS" {
+		return errors.New("支付未成功")
+	}
+
+	var payOID int
+	var uid int
+	var moneyStr string
+	var status int
+	err := database.DB.QueryRow(
+		"SELECT oid, uid, COALESCE(money,''), status FROM qingka_wangke_pay WHERE out_trade_no = ? LIMIT 1",
+		outTradeNo,
+	).Scan(&payOID, &uid, &moneyStr, &status)
+	if err == sql.ErrNoRows {
+		return errors.New("订单不存在")
+	}
+	if err != nil {
+		return err
+	}
+	if status >= 1 {
+		return nil
+	}
+
+	payData, _, err := s.getParentPayData(uid)
+	if err != nil {
+		return err
+	}
+	epayPID := strings.TrimSpace(payData["epay_pid"])
+	epayKey := strings.TrimSpace(payData["epay_key"])
+	if epayPID == "" || epayKey == "" {
+		return errors.New("支付配置不完整")
+	}
+	if !s.verifyEpaySign(params, epayKey) {
+		return errors.New("签名验证失败")
+	}
+	if !s.matchPayQueryResult(params, epayPID, outTradeNo, moneyStr) {
+		return errors.New("回调数据校验失败")
+	}
+
+	var money float64
+	fmt.Sscanf(moneyStr, "%f", &money)
+	now := time.Now().Format("2006-01-02 15:04:05")
+
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(
+		"UPDATE qingka_wangke_pay SET status = 1, endtime = ?, trade_no = ?, type = ?, payUser = ?, money2 = ? WHERE oid = ? AND status = 0",
+		now, tradeNo, params["type"], params["buyer"], params["money"], payOID,
+	)
+	if err != nil {
+		return err
+	}
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
+		return nil
+	}
+
+	if err := s.creditRechargeTx(tx, uid, money, outTradeNo, now); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// creditRechargeTx 在同一事务中完成充值到账和赠送入账，避免重复加钱。
+func (s *Service) creditRechargeTx(tx *sql.Tx, uid int, money float64, outTradeNo, now string) error {
+	bonus, _, _ := s.calcRechargeBonus(money)
+	total := money + bonus
+
+	if _, err := tx.Exec("UPDATE qingka_wangke_user SET money = money + ?, zcz = zcz + ? WHERE uid = ?", total, money, uid); err != nil {
+		return fmt.Errorf("余额更新失败，请联系客服")
+	}
+	if _, err := tx.Exec(
+		"INSERT INTO qingka_wangke_moneylog (uid, type, money, balance, remark, addtime) VALUES (?, '充值', ?, (SELECT money FROM qingka_wangke_user WHERE uid = ?), ?, ?)",
+		uid, money, uid, fmt.Sprintf("在线充值%.2f元[%s]", money, outTradeNo), now,
+	); err != nil {
+		return err
+	}
+	if bonus > 0 {
+		if _, err := tx.Exec(
+			"INSERT INTO qingka_wangke_moneylog (uid, type, money, balance, remark, addtime) VALUES (?, '充值赠送', ?, (SELECT money FROM qingka_wangke_user WHERE uid = ?), ?, ?)",
+			uid, bonus, uid, fmt.Sprintf("充值%.2f元赠送%.2f元", money, bonus), now,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// verifyEpaySign 按对接文档验签：按 ASCII 排序，去掉 sign/sign_type/空值后拼接，再做 md5(str+key)。
+func (s *Service) verifyEpaySign(params map[string]string, key string) bool {
+	sign := strings.TrimSpace(params["sign"])
+	if sign == "" || key == "" {
+		return false
+	}
+	keys := make([]string, 0, len(params))
+	for k, v := range params {
+		if k != "sign" && k != "sign_type" && strings.TrimSpace(v) != "" {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	var parts []string
+	for _, k := range keys {
+		parts = append(parts, k+"="+params[k])
+	}
+	signStr := strings.Join(parts, "&")
+	expected := fmt.Sprintf("%x", md5.Sum([]byte(signStr+key)))
+	return strings.EqualFold(expected, sign)
+}
+
+// matchPayQueryResult 校验商户号、商户订单号和金额，避免串单或异常响应误入账。
+func (s *Service) matchPayQueryResult(data map[string]string, pid, outTradeNo, money string) bool {
+	if pid != "" && data["pid"] != "" && strings.TrimSpace(data["pid"]) != strings.TrimSpace(pid) {
+		return false
+	}
+	if outTradeNo != "" && data["out_trade_no"] != "" && strings.TrimSpace(data["out_trade_no"]) != strings.TrimSpace(outTradeNo) {
+		return false
+	}
+	if money != "" && data["money"] != "" && strings.TrimSpace(data["money"]) != strings.TrimSpace(money) {
+		return false
+	}
+	return true
+}
+
+func stringifyMap(data map[string]interface{}) map[string]string {
+	result := make(map[string]string, len(data))
+	for k, v := range data {
+		result[k] = strings.TrimSpace(fmt.Sprintf("%v", v))
+	}
+	return result
+}
+
+// isAllowedPayType 检查支付方式是否已在当前商户配置中启用。
+func (s *Service) isAllowedPayType(payData map[string]string, payType string) bool {
+	switch payType {
+	case "alipay":
+		return payData["is_alipay"] == "1"
+	case "wxpay":
+		return payData["is_wxpay"] == "1"
+	case "qqpay":
+		return payData["is_qqpay"] == "1"
+	case "usdt":
+		return payData["is_usdt"] == "1"
+	default:
+		return false
+	}
 }
 
 func (s *Service) adminConfigEnabled(key string) bool {

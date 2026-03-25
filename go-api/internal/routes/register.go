@@ -6,6 +6,7 @@ import (
 	authmodule "go-api/internal/modules/auth"
 	auxmodule "go-api/internal/modules/auxiliary"
 	pushmodule "go-api/internal/modules/push"
+	usermodule "go-api/internal/modules/user"
 	"go-api/internal/ws"
 	"time"
 
@@ -29,6 +30,7 @@ func registerPublicRoutes(r *gin.Engine) {
 	adminmodule.RegisterPublicSiteRoutes(r)
 	auxmodule.RegisterPublicRoutes(r)
 	pushmodule.RegisterPublicRoutes(r)
+	usermodule.RegisterPublicRoutes(r)
 }
 
 func newProtectedAPIGroup(r *gin.Engine) *gin.RouterGroup {

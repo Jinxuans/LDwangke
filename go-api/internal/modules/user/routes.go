@@ -7,6 +7,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// RegisterPublicRoutes 注册无需登录的充值支付回调路由。
+func RegisterPublicRoutes(r *gin.Engine) {
+	r.POST("/api/v1/pay/notify", UserPayNotify)
+	r.GET("/api/v1/pay/notify", UserPayNotify)
+}
+
 // RegisterRoutes 注册用户中心路由。
 func RegisterRoutes(api *gin.RouterGroup) {
 	uc := api.Group("/user")
