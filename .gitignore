@@ -42,6 +42,7 @@ Thumbs.db
 # AI tool configs
 AGENTS.md
 CLAUDE.md
+.claude
 .sisyphus/
 .clinerules/
 .opencode/
@@ -62,3 +63,5 @@ auth-server/config.toml
 *.bak
 *.bak2
 bug.md
+*.rar
+*.zip
