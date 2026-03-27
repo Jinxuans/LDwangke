@@ -14,6 +14,8 @@ export interface UserProfile {
   name: string;
   money: number;
   cdmoney: number;
+  mall_money: number;
+  mall_cdmoney: number;
   grade: string;
   grade_id: number;
   addprice: number;
@@ -106,6 +108,43 @@ export interface MoneyLogListResult {
 
 export async function getMoneyLogApi(params: { page?: number; limit?: number; type?: string } = {}) {
   return requestClient.get<MoneyLogListResult>('/user/moneylog', { params });
+}
+
+// ===== 提现 =====
+export interface WithdrawRequestItem {
+  id: number;
+  uid: number;
+  amount: number;
+  method: string;
+  account_name: string;
+  account_no: string;
+  bank_name: string;
+  note: string;
+  status: number;
+  audit_remark: string;
+  audit_uid: number;
+  addtime: string;
+  audit_time: string;
+}
+
+export interface WithdrawListResult {
+  list: WithdrawRequestItem[];
+  pagination: { page: number; limit: number; total: number };
+}
+
+export async function createWithdrawRequestApi(data: {
+  amount: number;
+  method?: string;
+  account_name: string;
+  account_no: string;
+  bank_name?: string;
+  note?: string;
+}) {
+  return requestClient.post<{ id: number }>('/user/withdraw/request', data);
+}
+
+export async function getWithdrawRequestsApi(params: { page?: number; limit?: number; status?: number } = {}) {
+  return requestClient.get<WithdrawListResult>('/user/withdraw/requests', { params });
 }
 
 // ===== 工单 =====

@@ -237,8 +237,14 @@ onMounted(loadProfile);
           <Col :xs="12" :sm="8" :lg="4">
             <Card><Statistic title="账户余额" :value="profile.money" :precision="2" prefix="¥" /></Card>
           </Col>
+          <Col :xs="12" :sm="8" :lg="4">
+            <Card><Statistic title="商城钱包" :value="profile.mall_money" :precision="2" prefix="¥" /></Card>
+          </Col>
           <Col :xs="12" :sm="8" :lg="4" v-if="profile.cdmoney > 0">
             <Card><Statistic title="储值金额" :value="profile.cdmoney" :precision="2" prefix="¥" /></Card>
+          </Col>
+          <Col :xs="12" :sm="8" :lg="4" v-if="profile.mall_cdmoney > 0">
+            <Card><Statistic title="商城冻结" :value="profile.mall_cdmoney" :precision="2" prefix="¥" /></Card>
           </Col>
           <Col :xs="12" :sm="8" :lg="4">
             <Card><Statistic title="总充值" :value="profile.zcz" :precision="2" prefix="¥" /></Card>

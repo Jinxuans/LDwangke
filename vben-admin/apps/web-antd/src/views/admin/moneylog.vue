@@ -79,6 +79,10 @@ onMounted(() => loadData(1));
             <SelectOption value="充值">充值</SelectOption>
             <SelectOption value="退款">退款</SelectOption>
             <SelectOption value="调整">调整</SelectOption>
+            <SelectOption value="商城代收">商城代收</SelectOption>
+            <SelectOption value="提现申请">提现申请</SelectOption>
+            <SelectOption value="提现通过">提现通过</SelectOption>
+            <SelectOption value="提现驳回">提现驳回</SelectOption>
           </Select>
           <Button type="primary" @click="handleSearch">
             <template #icon><SearchOutlined /></template>搜索
@@ -101,7 +105,15 @@ onMounted(() => loadData(1));
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'type'">
-              <Tag :color="record.type === '充值' ? 'green' : record.type === '退款' ? 'blue' : record.type === '扣费' ? 'red' : record.type === '调整' ? 'orange' : 'default'">
+              <Tag :color="record.type === '充值' || record.type === '商城代收' || record.type === '提现驳回'
+                ? 'green'
+                : record.type === '退款'
+                  ? 'blue'
+                  : record.type === '扣费' || record.type === '提现申请'
+                    ? 'red'
+                    : record.type === '调整' || record.type === '提现通过'
+                      ? 'orange'
+                      : 'default'">
                 {{ record.type }}
               </Tag>
             </template>

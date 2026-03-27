@@ -38,9 +38,9 @@ func (s *Service) Profile(uid int, grade string) (*model.UserProfile, error) {
 	var p model.UserProfile
 	var uuid int
 	err := database.DB.QueryRow(
-		"SELECT uid, COALESCE(uuid,0), user, COALESCE(name,''), COALESCE(money,0), COALESCE(grade,'0'), COALESCE(grade_id,0), COALESCE(addprice,1), COALESCE(invite_grade_id,0), COALESCE(`key`,''), COALESCE(yqm,''), COALESCE(email,''), COALESCE(tuisongtoken,''), COALESCE(zcz,0) FROM qingka_wangke_user WHERE uid = ?",
+		"SELECT uid, COALESCE(uuid,0), user, COALESCE(name,''), COALESCE(money,0), COALESCE(grade,'0'), COALESCE(grade_id,0), COALESCE(addprice,1), COALESCE(invite_grade_id,0), COALESCE(`key`,''), COALESCE(yqm,''), COALESCE(email,''), COALESCE(tuisongtoken,''), COALESCE(zcz,0), COALESCE(mall_money,0), COALESCE(mall_cdmoney,0) FROM qingka_wangke_user WHERE uid = ?",
 		uid,
-	).Scan(&p.UID, &uuid, &p.User, &p.Name, &p.Money, &p.Grade, &p.GradeID, &p.AddPrice, &p.InviteGradeID, &p.Key, &p.YQM, &p.Email, &p.PushToken, &p.ZCZ)
+	).Scan(&p.UID, &uuid, &p.User, &p.Name, &p.Money, &p.Grade, &p.GradeID, &p.AddPrice, &p.InviteGradeID, &p.Key, &p.YQM, &p.Email, &p.PushToken, &p.ZCZ, &p.MallMoney, &p.MallCDMoney)
 	if err == nil {
 		database.DB.QueryRow("SELECT COALESCE(cdmoney,0) FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&p.CDMoney)
 		if commonmodule.CrossRechargeAllowed(uid) {

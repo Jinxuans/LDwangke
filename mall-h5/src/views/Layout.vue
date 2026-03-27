@@ -2,20 +2,32 @@
 import { watch, computed } from "vue";
 import { useRoute } from "vue-router";
 import { Tabbar, TabbarItem } from "vant";
-import { setTid } from "../api";
+import { saveMallPromoterCode, setTid } from "../api";
 
 const route = useRoute();
-const tid = computed(() => route.params.tid as string);
+const tid = computed(() => String(route.params.tid || ""));
+const basePath = computed(() => tid.value ? `/${tid.value}` : "");
 
 watch(
-  () => route.params.tid as string,
-  (tid) => { if (tid) setTid(tid); },
+  () => String(route.params.tid || ""),
+  (tid) => { setTid(tid); },
+  { immediate: true },
+);
+
+watch(
+  () => route.query.sp,
+  (sp) => {
+    if (typeof sp === "string" && sp.trim()) {
+      saveMallPromoterCode(sp, tid.value);
+    }
+  },
   { immediate: true },
 );
 
 // Determine active tab based on current route
 const activeTab = computed(() => {
   const path = route.path;
+  if (path.includes('/mine')) return 'mine';
   if (path.includes('/query')) return 'query';
   if (path.includes('/orders')) return 'orders';
   return 'home';
@@ -24,8 +36,8 @@ const activeTab = computed(() => {
 // Hide tabbar on Product and PayResult pages
 const showTabbar = computed(() => {
   const path = route.path;
-  // Only show on Home, Query, Orders pages
-  return !path.includes('/product/') && !path.includes('/pay-result');
+  // Only show on main pages
+  return !path.includes('/product/') && !path.includes('/pay-result') && !path.includes('/login') && !path.includes('/register');
 });
 </script>
 
@@ -39,20 +51,23 @@ const showTabbar = computed(() => {
     
     <!-- Bottom Tabbar -->
     <Tabbar 
-      v-if="showTabbar && tid" 
+      v-if="showTabbar" 
       v-model="activeTab" 
       class="bottom-tabbar"
       active-color="var(--primary-color)"
       inactive-color="var(--text-muted)"
     >
-      <TabbarItem name="home" icon="home-o" :to="`/${tid}`">
+      <TabbarItem name="home" icon="home-o" :to="basePath || '/'">
         首页
       </TabbarItem>
-      <TabbarItem name="query" icon="search" :to="`/${tid}/query`">
-        查订单
+      <TabbarItem name="query" icon="search" :to="`${basePath}/query`">
+        查进度
       </TabbarItem>
-      <TabbarItem name="orders" icon="orders-o" :to="`/${tid}/orders`">
-        我的订单
+      <TabbarItem name="orders" icon="orders-o" :to="`${basePath}/orders`">
+        订单
+      </TabbarItem>
+      <TabbarItem name="mine" icon="user-o" :to="`${basePath}/mine`">
+        我的
       </TabbarItem>
     </Tabbar>
   </div>

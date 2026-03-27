@@ -88,6 +88,13 @@ function getVal(key: string, def = '') {
 function setVal(key: string, val: string) {
   config.value[key] = val;
 }
+function normalizeDomain(raw?: string) {
+  let value = String(raw || '').trim().toLowerCase();
+  value = value.replace(/^https?:\/\//, '');
+  value = value.replace(/\/.*$/, '');
+  value = value.replace(/:\d+$/, '');
+  return value;
+}
 function getPayVal(key: string, def = '') {
   return payData.value[key] ?? def;
 }
@@ -381,6 +388,17 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                 <Col :xs="24" :lg="12">
                   <label class="field-label">主页顶部 LOGO 地址</label>
                   <Input :value="getVal('hlogo')" @update:value="(v: string) => setVal('hlogo', v)" placeholder="https://..." />
+                </Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">商城主域名</label>
+                  <Input
+                    :value="getVal('mall_domain_suffix')"
+                    @update:value="(v: string) => setVal('mall_domain_suffix', normalizeDomain(v))"
+                    placeholder="例如 mall.leaderx.cn"
+                  />
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    配置后，店铺设置页可直接填写子域名前缀，最终商城地址形如 <code>前缀.主域名/mall</code>。
+                  </div>
                 </Col>
 
                 <Col :span="24"><Divider orientation="left" class="!my-0">系统功能开关</Divider></Col>

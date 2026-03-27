@@ -845,8 +845,8 @@ WantedBy=multi-user.target
     }
 
     # 商城 H5
-    location /mall/ {
-        alias %s/;
+    location ^~ /mall/ {
+        root %s;
         try_files $uri $uri/ /mall/index.html;
     }
 
@@ -918,7 +918,7 @@ WantedBy=multi-user.target
 
     access_log /www/wwwlogs/%s.log;
     error_log /www/wwwlogs/%s.error.log;
-}''' % (domain, site_root, domain, mall_root.rstrip('/'), domain, domain)
+}''' % (domain, site_root, domain, site_base, domain, domain)
 
         public.writeFile(conf_file, nginx_conf)
 

@@ -14,8 +14,8 @@ func (s *CommandService) Add(uid int, req model.OrderAddRequest) (*model.OrderAd
 	return s.repo.AddOrders(uid, req)
 }
 
-func (s *CommandService) AddForMall(bUID, tid, cUID int, retailPrice float64, req model.OrderAddRequest) (*model.OrderAddResult, error) {
-	return s.repo.AddOrdersForMall(bUID, tid, cUID, retailPrice, req)
+func (s *CommandService) AddForMall(bUID, tid, cUID int, retailPrice float64, outTradeNo string, req model.OrderAddRequest) (*model.OrderAddResult, error) {
+	return s.repo.AddOrdersForMall(bUID, tid, cUID, retailPrice, outTradeNo, req)
 }
 
 func (s *CommandService) ChangeStatus(uid int, grade string, req model.OrderStatusRequest) error {

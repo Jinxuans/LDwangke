@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS `qingka_wangke_user` (
   `faceimg` varchar(255) COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   `money` decimal(10,2) NOT NULL DEFAULT '0.00',
   `cdmoney` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '冻结余额',
+  `mall_money` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '商城钱包余额',
+  `mall_cdmoney` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '商城钱包冻结余额',
   `zcz` varchar(10) COLLATE utf8_unicode_ci NOT NULL DEFAULT '0',
   `addprice` decimal(10,2) NOT NULL DEFAULT '1.00' COMMENT '加价',
   `grade_id` int(11) DEFAULT NULL COMMENT '费率等级ID',
@@ -113,6 +115,9 @@ CREATE TABLE IF NOT EXISTS `qingka_wangke_order` (
   `laststatus` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
   `shoujia` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '商城售价',
   `out_trade_no` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '订单交易号',
+  `tid` int(11) NOT NULL DEFAULT '0' COMMENT '所属店铺ID',
+  `c_uid` int(11) NOT NULL DEFAULT '0' COMMENT 'C端用户ID',
+  `retail_fees` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '商城零售价',
   `paytime` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '支付时间',
   `payUser` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '支付用户',
   `type` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '支付类型',
@@ -138,7 +143,8 @@ CREATE TABLE IF NOT EXISTS `qingka_wangke_order` (
   KEY `idx_dockstatus_addtime` (`dockstatus`,`addtime`),
   KEY `idx_fenlei_addtime` (`fenlei`,`addtime`),
   KEY `idx_user` (`user`),
-  KEY `idx_user_status` (`user`,`status`)
+  KEY `idx_user_status` (`user`,`status`),
+  KEY `idx_tid_cuid` (`tid`,`c_uid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 -- 3. 商品分类表
@@ -891,6 +897,7 @@ CREATE TABLE IF NOT EXISTS `qingka_tenant` (
   `shop_desc` text,
   `domain` varchar(100) DEFAULT '',
   `pay_config` text,
+  `mall_config` text,
   `status` tinyint(4) DEFAULT '1',
   `addtime` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`tid`),
@@ -898,7 +905,20 @@ CREATE TABLE IF NOT EXISTS `qingka_tenant` (
   KEY `idx_domain` (`domain`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 35. 租户商品表
+-- 35. 商城商品分类表
+CREATE TABLE IF NOT EXISTS `qingka_tenant_mall_category` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `tid` int(11) NOT NULL DEFAULT 0 COMMENT '店铺ID',
+  `name` varchar(100) NOT NULL DEFAULT '' COMMENT '分类名称',
+  `sort` int(11) NOT NULL DEFAULT 10 COMMENT '排序',
+  `status` tinyint(4) NOT NULL DEFAULT 1 COMMENT '状态',
+  `addtime` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tid_name` (`tid`,`name`),
+  KEY `idx_tid` (`tid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商城商品分类';
+
+-- 36. 租户商品表
 CREATE TABLE IF NOT EXISTS `qingka_tenant_product` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `tid` int(11) NOT NULL,
@@ -906,18 +926,23 @@ CREATE TABLE IF NOT EXISTS `qingka_tenant_product` (
   `retail_price` decimal(10,2) NOT NULL DEFAULT '0.00',
   `status` tinyint(4) DEFAULT '1',
   `sort` int(11) DEFAULT '10',
+  `display_name` varchar(255) NOT NULL DEFAULT '' COMMENT '商城展示名称',
+  `cover_url` varchar(500) NOT NULL DEFAULT '' COMMENT '商城封面图',
+  `description` text COMMENT '商城商品介绍',
+  `category_id` int(11) NOT NULL DEFAULT 0 COMMENT '商城分类ID',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tid_cid` (`tid`,`cid`),
   KEY `idx_tid` (`tid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 36. 商城C端支付订单表
+-- 37. 商城C端支付订单表
 CREATE TABLE IF NOT EXISTS `qingka_mall_pay_order` (
   `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
   `out_trade_no` varchar(64) NOT NULL DEFAULT '' COMMENT '商户订单号',
   `trade_no` varchar(64) NOT NULL DEFAULT '' COMMENT '第三方流水号',
   `tid` int(11) NOT NULL DEFAULT 0 COMMENT '店铺ID',
   `cid` int(11) NOT NULL DEFAULT 0 COMMENT '商品ID',
+  `school` varchar(255) NOT NULL DEFAULT '' COMMENT '学校/站点',
   `account` varchar(128) NOT NULL DEFAULT '' COMMENT 'C端填写的账号',
   `password` varchar(128) NOT NULL DEFAULT '' COMMENT 'C端填写的密码',
   `remark` varchar(255) NOT NULL DEFAULT '' COMMENT '备注',
@@ -929,6 +954,12 @@ CREATE TABLE IF NOT EXISTS `qingka_mall_pay_order` (
   `course_id` varchar(64) NOT NULL DEFAULT '' COMMENT '选择的课程ID',
   `course_name` varchar(255) NOT NULL DEFAULT '' COMMENT '选择的课程名称',
   `course_kcjs` varchar(64) NOT NULL DEFAULT '' COMMENT '课程结束时间',
+  `course_items` text COMMENT '选择的课程明细JSON',
+  `promoter_c_uid` int(11) NOT NULL DEFAULT 0 COMMENT '推广会员ID',
+  `promoter_code` varchar(64) NOT NULL DEFAULT '' COMMENT '推广码快照',
+  `commission_rate` decimal(5,2) NOT NULL DEFAULT 0.00 COMMENT '返利比例快照',
+  `commission_amount` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '返利金额快照',
+  `commission_status` tinyint(4) NOT NULL DEFAULT 0 COMMENT '0待处理 1已返利 -1跳过',
   `ip` varchar(64) NOT NULL DEFAULT '',
   `addtime` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `paytime` datetime NULL DEFAULT NULL COMMENT '支付完成时间',
@@ -942,7 +973,7 @@ CREATE TABLE IF NOT EXISTS `qingka_mall_pay_order` (
 -- 第九部分：网签模块
 -- =============================================
 
--- 37. 网签公司列表表
+-- 38. 网签公司列表表
 CREATE TABLE IF NOT EXISTS `mlsx_gslb` (
   `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
   `qymc` varchar(100) NOT NULL COMMENT '企业名称',
@@ -952,7 +983,7 @@ CREATE TABLE IF NOT EXISTS `mlsx_gslb` (
   KEY `qymc` (`qymc`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='网签公司列表表';
 
--- 38. 网签文件表
+-- 39. 网签文件表
 CREATE TABLE IF NOT EXISTS `mlsx_wj_wq` (
   `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增ID',
   `wjid` varchar(50) NOT NULL COMMENT '文件ID，关联订单',
@@ -976,16 +1007,83 @@ CREATE TABLE IF NOT EXISTS `qingka_c_user` (
   `account` varchar(100) NOT NULL DEFAULT '' COMMENT '账号',
   `password` varchar(255) NOT NULL DEFAULT '' COMMENT '密码',
   `nickname` varchar(100) DEFAULT '' COMMENT '昵称',
+  `invite_code` varchar(64) NOT NULL DEFAULT '' COMMENT '推广码',
+  `referrer_id` int(11) NOT NULL DEFAULT 0 COMMENT '邀请人ID',
+  `commission_money` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '可用佣金余额',
+  `commission_cdmoney` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '冻结佣金余额',
+  `commission_total` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '累计佣金',
+  `status` tinyint(4) NOT NULL DEFAULT 1 COMMENT '状态 1正常 0禁用',
   `openid` varchar(255) DEFAULT '' COMMENT '微信openid',
   `token` varchar(255) DEFAULT '' COMMENT '登录token',
   `addtime` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
   PRIMARY KEY (`id`),
   KEY `idx_tid` (`tid`),
   KEY `idx_account` (`account`),
+  KEY `idx_invite_code` (`invite_code`),
   KEY `idx_token` (`token`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='C端用户表';
 
--- 40. SMTP邮箱配置表
+-- 40. C端会员推广返利日志表
+CREATE TABLE IF NOT EXISTS `qingka_c_user_commission_log` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `tid` int(11) NOT NULL DEFAULT 0 COMMENT '店铺ID',
+  `c_uid` int(11) NOT NULL DEFAULT 0 COMMENT '推广会员ID',
+  `pay_order_id` int(11) NOT NULL DEFAULT 0 COMMENT '商城支付订单ID',
+  `out_trade_no` varchar(64) NOT NULL DEFAULT '' COMMENT '商城支付单号',
+  `buyer_c_uid` int(11) NOT NULL DEFAULT 0 COMMENT '购买会员ID',
+  `buyer_account` varchar(128) NOT NULL DEFAULT '' COMMENT '购买账号',
+  `amount` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '返利金额',
+  `rate` decimal(5,2) NOT NULL DEFAULT 0.00 COMMENT '返利比例',
+  `status` tinyint(4) NOT NULL DEFAULT 1 COMMENT '1已返利',
+  `remark` varchar(255) NOT NULL DEFAULT '' COMMENT '备注',
+  `addtime` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_tid_uid` (`tid`,`c_uid`),
+  KEY `idx_pay_order_id` (`pay_order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='C端会员推广返利日志';
+
+-- 41. C端会员佣金提现申请表
+CREATE TABLE IF NOT EXISTS `qingka_c_user_withdraw_request` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `tid` int(11) NOT NULL DEFAULT 0 COMMENT '店铺ID',
+  `c_uid` int(11) NOT NULL DEFAULT 0 COMMENT '会员ID',
+  `amount` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '提现金额',
+  `method` varchar(32) NOT NULL DEFAULT 'manual' COMMENT '提现方式',
+  `account_name` varchar(100) NOT NULL DEFAULT '' COMMENT '收款人',
+  `account_no` varchar(120) NOT NULL DEFAULT '' COMMENT '收款账号',
+  `bank_name` varchar(120) NOT NULL DEFAULT '' COMMENT '开户行/渠道',
+  `note` varchar(255) NOT NULL DEFAULT '' COMMENT '备注',
+  `status` tinyint(4) NOT NULL DEFAULT 0 COMMENT '0待审核 1已通过 -1已驳回',
+  `audit_remark` varchar(255) NOT NULL DEFAULT '' COMMENT '审核备注',
+  `audit_uid` int(11) NOT NULL DEFAULT 0 COMMENT '审核人UID',
+  `addtime` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `audit_time` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_tid_cuid` (`tid`,`c_uid`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='C端会员佣金提现申请';
+
+-- 42. SMTP邮箱配置表
+CREATE TABLE IF NOT EXISTS `qingka_withdraw_request` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `uid` int(11) NOT NULL DEFAULT 0 COMMENT '申请用户UID',
+  `amount` decimal(10,2) NOT NULL DEFAULT 0 COMMENT '提现金额',
+  `method` varchar(32) NOT NULL DEFAULT 'manual' COMMENT '提现方式',
+  `account_name` varchar(100) NOT NULL DEFAULT '' COMMENT '收款人',
+  `account_no` varchar(120) NOT NULL DEFAULT '' COMMENT '收款账号',
+  `bank_name` varchar(120) NOT NULL DEFAULT '' COMMENT '开户行/渠道',
+  `note` varchar(255) NOT NULL DEFAULT '' COMMENT '备注',
+  `status` tinyint(4) NOT NULL DEFAULT 0 COMMENT '0待审核 1已通过 -1已驳回',
+  `audit_remark` varchar(255) NOT NULL DEFAULT '' COMMENT '审核备注',
+  `audit_uid` int(11) NOT NULL DEFAULT 0 COMMENT '审核人UID',
+  `addtime` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `audit_time` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_uid` (`uid`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='提现申请';
+
+-- 43. SMTP邮箱配置表
 CREATE TABLE IF NOT EXISTS `qingka_smtp_config` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `host` varchar(255) NOT NULL DEFAULT '' COMMENT 'SMTP服务器',
@@ -1001,7 +1099,7 @@ CREATE TABLE IF NOT EXISTS `qingka_smtp_config` (
 -- 第十一部分：菜单配置
 -- =============================================
 
--- 41. 菜单配置表
+-- 42. 菜单配置表
 CREATE TABLE IF NOT EXISTS `menu_config` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `menu_key` varchar(100) NOT NULL COMMENT '菜单唯一标识',

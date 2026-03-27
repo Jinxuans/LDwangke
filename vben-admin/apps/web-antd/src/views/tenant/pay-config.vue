@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { Page } from '@vben/common-ui';
 import {
   Card,
@@ -9,6 +9,8 @@ import {
   message,
   Divider,
   Alert,
+  RadioGroup,
+  RadioButton,
 } from 'ant-design-vue';
 import { SaveOutlined, KeyOutlined, AlipayCircleOutlined, WechatOutlined, QqOutlined } from '@ant-design/icons-vue';
 import { getTenantShopApi, saveTenantPayConfigApi } from '#/api/tenant';
@@ -16,7 +18,10 @@ import { getTenantShopApi, saveTenantPayConfigApi } from '#/api/tenant';
 const loading = ref(false);
 const saving = ref(false);
 
+type PayMode = 'site_balance' | 'merchant_epay';
+
 interface PayConfig {
+  pay_mode: PayMode;
   epay_api: string;
   epay_pid: string;
   epay_key: string;
@@ -26,6 +31,7 @@ interface PayConfig {
 }
 
 const form = reactive<PayConfig>({
+  pay_mode: 'site_balance',
   epay_api: '',
   epay_pid: '',
   epay_key: '',
@@ -33,6 +39,19 @@ const form = reactive<PayConfig>({
   is_wxpay: '0',
   is_qqpay: '0',
 });
+
+const isSiteBalanceMode = computed(() => form.pay_mode === 'site_balance');
+
+function resolvePayMode(cfg: Record<string, any>): PayMode {
+  const mode = String(cfg.pay_mode || cfg.mode || '').trim();
+  if (mode === 'merchant_epay' || mode === 'site_balance') {
+    return mode;
+  }
+  if (cfg.epay_api || cfg.epay_pid || cfg.epay_key) {
+    return 'merchant_epay';
+  }
+  return 'site_balance';
+}
 
 async function load() {
   loading.value = true;
@@ -43,6 +62,7 @@ async function load() {
       try {
         const cfg = JSON.parse(data.pay_config);
         Object.assign(form, {
+          pay_mode: resolvePayMode(cfg),
           epay_api: cfg.epay_api || '',
           epay_pid: cfg.epay_pid || '',
           epay_key: cfg.epay_key || '',
@@ -61,29 +81,34 @@ async function load() {
 }
 
 async function handleSave() {
-  if (!form.epay_api.trim()) {
-    message.warning('请填写易支付 API 地址');
-    return;
-  }
-  if (!form.epay_pid.trim()) {
-    message.warning('请填写商户 PID');
-    return;
-  }
-  if (!form.epay_key.trim()) {
-    message.warning('请填写商户密钥');
-    return;
-  }
-  if (
-    form.is_alipay !== '1' &&
-    form.is_wxpay !== '1' &&
-    form.is_qqpay !== '1'
-  ) {
-    message.warning('请至少开启一种支付方式');
-    return;
+  if (form.pay_mode === 'merchant_epay') {
+    if (!form.epay_api.trim()) {
+      message.warning('请填写易支付 API 地址');
+      return;
+    }
+    if (!form.epay_pid.trim()) {
+      message.warning('请填写商户 PID');
+      return;
+    }
+    if (!form.epay_key.trim()) {
+      message.warning('请填写商户密钥');
+      return;
+    }
+    if (
+      form.is_alipay !== '1' &&
+      form.is_wxpay !== '1' &&
+      form.is_qqpay !== '1'
+    ) {
+      message.warning('请至少开启一种支付方式');
+      return;
+    }
   }
   saving.value = true;
   try {
-    await saveTenantPayConfigApi(JSON.stringify(form));
+    const payload = form.pay_mode === 'site_balance'
+      ? { pay_mode: 'site_balance' }
+      : { ...form };
+    await saveTenantPayConfigApi(JSON.stringify(payload));
     message.success('保存成功');
   } catch (e: any) {
     message.error(e?.message || '保存失败');
@@ -101,13 +126,30 @@ onMounted(load);
       type="info"
       show-icon
       class="mb-4"
-      message="配置易支付接口，C端用户购买商品时将跳转到对应支付页面完成付款。"
+      :message="isSiteBalanceMode ? '默认使用站长代收。C端支付成功后，货款先进入您的主站余额，再自动扣供货价下单，利润会留在余额中。' : '商家直连模式下，C端用户购买商品时将跳转到您配置的易支付页面完成付款。'"
       style="max-width: 600px"
     />
 
     <Card :loading="loading" style="max-width: 600px">
       <div class="space-y-5">
         <div>
+          <div class="mb-3 flex items-center gap-2">
+            <span class="text-base font-semibold">收款模式</span>
+          </div>
+
+          <RadioGroup v-model:value="form.pay_mode" button-style="solid">
+            <RadioButton value="site_balance">站长代收</RadioButton>
+            <RadioButton value="merchant_epay">商家直连</RadioButton>
+          </RadioGroup>
+
+          <div class="mt-3 text-xs text-gray-400 dark:text-gray-500">
+            站长代收为默认模式；若切换为商家直连，则由您自己的易支付接口完成收款。
+          </div>
+        </div>
+
+        <Divider />
+
+        <div v-if="!isSiteBalanceMode">
           <div class="mb-3 flex items-center gap-2">
             <KeyOutlined />
             <span class="text-base font-semibold">易支付接口配置</span>
@@ -152,10 +194,22 @@ onMounted(load);
           </div>
         </div>
 
-        <Divider />
+        <div v-else>
+          <Alert
+            type="success"
+            show-icon
+            message="当前为站长代收模式"
+            description="商城实付金额会先充入您的主站余额，再按供货价自动扣款下单。您无需单独维护易支付参数。"
+          />
+        </div>
 
-        <div>
-          <div class="mb-3 text-base font-semibold">开启支付方式</div>
+        <Divider v-if="!isSiteBalanceMode" />
+
+        <div v-if="!isSiteBalanceMode">
+          <div class="mb-3 text-base font-semibold">对外展示支付方式</div>
+          <div class="mb-3 text-xs text-gray-400 dark:text-gray-500">
+            这里只控制商家直连模式下商城对外开放哪些支付渠道。
+          </div>
           <div class="space-y-3">
             <div
               class="flex items-center justify-between rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-2"
@@ -202,6 +256,15 @@ onMounted(load);
               />
             </div>
           </div>
+        </div>
+
+        <div v-else>
+          <Alert
+            type="info"
+            show-icon
+            message="平台代收模式下支付方式自动读取平台配置"
+            description="当前商城展示的支付宝、微信支付、QQ支付渠道会直接读取平台管理员在系统设置中的支付开关，商家无需单独配置。"
+          />
         </div>
 
         <Divider />
