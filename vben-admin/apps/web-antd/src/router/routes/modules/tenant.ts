@@ -35,13 +35,33 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        name: 'TenantMallCategories',
+        path: '/tenant/mall-categories',
+        component: () => import('#/views/tenant/mall-categories.vue'),
+        meta: {
+          icon: 'mdi:file-tree-outline',
+          order: 3,
+          title: '商城分类',
+        },
+      },
+      {
         name: 'TenantProducts',
         path: '/tenant/products',
         component: () => import('#/views/tenant/products.vue'),
         meta: {
           icon: 'mdi:package-variant',
-          order: 3,
+          order: 4,
           title: '选品管理',
+        },
+      },
+      {
+        name: 'TenantCUsers',
+        path: '/tenant/cusers',
+        component: () => import('#/views/tenant/cusers.vue'),
+        meta: {
+          icon: 'mdi:account-group-outline',
+          order: 5,
+          title: '会员管理',
         },
       },
       {
@@ -50,7 +70,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('#/views/tenant/mall-orders.vue'),
         meta: {
           icon: 'mdi:receipt-text-outline',
-          order: 4,
+          order: 6,
           title: '支付订单',
         },
       },
@@ -60,8 +80,28 @@ const routes: RouteRecordRaw[] = [
         component: () => import('#/views/tenant/pay-config.vue'),
         meta: {
           icon: 'mdi:credit-card-settings-outline',
-          order: 6,
+          order: 7,
           title: '支付配置',
+        },
+      },
+      {
+        name: 'TenantWithdraw',
+        path: '/tenant/withdraw',
+        component: () => import('#/views/user/withdraw.vue'),
+        meta: {
+          icon: 'mdi:cash-fast',
+          order: 8,
+          title: '商城提现',
+        },
+      },
+      {
+        name: 'TenantCUserWithdraw',
+        path: '/tenant/cuser-withdraw',
+        component: () => import('#/views/tenant/cuser-withdraw.vue'),
+        meta: {
+          icon: 'mdi:cash-refund',
+          order: 9,
+          title: '会员提现',
         },
       },
     ],

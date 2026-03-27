@@ -15,45 +15,84 @@ import {
     getProductDetail,
     getPayChannels,
     createPay,
+    getMallPromoterCode,
     queryCourse,
+    saveGuestMallOrder,
 } from "../api";
+import alipayIcon from "../assets/pay-alipay.svg";
+import wechatIcon from "../assets/pay-wechat.svg";
+import qqpayIcon from "../assets/pay-qq.svg";
 
 const route = useRoute();
 const router = useRouter();
-const tid = route.params.tid as string;
+const tid = String(route.params.tid || "");
+const basePath = tid ? `/${tid}` : "";
 const cid = Number(route.params.cid);
 
 const product = ref<any>(null);
 const loading = ref(true);
 const submitting = ref(false);
 const querying = ref(false);
+const school = ref("");
 const account = ref("");
 const password = ref("");
-const remark = ref("");
 
 // 查课结果
 const queryResult = ref<any>(null);
 const queryDone = ref(false);
 const selectedCourses = ref<any[]>([]);
+const totalPrice = ref("0.00");
+
+function courseKey(item: any, index: number | string = 0) {
+    const idPart = String(item?.id || "").trim();
+    const namePart = String(item?.name || "").trim();
+    const kcjsPart = String(item?.kcjs || "").trim();
+    return idPart || `${namePart}__${kcjsPart}__${index}`;
+}
+
+function updateTotalPrice() {
+    const unitPrice = Number(product.value?.retail_price || 0);
+    const hasSelectableCourses =
+        Array.isArray(queryResult.value?.data) && queryResult.value.data.length > 0;
+    const count = hasSelectableCourses
+        ? selectedCourses.value.length
+        : queryDone.value
+          ? 1
+          : 0;
+    totalPrice.value = (unitPrice * count).toFixed(2);
+}
 
 function toggleCourse(item: any) {
-    const idx = selectedCourses.value.findIndex((c) => c.id === item.id);
+    const key = courseKey(item);
+    const idx = selectedCourses.value.findIndex((c) => courseKey(c) === key);
     if (idx >= 0) {
         selectedCourses.value.splice(idx, 1);
     } else {
         selectedCourses.value.push(item);
     }
+    updateTotalPrice();
 }
 function isCourseSelected(item: any) {
-    return selectedCourses.value.some((c) => c.id === item.id);
+    const key = courseKey(item);
+    return selectedCourses.value.some((c) => courseKey(c) === key);
 }
 
 interface Channel {
-    type: string;
-    name: string;
+    key?: string;
+    label?: string;
+    type?: string;
+    name?: string;
 }
 const channels = ref<Channel[]>([]);
 const payType = ref("");
+
+function channelKey(channel: Channel) {
+    return String(channel.key || channel.type || "");
+}
+
+function channelLabel(channel: Channel) {
+    return String(channel.label || channel.name || "");
+}
 
 onMounted(async () => {
     try {
@@ -62,10 +101,11 @@ onMounted(async () => {
             getPayChannels(),
         ]);
         product.value = prod;
-        channels.value = (chs as unknown as Channel[]) || [];
+        channels.value = Array.isArray(chs) ? (chs as unknown as Channel[]) : [];
         if (channels.value.length > 0) {
-            payType.value = channels.value[0]!.type;
+            payType.value = channelKey(channels.value[0]!);
         }
+        updateTotalPrice();
     } catch (e: any) {
         showToast(e?.message || "加载失败");
     } finally {
@@ -85,10 +125,14 @@ async function handleQuery() {
     querying.value = true;
     queryResult.value = null;
     queryDone.value = false;
+    selectedCourses.value = [];
+    updateTotalPrice();
     try {
         const res: any = await queryCourse({
             cid,
-            userinfo: `${account.value.trim()} ${password.value.trim()}`,
+            userinfo: school.value.trim()
+                ? `${school.value.trim()} ${account.value.trim()} ${password.value.trim()}`
+                : `${account.value.trim()} ${password.value.trim()}`,
         });
         queryResult.value = res;
         queryDone.value = true;
@@ -97,6 +141,7 @@ async function handleQuery() {
         if (res?.data?.length === 1) {
             selectedCourses.value = [res.data[0]];
         }
+        updateTotalPrice();
     } catch (e: any) {
         showToast(e?.message || "查课失败");
     } finally {
@@ -121,10 +166,16 @@ async function handleOrder() {
     try {
         const res: any = await createPay({
             cid,
+            school: school.value.trim(),
             account: account.value.trim(),
             password: password.value.trim(),
             pay_type: payType.value,
-            remark: remark.value,
+            promoter_code: getMallPromoterCode(tid),
+            courses: selectedCourses.value.map((c) => ({
+                id: String(c.id || ""),
+                name: String(c.name || ""),
+                kcjs: String(c.kcjs || ""),
+            })),
             course_id: selectedCourses.value.map((c) => c.id).join(","),
             course_name: selectedCourses.value.map((c) => c.name).join(","),
             course_kcjs: selectedCourses.value.map((c) => c.kcjs || "").join(","),
@@ -133,10 +184,20 @@ async function handleOrder() {
             // 存订单号，支付完成后结果页用于检测
             localStorage.setItem("pending_out_trade_no", res.out_trade_no);
             localStorage.setItem("pending_pay_url", res.pay_url);
-            router.push(`/${tid}/pay-result?out_trade_no=${res.out_trade_no}`);
+            if (res.access_token) {
+                localStorage.setItem("pending_guest_access_token", res.access_token);
+                saveGuestMallOrder({
+                    tid,
+                    outTradeNo: res.out_trade_no,
+                    accessToken: res.access_token,
+                    createdAt: Date.now(),
+                });
+            }
+            sessionStorage.removeItem(`mall_pay_redirected_${res.out_trade_no}`);
+            router.push(`${basePath}/pay-result?out_trade_no=${res.out_trade_no}`);
         } else {
             showToast({ type: "success", message: "下单成功", duration: 1500 });
-            setTimeout(() => router.push(`/${tid}/orders`), 1500);
+            setTimeout(() => router.push(`${basePath}/orders`), 1500);
         }
     } catch (e: any) {
         showToast(e?.message || "提交失败");
@@ -145,10 +206,10 @@ async function handleOrder() {
     }
 }
 
-const payIcons: Record<string, string> = {
-    alipay: "https://img.icons8.com/color/48/alipay.png",
-    wxpay: "https://img.icons8.com/color/48/wechat.png",
-    qqpay: "https://img.icons8.com/color/48/qq.png",
+const payIconMap: Record<string, string> = {
+    alipay: alipayIcon,
+    wxpay: wechatIcon,
+    qqpay: qqpayIcon,
 };
 
 // Generate gradient based on product name
@@ -186,14 +247,19 @@ function getGradient(name: string): string {
 
         <template v-else-if="product">
             <!-- Gradient header with product name -->
-            <div 
+            <div
                 class="product-cover"
-                :style="{ background: getGradient(product.name || '商品') }"
+                :style="product.cover_url ? undefined : { background: getGradient(product.name || '商品') }"
             >
+                <img
+                    v-if="product.cover_url"
+                    :src="product.cover_url"
+                    :alt="product.name || '商品封面'"
+                    class="cover-image"
+                />
                 <div class="cover-content">
-                    <span class="cover-char">{{ (product.name || '商')[0] }}</span>
+                    <span v-if="!product.cover_url" class="cover-char">{{ (product.name || '商')[0] }}</span>
                     <h2 class="cover-title">{{ product.name }}</h2>
-                    <p v-if="product.noun" class="cover-desc">{{ product.noun }}</p>
                 </div>
             </div>
 
@@ -202,8 +268,10 @@ function getGradient(name: string): string {
                     <span class="price-symbol">¥</span>
                     <span class="price-value">{{ product.retail_price }}</span>
                 </div>
+                <div v-if="product.fenlei_name || product.fenlei" class="product-category-chip">
+                    {{ product.fenlei_name || product.fenlei }}
+                </div>
                 <h1 class="product-title">{{ product.name }}</h1>
-                <p v-if="product.noun" class="product-desc">{{ product.noun }}</p>
                 <div class="product-tags">
                     <span class="tag">正品保证</span>
                     <span class="tag">极速发货</span>
@@ -213,10 +281,23 @@ function getGradient(name: string): string {
 
             <div class="divider"></div>
 
+            <div v-if="product.description || product.noun" class="product-intro-card animate-fade-in-up">
+                <div class="form-title">商品介绍</div>
+                <div class="intro-text">{{ product.description || product.noun }}</div>
+            </div>
+
+            <div class="divider"></div>
+
             <div class="form-section animate-fade-in-up">
                 <div class="form-title">填写信息</div>
                 <Form>
                     <CellGroup inset>
+                        <Field
+                            v-model="school"
+                            label="学校"
+                            placeholder="选填，不填则自动识别"
+                            clearable
+                        />
                         <Field
                             v-model="account"
                             label="账号"
@@ -231,13 +312,6 @@ function getGradient(name: string): string {
                             placeholder="请输入账号密码"
                             required
                             clearable
-                        />
-                        <Field
-                            v-model="remark"
-                            label="备注"
-                            type="textarea"
-                            rows="2"
-                            placeholder="选填，如特殊需求等"
                         />
                     </CellGroup>
 
@@ -271,8 +345,8 @@ function getGradient(name: string): string {
                         class="course-list"
                     >
                         <div
-                            v-for="item in queryResult.data"
-                            :key="item.id"
+                            v-for="(item, index) in queryResult.data"
+                            :key="courseKey(item, index)"
                             class="course-item"
                             :class="{ selected: isCourseSelected(item) }"
                             @click="toggleCourse(item)"
@@ -304,19 +378,22 @@ function getGradient(name: string): string {
                         <div class="pay-channels">
                             <label
                                 v-for="ch in channels"
-                                :key="ch.type"
+                                :key="channelKey(ch)"
                                 class="pay-channel-item"
-                                :class="{ active: payType === ch.type }"
-                                @click="payType = ch.type"
+                                :class="{ active: payType === channelKey(ch) }"
+                                @click="payType = channelKey(ch)"
                             >
-                                <img
-                                    v-if="payIcons[ch.type]"
-                                    :src="payIcons[ch.type]"
-                                    class="pay-icon"
-                                    alt=""
-                                />
-                                <span class="pay-name">{{ ch.name }}</span>
-                                <Radio :name="ch.type" class="pay-radio" />
+                                <span class="pay-icon-box">
+                                    <img
+                                        v-if="payIconMap[channelKey(ch)]"
+                                        :src="payIconMap[channelKey(ch)]"
+                                        :alt="channelLabel(ch)"
+                                        class="pay-icon-image"
+                                    />
+                                    <span v-else class="pay-icon-fallback">付</span>
+                                </span>
+                                <span class="pay-name">{{ channelLabel(ch) }}</span>
+                                <Radio :name="channelKey(ch)" class="pay-radio" />
                             </label>
                         </div>
                     </RadioGroup>
@@ -336,7 +413,7 @@ function getGradient(name: string): string {
                             submitting
                                 ? "跳转支付中..."
                                 : queryDone
-                                  ? `立即支付 ¥${product.retail_price}`
+                                  ? `立即支付 ¥${totalPrice}`
                                   : "请先查课再支付"
                         }}
                     </Button>
@@ -364,6 +441,13 @@ function getGradient(name: string): string {
     justify-content: center;
     position: relative;
     overflow: hidden;
+}
+.cover-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 .product-cover::before {
     content: '';
@@ -397,12 +481,6 @@ function getGradient(name: string): string {
     margin: 0;
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
-.cover-desc {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.85);
-    margin: 8px 0 0;
-    max-width: 280px;
-}
 .product-info-card {
     margin: 0;
     padding: 16px;
@@ -424,18 +502,22 @@ function getGradient(name: string): string {
     font-weight: 700;
     color: #ef4444;
 }
+.product-category-chip {
+    display: inline-flex;
+    margin-bottom: 10px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(99, 102, 241, 0.08);
+    color: var(--primary-color);
+    font-size: 12px;
+    font-weight: 600;
+}
 .product-title {
     font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
     line-height: 1.5;
     margin-bottom: 8px;
-}
-.product-desc {
-    font-size: 13px;
-    color: var(--text-secondary);
-    line-height: 1.5;
-    margin-bottom: 12px;
 }
 .product-tags {
     display: flex;
@@ -453,6 +535,16 @@ function getGradient(name: string): string {
 .divider {
     height: 8px;
     background: var(--bg-primary);
+}
+.product-intro-card {
+    background: var(--bg-secondary);
+    padding: 16px;
+}
+.intro-text {
+    white-space: pre-wrap;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text-secondary);
 }
 .form-section {
     background: var(--bg-secondary);
@@ -489,10 +581,30 @@ function getGradient(name: string): string {
     border-color: var(--primary-color, #6366f1);
     background: var(--primary-bg, #eef2ff);
 }
-.pay-icon {
-    width: 28px;
-    height: 28px;
-    object-fit: contain;
+.pay-icon-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+.pay-icon-image {
+    width: 32px;
+    height: 32px;
+    display: block;
+}
+.pay-icon-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
 }
 .pay-name {
     flex: 1;
