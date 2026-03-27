@@ -9,7 +9,9 @@ export interface TenantInfo {
   shop_desc: string;
   status: number;
   pay_config: string;
+  mall_config?: string;
   domain: string;
+  mall_domain_suffix?: string;
   addtime: string;
 }
 
@@ -25,6 +27,35 @@ export async function saveTenantPayConfigApi(payConfig: string) {
   return requestClient.post('/tenant/pay-config', { pay_config: payConfig });
 }
 
+export async function saveTenantMallConfigApi(mallConfig: string) {
+  return requestClient.post('/tenant/mall-config', { mall_config: mallConfig });
+}
+
+export interface TenantMallCategory {
+  id: number;
+  tid: number;
+  name: string;
+  sort: number;
+  status: number;
+  addtime: string;
+}
+
+export async function getTenantMallCategoriesApi() {
+  return requestClient.get<TenantMallCategory[]>('/tenant/mall-categories');
+}
+
+export async function saveTenantMallCategoryApi(data: Partial<TenantMallCategory>) {
+  return requestClient.post('/tenant/mall-category/save', data);
+}
+
+export async function updateTenantMallCategorySortApi(items: { id: number; sort: number }[]) {
+  return requestClient.post('/tenant/mall-category/update-sort', { items });
+}
+
+export async function deleteTenantMallCategoryApi(id: number) {
+  return requestClient.delete(`/tenant/mall-category/${id}`);
+}
+
 // ===== 选品管理 =====
 export interface TenantProduct {
   id: number;
@@ -33,8 +64,14 @@ export interface TenantProduct {
   retail_price: number;
   sort: number;
   status: number;
+  display_name?: string;
+  cover_url?: string;
+  description?: string;
+  category_id?: number;
+  category_name?: string;
   class_name: string;
-  class_price: string;
+  supply_price: string;
+  fenlei?: string;
 }
 
 export async function getTenantProductsApi() {
@@ -140,6 +177,12 @@ export interface MallPayOrder {
   status: number;
   order_id: number;
   addtime: string;
+  product_name?: string;
+  course_name?: string;
+  order_status?: string;
+  order_process?: string;
+  order_remarks?: string;
+  order_count?: number;
 }
 
 export async function getTenantMallOrdersApi(params?: {
@@ -150,4 +193,63 @@ export async function getTenantMallOrdersApi(params?: {
     '/tenant/mall-orders',
     { params },
   );
+}
+
+export interface TenantLinkedOrder {
+  oid: number;
+  cid: number;
+  ptname: string;
+  school: string;
+  user: string;
+  kcname: string;
+  kcid: string;
+  status: string;
+  fees: string;
+  process: string;
+  remarks: string;
+  yid: string;
+  addtime: string;
+}
+
+export async function getTenantMallLinkedOrdersApi(id: number) {
+  return requestClient.get<TenantLinkedOrder[]>(`/tenant/mall-order/${id}/orders`);
+}
+
+export interface TenantCUserWithdrawItem {
+  id: number;
+  tid: number;
+  c_uid: number;
+  account: string;
+  nickname: string;
+  amount: number;
+  method: string;
+  account_name: string;
+  account_no: string;
+  bank_name: string;
+  note: string;
+  status: number;
+  audit_remark: string;
+  audit_uid: number;
+  audit_user: string;
+  addtime: string;
+  audit_time: string;
+}
+
+export async function getTenantCUserWithdrawRequestsApi(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  c_uid?: string;
+}) {
+  return requestClient.get<{ list: TenantCUserWithdrawItem[]; pagination?: { total?: number } }>(
+    '/tenant/cuser-withdraw/requests',
+    { params },
+  );
+}
+
+export async function reviewTenantCUserWithdrawApi(id: number, data: {
+  status: number;
+  remark?: string;
+}) {
+  return requestClient.post(`/tenant/cuser-withdraw/${id}/review`, data);
 }
