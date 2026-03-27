@@ -2,19 +2,24 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { NavBar, Button, showToast } from "vant";
-import { checkPay, confirmPay } from "../api";
+import { checkPay } from "../api";
 
 const route = useRoute();
 const router = useRouter();
-const tid = route.params.tid as string;
+const tid = String(route.params.tid || "");
+const basePath = tid ? `/${tid}` : "";
 const outTradeNo = (route.query.out_trade_no as string) || localStorage.getItem("pending_out_trade_no") || "";
 const payUrl = localStorage.getItem("pending_pay_url") || "";
+const guestAccessToken =
+    (route.query.access_token as string) ||
+    localStorage.getItem("pending_guest_access_token") ||
+    "";
 
 // 0=未支付 1=已支付待下单 2=已下单成功
 const status = ref(0);
 const checking = ref(false);
-const confirming = ref(false);
 const orderID = ref(0);
+const autoRedirected = ref(false);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let pollCount = 0;
 
@@ -22,13 +27,15 @@ async function doCheck() {
     if (!outTradeNo) return;
     checking.value = true;
     try {
-        const res: any = await checkPay(outTradeNo);
+        const res: any = await checkPay(outTradeNo, guestAccessToken);
         status.value = res.status;
         orderID.value = res.order_id || 0;
         if (res.status === 2) {
             // 下单成功，清理缓存
             localStorage.removeItem("pending_out_trade_no");
             localStorage.removeItem("pending_pay_url");
+            localStorage.removeItem("pending_guest_access_token");
+            sessionStorage.removeItem(`mall_pay_redirected_${outTradeNo}`);
         }
     } catch (e: any) {
         showToast(e?.message || "检测失败，请重试");
@@ -48,36 +55,27 @@ function startAutoPoll() {
 }
 
 onMounted(() => {
-    if (outTradeNo) {
-        doCheck();
+    if (!outTradeNo) return;
+    void (async () => {
+        await doCheck();
         startAutoPoll();
-    }
+        const redirectKey = `mall_pay_redirected_${outTradeNo}`;
+        if (payUrl && status.value === 0 && !sessionStorage.getItem(redirectKey)) {
+            sessionStorage.setItem(redirectKey, "1");
+            autoRedirected.value = true;
+            setTimeout(() => {
+                goPay();
+            }, 200);
+        }
+    })();
 });
 
 onUnmounted(() => {
     if (pollTimer) clearTimeout(pollTimer);
 });
 
-async function doConfirm() {
-    if (!outTradeNo) return;
-    confirming.value = true;
-    try {
-        const res: any = await confirmPay(outTradeNo);
-        status.value = res.status;
-        orderID.value = res.order_id || 0;
-        if (res.status === 2) {
-            localStorage.removeItem("pending_out_trade_no");
-            localStorage.removeItem("pending_pay_url");
-        }
-    } catch (e: any) {
-        showToast(e?.message || "提交失败，请重试");
-    } finally {
-        confirming.value = false;
-    }
-}
-
 function goOrders() {
-    router.push(`/${tid}/orders`);
+    router.push(`${basePath}/orders`);
 }
 
 function goPay() {
@@ -110,21 +108,19 @@ function goPay() {
                     <van-icon name="clock-o" size="56" color="#f59e0b" />
                 </div>
                 <h2 class="result-title">支付成功</h2>
-                <p class="result-desc">正在自动下单，或点击「我已支付」立即提交</p>
+                <p class="result-desc">系统已检测到支付成功，正在自动提交订单</p>
                 <div class="btn-group">
                     <Button
-                        type="primary"
-                        block
+                        plain
                         round
-                        :loading="confirming"
-                        class="main-btn"
-                        @click="doConfirm"
+                        block
+                        :loading="checking"
+                        class="sub-btn"
+                        @click="doCheck"
                     >
-                        {{ confirming ? "提交中..." : "我已支付" }}
+                        {{ checking ? "检测中..." : "刷新状态" }}
                     </Button>
-                    <Button plain round block class="sub-btn" @click="goOrders">
-                        查看订单列表
-                    </Button>
+                    <Button plain round block class="sub-btn" @click="goOrders">查看订单列表</Button>
                 </div>
             </template>
 
@@ -134,17 +130,18 @@ function goPay() {
                     <van-icon name="warning-o" size="56" color="#6366f1" />
                 </div>
                 <h2 class="result-title">等待支付</h2>
-                <p class="result-desc">完成支付后点击「我已支付」提交订单</p>
+                <p class="result-desc">
+                    {{ autoRedirected ? "正在跳转支付页面，如未自动打开可手动继续支付" : "请先完成支付，支付成功后系统会自动检测并提交订单" }}
+                </p>
                 <div class="btn-group">
                     <Button
                         type="primary"
                         block
                         round
-                        :loading="confirming"
                         class="main-btn"
-                        @click="doConfirm"
+                        @click="goPay"
                     >
-                        {{ confirming ? "提交中..." : "我已支付" }}
+                        立即支付
                     </Button>
                     <Button
                         plain

@@ -43,6 +43,17 @@ const modeText = (mode: string) => {
   return map[String(mode)] || '未知类型';
 };
 
+// 根据当前密价模式展示对应公式，避免管理员按字面误解定价逻辑。
+const formulaTipMap: Record<string, string> = {
+  '0': '公式：最终价 = 原本售价 - 扣减金额',
+  '1': '公式：最终价 = (商品原价 - 扣减金额) × 用户加价倍数',
+  '2': '公式：最终价 = 直接定价金额',
+  '3': '公式：最终价 = 商品原价 × 密价倍率',
+  '4': '公式：最终价 = 商品原价 × 密价倍率',
+};
+
+const modeBoundaryTip = '说明：最终价格不会低于 0，也不会高于原本售价。';
+
 // ===== 添加弹窗 =====
 const addVisible = ref(false);
 const addForm = reactive({
@@ -94,6 +105,9 @@ const calculatedPrice = computed(() => {
   if (!addForm.cid || !Number.isFinite(m)) return '0.00';
   return (Number(selectedProductPrice.value || 0) * m).toFixed(2);
 });
+const addModeFormulaTip = computed(
+  () => formulaTipMap[String(addForm.mode)] || '公式：请按当前类型填写金额或倍率',
+);
 
 const categoryProducts = computed(() => {
   if (addForm.setType !== 'batch' || !addForm.fenlei) return [];
@@ -123,6 +137,9 @@ const editForm = reactive({
   mode: '2',
   price: '',
 });
+const editModeFormulaTip = computed(
+  () => formulaTipMap[String(editForm.mode)] || '公式：请按当前类型填写金额或倍率',
+);
 
 // ===== 数据加载 =====
 async function loadData(page = 1) {
@@ -550,6 +567,10 @@ onMounted(async () => {
             <Radio value="2">直接定价</Radio>
             <Radio value="3">按倍率定价</Radio>
           </RadioGroup>
+          <div class="mt-2 rounded bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:bg-gray-900/30 dark:text-gray-400">
+            <div>{{ addModeFormulaTip }}</div>
+            <div class="mt-1">{{ modeBoundaryTip }}</div>
+          </div>
         </div>
 
         <div v-if="!isAddMultiplierMode">
@@ -673,6 +694,10 @@ onMounted(async () => {
             <SelectOption value="2">直接定价</SelectOption>
             <SelectOption value="3">按倍率定价</SelectOption>
           </Select>
+          <div class="mt-2 rounded bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:bg-gray-900/30 dark:text-gray-400">
+            <div>{{ editModeFormulaTip }}</div>
+            <div class="mt-1">{{ modeBoundaryTip }}</div>
+          </div>
         </div>
 
         <div>

@@ -17,4 +17,5 @@ func RegisterRoutes(api *gin.RouterGroup) {
 	registerOrderRoutes(admin)
 	registerContentRoutes(admin)
 	registerOpsRoutes(admin)
+	registerWithdrawRoutes(admin)
 }

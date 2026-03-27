@@ -93,6 +93,8 @@ type UserProfile struct {
 	Name            string      `json:"name"`
 	Money           float64     `json:"money"`
 	CDMoney         float64     `json:"cdmoney"`
+	MallMoney       float64     `json:"mall_money"`
+	MallCDMoney     float64     `json:"mall_cdmoney"`
 	Grade           string      `json:"grade"`
 	GradeID         int         `json:"grade_id"`
 	AddPrice        float64     `json:"addprice"`

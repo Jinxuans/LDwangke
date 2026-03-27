@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS `qingka_mall_pay_order` (
   `course_id`     VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '选择的课程ID',
   `course_name`   VARCHAR(255) NOT NULL DEFAULT '' COMMENT '选择的课程名称',
   `course_kcjs`   VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '课程结束时间',
+  `course_items`  TEXT COMMENT '选择的课程明细JSON',
   `ip`            VARCHAR(64)  NOT NULL DEFAULT '',
   `addtime`       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `paytime`       DATETIME     NULL     DEFAULT NULL COMMENT '支付完成时间',

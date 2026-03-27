@@ -75,7 +75,7 @@ type Repository interface {
 	Detail(uid int, grade string, oid int) (*model.Order, error)
 	Stats(uid int, grade string) (*model.OrderStats, error)
 	AddOrders(uid int, req model.OrderAddRequest) (*model.OrderAddResult, error)
-	AddOrdersForMall(bUID, tid, cUID int, retailPrice float64, req model.OrderAddRequest) (*model.OrderAddResult, error)
+	AddOrdersForMall(bUID, tid, cUID int, retailPrice float64, outTradeNo string, req model.OrderAddRequest) (*model.OrderAddResult, error)
 	ChangeStatus(uid int, grade string, req model.OrderStatusRequest) error
 	CancelOrder(uid int, grade string, oid int) error
 	RefundOrders(uid int, grade string, oids []int) error
@@ -358,7 +358,9 @@ func (r *legacyRepository) AddOrders(uid int, req model.OrderAddRequest) (*model
 
 		successCount++
 		totalDeducted += unitPrice
-		r.distributeCommission(uid, clsPrice, cls.Yunsuan, unitPrice, 1)
+		// 已停用逐级返利：
+		// 现有代理充值按费率折算扣费，若继续在下级下单后给上级返利，
+		// 会与充值链路叠加形成套利，导致平台出现账务亏损。
 	}
 
 	if successCount == 0 {
@@ -379,7 +381,7 @@ func (r *legacyRepository) AddOrders(uid int, req model.OrderAddRequest) (*model
 	}, nil
 }
 
-func (r *legacyRepository) AddOrdersForMall(bUID, tid, cUID int, retailPrice float64, req model.OrderAddRequest) (*model.OrderAddResult, error) {
+func (r *legacyRepository) AddOrdersForMall(bUID, tid, cUID int, retailPrice float64, outTradeNo string, req model.OrderAddRequest) (*model.OrderAddResult, error) {
 	cls, err := r.sup.GetClassFull(req.CID)
 	if err != nil {
 		return nil, err
@@ -391,8 +393,8 @@ func (r *legacyRepository) AddOrdersForMall(bUID, tid, cUID int, retailPrice flo
 	clsPrice, _ := strconv.ParseFloat(cls.Price, 64)
 	dockingID, _ := strconv.Atoi(cls.Docking)
 
-	var money, addprice float64
-	err = database.DB.QueryRow("SELECT COALESCE(money,0), COALESCE(addprice,1) FROM qingka_wangke_user WHERE uid=?", bUID).Scan(&money, &addprice)
+	var money, mallMoney, addprice float64
+	err = database.DB.QueryRow("SELECT COALESCE(money,0), COALESCE(mall_money,0), COALESCE(addprice,1) FROM qingka_wangke_user WHERE uid=?", bUID).Scan(&money, &mallMoney, &addprice)
 	if err != nil {
 		return nil, errors.New("商家账户异常")
 	}
@@ -424,22 +426,21 @@ func (r *legacyRepository) AddOrdersForMall(bUID, tid, cUID int, retailPrice flo
 	}
 	defer tx.Rollback()
 
-	err = tx.QueryRow("SELECT COALESCE(money,0) FROM qingka_wangke_user WHERE uid=? FOR UPDATE", bUID).Scan(&money)
+	err = tx.QueryRow("SELECT COALESCE(money,0), COALESCE(mall_money,0) FROM qingka_wangke_user WHERE uid=? FOR UPDATE", bUID).Scan(&money, &mallMoney)
 	if err != nil {
 		return nil, errors.New("商家账户异常")
 	}
 
 	totalCost := float64(len(req.Data)) * supplyPrice
-	if money < totalCost {
-		return nil, fmt.Errorf("商家余额不足，无法完成下单")
+	if money+mallMoney < totalCost {
+		return nil, fmt.Errorf("余额不足，主余额 %.2f 元，商城钱包 %.2f 元，需扣 %.2f 元", money, mallMoney, totalCost)
 	}
 
 	now := time.Now().Format("2006-01-02 15:04:05")
 	successCount := 0
 	var totalDeducted float64
 	var allOIDs []int64
-	var skippedCount int
-	var skippedDetails []string
+	var insertErrors []string
 
 	for _, item := range req.Data {
 		parts := strings.Fields(item.UserInfo)
@@ -456,17 +457,6 @@ func (r *legacyRepository) AddOrdersForMall(bUID, tid, cUID int, retailPrice flo
 		kcname := item.Data.Name
 		kcjs := item.Data.KCJS
 
-		var dupCount int
-		database.DB.QueryRow(
-			"SELECT COUNT(*) FROM qingka_wangke_order WHERE uid=? AND ptname=? AND school=? AND user=? AND pass=? AND kcid=? AND kcname=?",
-			bUID, cls.Name, school, user, pass, kcid, kcname,
-		).Scan(&dupCount)
-		if dupCount > 0 {
-			skippedCount++
-			skippedDetails = append(skippedDetails, fmt.Sprintf("%s-%s", user, kcname))
-			continue
-		}
-
 		dockStatus := 0
 		if dockingID == 0 {
 			dockStatus = 99
@@ -474,22 +464,41 @@ func (r *legacyRepository) AddOrdersForMall(bUID, tid, cUID int, retailPrice flo
 
 		result, err := tx.Exec(
 			`INSERT INTO qingka_wangke_order
-			 (uid, cid, hid, ptname, school, name, user, pass, kcid, kcname, courseEndTime, fees, noun, addtime, ip, dockstatus, tid, c_uid, retail_fees)
-			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			 (uid, cid, hid, ptname, school, name, user, pass, kcid, kcname, courseEndTime, fees, noun, addtime, ip, dockstatus, tid, c_uid, retail_fees, out_trade_no)
+			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			bUID, cls.CID, dockingID, cls.Name, school, item.UserName, user, pass,
 			kcid, kcname, kcjs,
 			fmt.Sprintf("%.4f", supplyPrice), cls.Noun, now, "", dockStatus,
-			tid, cUID, fmt.Sprintf("%.2f", retailPrice),
+			tid, cUID, fmt.Sprintf("%.2f", retailPrice), outTradeNo,
 		)
 		if err != nil {
+			insertErrors = append(insertErrors, fmt.Sprintf("%s-%s: %s", user, kcname, err.Error()))
 			continue
 		}
 
-		tx.Exec("UPDATE qingka_wangke_user SET money=money-? WHERE uid=?", supplyPrice, bUID)
-		tx.Exec(
-			"INSERT INTO qingka_wangke_moneylog (uid,type,money,balance,remark,addtime) VALUES (?,'扣费',?,(SELECT money FROM qingka_wangke_user WHERE uid=?),?,?)",
-			bUID, -supplyPrice, bUID, fmt.Sprintf("商城订单 %s %s %s 扣除%.2f元", cls.Name, user, kcname, supplyPrice), now,
-		)
+		remaining := supplyPrice
+		if money > 0 {
+			deductMain := math.Min(money, remaining)
+			if deductMain > 0 {
+				if _, err := tx.Exec("UPDATE qingka_wangke_user SET money=money-? WHERE uid=?", deductMain, bUID); err == nil {
+					money -= deductMain
+					remaining -= deductMain
+					tx.Exec(
+						"INSERT INTO qingka_wangke_moneylog (uid,type,money,balance,remark,addtime) VALUES (?,'商城扣费',?,(SELECT money FROM qingka_wangke_user WHERE uid=?),?,?)",
+						bUID, -deductMain, bUID, fmt.Sprintf("商城订单 %s %s %s 优先扣主余额 %.2f 元", cls.Name, user, kcname, deductMain), now,
+					)
+				}
+			}
+		}
+		if remaining > 0 {
+			if _, err := tx.Exec("UPDATE qingka_wangke_user SET mall_money=mall_money-? WHERE uid=?", remaining, bUID); err == nil {
+				mallMoney -= remaining
+				tx.Exec(
+					"INSERT INTO qingka_wangke_moneylog (uid,type,money,balance,remark,addtime) VALUES (?,'商城扣费',?,(SELECT mall_money FROM qingka_wangke_user WHERE uid=?),?,?)",
+					bUID, -remaining, bUID, fmt.Sprintf("商城订单 %s %s %s 补扣商城钱包 %.2f 元", cls.Name, user, kcname, remaining), now,
+				)
+			}
+		}
 
 		var insertedOID int64
 		if oid, e := result.LastInsertId(); e == nil {
@@ -503,6 +512,9 @@ func (r *legacyRepository) AddOrdersForMall(bUID, tid, cUID int, retailPrice flo
 	}
 
 	if successCount == 0 {
+		if len(insertErrors) > 0 {
+			return nil, fmt.Errorf("提交失败: %s", strings.Join(insertErrors, "; "))
+		}
 		return nil, errors.New("提交失败，请检查下单信息")
 	}
 
@@ -512,9 +524,7 @@ func (r *legacyRepository) AddOrdersForMall(bUID, tid, cUID int, retailPrice flo
 
 	return &model.OrderAddResult{
 		SuccessCount: successCount,
-		SkippedCount: skippedCount,
 		TotalCost:    totalDeducted,
-		SkippedItems: skippedDetails,
 		OIDs:         allOIDs,
 	}, nil
 }

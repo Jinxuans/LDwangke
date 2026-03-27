@@ -196,6 +196,36 @@ func UserMoneyLog(c *gin.Context) {
 	})
 }
 
+func UserWithdrawCreate(c *gin.Context) {
+	uid := c.GetInt("uid")
+	var req model.WithdrawCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "请填写完整的提现信息")
+		return
+	}
+	id, err := userService.CreateWithdrawRequest(uid, req)
+	if err != nil {
+		response.BusinessError(c, 1003, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"id": id})
+}
+
+func UserWithdrawRequests(c *gin.Context) {
+	uid := c.GetInt("uid")
+	var req model.WithdrawListRequest
+	_ = c.ShouldBindQuery(&req)
+	list, total, err := userService.WithdrawRequests(uid, req)
+	if err != nil {
+		response.ServerError(c, "查询提现记录失败")
+		return
+	}
+	response.Success(c, gin.H{
+		"list":       list,
+		"pagination": gin.H{"page": req.Page, "limit": req.Limit, "total": total},
+	})
+}
+
 func UserTicketList(c *gin.Context) {
 	uid := c.GetInt("uid")
 	grade := c.GetString("grade")

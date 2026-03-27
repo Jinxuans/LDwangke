@@ -246,6 +246,18 @@ const routes: RouteRecordRaw[] = [
             component: () => import('#/views/admin/moneylog.vue'),
             meta: { icon: 'mdi:cash-register', order: 3, title: '全站流水' },
           },
+          {
+            name: 'AdminWithdraw',
+            path: '/admin/withdraw',
+            component: () => import('#/views/admin/withdraw.vue'),
+            meta: { icon: 'mdi:storefront-outline', order: 4, title: '商家提现审核' },
+          },
+          {
+            name: 'AdminMallCUserWithdraw',
+            path: '/admin/mall-cuser-withdraw',
+            component: () => import('#/views/admin/mall-cuser-withdraw.vue'),
+            meta: { icon: 'mdi:cash-refund', order: 5, title: '会员佣金提现审核' },
+          },
         ],
       },
 

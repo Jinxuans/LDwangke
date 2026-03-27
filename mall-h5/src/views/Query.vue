@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { NavBar, Field, Button, CellGroup, Empty } from "vant";
-import { queryOrder } from "../api";
+import { onMounted, ref } from "vue";
+import { useRoute } from "vue-router";
+import { NavBar, Field, Button, CellGroup, Empty, showToast } from "vant";
+import { getShopInfo, queryOrder, triggerCustomerService } from "../api";
 
+const route = useRoute();
 const keyword = ref("");
 const loading = ref(false);
 const results = ref<any[]>([]);
 const searched = ref(false);
+const shopConfig = ref<any>(null);
+const customerPopup = ref<null | { title: string; label: string; type: string; value: string }>(null);
 
 const statusMap: Record<string, { label: string; cls: string }> = {
     待处理: { label: "待处理", cls: "status-pending" },
@@ -26,24 +30,55 @@ async function handleSearch() {
     try {
         const res: any = await queryOrder(keyword.value.trim());
         results.value = Array.isArray(res) ? res : res?.list || [];
-    } catch (e) {
+    } catch (e: any) {
         results.value = [];
+        showToast(e?.message || "查询失败");
     } finally {
         loading.value = false;
         searched.value = true;
     }
 }
+
+async function contactService() {
+    const res = await triggerCustomerService(shopConfig.value?.mall_config?.customer_service);
+    if ((res as any)?.mode === "popup") {
+        customerPopup.value = res as any;
+        return;
+    }
+    showToast((res as any)?.message || "操作失败");
+}
+
+async function copyCustomerValue() {
+    if (!customerPopup.value?.value) return;
+    await navigator.clipboard.writeText(customerPopup.value.value);
+    showToast(customerPopup.value.type === "qq" ? "QQ号已复制" : customerPopup.value.type === "phone" ? "电话号码已复制" : "客服微信已复制");
+}
+
+function callCustomerPhone() {
+    if (!customerPopup.value?.value) return;
+    window.location.href = `tel:${customerPopup.value.value}`;
+}
+
+onMounted(() => {
+    const q = String(route.query.keyword || "").trim();
+    void getShopInfo().then((res) => {
+        shopConfig.value = res;
+    }).catch(() => {});
+    if (!q) return;
+    keyword.value = q;
+    handleSearch();
+});
 </script>
 
 <template>
     <div class="query-page">
-        <NavBar title="查询订单" />
+        <NavBar title="查进度" />
 
         <div class="search-section">
             <CellGroup inset>
                 <Field
                     v-model="keyword"
-                    placeholder="输入账号或订单号查询"
+                    placeholder="输入下单账号，查询正在处理的课程"
                     clearable
                     left-icon="search"
                     @keyup.enter="handleSearch"
@@ -58,22 +93,34 @@ async function handleSearch() {
                     class="search-btn"
                     @click="handleSearch"
                 >
-                    {{ loading ? "查询中..." : "查询" }}
+                    {{ loading ? "查询中..." : "查进度" }}
                 </Button>
             </div>
         </div>
 
         <div class="divider"></div>
 
+        <div v-if="shopConfig?.mall_config?.customer_service?.enabled" class="service-card">
+            <div>
+                <div class="service-title">查询不到或进度异常？</div>
+                <div class="service-desc">可以直接联系店铺客服处理订单问题。</div>
+            </div>
+            <Button size="small" round type="primary" class="service-btn" @click="contactService">
+                {{ shopConfig?.mall_config?.customer_service?.label || "联系客服" }}
+            </Button>
+        </div>
+
+        <div class="divider"></div>
+
         <div v-if="!searched && !loading" class="hint-state">
             <van-icon name="search" size="40" color="#d1d5db" />
-            <p>输入账号或订单号开始查询</p>
+            <p>输入下单账号开始查询课程进度</p>
         </div>
 
         <div v-else-if="searched">
             <Empty
                 v-if="!results.length"
-                description="未找到相关订单"
+                description="未找到正在处理的课程"
                 style="padding-top: 60px"
             />
             <div v-else class="result-list">
@@ -84,7 +131,7 @@ async function handleSearch() {
                     class="order-card animate-fade-in-up"
                 >
                     <div class="order-header">
-                        <span class="order-id">订单 #{{ o.oid }}</span>
+                        <span class="order-id">业务单 #{{ o.oid }}</span>
                         <span
                             class="status-badge"
                             :class="getStatus(o.status).cls"
@@ -105,11 +152,19 @@ async function handleSearch() {
                                 o.account || o.user
                             }}</span>
                         </div>
+                        <div class="order-row" v-if="o.kcname">
+                            <span class="order-label">课程</span>
+                            <span class="order-value">{{ o.kcname }}</span>
+                        </div>
                         <div class="order-row" v-if="o.addtime">
                             <span class="order-label">时间</span>
                             <span class="order-value muted">{{
                                 o.addtime
                             }}</span>
+                        </div>
+                        <div class="order-row" v-if="o.remarks">
+                            <span class="order-label">日志</span>
+                            <span class="order-value">{{ o.remarks }}</span>
                         </div>
                     </div>
                     <div
@@ -131,6 +186,31 @@ async function handleSearch() {
                         </div>
                         <span class="progress-text">{{ o.process }}%</span>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="customerPopup" class="notice-popup-mask" @click.self="customerPopup = null">
+            <div class="notice-popup animate-fade-in-up">
+                <div class="notice-popup-header">
+                    <span>{{ customerPopup.title }}</span>
+                    <button class="notice-popup-close" @click="customerPopup = null">×</button>
+                </div>
+                <div class="notice-popup-body">
+                    <div class="customer-value">{{ customerPopup.value }}</div>
+                    <div class="customer-tip">若无法直接跳转，可手动复制后联系。</div>
+                </div>
+                <div class="customer-actions">
+                    <Button plain round block @click="copyCustomerValue">复制{{ customerPopup.type === 'phone' ? '号码' : '账号' }}</Button>
+                    <Button
+                        v-if="customerPopup.type === 'phone'"
+                        type="primary"
+                        round
+                        block
+                        @click="callCustomerPhone"
+                    >
+                        立即拨号
+                    </Button>
                 </div>
             </div>
         </div>
@@ -158,6 +238,30 @@ async function handleSearch() {
 .divider {
     height: 8px;
     background: var(--bg-primary);
+}
+.service-card {
+    margin: 12px 12px 0;
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid #bfdbfe;
+    background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.service-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e3a8a;
+}
+.service-desc {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #64748b;
+}
+.service-btn {
+    flex-shrink: 0;
 }
 .hint-state {
     display: flex;
@@ -248,5 +352,69 @@ async function handleSearch() {
     color: var(--text-muted);
     min-width: 32px;
     text-align: right;
+}
+.notice-popup-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.notice-popup {
+    width: min(100%, 420px);
+    max-height: 80vh;
+    overflow: hidden;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.24);
+    display: flex;
+    flex-direction: column;
+}
+.notice-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+}
+.notice-popup-close {
+    border: none;
+    background: transparent;
+    font-size: 24px;
+    line-height: 1;
+    color: #64748b;
+}
+.notice-popup-body {
+    padding: 16px 18px;
+    overflow: auto;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #334155;
+}
+.customer-value {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 15px;
+    font-weight: 700;
+    word-break: break-all;
+}
+.customer-tip {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #64748b;
+}
+.customer-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 18px 18px;
 }
 </style>

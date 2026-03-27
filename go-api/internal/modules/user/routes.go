@@ -26,6 +26,8 @@ func RegisterRoutes(api *gin.RouterGroup) {
 		uc.POST("/pay", UserCreatePay)
 		uc.GET("/pay/orders", UserPayOrders)
 		uc.GET("/moneylog", UserMoneyLog)
+		uc.GET("/withdraw/requests", UserWithdrawRequests)
+		uc.POST("/withdraw/request", UserWithdrawCreate)
 		uc.GET("/tickets", UserTicketList)
 		uc.POST("/ticket/create", UserTicketCreate)
 		uc.POST("/ticket/reply", UserTicketReply)
