@@ -18,7 +18,7 @@ func Sessions(c *gin.Context) {
 	uid := c.GetInt("uid")
 	sessions, err := chatService.Sessions(uid)
 	if err != nil {
-		response.ServerError(c, "查询会话失败")
+		response.ServerErrorf(c, err, "查询会话失败")
 		return
 	}
 	response.Success(c, sessions)
@@ -137,14 +137,14 @@ func SendImage(c *gin.Context) {
 
 	uploadDir := filepath.Join("uploads", "chat")
 	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
-		response.ServerError(c, "创建上传目录失败")
+		response.ServerErrorf(c, err, "创建上传目录失败")
 		return
 	}
 
 	filename := fmt.Sprintf("%s_%d%s", time.Now().Format("20060102150405"), time.Now().UnixNano()%10000, ext)
 	savePath := filepath.Join(uploadDir, filename)
 	if err := c.SaveUploadedFile(file, savePath); err != nil {
-		response.ServerError(c, "图片保存失败")
+		response.ServerErrorf(c, err, "图片保存失败")
 		return
 	}
 
@@ -167,7 +167,7 @@ func MarkRead(c *gin.Context) {
 	}
 
 	if err := chatService.MarkRead(uid, listID); err != nil {
-		response.ServerError(c, "标记已读失败")
+		response.ServerErrorf(c, err, "标记已读失败")
 		return
 	}
 
@@ -178,7 +178,7 @@ func Unread(c *gin.Context) {
 	uid := c.GetInt("uid")
 	total, err := chatService.UnreadTotal(uid)
 	if err != nil {
-		response.ServerError(c, "查询未读数失败")
+		response.ServerErrorf(c, err, "查询未读数失败")
 		return
 	}
 
