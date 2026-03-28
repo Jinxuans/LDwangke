@@ -1,6 +1,8 @@
 package response
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -52,6 +54,20 @@ func Forbidden(c *gin.Context, msg string) {
 }
 
 func ServerError(c *gin.Context, msg string) {
+	Error(c, http.StatusInternalServerError, 500, msg)
+}
+
+// ServerErrorf 将真实错误记录到日志（附带 request_id），并向客户端返回通用错误提示。
+// 替代直接调用 ServerError，让排查时日志里能看到 err 原文。
+//
+// 用法：response.ServerErrorf(c, err, "查询统计失败")
+func ServerErrorf(c *gin.Context, err error, msg string) {
+	reqID, _ := c.Get("request_id")
+	if reqID == nil {
+		reqID = "-"
+	}
+	log.Printf("[ERROR] req_id=%s %s %s | %s: %v",
+		fmt.Sprint(reqID), c.Request.Method, c.Request.URL.Path, msg, err)
 	Error(c, http.StatusInternalServerError, 500, msg)
 }
 
