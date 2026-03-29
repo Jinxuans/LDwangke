@@ -3,13 +3,13 @@ package pluginruntime
 import (
 	"context"
 
+	xmmodule "go-api/internal/modules/xm"
 	"go-api/internal/service"
 )
 
 var (
 	runYDSJServiceCronFn   = service.RunYDSJCron
 	runWServiceCronFn      = service.RunWCron
-	runXMServiceCronFn     = service.RunXMCron
 	runYongyeServiceCronFn = service.RunYongyeCron
 	runSDXYServiceCronFn   = service.RunSDXYCron
 )
@@ -25,7 +25,7 @@ func RunWCron(ctx context.Context) {
 }
 
 func RunXMCron(ctx context.Context) {
-	runXMServiceCronFn(ctx)
+	xmmodule.RunXMCron(ctx)
 }
 
 func RunYongyeCron(ctx context.Context) {

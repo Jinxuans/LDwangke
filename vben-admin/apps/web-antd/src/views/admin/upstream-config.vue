@@ -37,6 +37,11 @@ import {
   type XMProjectItem,
 } from '#/api/xm-project';
 import {
+  xmProviderListApi, xmProviderSaveApi, xmProviderDeleteApi,
+  xmProviderTestApi, xmProviderFetchProjectsApi, xmProviderImportProjectsApi, xmProviderSyncProjectsApi,
+  type XMProviderItem, type XMUpstreamProjectItem,
+} from '#/api/xm-provider';
+import {
   wAppListApi, wAppSaveApi, wAppDeleteApi,
   type WAppItem,
 } from '#/api/w-app';
@@ -197,38 +202,264 @@ const tuzhiGoodsColumns = [
   { title: '上架', key: 'enabled', width: 80 },
 ];
 
-// 小米运动项目
+// 小米运动：连接 + 项目
+const xmProviders = ref<XMProviderItem[]>([]);
+const xmProvidersLoading = ref(false);
+const xmProviderModalVisible = ref(false);
+const xmProviderSaving = ref(false);
+const xmProviderTesting = ref(false);
+const xmProviderForm = reactive<Partial<XMProviderItem>>({
+  id: 0,
+  name: '',
+  base_url: '',
+  auth_type: 0,
+  uid: '',
+  key: '',
+  token: '',
+  status: 0,
+  remark: '',
+});
+
 const xmProjects = ref<XMProjectItem[]>([]);
 const xmLoading = ref(false);
 const xmModalVisible = ref(false);
 const xmSaving = ref(false);
 const xmForm = reactive<Partial<XMProjectItem>>({
-  id: 0, name: '', description: '', price: 0, query: 1, password: 1,
-  url: '', uid: '', key: '', token: '', type: 0, p_id: '', status: 0,
+  id: 0,
+  provider_id: 0,
+  provider_name: '',
+  name: '',
+  description: '',
+  price: 0,
+  upstream_price: 0,
+  query: 1,
+  password: 1,
+  p_id: '',
+  status: 0,
+  sort_order: 0,
+  sync_mode: 1,
 });
+
+const xmImportVisible = ref(false);
+const xmImportLoading = ref(false);
+const xmImportSubmitting = ref(false);
+const xmImportProvider = ref<XMProviderItem | null>(null);
+const xmImportProjects = ref<XMUpstreamProjectItem[]>([]);
+const xmSelectedImportProjectIds = ref<string[]>([]);
+const xmImportForm = reactive({
+  price_multiplier: 1,
+  price_addition: 0,
+  overwrite_local_price: true,
+});
+
+function handleXmImportSelectionChange(keys: (number | string)[]) {
+  xmSelectedImportProjectIds.value = keys.map((key) => String(key));
+}
+
+const xmSyncVisible = ref(false);
+const xmSyncLoading = ref(false);
+const xmSyncProvider = ref<XMProviderItem | null>(null);
+const xmSyncForm = reactive({
+  provider_id: 0,
+  sync_name: true,
+  sync_description: true,
+  sync_upstream_price: true,
+  sync_query: true,
+  sync_password: true,
+  overwrite_local_price: false,
+  price_multiplier: 1,
+  price_addition: 0,
+});
+
+const xmProviderColumns = [
+  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: '连接名称', dataIndex: 'name', width: 180, ellipsis: true },
+  { title: '认证', key: 'auth_type', width: 90 },
+  { title: 'API 地址', dataIndex: 'base_url', ellipsis: true },
+  { title: '项目数', dataIndex: 'project_count', width: 80 },
+  { title: '最近同步', dataIndex: 'last_sync_at', width: 160 },
+  { title: '状态', key: 'status', width: 80 },
+  { title: '操作', key: 'action', width: 280 },
+];
 
 const xmColumns = [
   { title: 'ID', dataIndex: 'id', width: 60 },
   { title: '项目名称', dataIndex: 'name', ellipsis: true },
-  { title: '价格', dataIndex: 'price', width: 80 },
+  { title: '来源连接', dataIndex: 'provider_name', width: 140, ellipsis: true },
+  { title: '本地售价', dataIndex: 'price', width: 90 },
+  { title: '上游价格', dataIndex: 'upstream_price', width: 90 },
   { title: '上游项目ID', dataIndex: 'p_id', width: 100 },
-  { title: '认证类型', key: 'type', width: 90 },
   { title: '状态', key: 'status', width: 80 },
   { title: '操作', key: 'action', width: 120 },
 ];
+
+const xmImportColumns = [
+  { title: '上游ID', dataIndex: 'id', width: 80 },
+  { title: '项目名称', dataIndex: 'name', ellipsis: true },
+  { title: '上游价格', dataIndex: 'price', width: 90 },
+  { title: '支持查询', key: 'query', width: 90 },
+  { title: '需要密码', key: 'password', width: 90 },
+];
+
+async function loadXmProviders() {
+  xmProvidersLoading.value = true;
+  try {
+    const res = await xmProviderListApi();
+    xmProviders.value = res || [];
+  } catch (e) {
+    console.error(e);
+  } finally {
+    xmProvidersLoading.value = false;
+  }
+}
 
 async function loadXmProjects() {
   xmLoading.value = true;
   try {
     const res = await xmProjectListApi();
     xmProjects.value = res || [];
-  } catch (e) { console.error(e); }
-  finally { xmLoading.value = false; }
+  } catch (e) {
+    console.error(e);
+  } finally {
+    xmLoading.value = false;
+  }
 }
 
-function openXmAdd() {
-  Object.assign(xmForm, { id: 0, name: '', description: '', price: 0, query: 1, password: 1, url: '', uid: '', key: '', token: '', type: 0, p_id: '', status: 0 });
-  xmModalVisible.value = true;
+function openXmProviderAdd() {
+  Object.assign(xmProviderForm, {
+    id: 0,
+    name: '',
+    base_url: '',
+    auth_type: 0,
+    uid: '',
+    key: '',
+    token: '',
+    status: 0,
+    remark: '',
+  });
+  xmProviderModalVisible.value = true;
+}
+
+function openXmProviderEdit(row: XMProviderItem) {
+  Object.assign(xmProviderForm, { ...row });
+  xmProviderModalVisible.value = true;
+}
+
+async function submitXmProviderForm() {
+  if (!xmProviderForm.name?.trim()) { message.warning('连接名称不能为空'); return; }
+  if (!xmProviderForm.base_url?.trim()) { message.warning('API 地址不能为空'); return; }
+  xmProviderSaving.value = true;
+  try {
+    await xmProviderSaveApi({ ...xmProviderForm });
+    message.success(xmProviderForm.id ? '连接保存成功' : '连接添加成功');
+    xmProviderModalVisible.value = false;
+    loadXmProviders();
+  } catch (e: any) {
+    message.error(e?.message || '保存失败');
+  } finally {
+    xmProviderSaving.value = false;
+  }
+}
+
+async function deleteXmProvider(id: number) {
+  try {
+    await xmProviderDeleteApi(id);
+    message.success('删除成功');
+    loadXmProviders();
+  } catch (e: any) {
+    message.error(e?.message || '删除失败');
+  }
+}
+
+async function testXmProvider(record: XMProviderItem) {
+  xmProviderTesting.value = true;
+  try {
+    const res = await xmProviderTestApi(record.id);
+    message.success(`${res?.message || '连接成功'}，拉到 ${res?.project_count || 0} 个项目`);
+  } catch (e: any) {
+    message.error(e?.message || '连接失败');
+  } finally {
+    xmProviderTesting.value = false;
+  }
+}
+
+async function fetchXmProviderProjects(record: XMProviderItem) {
+  xmImportLoading.value = true;
+  xmImportProvider.value = record;
+  try {
+    const res = await xmProviderFetchProjectsApi(record.id);
+    xmImportProjects.value = Array.isArray(res) ? res : [];
+    xmSelectedImportProjectIds.value = xmImportProjects.value.map((item) => item.id);
+    Object.assign(xmImportForm, {
+      price_multiplier: 1,
+      price_addition: 0,
+      overwrite_local_price: true,
+    });
+    xmImportVisible.value = true;
+  } catch (e: any) {
+    message.error(e?.message || '拉取项目失败');
+  } finally {
+    xmImportLoading.value = false;
+  }
+}
+
+async function submitXmImportProjects() {
+  if (!xmImportProvider.value) return;
+  if (xmSelectedImportProjectIds.value.length === 0) {
+    message.warning('请至少选择一个项目');
+    return;
+  }
+  xmImportSubmitting.value = true;
+  try {
+    const res = await xmProviderImportProjectsApi({
+      provider_id: xmImportProvider.value.id,
+      project_ids: xmSelectedImportProjectIds.value,
+      price_multiplier: xmImportForm.price_multiplier,
+      price_addition: xmImportForm.price_addition,
+      overwrite_local_price: xmImportForm.overwrite_local_price,
+    });
+    const summary = res?.summary || {};
+    message.success(`导入完成：新增 ${summary.created || 0}，更新 ${summary.updated || 0}`);
+    xmImportVisible.value = false;
+    loadXmProjects();
+    loadXmProviders();
+  } catch (e: any) {
+    message.error(e?.message || '导入失败');
+  } finally {
+    xmImportSubmitting.value = false;
+  }
+}
+
+function openXmSync(record: XMProviderItem) {
+  xmSyncProvider.value = record;
+  Object.assign(xmSyncForm, {
+    provider_id: record.id,
+    sync_name: true,
+    sync_description: true,
+    sync_upstream_price: true,
+    sync_query: true,
+    sync_password: true,
+    overwrite_local_price: false,
+    price_multiplier: 1,
+    price_addition: 0,
+  });
+  xmSyncVisible.value = true;
+}
+
+async function submitXmSyncProjects() {
+  xmSyncLoading.value = true;
+  try {
+    const res = await xmProviderSyncProjectsApi({ ...xmSyncForm });
+    const summary = res?.summary || {};
+    message.success(`同步完成：更新 ${summary.updated || 0}，跳过 ${summary.skipped || 0}`);
+    xmSyncVisible.value = false;
+    loadXmProjects();
+    loadXmProviders();
+  } catch (e: any) {
+    message.error(e?.message || '同步失败');
+  } finally {
+    xmSyncLoading.value = false;
+  }
 }
 
 function openXmEdit(row: XMProjectItem) {
@@ -241,11 +472,14 @@ async function submitXmForm() {
   xmSaving.value = true;
   try {
     await xmProjectSaveApi({ ...xmForm });
-    message.success(xmForm.id ? '保存成功' : '添加成功');
+    message.success('保存成功');
     xmModalVisible.value = false;
     loadXmProjects();
-  } catch (e: any) { message.error(e?.message || '保存失败'); }
-  finally { xmSaving.value = false; }
+  } catch (e: any) {
+    message.error(e?.message || '保存失败');
+  } finally {
+    xmSaving.value = false;
+  }
 }
 
 async function deleteXmProject(id: number) {
@@ -253,7 +487,9 @@ async function deleteXmProject(id: number) {
     await xmProjectDeleteApi(id);
     message.success('删除成功');
     loadXmProjects();
-  } catch (e: any) { message.error(e?.message || '删除失败'); }
+  } catch (e: any) {
+    message.error(e?.message || '删除失败');
+  }
 }
 
 // 鲸鱼运动项目
@@ -629,6 +865,7 @@ function isConfigured(url: string) {
 
 onMounted(() => {
   loadAll();
+  loadXmProviders();
   loadXmProjects();
   loadWApps();
   loadYFDKProjects();
@@ -1089,27 +1326,60 @@ onMounted(() => {
 
         <TabPane key="project" tab="项目管理">
           <div class="mt-3 space-y-4">
-            <!-- 小米运动 -->
             <Card :bordered="false" class="cfg-card">
               <template #title>
-                <span class="card-title">小米运动</span>
-                <Tag color="processing" class="ml-2">{{ xmProjects.length }} 个项目</Tag>
+                <span class="card-title">小米运动连接</span>
+                <Tag color="processing" class="ml-2">{{ xmProviders.length }} 条连接</Tag>
               </template>
               <template #extra>
                 <Space>
-                  <Button size="small" @click="loadXmProjects" :loading="xmLoading">刷新</Button>
-                  <Button type="primary" size="small" @click="openXmAdd">
+                  <Button size="small" @click="loadXmProviders" :loading="xmProvidersLoading">刷新</Button>
+                  <Button type="primary" size="small" @click="openXmProviderAdd">
                     <template #icon><PlusOutlined /></template>
-                    添加
+                    添加连接
                   </Button>
                 </Space>
               </template>
-              <Table :columns="xmColumns" :data-source="xmProjects" :loading="xmLoading" :pagination="false" row-key="id" size="small">
+              <Alert
+                class="mb-3"
+                type="info"
+                show-icon
+                message="先配置上游连接，再拉取 getProjects 批量导入项目；倍率和附加价会直接算出本地基础售价。"
+              />
+              <Table :columns="xmProviderColumns" :data-source="xmProviders" :loading="xmProvidersLoading" :pagination="false" row-key="id" size="small">
                 <template #bodyCell="{ column, record }">
-                  <template v-if="column.key === 'type'">
-                    <Tag :color="record.type === 0 ? 'blue' : 'green'">{{ record.type === 0 ? 'Key' : 'Token' }}</Tag>
+                  <template v-if="column.key === 'auth_type'">
+                    <Tag :color="record.auth_type === 0 ? 'blue' : 'green'">{{ record.auth_type === 0 ? 'Key' : 'Token' }}</Tag>
                   </template>
                   <template v-else-if="column.key === 'status'">
+                    <Tag :color="record.status === 0 ? 'green' : 'red'">{{ record.status === 0 ? '正常' : '停用' }}</Tag>
+                  </template>
+                  <template v-else-if="column.key === 'action'">
+                    <Space :size="0" wrap>
+                      <Button type="link" size="small" @click="openXmProviderEdit(record)">编辑</Button>
+                      <Button type="link" size="small" :loading="xmProviderTesting" @click="testXmProvider(record)">测试</Button>
+                      <Button type="link" size="small" @click="fetchXmProviderProjects(record)">导入项目</Button>
+                      <Button type="link" size="small" @click="openXmSync(record)">一键同步</Button>
+                      <Popconfirm title="确定删除连接？" @confirm="deleteXmProvider(record.id)">
+                        <Button type="link" danger size="small">删除</Button>
+                      </Popconfirm>
+                    </Space>
+                  </template>
+                </template>
+              </Table>
+            </Card>
+
+            <Card :bordered="false" class="cfg-card">
+              <template #title>
+                <span class="card-title">小米运动项目</span>
+                <Tag color="processing" class="ml-2">{{ xmProjects.length }} 个项目</Tag>
+              </template>
+              <template #extra>
+                <Button size="small" @click="loadXmProjects" :loading="xmLoading">刷新</Button>
+              </template>
+              <Table :columns="xmColumns" :data-source="xmProjects" :loading="xmLoading" :pagination="false" row-key="id" size="small">
+                <template #bodyCell="{ column, record }">
+                  <template v-if="column.key === 'status'">
                     <Tag :color="record.status === 0 ? 'green' : 'red'">{{ record.status === 0 ? '正常' : '下架' }}</Tag>
                   </template>
                   <template v-else-if="column.key === 'action'">
@@ -1166,54 +1436,216 @@ onMounted(() => {
       </Tabs>
     </div>
 
-    <!-- 小米运动编辑弹窗 -->
-    <Modal v-model:open="xmModalVisible" :title="xmForm.id ? '编辑项目' : '添加项目'" @ok="submitXmForm" :confirm-loading="xmSaving" ok-text="保存" width="640px">
+    <Modal v-model:open="xmProviderModalVisible" :title="xmProviderForm.id ? '编辑连接' : '添加连接'" @ok="submitXmProviderForm" :confirm-loading="xmProviderSaving" ok-text="保存" width="640px">
       <Form layout="vertical" :colon="false" class="mt-3">
         <Row :gutter="16">
           <Col :span="12">
-            <FormItem label="项目名称">
-              <Input v-model:value="xmForm.name" placeholder="例如：某某跑步" />
+            <FormItem label="连接名称">
+              <Input v-model:value="xmProviderForm.name" placeholder="例如：Spiderman 主号" />
             </FormItem>
           </Col>
-          <Col :span="12">
-            <FormItem label="价格（元/公里）">
-              <InputNumber v-model:value="xmForm.price" :min="0" :step="0.1" :precision="2" class="w-full" />
-            </FormItem>
-          </Col>
-        </Row>
-        <FormItem label="说明">
-          <Input.TextArea v-model:value="xmForm.description" :rows="2" placeholder="项目描述" />
-        </FormItem>
-        <Row :gutter="16">
           <Col :span="12">
             <FormItem label="认证类型">
-              <Select v-model:value="xmForm.type" class="w-full">
+              <Select v-model:value="xmProviderForm.auth_type" class="w-full">
                 <SelectOption :value="0">Key 认证</SelectOption>
                 <SelectOption :value="1">Token 认证</SelectOption>
               </Select>
             </FormItem>
           </Col>
-          <Col :span="12">
-            <FormItem label="上游项目ID">
-              <Input v-model:value="xmForm.p_id" placeholder="上游 p_id" />
-            </FormItem>
-          </Col>
         </Row>
         <FormItem label="API 地址">
-          <Input v-model:value="xmForm.url" placeholder="上游接口地址" />
+          <Input v-model:value="xmProviderForm.base_url" placeholder="例如：https://spiderman.sbs/api/xm_apis.php" />
         </FormItem>
         <Row :gutter="16">
           <Col :span="12">
-            <FormItem label="UID">
-              <Input v-model:value="xmForm.uid" placeholder="上游用户ID" />
+            <FormItem label="UID" v-if="xmProviderForm.auth_type === 0">
+              <Input v-model:value="xmProviderForm.uid" placeholder="上游用户 UID" />
+            </FormItem>
+            <FormItem label="Token" v-else>
+              <Input.Password v-model:value="xmProviderForm.token" placeholder="上游 Token" />
             </FormItem>
           </Col>
           <Col :span="12">
-            <FormItem v-if="xmForm.type === 0" label="Key">
-              <Input.Password v-model:value="xmForm.key" placeholder="API密钥" />
+            <FormItem label="Key" v-if="xmProviderForm.auth_type === 0">
+              <Input.Password v-model:value="xmProviderForm.key" placeholder="上游 API Key" />
             </FormItem>
-            <FormItem v-else label="Token">
-              <Input.Password v-model:value="xmForm.token" placeholder="Token" />
+            <FormItem label="状态" v-else>
+              <Select v-model:value="xmProviderForm.status" class="w-full">
+                <SelectOption :value="0">正常</SelectOption>
+                <SelectOption :value="1">停用</SelectOption>
+              </Select>
+            </FormItem>
+          </Col>
+        </Row>
+        <FormItem label="状态" v-if="xmProviderForm.auth_type === 0">
+          <Select v-model:value="xmProviderForm.status" class="w-full">
+            <SelectOption :value="0">正常</SelectOption>
+            <SelectOption :value="1">停用</SelectOption>
+          </Select>
+        </FormItem>
+        <FormItem label="备注">
+          <Input.TextArea v-model:value="xmProviderForm.remark" :rows="2" placeholder="记录这个连接的来源、限制或同步说明" />
+        </FormItem>
+      </Form>
+    </Modal>
+
+    <Modal v-model:open="xmImportVisible" title="导入上游项目" @ok="submitXmImportProjects" :confirm-loading="xmImportSubmitting" ok-text="确认导入" width="920px">
+      <Alert
+        class="mb-3"
+        type="info"
+        show-icon
+        :message="xmImportProvider ? `当前连接：${xmImportProvider.name}` : '请选择连接'"
+      />
+      <Row :gutter="16" class="mb-3">
+        <Col :span="8">
+          <FormItem label="本地价格倍率">
+            <InputNumber v-model:value="xmImportForm.price_multiplier" :min="0" :step="0.1" :precision="2" class="w-full" />
+          </FormItem>
+        </Col>
+        <Col :span="8">
+          <FormItem label="附加价">
+            <InputNumber v-model:value="xmImportForm.price_addition" :step="0.1" :precision="2" class="w-full" />
+          </FormItem>
+        </Col>
+        <Col :span="8">
+          <FormItem label="覆盖已有本地价格">
+            <Select v-model:value="xmImportForm.overwrite_local_price" class="w-full">
+              <SelectOption :value="true">是</SelectOption>
+              <SelectOption :value="false">否</SelectOption>
+            </Select>
+          </FormItem>
+        </Col>
+      </Row>
+      <Table
+        :columns="xmImportColumns"
+        :data-source="xmImportProjects"
+        :loading="xmImportLoading"
+        :pagination="false"
+        row-key="id"
+        size="small"
+        :row-selection="{
+          selectedRowKeys: xmSelectedImportProjectIds,
+          onChange: handleXmImportSelectionChange,
+        }"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'query'">
+            <Tag :color="record.query === 1 ? 'green' : 'default'">{{ record.query === 1 ? '支持' : '不支持' }}</Tag>
+          </template>
+          <template v-else-if="column.key === 'password'">
+            <Tag :color="record.password === 1 ? 'orange' : 'default'">{{ record.password === 1 ? '需要' : '不需要' }}</Tag>
+          </template>
+        </template>
+      </Table>
+    </Modal>
+
+    <Modal v-model:open="xmSyncVisible" title="同步上游项目" @ok="submitXmSyncProjects" :confirm-loading="xmSyncLoading" ok-text="开始同步" width="700px">
+      <Alert
+        class="mb-3"
+        type="info"
+        show-icon
+        :message="xmSyncProvider ? `将从连接 ${xmSyncProvider.name} 重新拉取项目并更新本地映射。` : '请选择连接'"
+      />
+      <Row :gutter="16">
+        <Col :span="8">
+          <FormItem label="同步名称">
+            <Select v-model:value="xmSyncForm.sync_name" class="w-full">
+              <SelectOption :value="true">是</SelectOption>
+              <SelectOption :value="false">否</SelectOption>
+            </Select>
+          </FormItem>
+        </Col>
+        <Col :span="8">
+          <FormItem label="同步说明">
+            <Select v-model:value="xmSyncForm.sync_description" class="w-full">
+              <SelectOption :value="true">是</SelectOption>
+              <SelectOption :value="false">否</SelectOption>
+            </Select>
+          </FormItem>
+        </Col>
+        <Col :span="8">
+          <FormItem label="同步上游价格">
+            <Select v-model:value="xmSyncForm.sync_upstream_price" class="w-full">
+              <SelectOption :value="true">是</SelectOption>
+              <SelectOption :value="false">否</SelectOption>
+            </Select>
+          </FormItem>
+        </Col>
+        <Col :span="8">
+          <FormItem label="同步查询能力">
+            <Select v-model:value="xmSyncForm.sync_query" class="w-full">
+              <SelectOption :value="true">是</SelectOption>
+              <SelectOption :value="false">否</SelectOption>
+            </Select>
+          </FormItem>
+        </Col>
+        <Col :span="8">
+          <FormItem label="同步密码要求">
+            <Select v-model:value="xmSyncForm.sync_password" class="w-full">
+              <SelectOption :value="true">是</SelectOption>
+              <SelectOption :value="false">否</SelectOption>
+            </Select>
+          </FormItem>
+        </Col>
+        <Col :span="8">
+          <FormItem label="重算本地价格">
+            <Select v-model:value="xmSyncForm.overwrite_local_price" class="w-full">
+              <SelectOption :value="true">是</SelectOption>
+              <SelectOption :value="false">否</SelectOption>
+            </Select>
+          </FormItem>
+        </Col>
+        <Col :span="12">
+          <FormItem label="本地价格倍率">
+            <InputNumber v-model:value="xmSyncForm.price_multiplier" :min="0" :step="0.1" :precision="2" class="w-full" />
+          </FormItem>
+        </Col>
+        <Col :span="12">
+          <FormItem label="附加价">
+            <InputNumber v-model:value="xmSyncForm.price_addition" :step="0.1" :precision="2" class="w-full" />
+          </FormItem>
+        </Col>
+      </Row>
+    </Modal>
+
+    <Modal v-model:open="xmModalVisible" title="编辑项目" @ok="submitXmForm" :confirm-loading="xmSaving" ok-text="保存" width="640px">
+      <Form layout="vertical" :colon="false" class="mt-3">
+        <Row :gutter="16">
+          <Col :span="12">
+            <FormItem label="项目名称">
+              <Input v-model:value="xmForm.name" placeholder="本地展示名称" />
+            </FormItem>
+          </Col>
+          <Col :span="12">
+            <FormItem label="来源连接">
+              <Input :value="xmForm.provider_name" disabled />
+            </FormItem>
+          </Col>
+        </Row>
+        <Row :gutter="16">
+          <Col :span="12">
+            <FormItem label="上游项目ID">
+              <Input :value="xmForm.p_id" disabled />
+            </FormItem>
+          </Col>
+          <Col :span="12">
+            <FormItem label="排序">
+              <InputNumber v-model:value="xmForm.sort_order" :min="0" :step="1" class="w-full" />
+            </FormItem>
+          </Col>
+        </Row>
+        <FormItem label="项目说明">
+          <Input.TextArea v-model:value="xmForm.description" :rows="2" placeholder="本地展示说明" />
+        </FormItem>
+        <Row :gutter="16">
+          <Col :span="12">
+            <FormItem label="本地基础售价">
+              <InputNumber v-model:value="xmForm.price" :min="0" :step="0.1" :precision="4" class="w-full" />
+            </FormItem>
+          </Col>
+          <Col :span="12">
+            <FormItem label="上游价格">
+              <InputNumber v-model:value="xmForm.upstream_price" :min="0" :step="0.1" :precision="4" class="w-full" disabled />
             </FormItem>
           </Col>
         </Row>
@@ -1227,7 +1659,7 @@ onMounted(() => {
             </FormItem>
           </Col>
           <Col :span="8">
-            <FormItem label="支持查课">
+            <FormItem label="支持查询">
               <Select v-model:value="xmForm.query" class="w-full">
                 <SelectOption :value="1">是</SelectOption>
                 <SelectOption :value="0">否</SelectOption>

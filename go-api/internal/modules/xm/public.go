@@ -8,6 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func isAdminUser(c *gin.Context) bool {
+	grade := c.GetString("grade")
+	return grade == "2" || grade == "3" || c.GetInt("uid") == 1
+}
+
 // ---------- 小米运动 项目列表 ----------
 
 func XMGetProjects(c *gin.Context) {
@@ -45,11 +50,7 @@ func XMAddOrder(c *gin.Context) {
 
 func XMGetOrders(c *gin.Context) {
 	uid := c.GetInt("uid")
-	role, _ := c.Get("role")
-	isAdmin := role == "super" || role == "admin"
-	if uid == 1 {
-		isAdmin = true
-	}
+	isAdmin := isAdminUser(c)
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
@@ -81,11 +82,7 @@ func XMGetOrders(c *gin.Context) {
 
 func XMAddOrderKM(c *gin.Context) {
 	uid := c.GetInt("uid")
-	role, _ := c.Get("role")
-	isAdmin := role == "super" || role == "admin"
-	if uid == 1 {
-		isAdmin = true
-	}
+	isAdmin := isAdminUser(c)
 
 	var body struct {
 		OrderID int `json:"order_id"`
@@ -95,8 +92,8 @@ func XMAddOrderKM(c *gin.Context) {
 		response.BadRequest(c, "请求数据格式错误")
 		return
 	}
-	if body.OrderID <= 0 || body.AddKM <= 0 {
-		response.BadRequest(c, "参数错误")
+	if body.OrderID <= 0 {
+		response.BadRequest(c, "缺少订单ID")
 		return
 	}
 
@@ -109,7 +106,7 @@ func XMAddOrderKM(c *gin.Context) {
 	response.Success(c, result)
 }
 
-// ---------- 查询跑步状态 ----------
+// ---------- 查询跑步信息 ----------
 
 func XMQueryRun(c *gin.Context) {
 	uid := c.GetInt("uid")
@@ -129,15 +126,11 @@ func XMQueryRun(c *gin.Context) {
 	response.Success(c, result)
 }
 
-// ---------- 退款 ----------
+// ---------- 退款订单 ----------
 
 func XMRefundOrder(c *gin.Context) {
 	uid := c.GetInt("uid")
-	role, _ := c.Get("role")
-	isAdmin := role == "super" || role == "admin"
-	if uid == 1 {
-		isAdmin = true
-	}
+	isAdmin := isAdminUser(c)
 
 	orderID, _ := strconv.Atoi(c.Query("order_id"))
 	if orderID <= 0 {
@@ -146,23 +139,19 @@ func XMRefundOrder(c *gin.Context) {
 	}
 
 	svc := XM()
-	data, err := svc.RefundOrder(uid, orderID, isAdmin)
+	result, err := svc.RefundOrder(uid, orderID, isAdmin)
 	if err != nil {
 		response.BusinessError(c, -1, err.Error())
 		return
 	}
-	response.Success(c, data)
+	response.Success(c, result)
 }
 
 // ---------- 删除订单 ----------
 
 func XMDeleteOrder(c *gin.Context) {
 	uid := c.GetInt("uid")
-	role, _ := c.Get("role")
-	isAdmin := role == "super" || role == "admin"
-	if uid == 1 {
-		isAdmin = true
-	}
+	isAdmin := isAdminUser(c)
 
 	orderID, _ := strconv.Atoi(c.Query("order_id"))
 	if orderID <= 0 {
@@ -183,11 +172,7 @@ func XMDeleteOrder(c *gin.Context) {
 
 func XMSyncOrder(c *gin.Context) {
 	uid := c.GetInt("uid")
-	role, _ := c.Get("role")
-	isAdmin := role == "super" || role == "admin"
-	if uid == 1 {
-		isAdmin = true
-	}
+	isAdmin := isAdminUser(c)
 
 	orderID, _ := strconv.Atoi(c.Query("order_id"))
 	if orderID <= 0 {
@@ -208,11 +193,7 @@ func XMSyncOrder(c *gin.Context) {
 
 func XMGetOrderLogs(c *gin.Context) {
 	uid := c.GetInt("uid")
-	role, _ := c.Get("role")
-	isAdmin := role == "super" || role == "admin"
-	if uid == 1 {
-		isAdmin = true
-	}
+	isAdmin := isAdminUser(c)
 
 	orderID, _ := strconv.Atoi(c.Query("order_id"))
 	if orderID <= 0 {
