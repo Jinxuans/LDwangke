@@ -2,9 +2,12 @@ import { requestClient } from '#/api/request';
 
 export interface XMProjectItem {
   id: number;
+  provider_id: number;
+  provider_name: string;
   name: string;
   description: string;
   price: number;
+  upstream_price: number;
   query: number;
   password: number;
   url: string;
@@ -14,6 +17,8 @@ export interface XMProjectItem {
   type: number;
   p_id: string;
   status: number;
+  sort_order: number;
+  sync_mode: number;
 }
 
 export async function xmProjectListApi() {

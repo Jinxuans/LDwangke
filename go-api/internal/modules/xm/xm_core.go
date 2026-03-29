@@ -12,20 +12,66 @@ import (
 	"go-api/internal/database"
 )
 
+type xmConnectionConfig struct {
+	ProviderID int
+	BaseURL    string
+	AuthType   int
+	UID        string
+	Key        string
+	Token      string
+}
+
+func buildXMTokenHeaders(token string, extras map[string]string) map[string]string {
+	headers := map[string]string{
+		"token":         token,
+		"Authorization": token,
+		"Cookie":        token,
+	}
+	for k, v := range extras {
+		headers[k] = v
+	}
+	return headers
+}
+
 // EnsureTable 确保小米运动相关表存在
 func (s *XMService) EnsureTable() {
-	_, err := database.DB.Exec(`CREATE TABLE IF NOT EXISTS xm_project (
+	_, err := database.DB.Exec(`CREATE TABLE IF NOT EXISTS xm_provider (
+		id BIGINT NOT NULL AUTO_INCREMENT,
+		name VARCHAR(255) NOT NULL COMMENT '连接名称',
+		base_url VARCHAR(500) NOT NULL COMMENT '上游接口地址',
+		auth_type TINYINT NOT NULL DEFAULT 0 COMMENT '0=Key 1=Token',
+		uid VARCHAR(255) DEFAULT '' COMMENT '上游UID',
+		` + "`key`" + ` VARCHAR(255) DEFAULT '' COMMENT '上游Key',
+		token VARCHAR(1024) DEFAULT '' COMMENT '上游Token',
+		status TINYINT NOT NULL DEFAULT 0 COMMENT '0正常 1停用',
+		remark VARCHAR(500) DEFAULT '' COMMENT '备注',
+		last_sync_at DATETIME DEFAULT NULL COMMENT '最近同步时间',
+		is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '软删除标记',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		PRIMARY KEY (id)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='小米运动上游连接表'`)
+	if err != nil {
+		fmt.Printf("[XM] 建 xm_provider 表失败: %v\n", err)
+	}
+
+	_, err = database.DB.Exec(`CREATE TABLE IF NOT EXISTS xm_project (
 		id BIGINT NOT NULL AUTO_INCREMENT,
 		name VARCHAR(255) NOT NULL COMMENT '项目名称',
 		p_id INT DEFAULT 0 COMMENT '源项目ID',
 		status TINYINT DEFAULT 0 COMMENT '0上架 1下架',
 		description TEXT NULL COMMENT '项目说明',
 		price DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '单价',
+		upstream_price DECIMAL(18,4) NOT NULL DEFAULT 0 COMMENT '上游原价',
+		local_price DECIMAL(18,4) NOT NULL DEFAULT 0 COMMENT '本地基础价',
 		url VARCHAR(255) DEFAULT NULL COMMENT '对接URL',
 		` + "`key`" + ` VARCHAR(255) DEFAULT NULL COMMENT '对接密钥',
 		uid VARCHAR(255) DEFAULT NULL COMMENT '对接UID',
 		token VARCHAR(1024) DEFAULT NULL COMMENT '对接JWT token',
 		type VARCHAR(50) DEFAULT NULL COMMENT '项目类型',
+		provider_id BIGINT NOT NULL DEFAULT 0 COMMENT '上游连接ID',
+		sort_order INT NOT NULL DEFAULT 0 COMMENT '排序',
+		sync_mode TINYINT NOT NULL DEFAULT 1 COMMENT '1同步上游基础信息',
 		` + "`query`" + ` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否支持查询',
 		password TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否需要密码',
 		is_deleted TINYINT DEFAULT 0 COMMENT '软删除标记',
@@ -67,8 +113,19 @@ func (s *XMService) EnsureTable() {
 		fmt.Printf("[XM] 建 xm_order 表失败: %v\n", err)
 	}
 
+	database.DB.Exec("ALTER TABLE xm_project ADD COLUMN `upstream_price` DECIMAL(18,4) NOT NULL DEFAULT 0 COMMENT '上游原价' AFTER `price`")
+	database.DB.Exec("ALTER TABLE xm_project ADD COLUMN `local_price` DECIMAL(18,4) NOT NULL DEFAULT 0 COMMENT '本地基础价' AFTER `upstream_price`")
+	database.DB.Exec("ALTER TABLE xm_project ADD COLUMN `provider_id` BIGINT NOT NULL DEFAULT 0 COMMENT '上游连接ID' AFTER `type`")
+	database.DB.Exec("ALTER TABLE xm_project ADD COLUMN `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序' AFTER `provider_id`")
+	database.DB.Exec("ALTER TABLE xm_project ADD COLUMN `sync_mode` TINYINT NOT NULL DEFAULT 1 COMMENT '1同步上游基础信息' AFTER `sort_order`")
+	database.DB.Exec("UPDATE xm_project SET upstream_price = price WHERE COALESCE(upstream_price, 0) = 0")
+	database.DB.Exec("UPDATE xm_project SET local_price = price WHERE COALESCE(local_price, 0) = 0")
+	database.DB.Exec("UPDATE xm_project SET sort_order = id WHERE COALESCE(sort_order, 0) = 0")
+
 	database.DB.Exec("ALTER TABLE xm_order ADD COLUMN `pace` DECIMAL(5,2) DEFAULT NULL COMMENT '配速（分/公里）' AFTER `type`")
 	database.DB.Exec("ALTER TABLE xm_order ADD COLUMN `distance` DECIMAL(5,2) DEFAULT NULL COMMENT '单次距离（公里）' AFTER `pace`")
+
+	s.migrateLegacyXMProviders()
 }
 
 func (s *XMService) httpRequest(method, reqURL string, body interface{}, headers map[string]string) (map[string]interface{}, error) {
@@ -121,32 +178,19 @@ func (s *XMService) httpRequest(method, reqURL string, body interface{}, headers
 	return result, nil
 }
 
-func (s *XMService) projectRequest(project map[string]interface{}, act string, body interface{}, method string) (map[string]interface{}, error) {
-	pURL := strings.TrimSpace(fmt.Sprintf("%v", project["url"]))
-	pType := 0
-	if t, ok := project["type"].(int64); ok {
-		pType = int(t)
-	} else if t, ok := project["type"].([]uint8); ok {
-		pType = int(t[0]) - '0'
-	} else if t, ok := project["type"].(float64); ok {
-		pType = int(t)
-	}
-	token := fmt.Sprintf("%v", project["token"])
-	key := fmt.Sprintf("%v", project["key"])
-	pUID := fmt.Sprintf("%v", project["uid"])
-
+func (s *XMService) providerRequest(conn xmConnectionConfig, act string, body interface{}, method string) (map[string]interface{}, error) {
 	headers := map[string]string{}
 	var reqURL string
 
-	if pType == 0 {
+	if conn.AuthType == 0 {
 		params := url.Values{}
 		params.Set("act", act)
-		params.Set("key", key)
-		params.Set("uid", pUID)
-		reqURL = pURL + "?" + params.Encode()
+		params.Set("key", conn.Key)
+		params.Set("uid", conn.UID)
+		reqURL = strings.TrimSpace(conn.BaseURL) + "?" + params.Encode()
 	} else {
-		reqURL = strings.TrimRight(pURL, "/") + "/" + act
-		headers["token"] = token
+		reqURL = strings.TrimRight(strings.TrimSpace(conn.BaseURL), "/") + "/" + act
+		headers = buildXMTokenHeaders(conn.Token, nil)
 	}
 
 	if method == "" {
@@ -154,6 +198,49 @@ func (s *XMService) projectRequest(project map[string]interface{}, act string, b
 	}
 
 	return s.httpRequest(method, reqURL, body, headers)
+}
+
+func (s *XMService) getProviderConnection(providerID int) (xmConnectionConfig, error) {
+	row, err := s.getProviderRow(providerID)
+	if err != nil {
+		return xmConnectionConfig{}, err
+	}
+	return xmConnectionConfig{
+		ProviderID: providerID,
+		BaseURL:    strings.TrimSpace(fmt.Sprintf("%v", row["base_url"])),
+		AuthType:   parseXMInt(row["auth_type"]),
+		UID:        strings.TrimSpace(fmt.Sprintf("%v", row["uid"])),
+		Key:        strings.TrimSpace(fmt.Sprintf("%v", row["key"])),
+		Token:      strings.TrimSpace(fmt.Sprintf("%v", row["token"])),
+	}, nil
+}
+
+func (s *XMService) resolveProjectConnection(project map[string]interface{}) (xmConnectionConfig, error) {
+	providerID := parseXMInt(project["provider_id"])
+	if providerID <= 0 {
+		return xmConnectionConfig{}, fmt.Errorf("项目未绑定上游连接，请先完成数据库迁移或重新导入项目")
+	}
+	return s.getProviderConnection(providerID)
+}
+
+func (s *XMService) projectRequest(project map[string]interface{}, act string, body interface{}, method string) (map[string]interface{}, error) {
+	conn, err := s.resolveProjectConnection(project)
+	if err != nil {
+		return nil, err
+	}
+	return s.providerRequest(conn, act, body, method)
+}
+
+func getXMProjectBasePrice(project map[string]interface{}) float64 {
+	localPrice := parseXMFloat(project["local_price"])
+	if localPrice > 0 {
+		return localPrice
+	}
+	price := parseXMFloat(project["price"])
+	if price > 0 {
+		return price
+	}
+	return parseXMFloat(project["upstream_price"])
 }
 
 func xmLog(uid int, logType, text string, money float64) {

@@ -41,6 +41,13 @@ func registerSupplierRoutes(admin *gin.RouterGroup) {
 	admin.GET("/xm-project/list", XMAdminListProjects)
 	admin.POST("/xm-project/save", XMAdminSaveProject)
 	admin.DELETE("/xm-project/delete", XMAdminDeleteProject)
+	admin.GET("/xm-provider/list", XMAdminListProviders)
+	admin.POST("/xm-provider/save", XMAdminSaveProvider)
+	admin.DELETE("/xm-provider/delete", XMAdminDeleteProvider)
+	admin.POST("/xm-provider/test", XMAdminTestProvider)
+	admin.POST("/xm-provider/fetch-projects", XMAdminFetchProviderProjects)
+	admin.POST("/xm-provider/import-projects", XMAdminImportProviderProjects)
+	admin.POST("/xm-provider/sync-projects", XMAdminSyncProviderProjects)
 	admin.GET("/w-app/list", WAdminListApps)
 	admin.POST("/w-app/save", WAdminSaveApp)
 	admin.DELETE("/w-app/delete", WAdminDeleteApp)
@@ -168,6 +175,102 @@ func XMAdminDeleteProject(c *gin.Context) {
 		return
 	}
 	response.SuccessMsg(c, "删除成功")
+}
+
+func XMAdminListProviders(c *gin.Context) {
+	list, err := xmmodule.XM().AdminListProviders()
+	if err != nil {
+		response.ServerError(c, "查询失败")
+		return
+	}
+	response.Success(c, list)
+}
+
+func XMAdminSaveProvider(c *gin.Context) {
+	var provider xmmodule.XMProviderAdmin
+	if err := c.ShouldBindJSON(&provider); err != nil {
+		response.BadRequest(c, "请求数据格式错误")
+		return
+	}
+	id, err := xmmodule.XM().AdminSaveProvider(provider)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.Success(c, map[string]int{"id": id})
+}
+
+func XMAdminDeleteProvider(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Query("id"))
+	if id <= 0 {
+		response.BadRequest(c, "缺少连接ID")
+		return
+	}
+	if err := xmmodule.XM().AdminDeleteProvider(id); err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.SuccessMsg(c, "删除成功")
+}
+
+func XMAdminTestProvider(c *gin.Context) {
+	var req struct {
+		ProviderID int `json:"provider_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.ProviderID <= 0 {
+		response.BadRequest(c, "缺少连接ID")
+		return
+	}
+	result, err := xmmodule.XM().AdminTestProvider(req.ProviderID)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func XMAdminFetchProviderProjects(c *gin.Context) {
+	var req struct {
+		ProviderID int `json:"provider_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.ProviderID <= 0 {
+		response.BadRequest(c, "缺少连接ID")
+		return
+	}
+	list, err := xmmodule.XM().AdminFetchProviderProjects(req.ProviderID)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.Success(c, list)
+}
+
+func XMAdminImportProviderProjects(c *gin.Context) {
+	var req xmmodule.XMImportProjectsRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.ProviderID <= 0 {
+		response.BadRequest(c, "请求数据格式错误")
+		return
+	}
+	result, err := xmmodule.XM().AdminImportProviderProjects(req)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.Success(c, result)
+}
+
+func XMAdminSyncProviderProjects(c *gin.Context) {
+	var req xmmodule.XMSyncProjectsRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.ProviderID <= 0 {
+		response.BadRequest(c, "请求数据格式错误")
+		return
+	}
+	result, err := xmmodule.XM().AdminSyncProviderProjects(req)
+	if err != nil {
+		response.BusinessError(c, -1, err.Error())
+		return
+	}
+	response.Success(c, result)
 }
 
 func WAdminListApps(c *gin.Context) {
