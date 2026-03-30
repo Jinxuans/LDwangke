@@ -3,7 +3,6 @@ package php
 import (
 	"crypto/md5"
 	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"net/http/httputil"
@@ -14,6 +13,7 @@ import (
 
 	"go-api/internal/config"
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 	"go-api/internal/response"
 
 	"github.com/gin-gonic/gin"
@@ -171,7 +171,7 @@ func BridgeMoneyChange(c *gin.Context) {
 		return
 	}
 
-	log.Printf("[PHP-Bridge] 余额变动: uid=%d amount=%.2f reason=%s", uid, amount, reason)
+	obslogger.L().Info("PHP-Bridge 余额变动", "uid", uid, "amount", amount, "reason", reason)
 
 	response.Success(c, gin.H{
 		"uid":     uid,
@@ -266,7 +266,7 @@ func BridgeCreateOrder(c *gin.Context) {
 
 	oid, _ := result.LastInsertId()
 
-	log.Printf("[PHP-Bridge] 创建订单: oid=%d uid=%d cid=%d user=%s kcname=%s", oid, uid, cid, userName, kcname)
+	obslogger.L().Info("PHP-Bridge 创建订单", "oid", oid, "uid", uid, "cid", cid, "user", userName, "kcname", kcname)
 
 	response.Success(c, gin.H{
 		"oid": oid,

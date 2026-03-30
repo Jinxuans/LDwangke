@@ -14,7 +14,7 @@ func TuboshuUserConfigGet(c *gin.Context) {
 	uid := c.GetInt("uid")
 	cfg, err := Tuboshu().GetConfig()
 	if err != nil {
-		response.ServerError(c, "获取配置失败")
+		response.ServerErrorf(c, err, "获取配置失败")
 		return
 	}
 	// 获取用户 addprice
@@ -117,7 +117,7 @@ func TuboshuOrderList(c *gin.Context) {
 		Params: params,
 	}, c.ClientIP())
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 

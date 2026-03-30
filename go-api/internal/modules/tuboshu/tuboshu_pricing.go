@@ -2,10 +2,10 @@ package tuboshu
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func (s *TuboshuService) calculateStagePrice(uid int, dialogueID string, options map[string]interface{}) (float64, error) {
@@ -144,7 +144,7 @@ func (s *TuboshuService) saveOrderAndDeduct(uid int, sourceID int64, title, dial
 		uid, title, now, clientIP, sourceID, dialogueID, price, dtype,
 	)
 	if err != nil {
-		log.Printf("[Tuboshu] 保存订单失败: %v", err)
+		obslogger.L().Warn("Tuboshu 保存订单失败", "error", err)
 		return 0
 	}
 	orderID, _ := result.LastInsertId()

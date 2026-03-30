@@ -249,6 +249,34 @@ export function clearMallPromoterCode(tid?: string) {
 
 const http = axios.create({ timeout: 15000 });
 
+function extractRequestId(source?: any) {
+    const headers = source?.headers ?? source?.response?.headers ?? {};
+    const requestId =
+        headers["x-request-id"] ??
+        headers["X-Request-ID"] ??
+        source?.data?.request_id ??
+        source?.response?.data?.request_id;
+    if (Array.isArray(requestId)) {
+        return requestId[0] || "";
+    }
+    return typeof requestId === "string" ? requestId : "";
+}
+
+function createRequestError(message: string, source?: any) {
+    const requestId = extractRequestId(source);
+    const finalMessage = requestId ? `${message} [RID: ${requestId}]` : message;
+    const error = new Error(finalMessage) as Error & { requestId?: string };
+    if (requestId) {
+        error.requestId = requestId;
+        console.error("Mall API request failed", {
+            requestId,
+            status: source?.status ?? source?.response?.status,
+            url: source?.config?.url ?? source?.response?.config?.url,
+        });
+    }
+    return error;
+}
+
 http.interceptors.request.use((config) => {
     const token = getCUserToken();
     if (token) {
@@ -264,9 +292,9 @@ http.interceptors.response.use(
         if (code === 401 || code === 1401) {
             clearCUserSession();
         }
-        return Promise.reject(new Error(message || "请求失败"));
+        return Promise.reject(createRequestError(message || "请求失败", res));
     },
-    (err) => Promise.reject(err),
+    (err) => Promise.reject(createRequestError(err?.message || "请求失败", err)),
 );
 
 function url(path: string) {

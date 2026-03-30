@@ -122,7 +122,7 @@ func YFDKOrderList(c *gin.Context) {
 	svc := YFDK()
 	orders, total, err := svc.ListOrders(uid, isAdmin, page, limit, keyword, status, cid)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.SuccessPage(c, orders, int64(total), page, limit)

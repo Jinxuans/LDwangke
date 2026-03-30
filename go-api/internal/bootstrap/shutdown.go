@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"go-api/internal/app"
+	obslogger "go-api/internal/observability/logger"
 )
 
 // NotifyContext 返回带系统信号监听的上下文。
@@ -23,7 +23,7 @@ func Serve(ctx context.Context, srv *http.Server, a *app.App) error {
 	errCh := make(chan error, 1)
 
 	go func() {
-		log.Printf("Go API 启动于 %s (模式: %s)", srv.Addr, a.Config.Server.Mode)
+		obslogger.L().Info("Go API 启动", "addr", srv.Addr, "mode", a.Config.Server.Mode)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 			return

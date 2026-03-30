@@ -9,7 +9,7 @@ import (
 func ConfigGet(c *gin.Context) {
 	cfg, err := YFDK().GetConfig()
 	if err != nil {
-		response.ServerError(c, "获取配置失败")
+		response.ServerErrorf(c, err, "获取配置失败")
 		return
 	}
 	response.Success(c, cfg)
@@ -22,7 +22,7 @@ func ConfigSave(c *gin.Context) {
 		return
 	}
 	if err := YFDK().SaveConfig(&cfg); err != nil {
-		response.ServerError(c, "保存配置失败")
+		response.ServerErrorf(c, err, "保存配置失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")

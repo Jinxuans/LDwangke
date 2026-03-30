@@ -2,12 +2,12 @@ package yfdk
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"strings"
 	"time"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func (s *YFDKService) GetPrice(cid string, days int) (float64, error) {
@@ -230,7 +230,7 @@ func (s *YFDKService) AddOrder(uid int, form map[string]interface{}) (string, er
 		endTime,
 	)
 	if err != nil {
-		log.Printf("[YFDK] 插入订单失败: %v", err)
+		obslogger.L().Warn("YFDK 插入订单失败", "error", err)
 	}
 
 	yfdkLog(uid, "YF打卡-添加订单成功", fmt.Sprintf("订单ID：%s", orderID), -totalMoney)

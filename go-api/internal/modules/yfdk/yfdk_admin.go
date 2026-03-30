@@ -2,16 +2,16 @@ package yfdk
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func (s *YFDKService) GetAdminProjects() ([]YFDKProject, error) {
 	rows, err := database.DB.Query("SELECT id, cid, name, content, cost_price, sell_price, enabled, sort, create_time, update_time FROM qingka_wangke_yfdk_projects ORDER BY sort ASC, id ASC")
 	if err != nil {
-		log.Printf("[YFDK] 查询项目列表失败: %v", err)
+		obslogger.L().Warn("YFDK 查询项目列表失败", "error", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -22,7 +22,7 @@ func (s *YFDKService) GetAdminProjects() ([]YFDKProject, error) {
 		var createTime, updateTime []uint8
 		err := rows.Scan(&p.ID, &p.CID, &p.Name, &p.Content, &p.CostPrice, &p.SellPrice, &p.Enabled, &p.Sort, &createTime, &updateTime)
 		if err != nil {
-			log.Printf("[YFDK] 扫描项目行失败: %v", err)
+			obslogger.L().Warn("YFDK 扫描项目行失败", "error", err)
 			continue
 		}
 		p.CreateTime = string(createTime)

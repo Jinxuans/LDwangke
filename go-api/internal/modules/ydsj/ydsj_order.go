@@ -3,12 +3,12 @@ package ydsj
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"strings"
 	"time"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 // runType: 0=运动世界晨跑, 1=运动世界课外跑, 2=小步点课外跑, 3=小步点晨跑
@@ -81,7 +81,7 @@ func (s *YDSJService) ListOrders(uid int, isAdmin bool, page, limit int, searchT
 
 	rows, err := database.DB.Query(query, args...)
 	if err != nil {
-		log.Printf("[YDSJ] ListOrders 查询失败: %v | SQL: %s | args: %v", err, query, args)
+		obslogger.L().Warn("YDSJ ListOrders 查询失败", "error", err, "sql", query, "args", args)
 		return nil, 0, err
 	}
 	defer rows.Close()
@@ -311,7 +311,7 @@ func (s *YDSJService) SyncOrder(uid, id int, isAdmin bool) (map[string]interface
 func (s *YDSJService) ToggleRun(uid, id int, isAdmin bool) (string, error) {
 	var orderUID, isRun int
 	err := database.DB.QueryRow("SELECT uid, is_run FROM qingka_wangke_hzw_ydsj WHERE id = ?", id).Scan(&orderUID, &isRun)
-	log.Printf("[YDSJ] ToggleRun id=%d uid=%d is_run=%d err=%v", id, orderUID, isRun, err)
+	obslogger.L().Info("YDSJ ToggleRun 查询结果", "id", id, "uid", orderUID, "is_run", isRun, "error", err)
 	if err != nil {
 		return "", fmt.Errorf("订单不存在")
 	}

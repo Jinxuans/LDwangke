@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -19,6 +18,7 @@ import (
 	"go-api/internal/database"
 	ordermodule "go-api/internal/modules/order"
 	suppliermodule "go-api/internal/modules/supplier"
+	obslogger "go-api/internal/observability/logger"
 )
 
 const longBinPath = "/usr/bin/long"
@@ -181,7 +181,7 @@ func LonglongInstallCLI() (string, error) {
 		longHost = "http://" + longHost
 	}
 	downloadURL := longHost + "/long"
-	log.Printf("[LongLong] 正在下载 long CLI: %s", downloadURL)
+	obslogger.L().Info("LongLong 正在下载 CLI", "url", downloadURL)
 
 	resp, err := http.Get(downloadURL)
 	if err != nil {
@@ -214,7 +214,7 @@ func LonglongInstallCLI() (string, error) {
 		}
 	}
 
-	log.Printf("[LongLong] long CLI 安装成功: %s", longBinPath)
+	obslogger.L().Info("LongLong CLI 安装成功", "path", longBinPath)
 	return fmt.Sprintf("安装成功: %s", longBinPath), nil
 }
 
@@ -299,7 +299,7 @@ func LonglongSyncOnce() (string, error) {
 		args = append(args, "--cover-name=true")
 	}
 
-	log.Printf("[LongLong Sync] 执行: %s %s", longPath, strings.Join(args, " "))
+	obslogger.L().Info("LongLong Sync 执行", "path", longPath, "args", strings.Join(args, " "))
 	cmd := exec.Command(longPath, args...)
 	cmd.Env = append(os.Environ())
 	output, err := cmd.CombinedOutput()
@@ -312,7 +312,7 @@ func LonglongSyncOnce() (string, error) {
 		} else {
 			resultMsg = fmt.Sprintf("同步异常: %v", err)
 		}
-		log.Printf("[LongLong Sync] %s", resultMsg)
+		obslogger.L().Info("LongLong Sync 结果", "message", resultMsg)
 	} else if outputStr != "" {
 		resultMsg = outputStr
 	} else {
@@ -407,7 +407,7 @@ func longlongListenOnce() (int, error) {
 }
 
 func RunLonglongDaemon(ctx context.Context) {
-	log.Println("[LongLong] 内置同步&监听守护启动")
+	obslogger.L().Info("LongLong 内置同步与监听守护启动")
 	go longlongSyncLoop(ctx)
 	go longlongListenLoop(ctx)
 }
@@ -428,7 +428,7 @@ func longlongSyncLoop(ctx context.Context) {
 	for {
 		cfg, err := loadLonglongCfg()
 		if err != nil {
-			log.Printf("[LongLong Sync] 配置未就绪: %v，1分钟后重试", err)
+			obslogger.L().Warn("LongLong Sync 配置未就绪", "error", err)
 			if !sleepWithContext(ctx, 60*time.Second) {
 				return
 			}
@@ -442,9 +442,9 @@ func longlongSyncLoop(ctx context.Context) {
 
 		msg, err := LonglongSyncOnce()
 		if err != nil {
-			log.Printf("[LongLong Sync] 失败: %v", err)
+			obslogger.L().Warn("LongLong Sync 失败", "error", err)
 		} else {
-			log.Printf("[LongLong Sync] %s", msg)
+			obslogger.L().Info("LongLong Sync 状态", "message", msg)
 		}
 		if !sleepWithContext(ctx, interval) {
 			return
@@ -490,11 +490,11 @@ func longlongListenLoop(ctx context.Context) {
 		longlongState.lastListenAt = now
 		if err != nil {
 			longlongState.lastListenMsg = fmt.Sprintf("失败: %v", err)
-			log.Printf("[LongLong Listen] %s", longlongState.lastListenMsg)
+			obslogger.L().Info("LongLong Listen 状态", "message", longlongState.lastListenMsg)
 		} else if cnt > 0 {
 			longlongState.lastListenMsg = fmt.Sprintf("更新了 %d 个订单", cnt)
 			longlongState.listenCount += cnt
-			log.Printf("[LongLong Listen] %s", longlongState.lastListenMsg)
+			obslogger.L().Info("LongLong Listen 状态", "message", longlongState.lastListenMsg)
 		} else {
 			longlongState.lastListenMsg = "无变动"
 		}

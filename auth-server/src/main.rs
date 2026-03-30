@@ -1,11 +1,16 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Instant;
 
+use axum::extract::Request;
+use axum::http::{HeaderName, HeaderValue};
 use axum::response::Html;
+use axum::response::Response;
 use axum::routing::{delete, get, post};
 use axum::{middleware, Router};
+use rand::RngCore;
 use tower_http::cors::CorsLayer;
-use tower_http::trace::TraceLayer;
+use tracing::Instrument;
 
 mod auth;
 mod cache;
@@ -105,7 +110,7 @@ async fn main() {
         .route("/api/v1/license/trial", post(handler::request_trial))
         .nest("/api/v1/admin", admin_routes)
         .layer(CorsLayer::permissive())
-        .layer(TraceLayer::new_for_http())
+        .layer(middleware::from_fn(request_trace_middleware))
         .with_state(state.clone());
 
     // 启动过期扫描定时任务（每小时）
@@ -155,4 +160,50 @@ async fn main() {
 
 async fn admin_page() -> Html<&'static str> {
     Html(include_str!("../static/admin.html"))
+}
+
+async fn request_trace_middleware(req: Request, next: middleware::Next) -> Response {
+    let req_id = req
+        .headers()
+        .get("x-request-id")
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(generate_request_id);
+
+    let method = req.method().clone();
+    let path = req
+        .uri()
+        .path_and_query()
+        .map(|value| value.as_str().to_owned())
+        .unwrap_or_else(|| req.uri().path().to_owned());
+    let started_at = Instant::now();
+
+    let span = tracing::info_span!("http_request", req_id = %req_id, method = %method, path = %path);
+    let mut response = next.run(req).instrument(span).await;
+    let elapsed_ms = started_at.elapsed().as_millis();
+    let status = response.status();
+
+    if let Ok(value) = HeaderValue::from_str(&req_id) {
+        response
+            .headers_mut()
+            .insert(HeaderName::from_static("x-request-id"), value);
+    }
+
+    if status.is_server_error() {
+        tracing::error!(req_id = %req_id, method = %method, path = %path, status = %status.as_u16(), elapsed_ms, "request failed");
+    } else if status.is_client_error() {
+        tracing::warn!(req_id = %req_id, method = %method, path = %path, status = %status.as_u16(), elapsed_ms, "request completed with client error");
+    } else {
+        tracing::info!(req_id = %req_id, method = %method, path = %path, status = %status.as_u16(), elapsed_ms, "request completed");
+    }
+
+    response
+}
+
+fn generate_request_id() -> String {
+    let mut bytes = [0_u8; 8];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    hex::encode(bytes)
 }

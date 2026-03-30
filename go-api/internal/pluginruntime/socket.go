@@ -3,7 +3,6 @@ package pluginruntime
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -14,6 +13,7 @@ import (
 
 	"go-api/internal/database"
 	ordermodule "go-api/internal/modules/order"
+	obslogger "go-api/internal/observability/logger"
 
 	"github.com/gorilla/websocket"
 )
@@ -83,7 +83,7 @@ func (c *HZWSocketClient) Start() {
 				updates := atomic.LoadInt64(&c.updateCount)
 				skips := atomic.LoadInt64(&c.skipCount)
 				if updates > 0 || skips > 0 {
-					log.Printf("[HZW-Socket] 统计: 已更新 %d 条，跳过 %d 条", updates, skips)
+					obslogger.L().Info("HZW-Socket 统计", "updates", updates, "skips", skips)
 				}
 			}
 		}
@@ -97,7 +97,7 @@ func (c *HZWSocketClient) loadSuppliers() {
 		"SELECT hid, `user` FROM qingka_wangke_huoyuan WHERE pt = 'hzw' AND status = '1'",
 	)
 	if err != nil {
-		log.Printf("[HZW-Socket] 加载货源失败: %v", err)
+		obslogger.L().Warn("HZW-Socket 加载货源失败", "error", err)
 		return
 	}
 	defer rows.Close()
@@ -115,7 +115,7 @@ func (c *HZWSocketClient) loadSuppliers() {
 	c.supplierMap = newMap
 	c.mu.Unlock()
 
-	log.Printf("[HZW-Socket] 已加载 %d 个 HZW 货源", len(newMap))
+	obslogger.L().Info("HZW-Socket 已加载货源", "count", len(newMap))
 }
 
 func (c *HZWSocketClient) connectLoop() {
@@ -124,7 +124,7 @@ func (c *HZWSocketClient) connectLoop() {
 
 	for atomic.LoadInt32(&c.running) == 1 {
 		if err := c.connect(); err != nil {
-			log.Printf("[HZW-Socket] 连接失败: %v，%v 后重试", err, backoff)
+			obslogger.L().Warn("HZW-Socket 连接失败", "error", err, "retry_after", backoff.String())
 			if !c.sleep(backoff) {
 				return
 			}
@@ -137,7 +137,7 @@ func (c *HZWSocketClient) connectLoop() {
 
 		backoff = 3 * time.Second
 		c.readLoop()
-		log.Printf("[HZW-Socket] 连接断开，3秒后重连")
+		obslogger.L().Warn("HZW-Socket 连接断开，准备重连")
 		if !c.sleep(3 * time.Second) {
 			return
 		}
@@ -180,7 +180,7 @@ func (c *HZWSocketClient) connect() error {
 		return fmt.Errorf("构造 WebSocket URL 失败: %w", err)
 	}
 
-	log.Printf("[HZW-Socket] 连接中: %s", wsURL)
+	obslogger.L().Info("HZW-Socket 连接中", "url", wsURL)
 	dialer := websocket.Dialer{HandshakeTimeout: 15 * time.Second}
 	header := http.Header{}
 	header.Set("Origin", c.serverURL)
@@ -207,7 +207,7 @@ func (c *HZWSocketClient) connect() error {
 		PingInterval int    `json:"pingInterval"`
 	}
 	if err := json.Unmarshal([]byte(msgStr[1:]), &openData); err == nil {
-		log.Printf("[HZW-Socket] 握手成功 sid=%s pingInterval=%dms", openData.SID, openData.PingInterval)
+		obslogger.L().Info("HZW-Socket 握手成功", "sid", openData.SID, "ping_interval_ms", openData.PingInterval)
 	}
 
 	_, msg, err = conn.ReadMessage()
@@ -221,7 +221,7 @@ func (c *HZWSocketClient) connect() error {
 		return fmt.Errorf("非预期的 Socket.IO 连接响应: %s", msgStr)
 	}
 
-	log.Printf("[HZW-Socket] 已连接到 HZW Socket 服务")
+	obslogger.L().Info("HZW-Socket 已连接到服务")
 	pingInterval := 25 * time.Second
 	if openData.PingInterval > 0 {
 		pingInterval = time.Duration(openData.PingInterval) * time.Millisecond
@@ -253,7 +253,7 @@ func (c *HZWSocketClient) readLoop() {
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("[HZW-Socket] 读取消息错误: %v", err)
+			obslogger.L().Warn("HZW-Socket 读取消息错误", "error", err)
 			return
 		}
 		msgStr := string(msg)
@@ -268,7 +268,7 @@ func (c *HZWSocketClient) readLoop() {
 		case strings.HasPrefix(msgStr, "42"):
 			c.handleEvent(msgStr[2:])
 		case strings.HasPrefix(msgStr, "41"):
-			log.Printf("[HZW-Socket] 服务端断开连接")
+			obslogger.L().Warn("HZW-Socket 服务端断开连接")
 			return
 		}
 	}
@@ -317,12 +317,12 @@ func (c *HZWSocketClient) processMessage(msg HZWSocketMessage) {
 			msg.Status, msg.Process, msg.Remarks, msg.ExamStartTime, msg.ExamEndTime, remoteOID, hid,
 		)
 		if err != nil {
-			log.Printf("[HZW-Socket] DB更新失败 hid=%d yid=%s: %v", hid, remoteOID, err)
+			obslogger.L().Warn("HZW-Socket DB更新失败", "hid", hid, "yid", remoteOID, "error", err)
 			continue
 		}
 		if affected, _ := result.RowsAffected(); affected > 0 {
 			atomic.AddInt64(&c.updateCount, 1)
-			log.Printf("[HZW-Socket] 更新 hid=%d yid=%s 状态=%s 进度=%s", hid, remoteOID, msg.Status, msg.Process)
+			obslogger.L().Info("HZW-Socket 更新状态", "hid", hid, "yid", remoteOID, "status", msg.Status, "process", msg.Process)
 			oidInt, _ := strconv.Atoi(remoteOID)
 			if oidInt > 0 {
 				var localOID int
@@ -369,7 +369,7 @@ func SetHZWSocketURL(socketURL string) error {
 func StartHZWSocket() {
 	socketURL := GetHZWSocketURL()
 	if socketURL == "" {
-		log.Printf("[HZW-Socket] 未配置 Socket URL，跳过启动。请在对接中心设置。")
+		obslogger.L().Warn("HZW-Socket 未配置 Socket URL，跳过启动")
 		return
 	}
 	globalHZWSocket = newHZWSocketClient(socketURL)

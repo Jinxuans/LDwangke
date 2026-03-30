@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"mime/multipart"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 
 	"go-api/internal/cache"
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 const (
@@ -702,14 +702,14 @@ func (s *paperService) insertOrder(uid int, orderID, shopcode, title string, pri
 		uid, orderID, shopcode, title, price,
 	)
 	if err != nil {
-		log.Printf("[Paper] 插入订单记录失败: %v", err)
+		obslogger.L().Warn("Paper 插入订单记录失败", "error", err)
 	}
 }
 
 func (s *paperService) deductMoney(uid int, amount float64, logType, desc string) {
 	_, err := database.DB.Exec("UPDATE qingka_wangke_user SET money = money - ? WHERE uid = ? LIMIT 1", amount, uid)
 	if err != nil {
-		log.Printf("[Paper] 扣费失败: %v", err)
+		obslogger.L().Warn("Paper 扣费失败", "error", err)
 		return
 	}
 	database.DB.Exec(

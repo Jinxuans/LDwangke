@@ -1,6 +1,7 @@
 package xm
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -12,17 +13,17 @@ import (
 // XMProviderAdmin 表示一个可复用的上游连接配置。
 // 一个 provider 对应一套认证参数，多个项目共享它。
 type XMProviderAdmin struct {
-	ID           int     `json:"id"`
-	Name         string  `json:"name"`
-	BaseURL      string  `json:"base_url"`
-	AuthType     int     `json:"auth_type"`
-	UID          string  `json:"uid"`
-	Key          string  `json:"key"`
-	Token        string  `json:"token"`
-	Status       int     `json:"status"`
-	Remark       string  `json:"remark"`
-	LastSyncAt   string  `json:"last_sync_at"`
-	ProjectCount int     `json:"project_count"`
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	BaseURL      string `json:"base_url"`
+	AuthType     int    `json:"auth_type"`
+	UID          string `json:"uid"`
+	Key          string `json:"key"`
+	Token        string `json:"token"`
+	Status       int    `json:"status"`
+	Remark       string `json:"remark"`
+	LastSyncAt   string `json:"last_sync_at"`
+	ProjectCount int    `json:"project_count"`
 }
 
 // XMUpstreamProject 表示上游 getProjects 返回的一条项目数据。
@@ -286,7 +287,7 @@ func normalizeUpstreamProjects(result map[string]interface{}) ([]XMUpstreamProje
 		if msg == "" {
 			msg = "上游返回失败"
 		}
-		return nil, fmt.Errorf(msg)
+		return nil, errors.New(msg)
 	}
 
 	rawList, ok := result["data"].([]interface{})

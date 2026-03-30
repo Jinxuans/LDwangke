@@ -4,15 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func RunWCron(ctx context.Context) {
-	log.Println("[W] 后台批量同步任务启动")
+	obslogger.L().Info("W 后台批量同步任务启动")
 	go wCronBatchSync(ctx)
 	go wCronRetryWaitAdd(ctx)
 }
@@ -27,14 +27,14 @@ func wCronBatchSync(ctx context.Context) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("[W-cron-sync] panic: %v", r)
+					obslogger.L().Error("W cron sync panic", "panic", r)
 				}
 			}()
 
 			// 获取所有项目
 			appRows, err := database.DB.Query("SELECT id, name, code, org_app_id, url, `key`, uid, token, type FROM w_app WHERE deleted = 0")
 			if err != nil {
-				log.Printf("[W-cron-sync] 查询项目失败: %v", err)
+				obslogger.L().Warn("W cron sync 查询项目失败", "error", err)
 				return
 			}
 			defer appRows.Close()
@@ -66,7 +66,7 @@ func wCronBatchSync(ctx context.Context) {
 			appOrders := make(map[int64][]string)
 			rows, err := database.DB.Query("SELECT agg_order_id, app_id FROM w_order WHERE status NOT IN ('END', 'REFUND') AND agg_order_id IS NOT NULL AND deleted = 0")
 			if err != nil {
-				log.Printf("[W-cron-sync] 查询订单失败: %v", err)
+				obslogger.L().Warn("W cron sync 查询订单失败", "error", err)
 				return
 			}
 			defer rows.Close()
@@ -106,7 +106,7 @@ func wCronBatchSync(ctx context.Context) {
 						"url": app.URL, "code": app.Code, "key": app.Key, "uid": app.UID,
 					}
 					jingyuCronSync(svc, appRow, appID)
-					log.Printf("[W-cron-sync] [%s] jingyu同步完成", app.Name)
+					obslogger.L().Info("W cron sync jingyu 同步完成", "app_name", app.Name, "app_id", appID)
 					continue
 				}
 
@@ -122,9 +122,9 @@ func wCronBatchSync(ctx context.Context) {
 
 					err := wSyncBatch(svc, app, aidsStr)
 					if err != nil {
-						log.Printf("[W-cron-sync] [%s] 批量同步失败: %v", app.Name, err)
+						obslogger.L().Warn("W cron sync 批量同步失败", "app_name", app.Name, "error", err)
 					} else {
-						log.Printf("[W-cron-sync] [%s] 批量同步 %d 条", app.Name, len(batch))
+						obslogger.L().Info("W cron sync 批量同步完成", "app_name", app.Name, "count", len(batch))
 					}
 					if !sleepWithContext(ctx, time.Second) {
 						return
@@ -209,7 +209,7 @@ func wCronRetryWaitAdd(ctx context.Context) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("[W-cron-retry] panic: %v", r)
+					obslogger.L().Error("W cron retry panic", "panic", r)
 				}
 			}()
 
@@ -285,7 +285,7 @@ func wCronRetryWaitAdd(ctx context.Context) {
 								subJSON, _ := json.Marshal(extData["sub_order"])
 								database.DB.Exec("UPDATE w_order SET agg_order_id = ?, status = 'NORMAL', num = ?, sub_order = ? WHERE id = ? LIMIT 1",
 									aggID, extNum, string(subJSON), o.ID)
-								log.Printf("[W-cron-retry] 订单#%d 重新提交成功", o.ID)
+								obslogger.L().Info("W cron retry 订单重新提交成功", "order_id", o.ID)
 								continue
 							}
 						}
@@ -294,7 +294,7 @@ func wCronRetryWaitAdd(ctx context.Context) {
 
 				// 失败，恢复 WAITADD
 				database.DB.Exec("UPDATE w_order SET status = 'WAITADD' WHERE id = ? LIMIT 1", o.ID)
-				log.Printf("[W-cron-retry] 订单#%d 重新提交失败", o.ID)
+				obslogger.L().Warn("W cron retry 订单重新提交失败", "order_id", o.ID)
 				if !sleepWithContext(ctx, 3*time.Second) {
 					return
 				}

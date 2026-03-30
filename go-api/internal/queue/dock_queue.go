@@ -1,11 +1,11 @@
 package queue
 
 import (
-	"fmt"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	obslogger "go-api/internal/observability/logger"
 )
 
 // DockTask 对接任务
@@ -69,7 +69,7 @@ func (q *DockQueue) Start() {
 		return
 	}
 	q.running = true
-	log.Printf("[DockQueue] 启动，最大并发数: %d, 缓冲区: %d", q.maxWorkers, cap(q.taskChan))
+	obslogger.L().Info("DockQueue 启动", "max_workers", q.maxWorkers, "buffer", cap(q.taskChan))
 
 	// 启动 dispatcher
 	go q.dispatch()
@@ -110,7 +110,7 @@ func (q *DockQueue) processTask(task DockTask) {
 		q.wg.Done()
 		if r := recover(); r != nil {
 			atomic.AddInt64(&q.failed, 1)
-			log.Printf("[DockQueue] worker panic: %v, oid=%d", r, task.OID)
+			obslogger.L().Error("DockQueue worker panic", "oid", task.OID, "panic", r)
 			return
 		}
 		if panicked {
@@ -141,7 +141,7 @@ func (q *DockQueue) Push(oid int64) {
 		// 成功入队
 	default:
 		// 队列满了，带超时等待入队，防止 goroutine 泄漏
-		log.Printf("[DockQueue] 队列已满，oid=%d 等待入队...", oid)
+		obslogger.L().Warn("DockQueue 队列已满，等待入队", "oid", oid)
 		go func() {
 			timer := time.NewTimer(2 * time.Minute)
 			defer timer.Stop()
@@ -150,7 +150,7 @@ func (q *DockQueue) Push(oid int64) {
 				// 入队成功
 			case <-timer.C:
 				atomic.AddInt64(&q.pending, -1)
-				log.Printf("[DockQueue] oid=%d 入队超时，已丢弃", oid)
+				obslogger.L().Warn("DockQueue 入队超时，已丢弃", "oid", oid)
 			case <-q.stopCh:
 				atomic.AddInt64(&q.pending, -1)
 			}
@@ -185,7 +185,7 @@ func (q *DockQueue) SetMaxWorkers(n int) {
 	q.mu.Lock()
 	q.sem = make(chan struct{}, n)
 	q.mu.Unlock()
-	log.Printf("[DockQueue] 并发数从 %d 调整为 %d", old, n)
+	obslogger.L().Info("DockQueue 并发数调整", "old", old, "new", n)
 }
 
 // Stats 获取队列状态
@@ -213,5 +213,5 @@ func (q *DockQueue) Stop() {
 	q.running = false
 	close(q.stopCh)
 	q.wg.Wait()
-	fmt.Println("[DockQueue] 已停止")
+	obslogger.L().Info("DockQueue 已停止")
 }

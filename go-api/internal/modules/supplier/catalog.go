@@ -3,19 +3,19 @@ package supplier
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"go-api/internal/database"
 	"go-api/internal/model"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func (s *Service) GetSupplierCategories(sup *model.SupplierFull) map[string]string {
 	cfg := GetPlatformConfig(sup.PT)
 	if err := requireExplicitActionConfig("分类接口", cfg.CategoryPath, cfg.CategoryMethod, cfg.CategoryParamMap); err != nil {
-		log.Printf("[GetSupplierCategories] pt=%s %v", sup.PT, err)
+		obslogger.L().Warn("GetSupplierCategories 配置缺失", "pt", sup.PT, "error", err)
 		return nil
 	}
 	client := &http.Client{Timeout: 8 * time.Second}
@@ -33,17 +33,17 @@ func (s *Service) GetSupplierCategories(sup *model.SupplierFull) map[string]stri
 		map[string]string{},
 	)
 	if err != nil {
-		log.Printf("[GetSupplierCategories] pt=%s endpoint=%s 请求失败: %v", sup.PT, apiURL, err)
+		obslogger.L().Warn("GetSupplierCategories 请求失败", "pt", sup.PT, "endpoint", apiURL, "error", err)
 		return nil
 	}
 
 	result := parseCategoryResponse(execResult.Body)
 	if len(result) > 0 {
-		log.Printf("[GetSupplierCategories] pt=%s endpoint=%s 成功获取 %d 个分类", sup.PT, apiURL, len(result))
+		obslogger.L().Info("GetSupplierCategories 成功获取分类", "pt", sup.PT, "endpoint", apiURL, "count", len(result))
 		return result
 	}
 
-	log.Printf("[GetSupplierCategories] pt=%s endpoint=%s 未获取到分类数据", sup.PT, apiURL)
+	obslogger.L().Warn("GetSupplierCategories 未获取到分类数据", "pt", sup.PT, "endpoint", apiURL)
 	return nil
 }
 

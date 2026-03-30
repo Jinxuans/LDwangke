@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"net/smtp"
@@ -15,6 +14,7 @@ import (
 	"go-api/internal/config"
 	"go-api/internal/database"
 	"go-api/internal/model"
+	obslogger "go-api/internal/observability/logger"
 )
 
 type Service struct{}
@@ -116,7 +116,7 @@ func (s *Service) SendEmailWithType(to, subject, htmlBody, mailType string) erro
 			return nil
 		}
 
-		log.Printf("[EmailPool] 邮箱#%d 发送失败: %v, 尝试 %d/%d", account.ID, err, attempt+1, maxRetry+1)
+		obslogger.L().Warn("EmailPool 发送失败", "pool_id", account.ID, "error", err, "attempt", attempt+1, "max_attempt", maxRetry+1)
 		s.onEmailPoolFail(account.ID, err.Error())
 		s.logEmailPoolSend(account.ID, from, to, subject, mailType, false, err.Error())
 	}
@@ -175,7 +175,7 @@ func (s *Service) MassSend(target, subject, content string) (int64, error) {
 		failCount := 0
 		for _, email := range recipients {
 			if err := s.SendEmailWithType(email, subject, content, "mass"); err != nil {
-				log.Printf("[EmailMassSend] 发送到 %s 失败: %v", email, err)
+				obslogger.L().Warn("EmailMassSend 发送失败", "email", email, "error", err)
 				failCount++
 			} else {
 				successCount++
@@ -603,7 +603,7 @@ func (s *Service) onEmailPoolFail(poolID int, errMsg string) {
 	database.DB.QueryRow("SELECT fail_streak FROM qingka_email_pool WHERE id=?", poolID).Scan(&streak)
 	if streak >= threshold {
 		database.DB.Exec("UPDATE qingka_email_pool SET status=2 WHERE id=?", poolID)
-		log.Printf("[EmailPool] 邮箱 #%d 连续失败 %d 次，已自动标记异常", poolID, streak)
+		obslogger.L().Warn("EmailPool 已自动标记异常", "pool_id", poolID, "streak", streak)
 	}
 }
 

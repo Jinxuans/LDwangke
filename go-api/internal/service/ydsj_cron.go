@@ -4,15 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"time"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func RunYDSJCron(ctx context.Context) {
-	log.Println("[YDSJ] 后台同步任务启动")
+	obslogger.L().Info("YDSJ 后台同步任务启动")
 	go ydsjCronOrderStatus(ctx) // cron_order.php    — 同步订单状态
 	go ydsjCronOrderYID(ctx)    // cron_order_yid.php — 同步上游订单ID
 	go ydsjCronOrderInfo(ctx)   // cron_order_info.php — 同步订单详情
@@ -84,7 +84,7 @@ func ydsjCronOrderStatus(ctx context.Context) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("[YDSJ-cron-status] panic: %v", r)
+					obslogger.L().Error("YDSJ cron status panic", "panic", r)
 				}
 			}()
 
@@ -96,7 +96,7 @@ func ydsjCronOrderStatus(ctx context.Context) {
 
 			rows, err := database.DB.Query("SELECT id, uid, `user`, pass, fees, run_type, yid FROM qingka_wangke_hzw_ydsj WHERE status = 1 ORDER BY id ASC")
 			if err != nil {
-				log.Printf("[YDSJ-cron-status] 查询失败: %v", err)
+				obslogger.L().Warn("YDSJ cron status 查询失败", "error", err)
 				return
 			}
 			defer rows.Close()
@@ -161,7 +161,7 @@ func ydsjCronOrderStatus(ctx context.Context) {
 						database.DB.Exec("INSERT INTO qingka_wangke_moneylog (uid, type, money, mark, addtime) VALUES (?, 'ydsj_refund', ?, ?, ?)",
 							o.UID, fees, logContent, now)
 					}
-					log.Printf("[YDSJ-cron-status] 订单#%d 源台退款，退还%.2f", o.ID, fees)
+					obslogger.L().Info("YDSJ cron status 源台退款", "order_id", o.ID, "refund", fees)
 				} else if status == 2 {
 					// 处理成功 → 计算实际费用差额
 					originRealCost := math.Round(realCost*cfg.RealCostMultiple*100) / 100
@@ -173,14 +173,14 @@ func ydsjCronOrderStatus(ctx context.Context) {
 						logContent := fmt.Sprintf("%s 下单成功，补扣%.2f元", projectName, absDiff)
 						database.DB.Exec("INSERT INTO qingka_wangke_moneylog (uid, type, money, mark, addtime) VALUES (?, 'ydsj_add', ?, ?, ?)",
 							o.UID, -absDiff, logContent, now)
-						log.Printf("[YDSJ-cron-status] 订单#%d 成功，补扣%.2f", o.ID, absDiff)
+						obslogger.L().Info("YDSJ cron status 成功补扣", "order_id", o.ID, "amount", absDiff)
 					} else if difference < 0 {
 						absDiff := math.Abs(difference)
 						database.DB.Exec("UPDATE qingka_wangke_user SET money = money + ? WHERE uid = ?", absDiff, o.UID)
 						logContent := fmt.Sprintf("%s 下单成功，退回%.2f元", projectName, absDiff)
 						database.DB.Exec("INSERT INTO qingka_wangke_moneylog (uid, type, money, mark, addtime) VALUES (?, 'ydsj_add', ?, ?, ?)",
 							o.UID, absDiff, logContent, now)
-						log.Printf("[YDSJ-cron-status] 订单#%d 成功，退回%.2f", o.ID, absDiff)
+						obslogger.L().Info("YDSJ cron status 成功退回", "order_id", o.ID, "amount", absDiff)
 					}
 
 					database.DB.Exec("UPDATE qingka_wangke_hzw_ydsj SET real_fees = ? WHERE id = ?", fmt.Sprintf("%.2f", originRealCost), o.ID)
@@ -208,7 +208,7 @@ func ydsjCronOrderYID(ctx context.Context) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("[YDSJ-cron-yid] panic: %v", r)
+					obslogger.L().Error("YDSJ cron yid panic", "panic", r)
 				}
 			}()
 
@@ -245,7 +245,7 @@ func ydsjCronOrderYID(ctx context.Context) {
 				oid := fmt.Sprintf("%v", items[0]["orderid"])
 				if oid != "" && oid != "<nil>" {
 					database.DB.Exec("UPDATE qingka_wangke_hzw_ydsj SET yid = ? WHERE id = ?", oid, o.ID)
-					log.Printf("[YDSJ-cron-yid] 订单#%d 同步yid=%s", o.ID, oid)
+					obslogger.L().Info("YDSJ cron yid 同步完成", "order_id", o.ID, "yid", oid)
 				}
 			}
 		}()
@@ -267,7 +267,7 @@ func ydsjCronOrderInfo(ctx context.Context) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("[YDSJ-cron-info] panic: %v", r)
+					obslogger.L().Error("YDSJ cron info panic", "panic", r)
 				}
 			}()
 
@@ -326,7 +326,7 @@ func ydsjCronOrderInfo(ctx context.Context) {
 				statusStr := mapGetString(matched, "status")
 				status := ydsjMapUpstreamStatus(statusStr)
 				database.DB.Exec("UPDATE qingka_wangke_hzw_ydsj SET status = ? WHERE id = ? AND status = 1", status, o.ID)
-				log.Printf("[YDSJ-cron-info] 订单#%d 状态已同步: %s -> %d", o.ID, statusStr, status)
+				obslogger.L().Info("YDSJ cron info 状态已同步", "order_id", o.ID, "status_text", statusStr, "status", status)
 
 				if !sleepWithContext(ctx, time.Second) {
 					return
@@ -350,7 +350,7 @@ func ydsjCronOrderRefund(ctx context.Context) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("[YDSJ-cron-refund] panic: %v", r)
+					obslogger.L().Error("YDSJ cron refund panic", "panic", r)
 				}
 			}()
 
@@ -419,7 +419,7 @@ func ydsjCronOrderRefund(ctx context.Context) {
 						logContent := fmt.Sprintf("%s 退款：账号%s 退还%.2f元", projectName, o.User, refundMoney)
 						database.DB.Exec("INSERT INTO qingka_wangke_moneylog (uid, type, money, mark, addtime) VALUES (?, 'ydsj_refund', ?, ?, ?)",
 							o.UID, refundMoney, logContent, now)
-						log.Printf("[YDSJ-cron-refund] 订单#%d 退款%.2f", o.ID, refundMoney)
+						obslogger.L().Info("YDSJ cron refund 完成", "order_id", o.ID, "refund", refundMoney)
 					}
 				}
 			}

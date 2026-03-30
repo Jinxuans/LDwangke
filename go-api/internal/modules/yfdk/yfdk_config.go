@@ -2,13 +2,13 @@ package yfdk
 
 import (
 	"encoding/json"
-	"log"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func (s *YFDKService) EnsureTable() {
-	log.Println("[YFDK] 开始检查/创建项目表")
+	obslogger.L().Info("YFDK 开始检查/创建项目表")
 	_, err := database.DB.Exec(`CREATE TABLE IF NOT EXISTS qingka_wangke_yfdk_projects (
 		id INT(11) NOT NULL AUTO_INCREMENT,
 		cid VARCHAR(10) NOT NULL COMMENT '上游项目CID',
@@ -24,9 +24,9 @@ func (s *YFDKService) EnsureTable() {
 		UNIQUE KEY uk_cid (cid)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='YF打卡项目表'`)
 	if err != nil {
-		log.Printf("[YFDK] 创建表失败: %v", err)
+		obslogger.L().Warn("YFDK 创建表失败", "error", err)
 	} else {
-		log.Println("[YFDK] 项目表检查/创建完成")
+		obslogger.L().Info("YFDK 项目表检查/创建完成")
 	}
 }
 

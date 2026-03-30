@@ -199,7 +199,7 @@ func MallProductList(c *gin.Context) {
 	}
 	list, err := tenantService.MallProducts(tid)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, list)
@@ -240,7 +240,7 @@ func MallCUserLogin(c *gin.Context) {
 	}
 	merged, err := tenantService.MergeGuestOrdersToCUser(tid, u.ID, req.GuestOrders)
 	if err != nil {
-		response.ServerError(c, "订单合并失败")
+		response.ServerErrorf(c, err, "订单合并失败")
 		return
 	}
 	response.Success(c, model.CUserLoginResponse{
@@ -382,7 +382,7 @@ func MallOrderList(c *gin.Context) {
 
 	list, total, err := tenantService.CUserPayOrders(tid, u.ID, page, limit)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	domain := c.Request.Host
@@ -433,7 +433,7 @@ func MallPromotionOrders(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	list, total, err := tenantService.CUserPromotionOrders(tid, u.ID, page, limit)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, gin.H{"list": list, "total": total})
@@ -476,7 +476,7 @@ func MallCUserWithdrawRequests(c *gin.Context) {
 	_ = c.ShouldBindQuery(&req)
 	list, total, err := tenantService.CUserWithdrawRequests(tid, u.ID, req)
 	if err != nil {
-		response.ServerError(c, "查询提现记录失败")
+		response.ServerErrorf(c, err, "查询提现记录失败")
 		return
 	}
 	response.Success(c, gin.H{

@@ -2,11 +2,11 @@ package sdxy
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"time"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func (s *SDXYService) ListOrders(uid int, isAdmin bool, page, limit int, searchType, keyword, statusFilter string) ([]SDXYOrder, int, error) {
@@ -86,7 +86,7 @@ func (s *SDXYService) AddOrder(uid int, form map[string]interface{}) (string, er
 		return "", fmt.Errorf("手机号不能为空")
 	}
 	if distance == "" || (zoneId == "" && zoneName == "") || runType == "" || studentId == "" || runRuleId == "" {
-		log.Printf("[SDXY-AddOrder] 字段缺失: dis=%q zone_id=%q zone_name=%q run_type=%q student_id=%q run_rule_id=%q", distance, zoneId, zoneName, runType, studentId, runRuleId)
+		obslogger.L().Warn("SDXY AddOrder 字段缺失", "distance", distance, "zone_id", zoneId, "zone_name", zoneName, "run_type", runType, "student_id", studentId, "run_rule_id", runRuleId)
 		return "", fmt.Errorf("请将信息填写完整")
 	}
 	taskListCount := len(taskList)
@@ -129,10 +129,10 @@ func (s *SDXYService) AddOrder(uid int, form map[string]interface{}) (string, er
 
 	result, err := s.upstreamRequest("add", params)
 	if err != nil {
-		log.Printf("[SDXY-AddOrder] 上游请求失败: %v", err)
+		obslogger.L().Warn("SDXY AddOrder 上游请求失败", "error", err)
 		return "", err
 	}
-	log.Printf("[SDXY-AddOrder] 上游响应: %+v", result)
+	obslogger.L().Info("SDXY AddOrder 上游响应", "result", result)
 
 	code := mapGetFloat(result, "code")
 	if code != 0 {

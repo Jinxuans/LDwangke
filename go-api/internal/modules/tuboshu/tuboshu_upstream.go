@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"go-api/internal/cache"
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func (s *TuboshuService) getToken() (string, error) {
@@ -104,7 +104,7 @@ func (s *TuboshuService) testRoutes() string {
 	}
 
 	if best.url != "" {
-		log.Printf("[Tuboshu] 最优线路: %s (延迟: %v)", best.url, best.latency)
+		obslogger.L().Info("Tuboshu 最优线路", "url", best.url, "latency", best.latency.String())
 	}
 	return best.url
 }
@@ -117,7 +117,7 @@ func (s *TuboshuService) upstreamRequest(endpoint string, data interface{}, meth
 		result, err := s.doUpstreamRequest(apiURL, data, method, isBlob)
 		if err != nil {
 			lastErr = err
-			log.Printf("[Tuboshu] 请求失败 (尝试 %d): %v", attempt+1, err)
+			obslogger.L().Warn("Tuboshu 请求失败", "attempt", attempt+1, "error", err)
 			time.Sleep(tbsRetryDelay)
 			continue
 		}
@@ -127,7 +127,7 @@ func (s *TuboshuService) upstreamRequest(endpoint string, data interface{}, meth
 			shouldRetry := false
 			if json.Unmarshal(result, &resp) == nil {
 				if code, ok := resp["code"]; ok && fmt.Sprintf("%v", code) == "401" {
-					log.Printf("[Tuboshu] 收到401，清除token重试")
+					obslogger.L().Warn("Tuboshu 收到401，清除token重试")
 					s.clearToken()
 					shouldRetry = true
 				}
@@ -136,7 +136,7 @@ func (s *TuboshuService) upstreamRequest(endpoint string, data interface{}, meth
 						notLoggedIn := []string{"当前未登录", "API令牌无效或已过期", "未授权访问", "token无效或已过期", "用户未登录或登录已过期"}
 						for _, m := range notLoggedIn {
 							if msg == m {
-								log.Printf("[Tuboshu] 未登录响应: %s", msg)
+								obslogger.L().Warn("Tuboshu 未登录响应", "message", msg)
 								s.clearToken()
 								shouldRetry = true
 								break

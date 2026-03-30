@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
+
+	obslogger "go-api/internal/observability/logger"
 )
 
 func ydsjIsConfigured(cfg *YDSJConfig) bool {
@@ -74,7 +75,7 @@ func (s *YDSJService) GetSchools() ([]map[string]interface{}, error) {
 				}
 			}
 		} else {
-			log.Printf("[YDSJ] 上游学校列表请求失败: %v，回退本地", err)
+			obslogger.L().Warn("YDSJ 上游学校列表请求失败，回退本地", "error", err)
 		}
 	}
 

@@ -306,7 +306,7 @@ func AdminSetTurbo(c *gin.Context) {
 func AdminConfigGet(c *gin.Context) {
 	config, err := getAdminConfig()
 	if err != nil {
-		response.ServerError(c, "查询设置失败")
+		response.ServerErrorf(c, err, "查询设置失败")
 		return
 	}
 	response.Success(c, config)
@@ -319,7 +319,7 @@ func AdminConfigSave(c *gin.Context) {
 		return
 	}
 	if err := saveAdminConfig(configs); err != nil {
-		response.ServerError(c, "保存设置失败")
+		response.ServerErrorf(c, err, "保存设置失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -328,7 +328,7 @@ func AdminConfigSave(c *gin.Context) {
 func AdminPayDataGet(c *gin.Context) {
 	data, err := getAdminPayData()
 	if err != nil {
-		response.ServerError(c, "查询支付配置失败")
+		response.ServerErrorf(c, err, "查询支付配置失败")
 		return
 	}
 	response.Success(c, data)
@@ -341,7 +341,7 @@ func AdminPayDataSave(c *gin.Context) {
 		return
 	}
 	if err := saveAdminPayData(data); err != nil {
-		response.ServerError(c, "保存支付配置失败")
+		response.ServerErrorf(c, err, "保存支付配置失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -370,7 +370,7 @@ func AdminPlatformConfigList(c *gin.Context) {
 		COALESCE(source_code,''), created_at, updated_at
 		FROM qingka_platform_config ORDER BY pt`)
 	if err != nil {
-		response.ServerError(c, "查询失败: "+err.Error())
+		response.ServerErrorf(c, err, "查询失败: "+err.Error())
 		return
 	}
 	defer rows.Close()
@@ -397,7 +397,7 @@ func AdminPlatformConfigList(c *gin.Context) {
 			&cfg.SourceCode, &cfg.CreatedAt, &cfg.UpdatedAt,
 		)
 		if err != nil {
-			response.ServerError(c, "解析数据失败: "+err.Error())
+			response.ServerErrorf(c, err, "解析数据失败: "+err.Error())
 			return
 		}
 		canonicalizePlatformConfigDB(&cfg)
@@ -423,7 +423,7 @@ func AdminPlatformConfigSave(c *gin.Context) {
 	}
 	err := upsertAdminPlatformConfig(req)
 	if err != nil {
-		response.ServerError(c, "保存失败: "+err.Error())
+		response.ServerErrorf(c, err, "保存失败: "+err.Error())
 		return
 	}
 
@@ -682,7 +682,7 @@ func AdminPlatformConfigDelete(c *gin.Context) {
 
 	result, err := database.DB.Exec("DELETE FROM qingka_platform_config WHERE pt = ?", pt)
 	if err != nil {
-		response.ServerError(c, "删除失败: "+err.Error())
+		response.ServerErrorf(c, err, "删除失败: "+err.Error())
 		return
 	}
 	affected, _ := result.RowsAffected()
@@ -779,7 +779,7 @@ func AdminParsePHPCode(c *gin.Context) {
 func SyncGetConfig(c *gin.Context) {
 	cfg, err := getAdminSyncConfig()
 	if err != nil {
-		response.ServerError(c, "获取配置失败")
+		response.ServerErrorf(c, err, "获取配置失败")
 		return
 	}
 	response.Success(c, cfg)
@@ -792,7 +792,7 @@ func SyncSaveConfig(c *gin.Context) {
 		return
 	}
 	if err := saveAdminSyncConfig(&cfg); err != nil {
-		response.ServerError(c, "保存失败: "+err.Error())
+		response.ServerErrorf(c, err, "保存失败: "+err.Error())
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -806,7 +806,7 @@ func SyncPreview(c *gin.Context) {
 	}
 	result, err := adminSyncPreview(hid)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -822,7 +822,7 @@ func SyncExecute(c *gin.Context) {
 	}
 	result, err := adminSyncExecute(req.HID)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -843,7 +843,7 @@ func SyncLogs(c *gin.Context) {
 
 	list, total, err := getAdminSyncLogs(page, pageSize, supplierID, action)
 	if err != nil {
-		response.ServerError(c, "查询日志失败")
+		response.ServerErrorf(c, err, "查询日志失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -862,7 +862,7 @@ func SyncMonitoredSuppliers(c *gin.Context) {
 	}
 	list, err := getAdminMonitoredSuppliers(cfg.SupplierIDs)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, list)
@@ -922,7 +922,7 @@ func LonglongToolSaveConfig(c *gin.Context) {
 		string(data), string(data),
 	)
 	if err != nil {
-		response.ServerError(c, "保存失败: "+err.Error())
+		response.ServerErrorf(c, err, "保存失败: "+err.Error())
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -969,7 +969,7 @@ func HZWSocketConfigSave(c *gin.Context) {
 		return
 	}
 	if err := setAdminHZWSocketURL(req.SocketURL); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	restartAdminHZWSocket()
@@ -979,7 +979,7 @@ func HZWSocketConfigSave(c *gin.Context) {
 func TutuQGConfigGet(c *gin.Context) {
 	cfg, err := tutuqgmodule.TutuQG().GetConfig()
 	if err != nil {
-		response.ServerError(c, "获取配置失败")
+		response.ServerErrorf(c, err, "获取配置失败")
 		return
 	}
 	response.Success(c, cfg)
@@ -992,7 +992,7 @@ func TutuQGConfigSave(c *gin.Context) {
 		return
 	}
 	if err := tutuqgmodule.TutuQG().SaveConfig(&cfg); err != nil {
-		response.ServerError(c, "保存配置失败")
+		response.ServerErrorf(c, err, "保存配置失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -1001,7 +1001,7 @@ func TutuQGConfigSave(c *gin.Context) {
 func TuboshuConfigGet(c *gin.Context) {
 	cfg, err := tuboshumodule.Tuboshu().GetConfig()
 	if err != nil {
-		response.ServerError(c, "获取配置失败")
+		response.ServerErrorf(c, err, "获取配置失败")
 		return
 	}
 	response.Success(c, cfg)
@@ -1014,7 +1014,7 @@ func TuboshuConfigSave(c *gin.Context) {
 		return
 	}
 	if err := tuboshumodule.Tuboshu().SaveConfig(&cfg); err != nil {
-		response.ServerError(c, "保存配置失败")
+		response.ServerErrorf(c, err, "保存配置失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -1039,7 +1039,7 @@ func TuboshuSavePriceConfig(c *gin.Context) {
 	}
 
 	if err := tuboshumodule.Tuboshu().SavePriceConfig(priceConfig); err != nil {
-		response.ServerError(c, "保存失败: "+err.Error())
+		response.ServerErrorf(c, err, "保存失败: "+err.Error())
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -1048,7 +1048,7 @@ func TuboshuSavePriceConfig(c *gin.Context) {
 func PaperConfigGet(c *gin.Context) {
 	conf, err := papermodule.Paper().GetConfig()
 	if err != nil {
-		response.ServerError(c, "获取配置失败")
+		response.ServerErrorf(c, err, "获取配置失败")
 		return
 	}
 	response.Success(c, conf)
@@ -1061,7 +1061,7 @@ func PaperConfigSave(c *gin.Context) {
 		return
 	}
 	if err := papermodule.Paper().SaveConfig(data); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -1070,7 +1070,7 @@ func PaperConfigSave(c *gin.Context) {
 func YFDKConfigGet(c *gin.Context) {
 	cfg, err := yfdkmodule.YFDK().GetConfig()
 	if err != nil {
-		response.ServerError(c, "获取配置失败")
+		response.ServerErrorf(c, err, "获取配置失败")
 		return
 	}
 	response.Success(c, cfg)
@@ -1083,7 +1083,7 @@ func YFDKConfigSave(c *gin.Context) {
 		return
 	}
 	if err := yfdkmodule.YFDK().SaveConfig(&cfg); err != nil {
-		response.ServerError(c, "保存配置失败")
+		response.ServerErrorf(c, err, "保存配置失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -1092,7 +1092,7 @@ func YFDKConfigSave(c *gin.Context) {
 func YFDKAdminProjectList(c *gin.Context) {
 	projects, err := yfdkmodule.YFDK().GetAdminProjects()
 	if err != nil {
-		response.ServerError(c, "获取项目列表失败")
+		response.ServerErrorf(c, err, "获取项目列表失败")
 		return
 	}
 	response.Success(c, projects)
@@ -1120,7 +1120,7 @@ func YFDKAdminProjectUpdate(c *gin.Context) {
 		return
 	}
 	if err := yfdkmodule.YFDK().UpdateProject(req.ID, req.SellPrice, req.Enabled, req.Sort, req.Content); err != nil {
-		response.ServerError(c, "更新项目失败")
+		response.ServerErrorf(c, err, "更新项目失败")
 		return
 	}
 	response.SuccessMsg(c, "更新成功")
@@ -1133,7 +1133,7 @@ func YFDKAdminProjectDelete(c *gin.Context) {
 		return
 	}
 	if err := yfdkmodule.YFDK().DeleteProject(id); err != nil {
-		response.ServerError(c, "删除项目失败")
+		response.ServerErrorf(c, err, "删除项目失败")
 		return
 	}
 	response.SuccessMsg(c, "删除成功")
@@ -1142,7 +1142,7 @@ func YFDKAdminProjectDelete(c *gin.Context) {
 func TuZhiConfigGet(c *gin.Context) {
 	cfg, err := tuzhimodule.TuZhi().GetConfig()
 	if err != nil {
-		response.ServerError(c, "获取配置失败")
+		response.ServerErrorf(c, err, "获取配置失败")
 		return
 	}
 	response.Success(c, cfg)
@@ -1155,7 +1155,7 @@ func TuZhiConfigSave(c *gin.Context) {
 		return
 	}
 	if err := tuzhimodule.TuZhi().SaveConfig(&cfg); err != nil {
-		response.ServerError(c, "保存配置失败")
+		response.ServerErrorf(c, err, "保存配置失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -1173,7 +1173,7 @@ func TuZhiAdminGetGoods(c *gin.Context) {
 func TuZhiGoodsOverridesGet(c *gin.Context) {
 	list, err := tuzhimodule.TuZhi().GetGoodsOverrides()
 	if err != nil {
-		response.ServerError(c, "获取失败")
+		response.ServerErrorf(c, err, "获取失败")
 		return
 	}
 	response.Success(c, list)
@@ -1188,7 +1188,7 @@ func TuZhiGoodsOverridesSave(c *gin.Context) {
 		return
 	}
 	if err := tuzhimodule.TuZhi().SaveGoodsOverrides(req.Items); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -1197,7 +1197,7 @@ func TuZhiGoodsOverridesSave(c *gin.Context) {
 func SXDKConfigGet(c *gin.Context) {
 	cfg, err := sxdkmodule.SXDK().GetConfig()
 	if err != nil {
-		response.ServerError(c, "获取配置失败")
+		response.ServerErrorf(c, err, "获取配置失败")
 		return
 	}
 	response.Success(c, cfg)
@@ -1210,7 +1210,7 @@ func SXDKConfigSave(c *gin.Context) {
 		return
 	}
 	if err := sxdkmodule.SXDK().SaveConfig(&cfg); err != nil {
-		response.ServerError(c, "保存配置失败")
+		response.ServerErrorf(c, err, "保存配置失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -1221,7 +1221,7 @@ func AdminTenantList(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	list, total, err := listAdminTenants(page, limit)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, gin.H{"list": list, "total": total})
@@ -1248,7 +1248,7 @@ func AdminTenantSetStatus(c *gin.Context) {
 	}
 	c.ShouldBindJSON(&req)
 	if err := setAdminTenantStatus(tid, req.Status); err != nil {
-		response.ServerError(c, "操作失败")
+		response.ServerErrorf(c, err, "操作失败")
 		return
 	}
 	response.SuccessMsg(c, "ok")
@@ -1260,7 +1260,7 @@ func AdminCheckinStats(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	list, total, stat, err := listAdminCheckinStats(date, page, limit)
 	if err != nil {
-		response.ServerError(c, "查询签到记录失败")
+		response.ServerErrorf(c, err, "查询签到记录失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -1274,7 +1274,7 @@ func AdminCheckinStats(c *gin.Context) {
 func AdminDBCompatCheck(c *gin.Context) {
 	result, err := checkAdminDBCompat()
 	if err != nil {
-		response.ServerError(c, "检查失败: "+err.Error())
+		response.ServerErrorf(c, err, "检查失败: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -1283,7 +1283,7 @@ func AdminDBCompatCheck(c *gin.Context) {
 func AdminDBCompatFix(c *gin.Context) {
 	result, err := fixAdminDBCompat()
 	if err != nil {
-		response.ServerError(c, "修复失败: "+err.Error())
+		response.ServerErrorf(c, err, "修复失败: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -1298,7 +1298,7 @@ func AdminDBSyncTest(c *gin.Context) {
 	// 后台入口只负责请求绑定和统一响应，真正的同步探测逻辑交给 dbtools。
 	result, err := testAdminDBSyncConnection(req)
 	if err != nil {
-		response.ServerError(c, "测试失败: "+err.Error())
+		response.ServerErrorf(c, err, "测试失败: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -1317,7 +1317,7 @@ func AdminDBSyncExecute(c *gin.Context) {
 	// 后台入口只做协议层处理，真正的数据同步执行由 dbtools 负责。
 	result, err := executeAdminDBSync(req)
 	if err != nil {
-		response.ServerError(c, "同步失败: "+err.Error())
+		response.ServerErrorf(c, err, "同步失败: "+err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -1328,7 +1328,7 @@ func AdminCardKeyList(c *gin.Context) {
 	_ = c.ShouldBindQuery(&req)
 	list, total, err := auxmodule.Auxiliary().CardKeyList(req)
 	if err != nil {
-		response.ServerError(c, "查询卡密失败")
+		response.ServerErrorf(c, err, "查询卡密失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -1345,7 +1345,7 @@ func AdminCardKeyGenerate(c *gin.Context) {
 	}
 	codes, err := auxmodule.Auxiliary().CardKeyGenerate(req.Money, req.Count)
 	if err != nil {
-		response.ServerError(c, "生成卡密失败")
+		response.ServerErrorf(c, err, "生成卡密失败")
 		return
 	}
 	response.Success(c, gin.H{"codes": codes, "count": len(codes)})
@@ -1361,7 +1361,7 @@ func AdminCardKeyDelete(c *gin.Context) {
 	}
 	deleted, err := auxmodule.Auxiliary().CardKeyDelete(body.IDs)
 	if err != nil {
-		response.ServerError(c, "删除失败")
+		response.ServerErrorf(c, err, "删除失败")
 		return
 	}
 	response.Success(c, gin.H{"deleted": deleted})
@@ -1372,7 +1372,7 @@ func AdminActivityList(c *gin.Context) {
 	_ = c.ShouldBindQuery(&req)
 	list, total, err := auxmodule.Auxiliary().ActivityList(req)
 	if err != nil {
-		response.ServerError(c, "查询活动失败")
+		response.ServerErrorf(c, err, "查询活动失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -1388,7 +1388,7 @@ func AdminActivitySave(c *gin.Context) {
 		return
 	}
 	if err := auxmodule.Auxiliary().ActivitySave(req); err != nil {
-		response.ServerError(c, "保存活动失败")
+		response.ServerErrorf(c, err, "保存活动失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -1401,7 +1401,7 @@ func AdminActivityDelete(c *gin.Context) {
 		return
 	}
 	if err := auxmodule.Auxiliary().ActivityDelete(hid); err != nil {
-		response.ServerError(c, "删除失败")
+		response.ServerErrorf(c, err, "删除失败")
 		return
 	}
 	response.SuccessMsg(c, "删除成功")
@@ -1410,7 +1410,7 @@ func AdminActivityDelete(c *gin.Context) {
 func AdminPledgeConfigList(c *gin.Context) {
 	list, err := auxmodule.Auxiliary().PledgeConfigList()
 	if err != nil {
-		response.ServerError(c, "查询质押配置失败")
+		response.ServerErrorf(c, err, "查询质押配置失败")
 		return
 	}
 	response.Success(c, list)
@@ -1423,7 +1423,7 @@ func AdminPledgeConfigSave(c *gin.Context) {
 		return
 	}
 	if err := auxmodule.Auxiliary().PledgeConfigSave(req); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -1436,7 +1436,7 @@ func AdminPledgeConfigDelete(c *gin.Context) {
 		return
 	}
 	if err := auxmodule.Auxiliary().PledgeConfigDelete(id); err != nil {
-		response.ServerError(c, "删除失败")
+		response.ServerErrorf(c, err, "删除失败")
 		return
 	}
 	response.SuccessMsg(c, "删除成功")
@@ -1452,7 +1452,7 @@ func AdminPledgeConfigToggle(c *gin.Context) {
 		return
 	}
 	if err := auxmodule.Auxiliary().PledgeConfigToggle(body.ID, body.Status); err != nil {
-		response.ServerError(c, "更新失败")
+		response.ServerErrorf(c, err, "更新失败")
 		return
 	}
 	response.SuccessMsg(c, "更新成功")
@@ -1463,7 +1463,7 @@ func AdminPledgeRecordList(c *gin.Context) {
 	_ = c.ShouldBindQuery(&req)
 	list, total, err := auxmodule.Auxiliary().PledgeRecordList(req)
 	if err != nil {
-		response.ServerError(c, "查询质押记录失败")
+		response.ServerErrorf(c, err, "查询质押记录失败")
 		return
 	}
 	response.Success(c, gin.H{

@@ -3,11 +3,11 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"go-api/internal/config"
+	obslogger "go-api/internal/observability/logger"
 
 	"github.com/go-sql-driver/mysql"
 	"golang.org/x/crypto/bcrypt"
@@ -33,11 +33,11 @@ func Connect(cfg config.DatabaseConfig) *sql.DB {
 	dsn := mysqlCfg.FormatDSN()
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
-		log.Fatalf("数据库连接失败: %v", err)
+		obslogger.Fatal("数据库连接失败", "host", cfg.Host, "port", cfg.Port, "dbname", cfg.DBName, "error", err)
 	}
 
 	if err = db.Ping(); err != nil {
-		log.Fatalf("数据库 Ping 失败: %v", err)
+		obslogger.Fatal("数据库 Ping 失败", "host", cfg.Host, "port", cfg.Port, "dbname", cfg.DBName, "error", err)
 	}
 
 	db.SetMaxOpenConns(cfg.MaxOpenConns)
@@ -46,9 +46,9 @@ func Connect(cfg config.DatabaseConfig) *sql.DB {
 	db.SetConnMaxIdleTime(3 * time.Minute)
 
 	DB = db
-	log.Println("MySQL 连接成功")
+	obslogger.L().Info("MySQL 连接成功", "host", cfg.Host, "port", cfg.Port, "dbname", cfg.DBName)
 	if err := runConfiguredMigrations(db); err != nil {
-		log.Fatalf("数据库迁移失败: %v", err)
+		obslogger.Fatal("数据库迁移失败", "error", err)
 	}
 	bootstrapDefaultAdmin(db)
 	return db
@@ -60,9 +60,9 @@ func runLegacySchemaPatches(db *sql.DB) {
 	if count == 0 {
 		_, err := db.Exec("ALTER TABLE `qingka_wangke_user` ADD COLUMN `pass2` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '管理员二级密码' AFTER `pass`")
 		if err != nil {
-			log.Printf("[AutoMigrate] 添加 pass2 列失败: %v", err)
+			obslogger.L().Warn("AutoMigrate 添加 pass2 列失败", "error", err)
 		} else {
-			log.Println("[AutoMigrate] 已自动添加 pass2 列")
+			obslogger.L().Info("AutoMigrate 已自动添加 pass2 列")
 		}
 	}
 	// 确保 config 表有 skey/svalue 列（新模块用）
@@ -72,13 +72,13 @@ func runLegacySchemaPatches(db *sql.DB) {
 		// 分步添加：先加列（NULL 默认值，避免与已有行冲突），再加唯一索引
 		_, err := db.Exec("ALTER TABLE `qingka_wangke_config` ADD COLUMN `skey` VARCHAR(255) DEFAULT NULL AFTER `k`, ADD COLUMN `svalue` MEDIUMTEXT AFTER `skey`")
 		if err != nil {
-			log.Printf("[AutoMigrate] 添加 config.skey/svalue 列失败: %v", err)
+			obslogger.L().Warn("AutoMigrate 添加 config.skey/svalue 列失败", "error", err)
 		} else {
-			log.Println("[AutoMigrate] 已添加 config.skey/svalue 列")
+			obslogger.L().Info("AutoMigrate 已添加 config.skey/svalue 列")
 			// 再单独添加唯一索引（NULL 值不冲突）
 			_, err = db.Exec("ALTER TABLE `qingka_wangke_config` ADD UNIQUE KEY `uk_skey` (`skey`)")
 			if err != nil {
-				log.Printf("[AutoMigrate] 添加 config.uk_skey 索引失败(可能已存在): %v", err)
+				obslogger.L().Warn("AutoMigrate 添加 config.uk_skey 索引失败", "error", err)
 			}
 		}
 	} else {
@@ -90,9 +90,9 @@ func runLegacySchemaPatches(db *sql.DB) {
 			db.Exec("UPDATE `qingka_wangke_config` SET `skey` = NULL WHERE `skey` = ''")
 			_, err := db.Exec("ALTER TABLE `qingka_wangke_config` ADD UNIQUE KEY `uk_skey` (`skey`)")
 			if err != nil {
-				log.Printf("[AutoMigrate] 补建 config.uk_skey 索引失败: %v", err)
+				obslogger.L().Warn("AutoMigrate 补建 config.uk_skey 索引失败", "error", err)
 			} else {
-				log.Println("[AutoMigrate] 已补建 config.uk_skey 索引")
+				obslogger.L().Info("AutoMigrate 已补建 config.uk_skey 索引")
 			}
 		}
 	}
@@ -102,7 +102,7 @@ func runLegacySchemaPatches(db *sql.DB) {
 	db.QueryRow("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='qingka_wangke_moneylog' AND COLUMN_NAME='mark'").Scan(&hasMark)
 	if hasMark == 0 {
 		db.Exec("ALTER TABLE `qingka_wangke_moneylog` ADD COLUMN `mark` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '备注(别名)' AFTER `remark`, ADD COLUMN `remarks` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '备注(别名2)' AFTER `mark`")
-		log.Println("[AutoMigrate] 已添加 moneylog.mark/remarks 列")
+		obslogger.L().Info("AutoMigrate 已添加 moneylog.mark/remarks 列")
 	}
 }
 
@@ -112,21 +112,21 @@ func bootstrapDefaultAdmin(db *sql.DB) {
 	db.QueryRow("SELECT COUNT(*) FROM qingka_wangke_user WHERE grade='3'").Scan(&adminCount)
 	if adminCount == 0 {
 		if config.Global == nil || !config.Global.CreateDefaultAdminEnabled() {
-			log.Println("[AutoMigrate] 未发现管理员账号，已跳过默认管理员自动创建；如需启用请设置 bootstrap.create_default_admin=true 或 GO_API_BOOTSTRAP_CREATE_DEFAULT_ADMIN=true")
+			obslogger.L().Info("AutoMigrate 已跳过默认管理员自动创建")
 			return
 		}
 
 		hashed, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
 		if err != nil {
-			log.Printf("[AutoMigrate] 生成默认管理员密码哈希失败: %v", err)
+			obslogger.L().Warn("AutoMigrate 生成默认管理员密码哈希失败", "error", err)
 			return
 		}
 
 		_, err = db.Exec("INSERT INTO qingka_wangke_user (uuid, user, pass, name, grade, active, addprice, addtime) VALUES (1, 'admin', ?, 'Admin', '3', '1', 1, NOW())", string(hashed))
 		if err != nil {
-			log.Printf("[AutoMigrate] 插入管理员失败: %v", err)
+			obslogger.L().Warn("AutoMigrate 插入管理员失败", "error", err)
 		} else {
-			log.Println("[AutoMigrate] 已按显式开关创建默认管理员账号 admin/admin123")
+			obslogger.L().Info("AutoMigrate 已按显式开关创建默认管理员账号")
 		}
 	}
 }
@@ -146,7 +146,7 @@ func NormalizeLegacyUserPasswords(db *sql.DB) (int, int, error) {
 		var pass string
 		var pass2 string
 		if err := rows.Scan(&uid, &pass, &pass2); err != nil {
-			log.Printf("[PasswordMigration] 读取用户密码失败: %v", err)
+			obslogger.L().Warn("PasswordMigration 读取用户密码失败", "error", err)
 			continue
 		}
 
@@ -158,7 +158,7 @@ func NormalizeLegacyUserPasswords(db *sql.DB) (int, int, error) {
 		if pass != "" && !isBcryptHash(pass) {
 			hashed, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
 			if err != nil {
-				log.Printf("[PasswordMigration] 加密 uid=%d 的登录密码失败: %v", uid, err)
+				obslogger.L().Warn("PasswordMigration 加密登录密码失败", "uid", uid, "error", err)
 			} else {
 				newPass = string(hashed)
 				updatePass = true
@@ -169,7 +169,7 @@ func NormalizeLegacyUserPasswords(db *sql.DB) (int, int, error) {
 		if pass2 != "" && !isBcryptHash(pass2) {
 			hashed, err := bcrypt.GenerateFromPassword([]byte(pass2), bcrypt.DefaultCost)
 			if err != nil {
-				log.Printf("[PasswordMigration] 加密 uid=%d 的二级密码失败: %v", uid, err)
+				obslogger.L().Warn("PasswordMigration 加密二级密码失败", "uid", uid, "error", err)
 			} else {
 				newPass2 = string(hashed)
 				updatePass2 = true
@@ -180,15 +180,15 @@ func NormalizeLegacyUserPasswords(db *sql.DB) (int, int, error) {
 		switch {
 		case updatePass && updatePass2:
 			if _, err := db.Exec("UPDATE qingka_wangke_user SET pass = ?, pass2 = ? WHERE uid = ?", newPass, newPass2, uid); err != nil {
-				log.Printf("[PasswordMigration] 更新 uid=%d 的密码字段失败: %v", uid, err)
+				obslogger.L().Warn("PasswordMigration 更新密码字段失败", "uid", uid, "error", err)
 			}
 		case updatePass:
 			if _, err := db.Exec("UPDATE qingka_wangke_user SET pass = ? WHERE uid = ?", newPass, uid); err != nil {
-				log.Printf("[PasswordMigration] 更新 uid=%d 的登录密码失败: %v", uid, err)
+				obslogger.L().Warn("PasswordMigration 更新登录密码失败", "uid", uid, "error", err)
 			}
 		case updatePass2:
 			if _, err := db.Exec("UPDATE qingka_wangke_user SET pass2 = ? WHERE uid = ?", newPass2, uid); err != nil {
-				log.Printf("[PasswordMigration] 更新 uid=%d 的二级密码失败: %v", uid, err)
+				obslogger.L().Warn("PasswordMigration 更新二级密码失败", "uid", uid, "error", err)
 			}
 		}
 	}

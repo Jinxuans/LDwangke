@@ -3,7 +3,6 @@ package admin
 import (
 	"database/sql"
 	"errors"
-	"log"
 	"strconv"
 
 	"go-api/internal/middleware"
@@ -33,8 +32,7 @@ func AdminUserList(c *gin.Context) {
 
 	list, total, err := usermodule.User().UserList(req)
 	if err != nil {
-		log.Printf("[AdminUserList] 查询失败: %v", err)
-		response.ServerError(c, "查询用户失败: "+err.Error())
+		response.ServerErrorf(c, err, "查询用户失败: "+err.Error())
 		return
 	}
 
@@ -55,7 +53,7 @@ func AdminUserResetPass(c *gin.Context) {
 	}
 
 	if err := usermodule.User().ResetPassword(body.UID, body.NewPass); err != nil {
-		response.ServerError(c, "重置密码失败")
+		response.ServerErrorf(c, err, "重置密码失败")
 		return
 	}
 
@@ -73,7 +71,7 @@ func AdminUserSetBalance(c *gin.Context) {
 	}
 
 	if err := usermodule.User().SetBalance(body.UID, body.Balance); err != nil {
-		response.ServerError(c, "设置余额失败")
+		response.ServerErrorf(c, err, "设置余额失败")
 		return
 	}
 
@@ -99,7 +97,7 @@ func AdminUserSetGrade(c *gin.Context) {
 			response.BadRequest(c, "请选择有效的等级")
 			return
 		}
-		response.ServerError(c, "设置等级失败")
+		response.ServerErrorf(c, err, "设置等级失败")
 		return
 	}
 
@@ -109,7 +107,7 @@ func AdminUserSetGrade(c *gin.Context) {
 func AdminGradeList(c *gin.Context) {
 	list, err := classmodule.Classes().GradeList()
 	if err != nil {
-		response.ServerError(c, "查询等级列表失败")
+		response.ServerErrorf(c, err, "查询等级列表失败")
 		return
 	}
 	response.Success(c, list)
@@ -122,8 +120,7 @@ func AdminGradeSave(c *gin.Context) {
 		return
 	}
 	if err := classmodule.Classes().GradeSave(req); err != nil {
-		log.Printf("[AdminGradeSave] 保存失败: %v", err)
-		response.ServerError(c, "保存失败: "+err.Error())
+		response.ServerErrorf(c, err, "保存失败: "+err.Error())
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -136,7 +133,7 @@ func AdminGradeDelete(c *gin.Context) {
 		return
 	}
 	if err := classmodule.Classes().GradeDelete(id); err != nil {
-		response.ServerError(c, "删除失败")
+		response.ServerErrorf(c, err, "删除失败")
 		return
 	}
 	response.SuccessMsg(c, "删除成功")

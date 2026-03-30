@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,6 +14,7 @@ import (
 	"strings"
 
 	"go-api/internal/config"
+	obslogger "go-api/internal/observability/logger"
 
 	"github.com/go-sql-driver/mysql"
 )
@@ -40,7 +40,7 @@ var autoBaselineCheckpoints = []autoBaselineCheckpoint{
 
 func runConfiguredMigrations(db *sql.DB) error {
 	if config.Global != nil && !config.Global.AutoMigrateEnabled() {
-		log.Println("[Migration] 已通过配置关闭自动迁移")
+		obslogger.L().Info("Migration 已通过配置关闭自动迁移")
 		return nil
 	}
 
@@ -55,7 +55,7 @@ func runConfiguredMigrations(db *sql.DB) error {
 func runSQLMigrations(db *sql.DB) error {
 	migrationDir, err := resolveMigrationDir()
 	if err != nil {
-		log.Printf("[Migration] 未找到迁移目录，跳过 SQL 自动迁移: %v", err)
+		obslogger.L().Warn("Migration 未找到迁移目录，跳过 SQL 自动迁移", "error", err)
 		return nil
 	}
 
@@ -91,9 +91,9 @@ func runSQLMigrations(db *sql.DB) error {
 				return fmt.Errorf("刷新迁移记录失败: %w", err)
 			}
 			if len(missingTables) > 0 {
-				log.Printf("[Migration] 检测到已有业务数据库，但缺少关键表 %s，历史迁移基线调整到 %03d，将自动补执行后续迁移", strings.Join(missingTables, ", "), baselineVersion)
+				obslogger.L().Info("Migration 检测到已有业务数据库但缺少关键表", "tables", strings.Join(missingTables, ", "), "baseline_version", baselineVersion)
 			} else {
-				log.Printf("[Migration] 检测到已有业务数据库，已将历史迁移基线化到 %03d，仅自动执行后续新迁移", baselineVersion)
+				obslogger.L().Info("Migration 已将历史迁移基线化", "baseline_version", baselineVersion)
 			}
 		}
 	}
@@ -109,7 +109,7 @@ func runSQLMigrations(db *sql.DB) error {
 
 		if oldChecksum, ok := applied[name]; ok {
 			if oldChecksum != checksum {
-				log.Printf("[Migration] 警告: %s 已执行但文件内容发生变化，已跳过重新执行", name)
+				obslogger.L().Warn("Migration 已执行文件内容发生变化，已跳过重新执行", "name", name)
 			}
 			continue
 		}
@@ -125,11 +125,11 @@ func runSQLMigrations(db *sql.DB) error {
 			continue
 		}
 
-		log.Printf("[Migration] 开始执行 %s (%d 条语句)", name, len(statements))
+		obslogger.L().Info("Migration 开始执行", "name", name, "statement_count", len(statements))
 		for idx, stmt := range statements {
 			if _, err := db.Exec(stmt); err != nil {
 				if isIgnorableMigrationError(err) {
-					log.Printf("[Migration] %s 第 %d 条语句已存在/已处理，忽略错误: %v", name, idx+1, err)
+					obslogger.L().Warn("Migration 语句已存在或已处理，忽略错误", "name", name, "statement_index", idx+1, "error", err)
 					continue
 				}
 				return fmt.Errorf("%s 第 %d 条语句执行失败: %w", name, idx+1, err)
@@ -140,11 +140,11 @@ func runSQLMigrations(db *sql.DB) error {
 			return fmt.Errorf("记录迁移 %s 失败: %w", name, err)
 		}
 		appliedCount++
-		log.Printf("[Migration] 已完成 %s", name)
+		obslogger.L().Info("Migration 已完成", "name", name)
 	}
 
 	if appliedCount > 0 {
-		log.Printf("[Migration] 本次自动执行了 %d 个迁移文件", appliedCount)
+		obslogger.L().Info("Migration 本次自动执行完成", "applied_count", appliedCount)
 	}
 	return nil
 }

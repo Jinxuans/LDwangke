@@ -9,7 +9,6 @@ import (
 	classmodule "go-api/internal/modules/class"
 	suppliermodule "go-api/internal/modules/supplier"
 	shared "go-api/internal/shared/db"
-	"log"
 	"math"
 	"sort"
 	"strconv"
@@ -17,6 +16,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	obslogger "go-api/internal/observability/logger"
 )
 
 func autoSyncVerboseLogging() bool {
@@ -776,7 +777,7 @@ func (r *legacyRepository) SyncOrderProgress(oids []int) (int, error) {
 func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, error) {
 	logf := func(format string, args ...interface{}) {
 		msg := fmt.Sprintf(format, args...)
-		log.Printf("[AutoSync] %s", msg)
+		obslogger.L().Info("AutoSync", "message", msg)
 		if opts.LogCollector != nil {
 			opts.LogCollector(msg)
 		}
@@ -952,7 +953,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 				message := fmt.Sprintf("供应商 hid=%d 查询失败: %v（影响 %d 个订单）", hid, err, len(items))
 				recordSupplierName(fmt.Sprintf("hid=%d", hid))
 				if verboseLogging {
-					log.Printf("[AutoSync] %s", message)
+					obslogger.L().Info("AutoSync", "message", message)
 				}
 				recordSampleError(message)
 				atomic.AddInt64(&errorCount, int64(len(items)))
@@ -970,7 +971,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 						message = fmt.Sprintf("hid=%d 批量进度接口失败: %v", hid, err)
 					}
 					if verboseLogging {
-						log.Printf("[AutoSync] %s", message)
+						obslogger.L().Info("AutoSync", "message", message)
 					}
 					recordSampleError(message)
 					if opts.OnlyBatchSuppliers {
@@ -986,7 +987,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 						matchedItems := matchAutoSyncItems(progress, byYID, byNounUserCourse)
 						if len(matchedItems) == 0 {
 							if verboseLogging {
-								log.Printf("[AutoSync] hid=%d 批量进度项未匹配本地订单: yid=%s noun=%s user=%s kcname=%s", hid, progress.YID, progress.Noun, progress.User, progress.KCName)
+								obslogger.L().Info("AutoSync 批量进度项未匹配本地订单", "hid", hid, "yid", progress.YID, "noun", progress.Noun, "user", progress.User, "kcname", progress.KCName)
 							}
 							continue
 						}
@@ -994,7 +995,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 							if err := applyAutoSyncProgressUpdate(item, progress, syncTime); err != nil {
 								message := fmt.Sprintf("oid=%d 批量更新进度失败(hid=%d yid=%s): %v", item.OID, hid, item.YID, err)
 								if verboseLogging {
-									log.Printf("[AutoSync] %s", message)
+									obslogger.L().Info("AutoSync", "message", message)
 								}
 								recordSampleError(message)
 								atomic.AddInt64(&errorCount, 1)
@@ -1014,7 +1015,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 						}
 					}
 					if verboseLogging {
-						log.Printf("[AutoSync] hid=%d 批量进度同步完成，返回 %d 条变更，命中 %d 个订单", hid, len(progressItems), len(updatedOIDs))
+						obslogger.L().Info("AutoSync 批量进度同步完成", "hid", hid, "changes", len(progressItems), "matched_orders", len(updatedOIDs))
 					}
 					logProgress(int64(len(items)))
 					return
@@ -1037,7 +1038,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 					touchAutoSyncOrder(item.OID, syncTime)
 					message := fmt.Sprintf("oid=%d 查询进度失败(hid=%d yid=%s): %v", item.OID, hid, item.YID, err)
 					if verboseLogging {
-						log.Printf("[AutoSync] %s", message)
+						obslogger.L().Info("AutoSync", "message", message)
 					}
 					recordSampleError(message)
 					atomic.AddInt64(&errorCount, 1)
@@ -1050,7 +1051,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 					// 因为这说明当前订单没有拿到任何可回写的上游进度。
 					message := fmt.Sprintf("oid=%d 未查询到上游进度(hid=%d yid=%s)", item.OID, hid, item.YID)
 					if verboseLogging {
-						log.Printf("[AutoSync] %s", message)
+						obslogger.L().Info("AutoSync", "message", message)
 					}
 					recordSampleError(message)
 					atomic.AddInt64(&errorCount, 1)
@@ -1062,7 +1063,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 					if err := applyAutoSyncProgressUpdate(item, progress, syncTime); err != nil {
 						message := fmt.Sprintf("oid=%d 更新进度失败(hid=%d yid=%s): %v", item.OID, hid, item.YID, err)
 						if verboseLogging {
-							log.Printf("[AutoSync] %s", message)
+							obslogger.L().Info("AutoSync", "message", message)
 						}
 						recordSampleError(message)
 						atomic.AddInt64(&errorCount, 1)

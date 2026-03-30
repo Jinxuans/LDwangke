@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	"go-api/internal/config"
+	obslogger "go-api/internal/observability/logger"
 )
 
 // ===== 密钥（由宝塔插件部署时生成 .secrets 文件） =====
@@ -186,7 +186,7 @@ func NewManager(cfg config.LicenseConfig) *Manager {
 	}
 	secretsLoaded := true
 	if err := loadSecrets(secretsFile); err != nil {
-		log.Printf("[License] 加载密钥文件失败: %v（授权功能不可用）", err)
+		obslogger.L().Warn("License 加载密钥文件失败", "error", err)
 		m.lastError = fmt.Sprintf("密钥文件加载失败: %v", err)
 		secretsLoaded = false
 	}
@@ -204,7 +204,7 @@ func NewManager(cfg config.LicenseConfig) *Manager {
 
 	// 如果密钥文件和授权码都没配置，禁用授权检查（开发模式）
 	if !secretsLoaded && m.licenseKey == "" {
-		log.Println("[License] 未配置密钥文件和授权码，授权检查已禁用（开发模式）")
+		obslogger.L().Info("License 未配置密钥文件和授权码，授权检查已禁用")
 		m.disabled = true
 		m.status = StatusOK
 	}
@@ -218,7 +218,7 @@ func (m *Manager) Start() {
 		return
 	}
 	if m.licenseKey == "" {
-		log.Println("[License] 未配置授权码，系统将以降级模式运行")
+		obslogger.L().Warn("License 未配置授权码，系统将以降级模式运行")
 		m.mu.Lock()
 		m.status = StatusDegraded
 		m.lastError = "未配置授权码"
@@ -234,13 +234,13 @@ func (m *Manager) Start() {
 	if len(midPreview) > 8 {
 		midPreview = midPreview[:8]
 	}
-	log.Printf("[License] 授权码: %s****，机器码: %s...", keyPreview, midPreview)
+	obslogger.L().Info("License 开始校验授权", "license_key_preview", keyPreview+"****", "machine_id_preview", midPreview+"...")
 
 	// 启动时验证
 	if err := m.doVerify(); err != nil {
-		log.Printf("[License] 在线验证失败: %v，尝试离线缓存...", err)
+		obslogger.L().Warn("License 在线验证失败，尝试离线缓存", "error", err)
 		if cacheErr := m.loadCache(); cacheErr != nil {
-			log.Printf("[License] 离线缓存也无效: %v，降级运行", cacheErr)
+			obslogger.L().Warn("License 离线缓存也无效，降级运行", "error", cacheErr)
 			m.mu.Lock()
 			m.status = StatusDegraded
 			m.lastError = fmt.Sprintf("在线: %v / 离线: %v", err, cacheErr)
@@ -251,7 +251,7 @@ func (m *Manager) Start() {
 	// 后台心跳协程
 	go m.heartbeatLoop()
 
-	log.Printf("[License] 授权状态: %s", m.GetStatus())
+	obslogger.L().Info("License 授权状态", "status", m.GetStatus())
 }
 
 // Stop 停止后台心跳
@@ -346,7 +346,7 @@ func (m *Manager) doVerify() error {
 
 	m.saveCache(now)
 
-	log.Printf("[License] 在线验证成功，套餐: %s，到期: %s", vd.Plan, vd.ExpireAt)
+	obslogger.L().Info("License 在线验证成功", "plan", vd.Plan, "expire_at", vd.ExpireAt)
 	return nil
 }
 
@@ -390,7 +390,7 @@ func (m *Manager) heartbeatLoop() {
 					m.failCount++
 					m.lastError = fmt.Sprintf("verify: %v / heartbeat: %v", err, hbErr)
 					m.mu.Unlock()
-					log.Printf("[License] 心跳失败(第%d次): %v", m.failCount, hbErr)
+					obslogger.L().Warn("License 心跳失败", "fail_count", m.failCount, "error", hbErr)
 				} else {
 					m.mu.Lock()
 					m.failCount = 0
@@ -425,11 +425,11 @@ func (m *Manager) updateOfflineStatus() {
 		}
 	case elapsed < 72*time.Hour:
 		m.status = StatusWarning
-		log.Printf("[License] 离线警告：已 %s 未与授权站通信", elapsed.Round(time.Minute))
+		obslogger.L().Warn("License 离线警告", "elapsed", elapsed.Round(time.Minute).String())
 	default:
 		m.status = StatusDegraded
 		m.lastError = fmt.Sprintf("离线超过72小时 (%s)", elapsed.Round(time.Minute))
-		log.Printf("[License] 功能降级：已 %s 未与授权站通信", elapsed.Round(time.Minute))
+		obslogger.L().Warn("License 功能降级", "elapsed", elapsed.Round(time.Minute).String())
 	}
 }
 
@@ -497,12 +497,12 @@ func (m *Manager) saveCache(verifyTime time.Time) {
 
 	encrypted, err := aesGCMEncrypt(cacheAESKey, plaintext)
 	if err != nil {
-		log.Printf("[License] 缓存加密失败: %v", err)
+		obslogger.L().Warn("License 缓存加密失败", "error", err)
 		return
 	}
 
 	if err := os.WriteFile(m.cacheFile, encrypted, 0600); err != nil {
-		log.Printf("[License] 缓存写入失败: %v", err)
+		obslogger.L().Warn("License 缓存写入失败", "error", err)
 	}
 }
 
@@ -559,7 +559,7 @@ func (m *Manager) loadCache() error {
 	m.lastError = ""
 	m.mu.Unlock()
 
-	log.Printf("[License] 离线缓存有效（%s 前验证），状态: %s", elapsed.Round(time.Minute), m.status)
+	obslogger.L().Info("License 离线缓存有效", "elapsed", elapsed.Round(time.Minute).String(), "status", m.status)
 	return nil
 }
 

@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
 	"go-api/internal/database"
 	commonmodule "go-api/internal/modules/common"
 	mailmodule "go-api/internal/modules/mail"
+	obslogger "go-api/internal/observability/logger"
 )
 
 // NotifyOrderStatusChange 订单状态/进度变更后，自动推送通知给已绑定的用户。
@@ -19,7 +19,7 @@ func NotifyOrderStatusChange(oid int, newStatus string, newProcess string, remar
 	go func() {
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				log.Printf("[OrderPush] oid=%d panic: %v", oid, recovered)
+				obslogger.L().Error("OrderPush panic", "oid", oid, "panic", recovered)
 			}
 		}()
 

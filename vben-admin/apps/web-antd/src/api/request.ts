@@ -20,6 +20,25 @@ import { refreshTokenApi } from './core';
 
 const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
 
+function extractRequestId(error: any) {
+  const headers = error?.response?.headers ?? {};
+  const headerRequestId =
+    headers['x-request-id'] ??
+    headers['X-Request-ID'] ??
+    error?.response?.data?.request_id ??
+    error?.response?.data?.requestId;
+
+  if (Array.isArray(headerRequestId)) {
+    return headerRequestId[0] ?? '';
+  }
+
+  return typeof headerRequestId === 'string' ? headerRequestId : '';
+}
+
+function withRequestId(message: string, requestId: string) {
+  return requestId ? `${message} [RID: ${requestId}]` : message;
+}
+
 function createRequestClient(baseURL: string) {
   const client = new RequestClient({
     baseURL,
@@ -105,9 +124,19 @@ function createRequestClient(baseURL: string) {
       // 这里可以根据业务进行定制,你可以拿到 error 内的信息进行定制化处理，根据不同的 code 做不同的提示，而不是直接使用 message.error 提示 msg
       // 当前mock接口返回的错误字段是 error 或者 message
       const responseData = error?.response?.data ?? {};
+      const requestId = extractRequestId(error);
       const errorMessage = responseData?.error ?? responseData?.message ?? '';
+      const finalMessage = withRequestId(errorMessage || msg, requestId);
+      error.message = finalMessage;
+      if (requestId) {
+        console.error('API request failed', {
+          requestId,
+          status: error?.response?.status,
+          url: error?.config?.url,
+        });
+      }
       // 如果没有错误信息，则会根据状态码进行提示
-      message.error(errorMessage || msg);
+      message.error(finalMessage);
     }),
   );
 

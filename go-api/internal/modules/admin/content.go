@@ -365,7 +365,7 @@ func AdminAnnouncementList(c *gin.Context) {
 
 	list, total, err := listAdminAnnouncements(req)
 	if err != nil {
-		response.ServerError(c, "查询公告失败")
+		response.ServerErrorf(c, err, "查询公告失败")
 		return
 	}
 
@@ -386,7 +386,7 @@ func AdminAnnouncementSave(c *gin.Context) {
 	}
 
 	if err := saveAdminAnnouncement(uid, username, req); err != nil {
-		response.ServerError(c, "保存公告失败")
+		response.ServerErrorf(c, err, "保存公告失败")
 		return
 	}
 
@@ -401,7 +401,7 @@ func AdminAnnouncementDelete(c *gin.Context) {
 	}
 
 	if err := deleteAdminAnnouncement(id); err != nil {
-		response.ServerError(c, "删除公告失败")
+		response.ServerErrorf(c, err, "删除公告失败")
 		return
 	}
 
@@ -437,7 +437,7 @@ func AdminEmailLogs(c *gin.Context) {
 
 	logs, total, err := mailmodule.Mail().GetSendLogs(req.Page, req.Limit)
 	if err != nil {
-		response.ServerError(c, "查询发送记录失败")
+		response.ServerErrorf(c, err, "查询发送记录失败")
 		return
 	}
 
@@ -470,7 +470,7 @@ func AdminEmailPreview(c *gin.Context) {
 func ModuleListAll(c *gin.Context) {
 	modules, err := listAdminModules("")
 	if err != nil {
-		response.ServerError(c, "查询模块失败")
+		response.ServerErrorf(c, err, "查询模块失败")
 		return
 	}
 	response.Success(c, modules)
@@ -488,7 +488,7 @@ func PublicModuleList(c *gin.Context) {
 		modules, err = listAdminModules("status = 1")
 	}
 	if err != nil {
-		response.ServerError(c, "查询模块失败")
+		response.ServerErrorf(c, err, "查询模块失败")
 		return
 	}
 	response.Success(c, modules)
@@ -501,7 +501,7 @@ func AdminModuleSave(c *gin.Context) {
 		return
 	}
 	if err := saveAdminModule(req); err != nil {
-		response.ServerError(c, "保存失败: "+err.Error())
+		response.ServerErrorf(c, err, "保存失败: "+err.Error())
 		return
 	}
 	response.Success(c, nil)
@@ -514,7 +514,7 @@ func AdminModuleDelete(c *gin.Context) {
 		return
 	}
 	if err := deleteAdminModule(id); err != nil {
-		response.ServerError(c, "删除失败")
+		response.ServerErrorf(c, err, "删除失败")
 		return
 	}
 	response.Success(c, nil)
@@ -523,7 +523,7 @@ func AdminModuleDelete(c *gin.Context) {
 func AdminExtMenuList(c *gin.Context) {
 	list, err := listAdminExtMenus()
 	if err != nil {
-		response.ServerError(c, "查询扩展菜单失败")
+		response.ServerErrorf(c, err, "查询扩展菜单失败")
 		return
 	}
 	response.Success(c, list)
@@ -536,7 +536,7 @@ func AdminExtMenuSave(c *gin.Context) {
 		return
 	}
 	if err := saveAdminExtMenu(req); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -549,7 +549,7 @@ func AdminExtMenuDelete(c *gin.Context) {
 		return
 	}
 	if err := deleteAdminExtMenu(id); err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.SuccessMsg(c, "删除成功")
@@ -606,7 +606,7 @@ func AdminSetDemoMode(c *gin.Context) {
 		return
 	}
 	if err := middleware.SetDemoMode(req.Enabled); err != nil {
-		response.ServerError(c, "设置失败: "+err.Error())
+		response.ServerErrorf(c, err, "设置失败: "+err.Error())
 		return
 	}
 	msg := "演示模式已关闭"
@@ -664,7 +664,7 @@ func AdminSMTPSave(c *gin.Context) {
 	}
 
 	if err := mailmodule.Mail().SaveSMTPConfig(cfg); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -690,7 +690,7 @@ func AdminSMTPTest(c *gin.Context) {
 func AdminEmailTemplateList(c *gin.Context) {
 	list, err := listAdminEmailTemplates()
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, list)
@@ -703,7 +703,7 @@ func AdminEmailTemplateSave(c *gin.Context) {
 		return
 	}
 	if err := saveAdminEmailTemplate(req); err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -717,7 +717,7 @@ func AdminEmailTemplatePreview(c *gin.Context) {
 	}
 	subject, html, err := previewAdminEmailTemplateByCode(code)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, gin.H{"subject": subject, "html": html})
@@ -735,7 +735,7 @@ func AdminEmailTemplateTest(c *gin.Context) {
 	}
 	subject, html, err := previewAdminEmailTemplateByCode(req.Code)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	if err := mailmodule.Mail().SendEmailWithType(req.TestTo, subject, html, "notify"); err != nil {
@@ -754,7 +754,7 @@ func AdminTicketList(c *gin.Context) {
 
 	tickets, total, err := usermodule.User().AdminTicketList(page, limit, status, uid, search)
 	if err != nil {
-		response.ServerError(c, "查询工单失败")
+		response.ServerErrorf(c, err, "查询工单失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -766,7 +766,7 @@ func AdminTicketList(c *gin.Context) {
 func AdminTicketStats(c *gin.Context) {
 	stats, err := usermodule.User().TicketStats()
 	if err != nil {
-		response.ServerError(c, "统计失败")
+		response.ServerErrorf(c, err, "统计失败")
 		return
 	}
 	response.Success(c, stats)
@@ -792,7 +792,7 @@ func AdminTicketReply(c *gin.Context) {
 		req.Reply, now, req.ID,
 	)
 	if err != nil {
-		response.ServerError(c, "回复失败")
+		response.ServerErrorf(c, err, "回复失败")
 		return
 	}
 
@@ -818,7 +818,7 @@ func AdminTicketClose(c *gin.Context) {
 	}
 	_, err := database.DB.Exec("UPDATE qingka_wangke_ticket SET status = 3 WHERE id = ?", id)
 	if err != nil {
-		response.ServerError(c, "关闭失败")
+		response.ServerErrorf(c, err, "关闭失败")
 		return
 	}
 	response.SuccessMsg(c, "工单已关闭")
@@ -833,7 +833,7 @@ func AdminTicketAutoClose(c *gin.Context) {
 	}
 	affected, err := usermodule.User().AutoCloseExpiredTickets(req.Days)
 	if err != nil {
-		response.ServerError(c, "操作失败")
+		response.ServerErrorf(c, err, "操作失败")
 		return
 	}
 	response.Success(c, gin.H{"closed": affected})
@@ -842,7 +842,7 @@ func AdminTicketAutoClose(c *gin.Context) {
 func AdminEmailPoolList(c *gin.Context) {
 	list, err := mailmodule.Mail().EmailPoolList()
 	if err != nil {
-		response.ServerError(c, "查询失败: "+err.Error())
+		response.ServerErrorf(c, err, "查询失败: "+err.Error())
 		return
 	}
 	for i := range list {
@@ -860,7 +860,7 @@ func AdminEmailPoolSave(c *gin.Context) {
 		return
 	}
 	if err := mailmodule.Mail().SaveEmailPoolAccount(req); err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -873,7 +873,7 @@ func AdminEmailPoolDelete(c *gin.Context) {
 		return
 	}
 	if err := mailmodule.Mail().DeleteEmailPoolAccount(id); err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.SuccessMsg(c, "删除成功")
@@ -889,7 +889,7 @@ func AdminEmailPoolToggle(c *gin.Context) {
 		return
 	}
 	if err := mailmodule.Mail().ToggleEmailPoolStatus(body.ID, body.Status); err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.SuccessMsg(c, "操作成功")
@@ -918,7 +918,7 @@ func AdminEmailPoolStats(c *gin.Context) {
 
 func AdminEmailPoolResetCounters(c *gin.Context) {
 	if err := mailmodule.Mail().ResetEmailPoolCounters(); err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.SuccessMsg(c, "计数器已重置")
@@ -932,7 +932,7 @@ func AdminEmailSendLogs(c *gin.Context) {
 	}
 	list, total, err := mailmodule.Mail().QueryEmailPoolLogs(q)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, gin.H{"list": list, "total": total})
@@ -1140,7 +1140,7 @@ func AdminMenuSave(c *gin.Context) {
 			item.MenuKey, item.ParentKey, item.Title, item.Icon, item.SortOrder, item.Visible, item.Scope,
 		)
 		if err != nil {
-			response.ServerError(c, "保存菜单配置失败: "+err.Error())
+			response.ServerErrorf(c, err, "保存菜单配置失败: "+err.Error())
 			return
 		}
 	}

@@ -13,7 +13,7 @@ import (
 func AppuiConfigGet(c *gin.Context) {
 	cfg, err := appuiService.GetConfig()
 	if err != nil {
-		response.ServerError(c, "获取配置失败")
+		response.ServerErrorf(c, err, "获取配置失败")
 		return
 	}
 	response.Success(c, cfg)
@@ -26,7 +26,7 @@ func AppuiConfigSave(c *gin.Context) {
 		return
 	}
 	if err := appuiService.SaveConfig(&cfg); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -57,7 +57,7 @@ func AppuiGetPrice(c *gin.Context) {
 func AppuiGetCourses(c *gin.Context) {
 	cfg, err := appuiService.GetConfig()
 	if err != nil {
-		response.ServerError(c, "获取失败")
+		response.ServerErrorf(c, err, "获取失败")
 		return
 	}
 	response.Success(c, cfg.Courses)
@@ -84,7 +84,7 @@ func AppuiOrderList(c *gin.Context) {
 
 	orders, total, err := appuiService.ListOrders(uid, isAdmin, page, limit, searchType, keyword)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.SuccessPage(c, orders, int64(total), page, limit)

@@ -1,12 +1,12 @@
 package ws
 
 import (
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	obslogger "go-api/internal/observability/logger"
 )
 
 var upgrader = websocket.Upgrader{
@@ -33,7 +33,7 @@ func HandlePush(hub *Hub) gin.HandlerFunc {
 
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
-			log.Printf("WebSocket 升级失败: %v", err)
+			obslogger.L().Warn("WebSocket 升级失败", "error", err)
 			return
 		}
 

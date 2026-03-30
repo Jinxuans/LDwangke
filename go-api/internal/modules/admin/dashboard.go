@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"log"
 	"strconv"
 
 	"go-api/internal/dockscheduler"
@@ -37,7 +36,7 @@ func registerDashboardRoutes(admin *gin.RouterGroup) {
 func AdminDashboard(c *gin.Context) {
 	stats, err := dashboardStats()
 	if err != nil {
-		response.ServerError(c, "查询统计失败")
+		response.ServerErrorf(c, err, "查询统计失败")
 		return
 	}
 	response.Success(c, stats)
@@ -50,7 +49,7 @@ func AdminStats(c *gin.Context) {
 	}
 	stats, err := statsReport(days)
 	if err != nil {
-		response.ServerError(c, "查询统计失败")
+		response.ServerErrorf(c, err, "查询统计失败")
 		return
 	}
 	response.Success(c, stats)
@@ -63,8 +62,7 @@ func AdminMoneyLog(c *gin.Context) {
 	logType := c.Query("type")
 	list, total, err := adminMoneyLogList(page, limit, uid, logType)
 	if err != nil {
-		log.Printf("[AdminMoneyLog] 查询失败: %v", err)
-		response.ServerError(c, "查询流水失败: "+err.Error())
+		response.ServerErrorf(c, err, "查询流水失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{
@@ -93,7 +91,7 @@ func AdminDockSchedulerConfig(c *gin.Context) {
 	}
 	stats, err := dockscheduler.UpdateConfig(body.IntervalSec, body.BatchLimit)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, stats)
@@ -159,7 +157,7 @@ func AdminOrderProgressSyncConfig(c *gin.Context) {
 		Rules:            rules,
 	})
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, status)
@@ -177,7 +175,7 @@ func AdminOrderProgressSyncRunNow(c *gin.Context) {
 func AdminSupplierRanking(c *gin.Context) {
 	list, err := supplierRanking()
 	if err != nil {
-		response.ServerError(c, "查询货源排行失败")
+		response.ServerErrorf(c, err, "查询货源排行失败")
 		return
 	}
 	response.Success(c, list)
@@ -190,7 +188,7 @@ func AdminAgentProductRanking(c *gin.Context) {
 
 	list, err := agentProductRanking(uid, timeType, limit)
 	if err != nil {
-		response.ServerError(c, "查询代理商品排行失败")
+		response.ServerErrorf(c, err, "查询代理商品排行失败")
 		return
 	}
 	response.Success(c, list)
@@ -199,7 +197,7 @@ func AdminAgentProductRanking(c *gin.Context) {
 func AdminChatSessions(c *gin.Context) {
 	sessions, err := chatmodule.Chat().AdminSessions()
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, sessions)
@@ -218,7 +216,7 @@ func AdminChatMessages(c *gin.Context) {
 	}
 	rows, err := chatmodule.Chat().AdminMessages(listID, req.Limit)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, rows)
@@ -227,7 +225,7 @@ func AdminChatMessages(c *gin.Context) {
 func AdminChatStats(c *gin.Context) {
 	stats, err := chatmodule.Chat().ChatStats()
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, stats)
@@ -242,7 +240,7 @@ func AdminChatCleanup(c *gin.Context) {
 	}
 	archived, err := chatmodule.Chat().ManualCleanup(req.Days)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	trimmed, _ := chatmodule.Chat().TrimSessionMessages()

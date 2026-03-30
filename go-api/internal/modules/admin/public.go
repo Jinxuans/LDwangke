@@ -151,7 +151,7 @@ func TopConsumers(c *gin.Context) {
 func SiteConfigGet(c *gin.Context) {
 	config, err := getPublicConfig()
 	if err != nil {
-		response.ServerError(c, "查询站点配置失败")
+		response.ServerErrorf(c, err, "查询站点配置失败")
 		return
 	}
 	response.Success(c, config)
@@ -163,7 +163,7 @@ func AnnouncementListPublic(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	list, total, err := listPublicAnnouncements(uid, page, limit)
 	if err != nil {
-		response.ServerError(c, "查询公告失败")
+		response.ServerErrorf(c, err, "查询公告失败")
 		return
 	}
 	response.Success(c, gin.H{
