@@ -14,8 +14,8 @@ func NewEngine(cfg *config.Config) *gin.Engine {
 	}
 
 	r := gin.New()
-	r.Use(gin.Recovery())
 	r.Use(middleware.RequestLogger())
+	r.Use(middleware.RecoveryWithRequestID())
 	r.Use(middleware.SecurityHeaders())
 	r.Use(middleware.CORS())
 	r.Use(middleware.DemoGuard())

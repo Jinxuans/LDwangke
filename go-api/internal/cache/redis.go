@@ -3,10 +3,10 @@ package cache
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/redis/go-redis/v9"
 	"go-api/internal/config"
+	obslogger "go-api/internal/observability/logger"
 )
 
 var RDB *redis.Client
@@ -19,10 +19,10 @@ func Connect(cfg config.RedisConfig) *redis.Client {
 	})
 
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
-		log.Fatalf("Redis 连接失败: %v", err)
+		obslogger.Fatal("Redis 连接失败", "addr", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port), "error", err)
 	}
 
 	RDB = rdb
-	log.Println("Redis 连接成功")
+	obslogger.L().Info("Redis 连接成功", "addr", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port), "db", cfg.DB)
 	return rdb
 }

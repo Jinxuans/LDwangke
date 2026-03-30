@@ -55,7 +55,7 @@ func Proxy(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	defer c.Request.Body.Close()
 	if err != nil {
-		response.ServerError(c, "读取请求体失败")
+		response.ServerErrorf(c, err, "读取请求体失败")
 		return
 	}
 
@@ -68,7 +68,7 @@ func Proxy(c *gin.Context) {
 		proxyReq, err = http.NewRequest("POST", targetURL, bytes.NewReader(body))
 	}
 	if err != nil {
-		response.ServerError(c, "创建代理请求失败")
+		response.ServerErrorf(c, err, "创建代理请求失败")
 		return
 	}
 
@@ -85,7 +85,7 @@ func Proxy(c *gin.Context) {
 
 	resp, err := client.Do(proxyReq)
 	if err != nil {
-		response.ServerError(c, "代理请求失败: "+err.Error())
+		response.ServerErrorf(c, err, "代理请求失败: "+err.Error())
 		return
 	}
 	defer resp.Body.Close()

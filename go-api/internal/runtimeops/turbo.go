@@ -3,7 +3,6 @@ package runtimeops
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -16,6 +15,7 @@ import (
 	"go-api/internal/database"
 	"go-api/internal/dockscheduler"
 	ordermodule "go-api/internal/modules/order"
+	obslogger "go-api/internal/observability/logger"
 )
 
 type TurboProfile struct {
@@ -268,7 +268,7 @@ func calcProfile(mode string) TurboProfile {
 	}
 
 	if memMB < 1024 && (mode == "insane" || mode == "turbo") {
-		log.Printf("[Turbo] 内存仅 %dMB，自动降级参数", memMB)
+		obslogger.L().Warn("Turbo 内存偏低，自动降级参数", "mem_mb", memMB)
 		p.DBMaxOpen = min(p.DBMaxOpen, 50)
 		p.DBMaxIdle = min(p.DBMaxIdle, 25)
 		p.RedisPoolSize = min(p.RedisPoolSize, 15)
@@ -298,7 +298,7 @@ func autoDetectMode() string {
 func ApplyTurbo(mode string) TurboStatus {
 	if mode == "auto" {
 		mode = autoDetectMode()
-		log.Printf("[Turbo] 自动检测档位: %s", mode)
+		obslogger.L().Info("Turbo 自动检测档位", "mode", mode)
 	}
 	return applyProfile(calcProfile(mode))
 }
@@ -307,27 +307,27 @@ func applyProfile(p TurboProfile) TurboStatus {
 	turboMu.Lock()
 	defer turboMu.Unlock()
 
-	log.Printf("[Turbo] 切换到 [%s] 模式: CPU=%d, Mem=%dMB", p.Name, p.CPUCores, p.MemTotalMB)
+	obslogger.L().Info("Turbo 切换模式", "mode", p.Name, "cpu_cores", p.CPUCores, "mem_mb", p.MemTotalMB)
 
 	if database.DB != nil {
 		database.DB.SetMaxOpenConns(p.DBMaxOpen)
 		database.DB.SetMaxIdleConns(p.DBMaxIdle)
 		database.DB.SetConnMaxLifetime(time.Duration(p.DBMaxLifetime) * time.Second)
 		database.DB.SetConnMaxIdleTime(time.Duration(p.DBMaxIdleTime) * time.Second)
-		log.Printf("[Turbo] DB连接池: open=%d idle=%d lifetime=%ds", p.DBMaxOpen, p.DBMaxIdle, p.DBMaxLifetime)
+		obslogger.L().Info("Turbo DB连接池配置", "open", p.DBMaxOpen, "idle", p.DBMaxIdle, "lifetime_sec", p.DBMaxLifetime)
 	}
 
 	if cache.RDB != nil {
-		log.Printf("[Turbo] Redis连接池: pool=%d minIdle=%d", p.RedisPoolSize, p.RedisMinIdle)
+		obslogger.L().Info("Turbo Redis连接池配置", "pool", p.RedisPoolSize, "min_idle", p.RedisMinIdle)
 	}
 
 	dockscheduler.Configure(time.Duration(p.PendingDockIntervalSec)*time.Second, p.DockBatchLimit)
-	log.Printf("[Turbo] 待对接调度: batch=%d interval=%ds", p.DockBatchLimit, p.PendingDockIntervalSec)
+	obslogger.L().Info("Turbo 待对接调度配置", "batch", p.DockBatchLimit, "interval_sec", p.PendingDockIntervalSec)
 
 	prev := runtime.GOMAXPROCS(p.GOMAXPROCS)
-	log.Printf("[Turbo] GOMAXPROCS: %d -> %d", prev, p.GOMAXPROCS)
+	obslogger.L().Info("Turbo GOMAXPROCS 调整", "old", prev, "new", p.GOMAXPROCS)
 	oldGC := debug.SetGCPercent(p.GCPercent)
-	log.Printf("[Turbo] GOGC: %d -> %d", oldGC, p.GCPercent)
+	obslogger.L().Info("Turbo GOGC 调整", "old", oldGC, "new", p.GCPercent)
 
 	isEnabled := p.Name != "normal"
 	if isEnabled {
@@ -576,8 +576,8 @@ func InitSyncTicker(interval time.Duration) {
 
 	syncTickerStop = make(chan struct{})
 	batchSyncTickerStop = make(chan struct{})
-	log.Printf("[AutoSync] 主订单自动同步已启动，首次执行延迟 10s，轮询间隔 %s，规则数 %d", time.Duration(cfg.IntervalSec)*time.Second, len(cfg.Rules))
-	log.Printf("[AutoSync] 主订单批量进度同步已启动，首次执行延迟 10s，轮询间隔 %s", time.Duration(cfg.BatchIntervalSec)*time.Second)
+	obslogger.L().Info("AutoSync 主订单自动同步已启动", "interval", time.Duration(cfg.IntervalSec)*time.Second, "rules", len(cfg.Rules))
+	obslogger.L().Info("AutoSync 主订单批量进度同步已启动", "interval", time.Duration(cfg.BatchIntervalSec)*time.Second)
 	appendOrderProgressLog(OrderProgressSyncLogEntry{
 		Time:             time.Now().Format("2006-01-02 15:04:05"),
 		Mode:             "single",
@@ -640,7 +640,7 @@ func runSyncTicker(interval time.Duration, stop chan struct{}, enabled bool, mod
 // 都交给 order 模块内部完成。
 func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 	if database.DB == nil {
-		log.Printf("[AutoSync] 跳过执行：数据库未初始化")
+		obslogger.L().Warn("AutoSync 跳过执行：数据库未初始化")
 		return
 	}
 	if trigger == "" {
@@ -655,7 +655,7 @@ func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 	case "batch":
 		if orderProgressStatus.BatchRunning {
 			orderProgressMu.Unlock()
-			log.Printf("[AutoSync] 跳过执行：批量同步已在进行中")
+			obslogger.L().Warn("AutoSync 跳过执行：批量同步已在进行中")
 			return
 		}
 		orderProgressStatus.BatchRunning = true
@@ -663,7 +663,7 @@ func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 	default:
 		if orderProgressStatus.Running {
 			orderProgressMu.Unlock()
-			log.Printf("[AutoSync] 跳过执行：单条同步已在进行中")
+			obslogger.L().Warn("AutoSync 跳过执行：单条同步已在进行中")
 			return
 		}
 		orderProgressStatus.Running = true
@@ -683,9 +683,9 @@ func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 	}()
 
 	if mode == "batch" {
-		log.Printf("[AutoSync] 开始执行主订单批量进度同步")
+		obslogger.L().Info("AutoSync 开始执行主订单批量进度同步")
 	} else {
-		log.Printf("[AutoSync] 开始执行主订单自动同步")
+		obslogger.L().Info("AutoSync 开始执行主订单自动同步")
 	}
 	orderProgressMu.RLock()
 	opts := ordermodule.AutoSyncOptions{SupplierHIDs: append([]int(nil), orderProgressConfig.SupplierIDs...), ExcludedStatuses: append([]string(nil), orderProgressConfig.ExcludedStatuses...)}
@@ -778,16 +778,16 @@ func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 	})
 	if err != nil {
 		if mode == "batch" {
-			log.Printf("[AutoSync] 批量进度同步失败: %v", err)
+			obslogger.L().Warn("AutoSync 批量进度同步失败", "error", err)
 		} else {
-			log.Printf("[AutoSync] 查询进行中订单失败: %v", err)
+			obslogger.L().Warn("AutoSync 查询进行中订单失败", "error", err)
 		}
 		return
 	}
 	if mode == "batch" {
-		log.Printf("[AutoSync] 批量进度同步完成，更新 %d 个订单，失败 %d 个", updated, failed)
+		obslogger.L().Info("AutoSync 批量进度同步完成", "updated", updated, "failed", failed)
 	} else {
-		log.Printf("[AutoSync] 同步完成，更新 %d 个订单，失败 %d 个", updated, failed)
+		obslogger.L().Info("AutoSync 同步完成", "updated", updated, "failed", failed)
 	}
 }
 
@@ -815,17 +815,17 @@ func updateSyncTickers(cfg OrderProgressSyncConfig) {
 	syncTickerStop = make(chan struct{})
 	batchSyncTickerStop = make(chan struct{})
 	if !cfg.Enabled {
-		log.Printf("[AutoSync] 主订单自动同步已停用")
+		obslogger.L().Info("AutoSync 主订单自动同步已停用")
 		setOrderProgressNextRun("single", "")
 	} else {
-		log.Printf("[AutoSync] 主订单自动同步间隔已更新为 %s", time.Duration(cfg.IntervalSec)*time.Second)
+		obslogger.L().Info("AutoSync 主订单自动同步间隔已更新", "interval", time.Duration(cfg.IntervalSec)*time.Second)
 		go runSyncTicker(time.Duration(cfg.IntervalSec)*time.Second, syncTickerStop, true, "single")
 	}
 	if !cfg.BatchEnabled {
-		log.Printf("[AutoSync] 主订单批量进度同步已停用")
+		obslogger.L().Info("AutoSync 主订单批量进度同步已停用")
 		setOrderProgressNextRun("batch", "")
 	} else {
-		log.Printf("[AutoSync] 主订单批量进度同步间隔已更新为 %s", time.Duration(cfg.BatchIntervalSec)*time.Second)
+		obslogger.L().Info("AutoSync 主订单批量进度同步间隔已更新", "interval", time.Duration(cfg.BatchIntervalSec)*time.Second)
 		go runSyncTicker(time.Duration(cfg.BatchIntervalSec)*time.Second, batchSyncTickerStop, true, "batch")
 	}
 }

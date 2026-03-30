@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
 	"go-api/internal/database"
 	ordermodule "go-api/internal/modules/order"
+	obslogger "go-api/internal/observability/logger"
 )
 
 const (
@@ -105,7 +105,11 @@ func Start(ctx context.Context, interval time.Duration, batchLimit int) {
 	currentBatch := global.batchLimit
 	global.mu.Unlock()
 
-	log.Printf("[PendingDock] 调度器启动，首次执行延迟 %s，轮询间隔 %s，单轮批量 %d", startDelay, currentInterval, currentBatch)
+	obslogger.L().Info("PendingDock 调度器启动",
+		"start_delay", startDelay.String(),
+		"interval", currentInterval.String(),
+		"batch_limit", currentBatch,
+	)
 	appendLog(LogEntry{
 		Time:    time.Now().Format("2006-01-02 15:04:05"),
 		Trigger: "system",

@@ -75,7 +75,7 @@ func TenantShopSave(c *gin.Context) {
 		return
 	}
 	if err := updateTenantShop(uid, &req); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -89,7 +89,7 @@ func TenantPayConfigSave(c *gin.Context) {
 		return
 	}
 	if err := updateTenantPayConfig(uid, req.PayConfig); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -108,7 +108,7 @@ func TenantMallConfigSave(c *gin.Context) {
 		return
 	}
 	if err := updateTenantMallConfig(uid, normalized); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -123,7 +123,7 @@ func TenantMallCategoryList(c *gin.Context) {
 	}
 	list, err := listTenantMallCategories(t.TID)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, list)
@@ -185,7 +185,7 @@ func TenantMallCategoryUpdateSort(c *gin.Context) {
 		items = append(items, struct{ ID, Sort int }{ID: item.ID, Sort: item.Sort})
 	}
 	if err := updateTenantMallCategorySort(t.TID, items); err != nil {
-		response.ServerError(c, "排序更新失败")
+		response.ServerErrorf(c, err, "排序更新失败")
 		return
 	}
 	response.SuccessMsg(c, "排序更新成功")
@@ -200,7 +200,7 @@ func TenantProductList(c *gin.Context) {
 	}
 	list, err := listTenantProducts(t.TID)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, list)
@@ -234,7 +234,7 @@ func TenantProductDelete(c *gin.Context) {
 		return
 	}
 	if err := deleteTenantProduct(t.TID, cid); err != nil {
-		response.ServerError(c, "删除失败")
+		response.ServerErrorf(c, err, "删除失败")
 		return
 	}
 	response.SuccessMsg(c, "删除成功")
@@ -249,7 +249,7 @@ func TenantOrderStats(c *gin.Context) {
 	}
 	stats, err := getTenantOrderStats(t.TID)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, stats)
@@ -269,7 +269,7 @@ func TenantCUserList(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	list, total, err := listTenantCUsers(t.TID, page, limit)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, gin.H{"list": list, "total": total})
@@ -323,7 +323,7 @@ func TenantMallOrders(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	list, total, err := listTenantMallOrders(t.TID, page, limit)
 	if err != nil {
-		response.ServerError(c, "查询失败: "+err.Error())
+		response.ServerErrorf(c, err, "查询失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"list": list, "total": total})
@@ -343,7 +343,7 @@ func TenantMallLinkedOrders(c *gin.Context) {
 	}
 	list, err := listTenantMallLinkedOrders(t.TID, id)
 	if err != nil {
-		response.ServerError(c, "查询关联订单失败")
+		response.ServerErrorf(c, err, "查询关联订单失败")
 		return
 	}
 	response.Success(c, list)
@@ -360,7 +360,7 @@ func TenantCUserWithdrawRequests(c *gin.Context) {
 	_ = c.ShouldBindQuery(&req)
 	list, total, err := tenantService.TenantCUserWithdrawRequests(t.TID, req)
 	if err != nil {
-		response.ServerError(c, "查询会员提现记录失败")
+		response.ServerErrorf(c, err, "查询会员提现记录失败")
 		return
 	}
 	response.Success(c, gin.H{

@@ -4,10 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"log"
+	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func generateRequestID() string {
@@ -23,7 +25,10 @@ func generateRequestID() string {
 // request_id 写入响应头 X-Request-ID，方便前端/运维关联日志。
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		reqID := generateRequestID()
+		reqID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
+		if reqID == "" {
+			reqID = generateRequestID()
+		}
 		start := time.Now()
 
 		c.Set("request_id", reqID)
@@ -33,12 +38,6 @@ func RequestLogger() gin.HandlerFunc {
 
 		duration := time.Since(start)
 		status := c.Writer.Status()
-		method := c.Request.Method
-		path := c.Request.URL.Path
-		query := c.Request.URL.RawQuery
-		if query != "" {
-			path = path + "?" + query
-		}
 
 		// 尝试从 context 取 uid（JWTAuth 已写入），未认证接口为 0
 		uid, _ := c.Get("uid")
@@ -52,22 +51,21 @@ func RequestLogger() gin.HandlerFunc {
 		// 收集本次请求中通过 c.Error() 记录的错误
 		errors := c.Errors.ByType(gin.ErrorTypePrivate).String()
 
+		logger := obslogger.Request(c).With(
+			slog.Int("status", status),
+			slog.Int64("duration_ms", duration.Milliseconds()),
+			slog.Int("uid", uidVal),
+		)
+		if errors != "" {
+			logger = logger.With(slog.String("errors", errors))
+		}
+
 		if status >= 500 {
-			log.Printf("[ERROR] req_id=%s uid=%d %s %s -> %d (%s)%s",
-				reqID, uidVal, method, path, status, duration, formatErrors(errors))
+			logger.Error("request completed")
 		} else if status >= 400 {
-			log.Printf("[WARN]  req_id=%s uid=%d %s %s -> %d (%s)%s",
-				reqID, uidVal, method, path, status, duration, formatErrors(errors))
+			logger.Warn("request completed")
 		} else {
-			log.Printf("[INFO]  req_id=%s uid=%d %s %s -> %d (%s)",
-				reqID, uidVal, method, path, status, duration)
+			logger.Info("request completed")
 		}
 	}
-}
-
-func formatErrors(s string) string {
-	if s == "" {
-		return ""
-	}
-	return " errors=[" + s + "]"
 }

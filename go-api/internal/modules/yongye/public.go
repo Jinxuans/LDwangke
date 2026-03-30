@@ -13,7 +13,7 @@ import (
 func YongyeConfigGet(c *gin.Context) {
 	cfg, err := yongyeServiceInstance.GetConfig()
 	if err != nil {
-		response.ServerError(c, "获取配置失败")
+		response.ServerErrorf(c, err, "获取配置失败")
 		return
 	}
 	response.Success(c, cfg)
@@ -26,7 +26,7 @@ func YongyeConfigSave(c *gin.Context) {
 		return
 	}
 	if err := yongyeServiceInstance.SaveConfig(&cfg); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -65,7 +65,7 @@ func YongyeOrderList(c *gin.Context) {
 
 	orders, total, err := yongyeServiceInstance.ListOrders(uid, isAdmin, page, limit, keyword, statusFilter)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.SuccessPage(c, orders, int64(total), page, limit)
@@ -81,7 +81,7 @@ func YongyeStudentList(c *gin.Context) {
 
 	students, err := yongyeServiceInstance.ListStudents(uid, isAdmin, keyword)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, students)

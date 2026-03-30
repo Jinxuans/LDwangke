@@ -2,11 +2,11 @@ package supplier
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"go-api/internal/config"
 	"go-api/internal/model"
+	obslogger "go-api/internal/observability/logger"
 )
 
 type progressDebugInfo struct {
@@ -50,19 +50,19 @@ func (d progressDebugInfo) logRequest(sup *model.SupplierFull, method string, re
 	if !d.enabled {
 		return
 	}
-	log.Printf("%s 请求上游: method=%s url=%s contentType=%s body=%s", d.prefix(sup), method, requestURL, contentType, payload)
+	obslogger.L().Info("ManualSyncDebug 请求上游", "prefix", d.prefix(sup), "method", method, "url", requestURL, "content_type", contentType, "body", payload)
 }
 
 func (d progressDebugInfo) logRequestError(sup *model.SupplierFull, err error) {
 	if !d.enabled || err == nil {
 		return
 	}
-	log.Printf("%s 请求失败: %v", d.prefix(sup), err)
+	obslogger.L().Warn("ManualSyncDebug 请求失败", "prefix", d.prefix(sup), "error", err)
 }
 
 func (d progressDebugInfo) logResponse(sup *model.SupplierFull, status string, body []byte) {
 	if !d.enabled {
 		return
 	}
-	log.Printf("%s 上游响应: status=%s body=%s", d.prefix(sup), status, string(body))
+	obslogger.L().Info("ManualSyncDebug 上游响应", "prefix", d.prefix(sup), "status", status, "body", string(body))
 }

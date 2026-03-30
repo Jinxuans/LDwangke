@@ -57,7 +57,7 @@ func List(c *gin.Context) {
 	uid := c.GetInt("uid")
 	list, err := classes.ListClasses(uid, req)
 	if err != nil {
-		response.ServerError(c, "查询课程失败")
+		response.ServerErrorf(c, err, "查询课程失败")
 		return
 	}
 
@@ -73,7 +73,7 @@ func ListPaged(c *gin.Context) {
 	uid := c.GetInt("uid")
 	list, total, page, limit, err := classes.ListClassesPaged(uid, req)
 	if err != nil {
-		response.ServerError(c, "查询课程失败")
+		response.ServerErrorf(c, err, "查询课程失败")
 		return
 	}
 
@@ -99,7 +99,7 @@ func Search(c *gin.Context) {
 	req := model.ClassListRequest{Search: keyword}
 	list, err := classes.ListClasses(uid, req)
 	if err != nil {
-		response.ServerError(c, "搜索课程失败")
+		response.ServerErrorf(c, err, "搜索课程失败")
 		return
 	}
 
@@ -148,7 +148,7 @@ func CategorySwitches(c *gin.Context) {
 func Categories(c *gin.Context) {
 	categories, err := listCategories()
 	if err != nil {
-		response.ServerError(c, "查询分类失败")
+		response.ServerErrorf(c, err, "查询分类失败")
 		return
 	}
 

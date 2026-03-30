@@ -41,7 +41,7 @@ func PushBindWxUID(c *gin.Context) {
 
 	affected, err := pushService.BatchBindPushUID(orderIDs, req.PushUID)
 	if err != nil {
-		response.ServerError(c, "绑定失败: "+err.Error())
+		response.ServerErrorf(c, err, "绑定失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"msg": "绑定成功", "affected": affected})
@@ -58,7 +58,7 @@ func PushUnbindWxUID(c *gin.Context) {
 
 	affected, err := pushService.UnbindPushUIDByAccount(req.Account)
 	if err != nil {
-		response.ServerError(c, "解绑失败: "+err.Error())
+		response.ServerErrorf(c, err, "解绑失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"msg": "解绑成功", "affected": affected})
@@ -81,7 +81,7 @@ func PushBindEmail(c *gin.Context) {
 
 	affected, err := pushService.BindPushEmail(req.OrderID, req.Account, req.PushEmail)
 	if err != nil {
-		response.ServerError(c, "绑定失败: "+err.Error())
+		response.ServerErrorf(c, err, "绑定失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"msg": "绑定成功", "affected": affected})
@@ -99,7 +99,7 @@ func PushUnbindEmail(c *gin.Context) {
 
 	affected, err := pushService.BindPushEmail(req.OrderID, req.Account, "")
 	if err != nil {
-		response.ServerError(c, "解绑失败: "+err.Error())
+		response.ServerErrorf(c, err, "解绑失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"msg": "解绑成功", "affected": affected})
@@ -122,7 +122,7 @@ func PushBindShowDoc(c *gin.Context) {
 
 	affected, err := pushService.BindShowDocPush(req.OrderID, req.Account, req.ShowdocURL)
 	if err != nil {
-		response.ServerError(c, "绑定失败: "+err.Error())
+		response.ServerErrorf(c, err, "绑定失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"msg": "绑定成功", "affected": affected})
@@ -140,7 +140,7 @@ func PushUnbindShowDoc(c *gin.Context) {
 
 	affected, err := pushService.BindShowDocPush(req.OrderID, req.Account, "")
 	if err != nil {
-		response.ServerError(c, "解绑失败: "+err.Error())
+		response.ServerErrorf(c, err, "解绑失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"msg": "解绑成功", "affected": affected})
@@ -157,7 +157,7 @@ func PushWxQRCode(c *gin.Context) {
 
 	data, err := pushService.WxPusherQRCode(req.Account)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, data)

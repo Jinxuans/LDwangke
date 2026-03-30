@@ -42,7 +42,7 @@ func WGetOrders(c *gin.Context) {
 
 	orders, total, err := W().GetOrders(uid, isAdmin, page, pageSize, filters)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.SuccessPage(c, orders, int64(total), page, pageSize)

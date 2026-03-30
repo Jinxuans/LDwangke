@@ -143,7 +143,7 @@ func MailList(c *gin.Context) {
 
 	list, total, err := listMails(uid, req)
 	if err != nil {
-		response.ServerError(c, "查询站内信失败")
+		response.ServerErrorf(c, err, "查询站内信失败")
 		return
 	}
 
@@ -197,7 +197,7 @@ func MailUnread(c *gin.Context) {
 	uid := c.GetInt("uid")
 	count, err := unreadMailCount(uid)
 	if err != nil {
-		response.ServerError(c, "查询未读数失败")
+		response.ServerErrorf(c, err, "查询未读数失败")
 		return
 	}
 	response.Success(c, gin.H{"unread": count})
@@ -236,13 +236,13 @@ func MailUpload(c *gin.Context) {
 
 	uploadDir := "uploads/mail"
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		response.ServerError(c, "创建上传目录失败")
+		response.ServerErrorf(c, err, "创建上传目录失败")
 		return
 	}
 
 	savePath := filepath.Join(uploadDir, newName)
 	if err := c.SaveUploadedFile(file, savePath); err != nil {
-		response.ServerError(c, "保存文件失败")
+		response.ServerErrorf(c, err, "保存文件失败")
 		return
 	}
 

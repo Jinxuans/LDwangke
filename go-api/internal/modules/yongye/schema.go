@@ -1,9 +1,8 @@
 package yongye
 
 import (
-	"log"
-
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func Yongye() *yongyeService {
@@ -38,7 +37,7 @@ func (s *yongyeService) EnsureTable() {
 		KEY idx_dockstatus (dockstatus)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='永夜运动订单表'`)
 	if err != nil {
-		log.Printf("[Yongye] 建表 yy_ydsj_dd 失败: %v", err)
+		obslogger.L().Warn("Yongye 建表 yy_ydsj_dd 失败", "error", err)
 	}
 
 	_, err = database.DB.Exec(`CREATE TABLE IF NOT EXISTS yy_ydsj_student (
@@ -59,6 +58,6 @@ func (s *yongyeService) EnsureTable() {
 		KEY idx_user (user)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='永夜运动学生表'`)
 	if err != nil {
-		log.Printf("[Yongye] 建表 yy_ydsj_student 失败: %v", err)
+		obslogger.L().Warn("Yongye 建表 yy_ydsj_student 失败", "error", err)
 	}
 }

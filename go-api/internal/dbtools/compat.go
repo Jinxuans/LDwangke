@@ -2,12 +2,12 @@ package dbtools
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"go-api/internal/config"
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -153,7 +153,7 @@ func (s *DBCompatService) Fix() (*CompatFixResult, error) {
 				result.Errors = append(result.Errors, fmt.Sprintf("创建表 %s 失败: %v", tbl.Name, err))
 			} else {
 				result.TablesCreated = append(result.TablesCreated, tbl.Name)
-				log.Printf("[DBCompat] 创建表: %s", tbl.Name)
+				obslogger.L().Info("DBCompat 创建表", "table", tbl.Name)
 			}
 			continue
 		}
@@ -168,7 +168,7 @@ func (s *DBCompatService) Fix() (*CompatFixResult, error) {
 			} else {
 				desc := fmt.Sprintf("%s.%s (%s)", tbl.Name, col.Name, col.Type)
 				result.ColumnsAdded = append(result.ColumnsAdded, desc)
-				log.Printf("[DBCompat] 添加列: %s", desc)
+				obslogger.L().Info("DBCompat 添加列", "column", desc)
 			}
 		}
 	}
@@ -208,7 +208,7 @@ func (s *DBCompatService) ensureAdminCompatible(result *CompatFixResult) {
 	var adminUUID int
 	err := database.DB.QueryRow("SELECT COALESCE(uid, 0), COALESCE(uuid, 0) FROM qingka_wangke_user WHERE grade='3' LIMIT 1").Scan(&adminUID, &adminUUID)
 	if err == nil && adminUID == 1 && adminUUID == 1 {
-		log.Println("[DBCompat] 管理员账号已存在 (uid=1, uuid=1)")
+		obslogger.L().Info("DBCompat 管理员账号已存在", "uid", 1, "uuid", 1)
 		return
 	}
 
@@ -222,13 +222,13 @@ func (s *DBCompatService) ensureAdminCompatible(result *CompatFixResult) {
 			result.Errors = append(result.Errors, fmt.Sprintf("更新管理员账号失败: %v", err))
 		} else {
 			result.AdminCreated = true
-			log.Println("[DBCompat] 已将 uid=1 的用户升级为管理员账号")
+			obslogger.L().Info("DBCompat 已将 uid=1 的用户升级为管理员账号")
 		}
 		return
 	}
 
 	if config.Global == nil || !config.Global.CreateDefaultAdminEnabled() {
-		log.Println("[DBCompat] 未发现 uid=1 管理员账号，已跳过默认管理员创建；如需启用请设置 bootstrap.create_default_admin=true")
+		obslogger.L().Info("DBCompat 已跳过默认管理员创建")
 		return
 	}
 
@@ -247,7 +247,7 @@ func (s *DBCompatService) ensureAdminCompatible(result *CompatFixResult) {
 		return
 	}
 	result.AdminCreated = true
-	log.Println("[DBCompat] 已按显式开关创建默认管理员账号 admin (uid=1, uuid=1)，请立即修改默认密码")
+	obslogger.L().Warn("DBCompat 已按显式开关创建默认管理员账号", "user", "admin", "uid", 1, "uuid", 1)
 }
 
 func (s *DBCompatService) seedEmailTemplates(result *CompatFixResult) {
@@ -302,7 +302,7 @@ func (s *DBCompatService) seedEmailTemplates(result *CompatFixResult) {
 		if err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("插入邮件模板 %s 失败: %v", tpl.Code, err))
 		} else {
-			log.Printf("[DBCompat] 已创建邮件模板: %s (%s)", tpl.Name, tpl.Code)
+			obslogger.L().Info("DBCompat 已创建邮件模板", "name", tpl.Name, "code", tpl.Code)
 		}
 	}
 }

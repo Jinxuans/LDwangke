@@ -23,7 +23,7 @@ func AdminSupplierBalance(c *gin.Context) {
 	}
 	result, err := supplierService.QueryBalance(hid)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, result)
@@ -37,12 +37,12 @@ func AdminSupplierProducts(c *gin.Context) {
 	}
 	sup, err := supplierService.GetSupplierByHID(hid)
 	if err != nil {
-		response.ServerError(c, "供应商不存在")
+		response.ServerErrorf(c, err, "供应商不存在")
 		return
 	}
 	classes, err := supplierService.GetSupplierClasses(sup)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 
@@ -111,7 +111,7 @@ func AdminSupplierImport(c *gin.Context) {
 
 	inserted, updated, msg, err := supplierService.ImportSupplierClasses(hid, pricee, category, name, fd)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 
@@ -131,7 +131,7 @@ func AdminSupplierSyncStatus(c *gin.Context) {
 
 	count, msg, err := supplierService.SyncSupplierStatus(hid)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 

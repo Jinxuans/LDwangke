@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -15,6 +14,7 @@ import (
 
 	"go-api/internal/database"
 	"go-api/internal/model"
+	obslogger "go-api/internal/observability/logger"
 )
 
 var simpleThreadState struct {
@@ -145,7 +145,7 @@ func simpleThreadOnce() (int, error) {
 		}
 		updated, err := simpleThreadSyncSupplier(sup)
 		if err != nil {
-			log.Printf("[Simple-Thread] hid=%d 同步失败: %v", s.hid, err)
+			obslogger.L().Warn("Simple-Thread 同步失败", "hid", s.hid, "error", err)
 			continue
 		}
 		totalUpdated += updated
@@ -253,7 +253,7 @@ func simpleThreadSyncSupplier(sup *model.SupplierFull) (int, error) {
 				yid, status, progress, process, kcks, kcjs, ksks, ksjs, user, pass, course, cid,
 			)
 			if err != nil {
-				log.Printf("[Simple-Thread] 更新失败 user=%s course=%s: %v", user, course, err)
+				obslogger.L().Warn("Simple-Thread 更新失败", "user", user, "course", course, "error", err)
 				continue
 			}
 			if affected, _ := result.RowsAffected(); affected > 0 {
@@ -261,7 +261,7 @@ func simpleThreadSyncSupplier(sup *model.SupplierFull) (int, error) {
 			}
 		}
 
-		log.Printf("[Simple-Thread] hid=%d page=%d 已同步 %d 条", sup.HID, page, len(dataArr))
+		obslogger.L().Info("Simple-Thread 已同步分页数据", "hid", sup.HID, "page", page, "count", len(dataArr))
 		if len(dataArr) < 1000 {
 			break
 		}
@@ -272,7 +272,7 @@ func simpleThreadSyncSupplier(sup *model.SupplierFull) (int, error) {
 }
 
 func RunSimpleThreadSync(ctx context.Context) {
-	log.Println("[Simple-Thread] 至强平台 Thread 同步守护启动")
+	obslogger.L().Info("Simple-Thread 同步守护启动")
 	if !sleepWithContext(ctx, 25*time.Second) {
 		return
 	}
@@ -294,11 +294,11 @@ func RunSimpleThreadSync(ctx context.Context) {
 		simpleThreadState.lastRunTime = now
 		if err != nil {
 			simpleThreadState.lastMsg = fmt.Sprintf("失败: %v", err)
-			log.Printf("[Simple-Thread] %s", simpleThreadState.lastMsg)
+			obslogger.L().Info("Simple-Thread 状态", "message", simpleThreadState.lastMsg)
 		} else if cnt > 0 {
 			simpleThreadState.lastMsg = fmt.Sprintf("更新了 %d 个订单", cnt)
 			simpleThreadState.syncCount += cnt
-			log.Printf("[Simple-Thread] %s", simpleThreadState.lastMsg)
+			obslogger.L().Info("Simple-Thread 状态", "message", simpleThreadState.lastMsg)
 		} else {
 			simpleThreadState.lastMsg = "无变动"
 		}

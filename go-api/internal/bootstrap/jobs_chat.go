@@ -2,10 +2,10 @@ package bootstrap
 
 import (
 	"context"
-	"log"
 	"time"
 
 	chatmodule "go-api/internal/modules/chat"
+	obslogger "go-api/internal/observability/logger"
 )
 
 var (
@@ -25,16 +25,16 @@ func StartChatCleanup(ctx context.Context) {
 
 			archived, err := archiveOldMessagesFn()
 			if err != nil {
-				log.Printf("[ChatCleanup] 归档失败: %v", err)
+				obslogger.L().Warn("ChatCleanup 归档失败", "error", err)
 			} else if archived > 0 {
-				log.Printf("[ChatCleanup] 归档了 %d 条过期消息", archived)
+				obslogger.L().Info("ChatCleanup 已归档过期消息", "archived", archived)
 			}
 
 			trimmed, err := trimSessionMessagesFn()
 			if err != nil {
-				log.Printf("[ChatCleanup] 截断失败: %v", err)
+				obslogger.L().Warn("ChatCleanup 截断失败", "error", err)
 			} else if trimmed > 0 {
-				log.Printf("[ChatCleanup] 截断了 %d 条超限消息", trimmed)
+				obslogger.L().Info("ChatCleanup 已截断超限消息", "trimmed", trimmed)
 			}
 		}
 	}()

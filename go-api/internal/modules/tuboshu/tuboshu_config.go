@@ -2,9 +2,9 @@ package tuboshu
 
 import (
 	"encoding/json"
-	"log"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func (s *TuboshuService) EnsureTable() {
@@ -25,7 +25,7 @@ func (s *TuboshuService) EnsureTable() {
 		KEY idx_state (state)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
 	if err != nil {
-		log.Printf("[Tuboshu] 创建 dialogue 表失败: %v", err)
+		obslogger.L().Warn("Tuboshu 创建 dialogue 表失败", "error", err)
 	}
 
 	_, err = database.DB.Exec(`CREATE TABLE IF NOT EXISTS points_product (
@@ -41,7 +41,7 @@ func (s *TuboshuService) EnsureTable() {
 		PRIMARY KEY (id)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
 	if err != nil {
-		log.Printf("[Tuboshu] 创建 points_product 表失败: %v", err)
+		obslogger.L().Warn("Tuboshu 创建 points_product 表失败", "error", err)
 	}
 
 	_, err = database.DB.Exec(`CREATE TABLE IF NOT EXISTS points_product_code (
@@ -56,7 +56,7 @@ func (s *TuboshuService) EnsureTable() {
 		KEY idx_product_status (product_id, status)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
 	if err != nil {
-		log.Printf("[Tuboshu] 创建 points_product_code 表失败: %v", err)
+		obslogger.L().Warn("Tuboshu 创建 points_product_code 表失败", "error", err)
 	}
 
 	_, err = database.DB.Exec(`CREATE TABLE IF NOT EXISTS points_exchange_record (
@@ -72,7 +72,7 @@ func (s *TuboshuService) EnsureTable() {
 		KEY idx_uid (uid)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
 	if err != nil {
-		log.Printf("[Tuboshu] 创建 points_exchange_record 表失败: %v", err)
+		obslogger.L().Warn("Tuboshu 创建 points_exchange_record 表失败", "error", err)
 	}
 
 	var count int

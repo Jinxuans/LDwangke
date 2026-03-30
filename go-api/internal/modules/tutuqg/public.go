@@ -27,7 +27,7 @@ func TutuQGOrderList(c *gin.Context) {
 
 	orders, total, err := tutuqgServiceInstance.ListOrders(uid, isAdmin, page, limit, search)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.SuccessPage(c, orders, int64(total), page, limit)
@@ -237,7 +237,7 @@ func TutuQGBatchSync(c *gin.Context) {
 
 	orders, _, err := tutuqgServiceInstance.ListOrders(uid, isAdmin, 1, 9999, "")
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 

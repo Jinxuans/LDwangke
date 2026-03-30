@@ -23,7 +23,7 @@ func AdminWithdrawRequests(c *gin.Context) {
 	_ = c.ShouldBindQuery(&req)
 	list, total, err := usermodule.AdminWithdrawRequests(req)
 	if err != nil {
-		response.ServerError(c, "查询提现申请失败")
+		response.ServerErrorf(c, err, "查询提现申请失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -56,7 +56,7 @@ func AdminMallCUserWithdrawRequests(c *gin.Context) {
 	_ = c.ShouldBindQuery(&req)
 	list, total, err := tenantmodule.AdminCUserWithdrawRequests(req)
 	if err != nil {
-		response.ServerError(c, "查询会员提现申请失败")
+		response.ServerErrorf(c, err, "查询会员提现申请失败")
 		return
 	}
 	response.Success(c, gin.H{

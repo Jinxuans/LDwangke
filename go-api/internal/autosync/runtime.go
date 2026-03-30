@@ -2,7 +2,6 @@ package autosync
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -10,6 +9,7 @@ import (
 
 	"go-api/internal/database"
 	suppliermodule "go-api/internal/modules/supplier"
+	obslogger "go-api/internal/observability/logger"
 )
 
 type SyncDiffItem struct {
@@ -100,14 +100,14 @@ func AutoShelfCron() {
 
 		result, err := SyncExecute(hid)
 		if err != nil {
-			log.Printf("[AutoSync] hid=%d 同步失败: %v", hid, err)
+			obslogger.L().Warn("AutoSync 同步失败", "hid", hid, "error", err)
 			totalFailed++
 			continue
 		}
 		totalApplied += result.Applied
 		totalFailed += result.Failed
 		if result.Applied > 0 || result.Failed > 0 {
-			log.Printf("[AutoSync] hid=%d 应用%d项，失败%d项", hid, result.Applied, result.Failed)
+			obslogger.L().Info("AutoSync 同步完成", "hid", hid, "applied", result.Applied, "failed", result.Failed)
 		}
 	}
 

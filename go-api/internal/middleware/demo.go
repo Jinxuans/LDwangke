@@ -1,13 +1,13 @@
 package middleware
 
 import (
-	"log"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	obslogger "go-api/internal/observability/logger"
 	"go-api/internal/response"
 
 	"github.com/gin-gonic/gin"
@@ -63,10 +63,10 @@ func SetDemoMode(enable bool) error {
 		}
 		f.WriteString("demo")
 		f.Close()
-		log.Println("[DemoMode] 演示模式已开启")
+		obslogger.L().Info("DemoMode 演示模式已开启")
 	} else {
 		os.Remove(demoMode.flagFile)
-		log.Println("[DemoMode] 演示模式已关闭")
+		obslogger.L().Info("DemoMode 演示模式已关闭")
 	}
 	demoMode.enabled = enable
 	demoMode.lastCheck = time.Now()

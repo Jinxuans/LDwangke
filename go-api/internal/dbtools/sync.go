@@ -7,13 +7,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 
 	"github.com/go-sql-driver/mysql"
 )
@@ -1350,11 +1350,11 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, table syncTableDef, sour
 			if err != nil {
 				info.Failed++
 				errorSamples.add(fmt.Sprintf("source pk=%s 字段重写失败: %v", sourcePKValue, err))
-				log.Printf("[DBSync] %s(%s): source pk=%s remap failed: %v", table.label, sourceTableName, sourcePKValue, err)
+				obslogger.L().Warn("DBSync remap failed", "table", table.label, "source_table", sourceTableName, "source_pk", sourcePKValue, "error", err)
 				continue
 			}
 			for _, warning := range warnings {
-				log.Printf("[DBSync] %s(%s): source pk=%s remap fallback: %s", table.label, sourceTableName, sourcePKValue, warning)
+				obslogger.L().Warn("DBSync remap fallback", "table", table.label, "source_table", sourceTableName, "source_pk", sourcePKValue, "warning", warning)
 			}
 
 			insertArgsWithPK := make([]interface{}, 0, len(insertIndexesWithPK))
@@ -1505,7 +1505,7 @@ func (s *DBSyncService) syncTableGeneric(extDB *sql.DB, table syncTableDef, sour
 		if len(batchRows) < batchSize {
 			break
 		}
-		log.Printf("[DBSync] %s -> %s 已处理 %d 条...", sourceTableName, table.name, info.Total)
+		obslogger.L().Info("DBSync progress", "source_table", sourceTableName, "target_table", table.name, "processed", info.Total)
 	}
 
 	info.Message = appendSyncMessage(info.Message, errorSamples.summary())
@@ -1625,7 +1625,7 @@ func (s *DBSyncService) Execute(req SyncRequest) (*SyncResult, error) {
 				Label:  table.label,
 				Failed: -1,
 			})
-			log.Printf("[DBSync] %s同步失败: %v", table.label, err)
+			obslogger.L().Warn("DBSync table sync failed", "table", table.label, "error", err)
 			continue
 		}
 
@@ -1638,7 +1638,7 @@ func (s *DBSyncService) Execute(req SyncRequest) (*SyncResult, error) {
 				SourceTable: sourceTable,
 				Failed:      -1,
 			})
-			log.Printf("[DBSync] %s同步失败: 源库表计数失败: %v", table.label, err)
+			obslogger.L().Warn("DBSync source count failed", "table", table.label, "error", err)
 			continue
 		}
 		if shouldSkipEmptySourceTable(sourceCount) {
@@ -1654,7 +1654,7 @@ func (s *DBSyncService) Execute(req SyncRequest) (*SyncResult, error) {
 				Total:        0,
 			})
 			skippedEmptyTables++
-			log.Printf("[DBSync] %s(%s -> %s): 源表为空，跳过导入", table.label, sourceTable, table.name)
+			obslogger.L().Info("DBSync source table empty, skipped", "table", table.label, "source_table", sourceTable, "target_table", table.name)
 			continue
 		}
 
@@ -1669,7 +1669,7 @@ func (s *DBSyncService) Execute(req SyncRequest) (*SyncResult, error) {
 				LocalBefore: localBefore,
 				Failed:      -1,
 			})
-			log.Printf("[DBSync] %s同步失败: %v", table.label, err)
+			obslogger.L().Warn("DBSync import failed", "table", table.label, "error", err)
 			continue
 		}
 		localAfter, _ := s.countTableRows(database.DB, table.name)
@@ -1688,38 +1688,37 @@ func (s *DBSyncService) Execute(req SyncRequest) (*SyncResult, error) {
 		if info.Failed > 0 {
 			result.Errors = append(result.Errors, fmt.Sprintf("%s导入失败 %d 条: %s", table.label, info.Failed, strings.TrimSpace(info.Message)))
 		}
-		log.Printf(
-			"[DBSync] %s(%s -> %s): 共%d条, 本地%d->%d, 新增%d, 更新%d, 跳过%d, 失败%d, 说明=%s",
-			table.label,
-			sourceTable,
-			table.name,
-			info.Total,
-			info.LocalBefore,
-			info.LocalAfter,
-			info.Inserted,
-			info.Updated,
-			info.Skipped,
-			info.Failed,
-			strings.TrimSpace(info.Message),
+		obslogger.L().Info("DBSync table summary",
+			"table", table.label,
+			"source_table", sourceTable,
+			"target_table", table.name,
+			"total", info.Total,
+			"before_count", info.LocalBefore,
+			"after_count", info.LocalAfter,
+			"inserted", info.Inserted,
+			"updated", info.Updated,
+			"skipped", info.Skipped,
+			"failed", info.Failed,
+			"message", strings.TrimSpace(info.Message),
 		)
 
 		if table.name == "qingka_wangke_user" {
 			if err := s.syncDeferredUserRefs(extDB, sourceTable, ctx); err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("%s关联修复失败: %v", table.label, err))
-				log.Printf("[DBSync] %s关联修复失败: %v", table.label, err)
+				obslogger.L().Warn("DBSync deferred user refs failed", "table", table.label, "error", err)
 			}
 			if err := s.syncImportedInviteGradeRefs(); err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("%s邀请等级修复失败: %v", table.label, err))
-				log.Printf("[DBSync] %s邀请等级修复失败: %v", table.label, err)
+				obslogger.L().Warn("DBSync invite grade refs failed", "table", table.label, "error", err)
 			}
 			passMigrated, pass2Migrated, err := database.NormalizeLegacyUserPasswords(database.DB)
 			if err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("%s密码迁移失败: %v", table.label, err))
-				log.Printf("[DBSync] %s密码迁移失败: %v", table.label, err)
+				obslogger.L().Warn("DBSync password migration failed", "table", table.label, "error", err)
 			} else if passMigrated > 0 || pass2Migrated > 0 {
 				msg := fmt.Sprintf("密码已规范化：登录密码 %d 个，二级密码 %d 个", passMigrated, pass2Migrated)
 				info.Message = appendSyncMessage(info.Message, msg)
-				log.Printf("[DBSync] %s%s", table.label, msg)
+				obslogger.L().Info("DBSync password migration completed", "table", table.label, "message", msg)
 			}
 		}
 	}

@@ -67,7 +67,7 @@ func registerSupplierRoutes(admin *gin.RouterGroup) {
 func AdminSupplierList(c *gin.Context) {
 	list, err := adminSupplierToolService.ListSuppliers()
 	if err != nil {
-		response.ServerError(c, "查询货源失败")
+		response.ServerErrorf(c, err, "查询货源失败")
 		return
 	}
 	response.Success(c, list)
@@ -80,7 +80,7 @@ func AdminSupplierSave(c *gin.Context) {
 		return
 	}
 	if err := adminSupplierToolService.SaveSupplier(sup); err != nil {
-		response.ServerError(c, "保存货源失败")
+		response.ServerErrorf(c, err, "保存货源失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -93,7 +93,7 @@ func AdminSupplierDelete(c *gin.Context) {
 		return
 	}
 	if err := adminSupplierToolService.DeleteSupplier(hid); err != nil {
-		response.ServerError(c, "删除失败")
+		response.ServerErrorf(c, err, "删除失败")
 		return
 	}
 	response.SuccessMsg(c, "删除成功")
@@ -107,7 +107,7 @@ func AdminCloneExecute(c *gin.Context) {
 
 	result, err := adminSyncExecute(req.HID, buildCloneSyncConfig(req, cloneSyncModeCloneOnly))
 	if err != nil {
-		response.ServerError(c, "克隆失败: "+err.Error())
+		response.ServerErrorf(c, err, "克隆失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"message": "克隆完成", "result": result})
@@ -121,7 +121,7 @@ func AdminCloneUpdatePrices(c *gin.Context) {
 
 	result, err := adminSyncExecute(req.HID, buildCloneSyncConfig(req, cloneSyncModePriceOnly))
 	if err != nil {
-		response.ServerError(c, "更新价格失败: "+err.Error())
+		response.ServerErrorf(c, err, "更新价格失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"message": "价格更新完成", "result": result})
@@ -135,7 +135,7 @@ func AdminCloneAutoSync(c *gin.Context) {
 
 	result, err := adminSyncExecute(req.HID, buildCloneSyncConfig(req, cloneSyncModeFull))
 	if err != nil {
-		response.ServerError(c, "同步失败: "+err.Error())
+		response.ServerErrorf(c, err, "同步失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"message": "同步完成", "result": result})
@@ -144,7 +144,7 @@ func AdminCloneAutoSync(c *gin.Context) {
 func XMAdminListProjects(c *gin.Context) {
 	list, err := xmmodule.XM().AdminListProjects()
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, list)
@@ -180,7 +180,7 @@ func XMAdminDeleteProject(c *gin.Context) {
 func XMAdminListProviders(c *gin.Context) {
 	list, err := xmmodule.XM().AdminListProviders()
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, list)
@@ -276,7 +276,7 @@ func XMAdminSyncProviderProjects(c *gin.Context) {
 func WAdminListApps(c *gin.Context) {
 	list, err := wmodule.W().AdminListApps()
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.Success(c, list)
@@ -327,7 +327,7 @@ func XueMeiShouHou(c *gin.Context) {
 
 	code, msg, err := suppliermodule.XueMeiShouHou(sup, req.OID, req.FanKui)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, gin.H{"code": code, "msg": msg})
@@ -351,7 +351,7 @@ func XueMeiGetCity(c *gin.Context) {
 
 	data, err := suppliermodule.XueMeiGetCity(sup)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, data)
@@ -375,7 +375,7 @@ func XueMeiEditIP(c *gin.Context) {
 
 	code, msg, err := suppliermodule.XueMeiEditIP(sup, req.OID, req.NodeID)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, gin.H{"code": code, "msg": msg})
@@ -398,7 +398,7 @@ func XueMeiYouXian(c *gin.Context) {
 
 	code, msg, err := suppliermodule.XueMeiYouXian(sup, req.OID)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, gin.H{"code": code, "msg": msg})
@@ -423,7 +423,7 @@ func XueMeiGetName(c *gin.Context) {
 
 	data, err := suppliermodule.XueMeiGetName(sup, req.OrderID)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, data)
@@ -447,7 +447,7 @@ func XueMeiEditName(c *gin.Context) {
 
 	code, msg, err := suppliermodule.XueMeiEditName(sup, req.OID, req.NameID)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, gin.H{"code": code, "msg": msg})
@@ -472,7 +472,7 @@ func XueMeiChaZhsLog(c *gin.Context) {
 
 	data, err := suppliermodule.XueMeiChaZhsLog(sup, req.OrderID)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	response.Success(c, data)
@@ -481,7 +481,7 @@ func XueMeiChaZhsLog(c *gin.Context) {
 func getXueMeiSupplier(c *gin.Context, hid int) (*model.SupplierFull, bool) {
 	sup, err := adminSupplierToolService.GetSupplierByHID(hid)
 	if err != nil {
-		response.ServerError(c, "供应商不存在")
+		response.ServerErrorf(c, err, "供应商不存在")
 		return nil, false
 	}
 	if sup.PT != "xuemei" {

@@ -3,10 +3,10 @@ package xm
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func sleepWithContext(ctx context.Context, d time.Duration) bool {
@@ -24,7 +24,7 @@ func sleepWithContext(ctx context.Context, d time.Duration) bool {
 // RunXMCron 启动 XM 后台同步任务。
 // 这里直接复用 modules/xm 的同步逻辑，避免 service 与 modules 双份实现长期漂移。
 func RunXMCron(ctx context.Context) {
-	log.Println("[XM] 后台批量同步任务启动")
+	obslogger.L().Info("XM 后台批量同步任务启动")
 	go xmCronBatchSync(ctx)
 }
 
@@ -37,7 +37,7 @@ func xmCronBatchSync(ctx context.Context) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("[XM-cron-sync] panic: %v", r)
+					obslogger.L().Error("XM cron sync panic", "panic", r)
 				}
 			}()
 
@@ -48,7 +48,7 @@ func xmCronBatchSync(ctx context.Context) {
 				  AND y_oid IS NOT NULL AND y_oid > 0
 				  AND is_deleted = 0`)
 			if err != nil {
-				log.Printf("[XM-cron-sync] 查询订单失败: %v", err)
+				obslogger.L().Warn("XM cron sync 查询订单失败", "error", err)
 				return
 			}
 			defer rows.Close()
@@ -72,7 +72,7 @@ func xmCronBatchSync(ctx context.Context) {
 			for projectID, yOids := range projectOrders {
 				projectRow, err := svc.getProjectRow(projectID)
 				if err != nil {
-					log.Printf("[XM-cron-sync] project_id=%d 项目不存在: %v", projectID, err)
+					obslogger.L().Warn("XM cron sync 项目不存在", "project_id", projectID, "error", err)
 					continue
 				}
 
@@ -80,7 +80,7 @@ func xmCronBatchSync(ctx context.Context) {
 				syncCount := 0
 				for _, yOid := range yOids {
 					if _, err := svc.syncOrderFromUpstream(yOid, projectRow); err != nil {
-						log.Printf("[XM-cron-sync] [%s] y_oid=%d 同步失败: %v", projectName, yOid, err)
+						obslogger.L().Warn("XM cron sync 订单同步失败", "project_name", projectName, "y_oid", yOid, "error", err)
 					} else {
 						syncCount++
 					}
@@ -90,7 +90,7 @@ func xmCronBatchSync(ctx context.Context) {
 				}
 
 				if syncCount > 0 {
-					log.Printf("[XM-cron-sync] [%s] 同步完成 %d/%d 条", projectName, syncCount, len(yOids))
+					obslogger.L().Info("XM cron sync 同步完成", "project_name", projectName, "success", syncCount, "total", len(yOids))
 				}
 			}
 		}()

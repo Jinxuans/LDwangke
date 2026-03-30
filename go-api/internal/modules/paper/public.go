@@ -25,7 +25,7 @@ func PaperGenerateTitles(c *gin.Context) {
 	}
 	result, err := papers.GenerateTitles(params)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, result)
@@ -39,7 +39,7 @@ func PaperGenerateOutline(c *gin.Context) {
 	}
 	result, err := papers.GenerateOutline(params)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, result)
@@ -53,7 +53,7 @@ func PaperOutlineStatus(c *gin.Context) {
 	}
 	result, err := papers.OutlineStatus(orderID)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, result)
@@ -98,7 +98,7 @@ func PaperOrderList(c *gin.Context) {
 
 	result, err := papers.GetOrderList(uid, isAdmin, page, pageSize, searchParams)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, result)
@@ -113,7 +113,7 @@ func PaperDownload(c *gin.Context) {
 	}
 	result, err := papers.PaperDownload(orderID, fileName)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, result)
@@ -197,7 +197,7 @@ func PaperCountWords(c *gin.Context) {
 
 	result, err := papers.CountWords(file, header)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, result)
@@ -213,7 +213,7 @@ func PaperUploadCover(c *gin.Context) {
 
 	result, err := papers.UploadCover(file, header)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, result)
@@ -228,7 +228,7 @@ func PaperGetTemplates(c *gin.Context) {
 	}
 	result, err := papers.GetTemplateList(params)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, result)
@@ -242,7 +242,7 @@ func PaperSaveTemplate(c *gin.Context) {
 	}
 	result, err := papers.SaveTemplate(params)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, result)

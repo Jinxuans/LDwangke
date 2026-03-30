@@ -2,13 +2,13 @@ package tuzhi
 
 import (
 	"encoding/json"
-	"log"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func (s *TuZhiService) EnsureTable() {
-	log.Println("[TuZhi] 开始检查/创建表")
+	obslogger.L().Info("TuZhi 开始检查/创建表")
 	_, err := database.DB.Exec(`CREATE TABLE IF NOT EXISTS qingka_wangke_dakaaz (
 		id INT(10) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'ID',
 		api_id INT(11) DEFAULT NULL COMMENT '上游订单ID',
@@ -53,7 +53,7 @@ func (s *TuZhiService) EnsureTable() {
 		PRIMARY KEY (id)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='凸知打卡订单表'`)
 	if err != nil {
-		log.Printf("[TuZhi] 创建 dakaaz 表失败: %v", err)
+		obslogger.L().Warn("TuZhi 创建 dakaaz 表失败", "error", err)
 	}
 
 	_, err = database.DB.Exec(`CREATE TABLE IF NOT EXISTS qingka_wangke_daka_query_record (
@@ -68,9 +68,9 @@ func (s *TuZhiService) EnsureTable() {
 		PRIMARY KEY (id)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='凸知打卡查询扣费记录'`)
 	if err != nil {
-		log.Printf("[TuZhi] 创建 daka_query_record 表失败: %v", err)
+		obslogger.L().Warn("TuZhi 创建 daka_query_record 表失败", "error", err)
 	}
-	log.Println("[TuZhi] 表检查/创建完成")
+	obslogger.L().Info("TuZhi 表检查/创建完成")
 }
 
 func (s *TuZhiService) GetConfig() (*TuZhiConfig, error) {

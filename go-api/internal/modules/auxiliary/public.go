@@ -27,7 +27,7 @@ func UserCardKeyUse(c *gin.Context) {
 func UserActivityList(c *gin.Context) {
 	list, err := listPublicActivities()
 	if err != nil {
-		response.ServerError(c, "查询活动失败")
+		response.ServerErrorf(c, err, "查询活动失败")
 		return
 	}
 	response.Success(c, list)
@@ -36,7 +36,7 @@ func UserActivityList(c *gin.Context) {
 func UserPledgeConfigList(c *gin.Context) {
 	list, err := listPublicPledgeConfigs()
 	if err != nil {
-		response.ServerError(c, "查询质押配置失败")
+		response.ServerErrorf(c, err, "查询质押配置失败")
 		return
 	}
 	var active []model.PledgeConfig
@@ -85,7 +85,7 @@ func UserPledgeList(c *gin.Context) {
 	uid := c.GetInt("uid")
 	list, err := listActivePledges(uid)
 	if err != nil {
-		response.ServerError(c, "查询质押记录失败")
+		response.ServerErrorf(c, err, "查询质押记录失败")
 		return
 	}
 	response.Success(c, list)

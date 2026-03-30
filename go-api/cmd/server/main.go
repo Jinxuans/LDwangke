@@ -1,14 +1,16 @@
 package main
 
 import (
-	"log"
+	"os"
 
 	"go-api/internal/bootstrap"
+	obslogger "go-api/internal/observability/logger"
 	"go-api/internal/routes"
 )
 
 func main() {
 	cfg := bootstrap.LoadConfig("config/config.yaml")
+	obslogger.Init("go-api", cfg.Server.Mode)
 	application := bootstrap.BuildApp(cfg)
 	bootstrap.InitTables()
 
@@ -24,6 +26,7 @@ func main() {
 	srv := bootstrap.NewHTTPServer(cfg, r)
 
 	if err := bootstrap.Serve(ctx, srv, application); err != nil {
-		log.Fatalf("服务启动失败: %v", err)
+		obslogger.L().Error("服务启动失败", "error", err)
+		os.Exit(1)
 	}
 }

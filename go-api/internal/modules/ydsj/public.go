@@ -14,7 +14,7 @@ func YDSJConfigGet(c *gin.Context) {
 	svc := YDSJ()
 	cfg, err := svc.GetConfig()
 	if err != nil {
-		response.ServerError(c, "获取配置失败")
+		response.ServerErrorf(c, err, "获取配置失败")
 		return
 	}
 	response.Success(c, cfg)
@@ -28,7 +28,7 @@ func YDSJConfigSave(c *gin.Context) {
 	}
 	svc := YDSJ()
 	if err := svc.SaveConfig(&cfg); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -61,7 +61,7 @@ func YDSJGetSchools(c *gin.Context) {
 	svc := YDSJ()
 	schools, err := svc.GetSchools()
 	if err != nil {
-		response.ServerError(c, "获取学校列表失败")
+		response.ServerErrorf(c, err, "获取学校列表失败")
 		return
 	}
 	response.Success(c, schools)
@@ -90,7 +90,7 @@ func YDSJOrderList(c *gin.Context) {
 	svc := YDSJ()
 	orders, total, err := svc.ListOrders(uid, isAdmin, page, limit, searchType, keyword, statusFilter)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	response.SuccessPage(c, orders, int64(total), page, limit)

@@ -1,9 +1,8 @@
 package paper
 
 import (
-	"log"
-
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func (s *paperService) EnsureTable() {
@@ -19,7 +18,7 @@ func (s *paperService) EnsureTable() {
 		KEY idx_order_id (order_id)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智文论文订单表'`)
 	if err != nil {
-		log.Printf("[Paper] 创建 lunwen 表失败: %v", err)
+		obslogger.L().Warn("Paper 创建 lunwen 表失败", "error", err)
 	}
 
 	defaults := map[string]string{

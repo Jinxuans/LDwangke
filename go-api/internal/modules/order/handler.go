@@ -27,7 +27,7 @@ func OrderList(c *gin.Context) {
 
 	list, total, err := services.Query.List(uid, grade, req)
 	if err != nil {
-		response.ServerError(c, "查询订单失败")
+		response.ServerErrorf(c, err, "查询订单失败")
 		return
 	}
 
@@ -64,7 +64,7 @@ func OrderStats(c *gin.Context) {
 	grade := c.GetString("grade")
 	stats, err := services.Query.Stats(uid, grade)
 	if err != nil {
-		response.ServerError(c, "查询统计失败")
+		response.ServerErrorf(c, err, "查询统计失败")
 		return
 	}
 	response.Success(c, stats)
@@ -301,7 +301,7 @@ func OrderPause(c *gin.Context) {
 
 	code, msg, err := orderSupplierService.PauseOrder(sup, order.YID)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	if code == 1 || code == 0 {
@@ -358,7 +358,7 @@ func OrderChangePassword(c *gin.Context) {
 
 	code, msg, err := orderSupplierService.ChangePassword(sup, order.YID, body.NewPwd)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	if code == 1 || code == 0 {
@@ -408,7 +408,7 @@ func OrderResubmit(c *gin.Context) {
 
 	code, msg, err := orderSupplierService.ResubmitOrder(sup, order.YID)
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	if code == 1 || code == 0 {
@@ -466,7 +466,7 @@ func OrderPupReset(c *gin.Context) {
 		code, msg, err = orderSupplierService.ResetOrderPeriod(sup, order.YID, body.Value)
 	}
 	if err != nil {
-		response.ServerError(c, err.Error())
+		response.ServerErrorf(c, err, err.Error())
 		return
 	}
 	if code == 1 || code == 0 {

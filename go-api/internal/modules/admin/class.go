@@ -41,7 +41,7 @@ func registerClassRoutes(admin *gin.RouterGroup) {
 func AdminCategoryList(c *gin.Context) {
 	list, err := classmodule.Classes().CategoryListAll()
 	if err != nil {
-		response.ServerError(c, "查询分类失败")
+		response.ServerErrorf(c, err, "查询分类失败")
 		return
 	}
 	response.Success(c, list)
@@ -53,7 +53,7 @@ func AdminCategoryListPaged(c *gin.Context) {
 
 	list, total, err := classmodule.Classes().CategoryListPaged(req)
 	if err != nil {
-		response.ServerError(c, "查询分类失败")
+		response.ServerErrorf(c, err, "查询分类失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -69,7 +69,7 @@ func AdminCategorySave(c *gin.Context) {
 		return
 	}
 	if err := classmodule.Classes().CategorySave(cat); err != nil {
-		response.ServerError(c, "保存分类失败")
+		response.ServerErrorf(c, err, "保存分类失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -82,7 +82,7 @@ func AdminCategoryDelete(c *gin.Context) {
 		return
 	}
 	if err := classmodule.Classes().CategoryDelete(id); err != nil {
-		response.ServerError(c, "删除分类失败")
+		response.ServerErrorf(c, err, "删除分类失败")
 		return
 	}
 	response.SuccessMsg(c, "删除成功")
@@ -99,7 +99,7 @@ func AdminCategoryQuickModify(c *gin.Context) {
 	}
 	affected, err := classmodule.Classes().CategoryQuickModify(body.Keyword, body.CategoryID)
 	if err != nil {
-		response.ServerError(c, "修改失败")
+		response.ServerErrorf(c, err, "修改失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -129,7 +129,7 @@ func AdminCategoryUpdateSort(c *gin.Context) {
 		items = append(items, struct{ ID, Sort int }{ID: item.ID, Sort: item.Sort})
 	}
 	if err := classmodule.Classes().CategoryUpdateSort(items); err != nil {
-		response.ServerError(c, "排序更新失败")
+		response.ServerErrorf(c, err, "排序更新失败")
 		return
 	}
 	response.Success(c, gin.H{"msg": "排序更新成功"})
@@ -143,7 +143,7 @@ func AdminClassList(c *gin.Context) {
 
 	list, total, err := classmodule.Classes().ClassList(cateID, keywords, page, limit)
 	if err != nil {
-		response.ServerError(c, "查询课程失败")
+		response.ServerErrorf(c, err, "查询课程失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -159,7 +159,7 @@ func AdminClassSave(c *gin.Context) {
 		return
 	}
 	if err := classmodule.Classes().ClassSave(req); err != nil {
-		response.ServerError(c, "保存课程失败")
+		response.ServerErrorf(c, err, "保存课程失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -175,7 +175,7 @@ func AdminClassToggle(c *gin.Context) {
 		return
 	}
 	if err := classmodule.Classes().ClassToggleStatus(body.CID, body.Status); err != nil {
-		response.ServerError(c, "更新状态失败")
+		response.ServerErrorf(c, err, "更新状态失败")
 		return
 	}
 	response.SuccessMsg(c, "更新成功")
@@ -191,7 +191,7 @@ func AdminClassBatchDelete(c *gin.Context) {
 	}
 	deleted, err := classmodule.Classes().ClassBatchDelete(body.CIDs)
 	if err != nil {
-		response.ServerError(c, "删除失败: "+err.Error())
+		response.ServerErrorf(c, err, "删除失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"deleted": deleted, "msg": fmt.Sprintf("成功删除 %d 个课程", deleted)})
@@ -208,7 +208,7 @@ func AdminClassBatchCategory(c *gin.Context) {
 	}
 	updated, err := classmodule.Classes().ClassBatchCategory(body.CIDs, body.CateID)
 	if err != nil {
-		response.ServerError(c, "批量修改分类失败")
+		response.ServerErrorf(c, err, "批量修改分类失败")
 		return
 	}
 	response.Success(c, gin.H{"updated": updated, "msg": fmt.Sprintf("成功修改 %d 个课程的分类", updated)})
@@ -229,7 +229,7 @@ func AdminClassBatchPrice(c *gin.Context) {
 	}
 	updated, err := classmodule.Classes().ClassBatchPrice(body.CIDs, body.Rate, body.Yunsuan)
 	if err != nil {
-		response.ServerError(c, "批量修改价格失败")
+		response.ServerErrorf(c, err, "批量修改价格失败")
 		return
 	}
 	response.Success(c, gin.H{"updated": updated, "msg": fmt.Sprintf("成功修改 %d 个课程的价格", updated)})
@@ -255,7 +255,7 @@ func AdminClassBatchReplaceKeyword(c *gin.Context) {
 	}
 	updated, err := classmodule.Classes().ClassBatchReplaceKeyword(body.Search, body.Replace, body.Scope, body.ScopeID)
 	if err != nil {
-		response.ServerError(c, "替换失败: "+err.Error())
+		response.ServerErrorf(c, err, "替换失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"updated": updated, "msg": fmt.Sprintf("成功替换 %d 个课程的关键词", updated)})
@@ -280,7 +280,7 @@ func AdminClassBatchAddPrefix(c *gin.Context) {
 	}
 	updated, err := classmodule.Classes().ClassBatchAddPrefix(body.Prefix, body.Scope, body.ScopeID)
 	if err != nil {
-		response.ServerError(c, "添加前缀失败: "+err.Error())
+		response.ServerErrorf(c, err, "添加前缀失败: "+err.Error())
 		return
 	}
 	response.Success(c, gin.H{"updated": updated, "msg": fmt.Sprintf("成功为 %d 个课程添加前缀", updated)})
@@ -325,7 +325,7 @@ func AdminAddClass(c *gin.Context) {
 				req.Name, req.Price, req.GetNoun, req.Content, req.QueryPlat, req.Yunsuan, statusVal, sortVal, req.Fenlei, req.Docking, req.Noun,
 			)
 			if err != nil {
-				response.ServerError(c, "更新失败: "+err.Error())
+				response.ServerErrorf(c, err, "更新失败: "+err.Error())
 				return
 			}
 			response.SuccessMsg(c, "已更新")
@@ -338,7 +338,7 @@ func AdminAddClass(c *gin.Context) {
 		req.Name, req.Price, req.GetNoun, req.Noun, req.Content, req.QueryPlat, req.Docking, req.Yunsuan, statusVal, sortVal, req.Fenlei,
 	)
 	if err != nil {
-		response.ServerError(c, "添加失败: "+err.Error())
+		response.ServerErrorf(c, err, "添加失败: "+err.Error())
 		return
 	}
 	response.SuccessMsg(c, "添加成功")
@@ -361,7 +361,7 @@ func AdminCategoryBatchToggle(c *gin.Context) {
 
 	rows, err := database.DB.Query("SELECT id FROM qingka_wangke_fenlei WHERE status = ?", sourceStatus)
 	if err != nil {
-		response.ServerError(c, "查询分类失败")
+		response.ServerErrorf(c, err, "查询分类失败")
 		return
 	}
 	defer rows.Close()
@@ -383,7 +383,7 @@ func AdminCategoryBatchToggle(c *gin.Context) {
 func AdminClassDropdown(c *gin.Context) {
 	rows, err := database.DB.Query("SELECT cid, COALESCE(name,''), COALESCE(price,'0'), COALESCE(fenlei,'') FROM qingka_wangke_class WHERE status >= 0 ORDER BY sort ASC, cid ASC")
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 	defer rows.Close()
@@ -415,7 +415,7 @@ func AdminMiJiaList(c *gin.Context) {
 	}
 	list, total, uids, err := classmodule.Classes().MiJiaList(req)
 	if err != nil {
-		response.ServerError(c, "查询密价列表失败")
+		response.ServerErrorf(c, err, "查询密价列表失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -432,7 +432,7 @@ func AdminMiJiaSave(c *gin.Context) {
 		return
 	}
 	if err := classmodule.Classes().MiJiaSave(req); err != nil {
-		response.ServerError(c, "保存失败")
+		response.ServerErrorf(c, err, "保存失败")
 		return
 	}
 	response.SuccessMsg(c, "保存成功")
@@ -447,7 +447,7 @@ func AdminMiJiaDelete(c *gin.Context) {
 		return
 	}
 	if err := classmodule.Classes().MiJiaDelete(req.Mids); err != nil {
-		response.ServerError(c, "删除失败")
+		response.ServerErrorf(c, err, "删除失败")
 		return
 	}
 	response.SuccessMsg(c, "删除成功")
@@ -461,7 +461,7 @@ func AdminMiJiaBatch(c *gin.Context) {
 	}
 	count, err := classmodule.Classes().MiJiaBatch(req)
 	if err != nil {
-		response.ServerError(c, "批量设置失败")
+		response.ServerErrorf(c, err, "批量设置失败")
 		return
 	}
 	response.Success(c, gin.H{"count": count, "msg": fmt.Sprintf("成功为 %d 个商品设置密价", count)})

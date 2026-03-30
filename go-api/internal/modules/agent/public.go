@@ -30,7 +30,7 @@ func AgentList(c *gin.Context) {
 
 	list, total, err := agents.AgentList(uid, grade, body.Page, body.Limit, body.Type, body.Keywords)
 	if err != nil {
-		response.ServerError(c, "查询失败")
+		response.ServerErrorf(c, err, "查询失败")
 		return
 	}
 

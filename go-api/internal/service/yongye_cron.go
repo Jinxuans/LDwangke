@@ -4,15 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"time"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func RunYongyeCron(ctx context.Context) {
-	log.Println("[Yongye] 后台同步任务启动")
+	obslogger.L().Info("Yongye 后台同步任务启动")
 	go yongyeCronRetryFailed(ctx)  // 重试失败的订单
 	go yongyeCronSyncStudents(ctx) // 同步学生状态
 	go yongyeCronRefund(ctx)       // 处理退款
@@ -28,7 +28,7 @@ func yongyeCronRetryFailed(ctx context.Context) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("[Yongye-cron-retry] panic: %v", r)
+					obslogger.L().Error("Yongye cron retry panic", "panic", r)
 				}
 			}()
 
@@ -84,7 +84,7 @@ func yongyeCronRetryFailed(ctx context.Context) {
 
 				respBody, err := svc.yongyeUpstreamPost(cfg, "add", apiData)
 				if err != nil {
-					log.Printf("[Yongye-cron-retry] 订单#%d 重试失败: %v", o.ID, err)
+					obslogger.L().Warn("Yongye cron retry 失败", "order_id", o.ID, "error", err)
 					if !sleepWithContext(ctx, 5*time.Second) {
 						return
 					}
@@ -97,9 +97,9 @@ func yongyeCronRetryFailed(ctx context.Context) {
 				if int(mapGetFloat(apiResp, "code")) == 1 {
 					yid := fmt.Sprintf("%v", apiResp["id"])
 					database.DB.Exec("UPDATE yy_ydsj_dd SET dockstatus = 1, yid = ? WHERE id = ?", yid, o.ID)
-					log.Printf("[Yongye-cron-retry] 订单#%d 重试成功 yid=%s", o.ID, yid)
+					obslogger.L().Info("Yongye cron retry 成功", "order_id", o.ID, "yid", yid)
 				} else {
-					log.Printf("[Yongye-cron-retry] 订单#%d 重试失败: %s", o.ID, mapGetString(apiResp, "msg"))
+					obslogger.L().Warn("Yongye cron retry 失败", "order_id", o.ID, "message", mapGetString(apiResp, "msg"))
 				}
 
 				if !sleepWithContext(ctx, 3*time.Second) {
@@ -124,7 +124,7 @@ func yongyeCronSyncStudents(ctx context.Context) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("[Yongye-cron-sync] panic: %v", r)
+					obslogger.L().Error("Yongye cron sync panic", "panic", r)
 				}
 			}()
 
@@ -169,7 +169,7 @@ func yongyeCronSyncStudents(ctx context.Context) {
 
 					database.DB.Exec("INSERT INTO yy_ydsj_student (uid, user, pass, type, zkm, weeks, status, last_time) VALUES (?,?,?,?,?,?,0,?)",
 						k.UID, k.User, pass, k.Type, zkm, weeks, now)
-					log.Printf("[Yongye-cron-sync] 新增学生: %s type=%d", k.User, k.Type)
+					obslogger.L().Info("Yongye cron sync 新增学生", "user", k.User, "type", k.Type)
 				} else {
 					database.DB.Exec("UPDATE yy_ydsj_student SET last_time = ? WHERE id = ?", now, existID)
 				}
@@ -196,7 +196,7 @@ func yongyeCronRefund(ctx context.Context) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("[Yongye-cron-refund] panic: %v", r)
+					obslogger.L().Error("Yongye cron refund panic", "panic", r)
 				}
 			}()
 
@@ -247,7 +247,7 @@ func yongyeCronRefund(ctx context.Context) {
 				logContent := fmt.Sprintf("永夜运动学生退单：账号%s 退还%.2f", stu.User, refund)
 				database.DB.Exec("INSERT INTO qingka_wangke_moneylog (uid, type, money, mark, addtime) VALUES (?, 'yongye_refund', ?, ?, ?)",
 					stu.UID, refund, logContent, now)
-				log.Printf("[Yongye-cron-refund] 学生%s 退款%.2f给UID %d", stu.User, refund, stu.UID)
+				obslogger.L().Info("Yongye cron refund 完成", "user", stu.User, "uid", stu.UID, "refund", refund)
 			}
 		}()
 

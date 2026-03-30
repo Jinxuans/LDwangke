@@ -2,8 +2,9 @@ package ws
 
 import (
 	"encoding/json"
-	"log"
 	"sync"
+
+	obslogger "go-api/internal/observability/logger"
 )
 
 type PushMessage struct {
@@ -56,8 +57,9 @@ func (h *Hub) Run() {
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client.UID] = client
+			count := len(h.clients)
 			h.mu.Unlock()
-			log.Printf("WebSocket 客户端上线: uid=%d, 当前在线: %d", client.UID, len(h.clients))
+			obslogger.L().Info("WebSocket 客户端上线", "uid", client.UID, "online", count)
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -65,8 +67,9 @@ func (h *Hub) Run() {
 				delete(h.clients, client.UID)
 				close(client.Send)
 			}
+			count := len(h.clients)
 			h.mu.Unlock()
-			log.Printf("WebSocket 客户端下线: uid=%d, 当前在线: %d", client.UID, len(h.clients))
+			obslogger.L().Info("WebSocket 客户端下线", "uid", client.UID, "online", count)
 		}
 	}
 }
@@ -114,7 +117,7 @@ func (h *Hub) PushToUser(uid int, msg PushMessage) {
 
 	data, err := json.Marshal(msg)
 	if err != nil {
-		log.Printf("序列化推送消息失败: %v", err)
+		obslogger.L().Warn("序列化推送消息失败", "error", err)
 		return
 	}
 
@@ -122,7 +125,7 @@ func (h *Hub) PushToUser(uid int, msg PushMessage) {
 	case client.Send <- data:
 	default:
 		// 通道满了，丢弃
-		log.Printf("推送消息到 uid=%d 失败: 通道已满", uid)
+		obslogger.L().Warn("推送消息失败：通道已满", "uid", uid)
 	}
 }
 
@@ -136,7 +139,7 @@ func (h *Hub) Broadcast(msg PushMessage) {
 
 	data, err := json.Marshal(msg)
 	if err != nil {
-		log.Printf("序列化广播消息失败: %v", err)
+		obslogger.L().Warn("序列化广播消息失败", "error", err)
 		return
 	}
 

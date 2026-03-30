@@ -1,11 +1,11 @@
 package config
 
 import (
-	"log"
 	"os"
 	"strconv"
 	"strings"
 
+	obslogger "go-api/internal/observability/logger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -90,12 +90,12 @@ var Global *Config
 func Load(path string) *Config {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		log.Fatalf("读取配置文件失败: %v", err)
+		obslogger.Fatal("读取配置文件失败", "path", path, "error", err)
 	}
 
 	cfg := &Config{}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
-		log.Fatalf("解析配置文件失败: %v", err)
+		obslogger.Fatal("解析配置文件失败", "path", path, "error", err)
 	}
 
 	applyEnvOverrides(cfg)
@@ -206,7 +206,7 @@ func envInt(key string, current int) int {
 		if err == nil {
 			return parsed
 		}
-		log.Printf("[config] 忽略无效整数环境变量 %s=%q", key, val)
+		obslogger.L().Warn("忽略无效整数环境变量", "key", key, "value", val)
 	}
 	return current
 }
@@ -218,7 +218,7 @@ func envBool(key string) (bool, bool) {
 	}
 	parsed, err := strconv.ParseBool(strings.TrimSpace(val))
 	if err != nil {
-		log.Printf("[config] 忽略无效布尔环境变量 %s=%q", key, val)
+		obslogger.L().Warn("忽略无效布尔环境变量", "key", key, "value", val)
 		return false, false
 	}
 	return parsed, true

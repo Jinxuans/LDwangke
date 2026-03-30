@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"go-api/internal/model"
 	classmodule "go-api/internal/modules/class"
 	commonmodule "go-api/internal/modules/common"
+	obslogger "go-api/internal/observability/logger"
 	shared "go-api/internal/shared/db"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -71,7 +71,7 @@ func (s *Service) Login(req LoginRequest) (*model.VbenLoginResponse, string, err
 			return nil, "", errors.New("密码错误")
 		}
 		if hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost); err == nil {
-			log.Printf("[Auth] 用户 uid=%d 使用明文密码登录，已自动迁移为 bcrypt", user.UID)
+			obslogger.L().Info("Auth 用户使用明文密码登录，已自动迁移为 bcrypt", "uid", user.UID)
 			database.DB.Exec("UPDATE qingka_wangke_user SET pass = ? WHERE uid = ?", string(hashed), user.UID)
 		}
 	}
@@ -248,7 +248,7 @@ func (s *Service) ResetPassword(email, code, password string) error {
 		siteName := s.getSiteName()
 		htmlBody := templatePasswordChanged(siteName, username, time.Now().Format("2006-01-02 15:04:05"))
 		if err := commonmodule.SendEmail(email, siteName+" - 密码修改通知", htmlBody); err != nil {
-			log.Printf("发送密码修改通知失败: %v", err)
+			obslogger.L().Warn("发送密码修改通知失败", "error", err)
 		}
 	}()
 
@@ -285,7 +285,7 @@ func (s *Service) CheckLoginDevice(uid int, username, ip, ua string) {
 		loginTime := time.Now().Format("2006-01-02 15:04:05")
 		htmlBody := templateLoginAlert(siteName, username, ip, ua, loginTime)
 		if err := commonmodule.SendEmail(email, siteName+" - 登录安全提醒", htmlBody); err != nil {
-			log.Printf("发送登录提醒邮件失败: %v", err)
+			obslogger.L().Warn("发送登录提醒邮件失败", "error", err)
 		}
 	}()
 }

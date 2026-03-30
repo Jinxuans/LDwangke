@@ -5,20 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
 	"go-api/internal/database"
 	commonmodule "go-api/internal/modules/common"
 	mailmodule "go-api/internal/modules/mail"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func notifyAdminOrderStatusChange(oid int, status, process, remarks string) {
 	go func() {
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				log.Printf("[AdminPush] oid=%d panic: %v", oid, recovered)
+				obslogger.L().Error("AdminPush panic", "oid", oid, "panic", recovered)
 			}
 		}()
 

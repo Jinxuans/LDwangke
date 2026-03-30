@@ -19,7 +19,7 @@ func registerOrderRoutes(admin *gin.RouterGroup) {
 func AdminRedockPending(c *gin.Context) {
 	stats, err := dockscheduler.RunOnce("manual")
 	if err != nil {
-		response.ServerError(c, fmt.Sprintf("执行失败: %v", err))
+		response.ServerErrorf(c, err, fmt.Sprintf("执行失败: %v", err))
 		return
 	}
 	if stats.LastFetched == 0 {

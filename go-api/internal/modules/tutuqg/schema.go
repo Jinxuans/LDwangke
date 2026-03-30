@@ -1,9 +1,8 @@
 package tutuqg
 
 import (
-	"log"
-
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func (s *tutuqgService) EnsureTable() {
@@ -27,6 +26,6 @@ func (s *tutuqgService) EnsureTable() {
 		PRIMARY KEY (oid)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
 	if err != nil {
-		log.Printf("[TutuQG] 创建表失败: %v", err)
+		obslogger.L().Warn("TutuQG 创建表失败", "error", err)
 	}
 }

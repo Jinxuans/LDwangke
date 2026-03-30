@@ -144,7 +144,7 @@ func UserPayChannels(c *gin.Context) {
 	uid := c.GetInt("uid")
 	channels, err := userService.GetPayChannels(uid)
 	if err != nil {
-		response.ServerError(c, "获取支付渠道失败")
+		response.ServerErrorf(c, err, "获取支付渠道失败")
 		return
 	}
 	response.Success(c, channels)
@@ -172,7 +172,7 @@ func UserPayOrders(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	orders, total, err := userService.PayOrders(uid, page, limit)
 	if err != nil {
-		response.ServerError(c, "查询充值记录失败")
+		response.ServerErrorf(c, err, "查询充值记录失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -187,7 +187,7 @@ func UserMoneyLog(c *gin.Context) {
 	_ = c.ShouldBindQuery(&req)
 	logs, total, err := userService.MoneyLogList(uid, req)
 	if err != nil {
-		response.ServerError(c, "查询流水失败")
+		response.ServerErrorf(c, err, "查询流水失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -217,7 +217,7 @@ func UserWithdrawRequests(c *gin.Context) {
 	_ = c.ShouldBindQuery(&req)
 	list, total, err := userService.WithdrawRequests(uid, req)
 	if err != nil {
-		response.ServerError(c, "查询提现记录失败")
+		response.ServerErrorf(c, err, "查询提现记录失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -233,7 +233,7 @@ func UserTicketList(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	tickets, total, err := userService.TicketList(uid, grade, page, limit)
 	if err != nil {
-		response.ServerError(c, "查询工单失败")
+		response.ServerErrorf(c, err, "查询工单失败")
 		return
 	}
 	response.Success(c, gin.H{
@@ -259,7 +259,7 @@ func UserTicketCreate(c *gin.Context) {
 
 	id, err := userService.TicketCreate(uid, req)
 	if err != nil {
-		response.ServerError(c, "创建工单失败")
+		response.ServerErrorf(c, err, "创建工单失败")
 		return
 	}
 	if ws.GlobalHub != nil {
@@ -301,7 +301,7 @@ func UserTicketClose(c *gin.Context) {
 		return
 	}
 	if err := userService.TicketClose(uid, grade, id); err != nil {
-		response.ServerError(c, "关闭工单失败")
+		response.ServerErrorf(c, err, "关闭工单失败")
 		return
 	}
 	response.SuccessMsg(c, "工单已关闭")
@@ -311,7 +311,7 @@ func UserGetFavorites(c *gin.Context) {
 	uid := c.GetInt("uid")
 	favorites, err := userService.GetFavorites(uid)
 	if err != nil {
-		response.ServerError(c, "查询收藏失败")
+		response.ServerErrorf(c, err, "查询收藏失败")
 		return
 	}
 	response.Success(c, favorites)
@@ -343,7 +343,7 @@ func UserRemoveFavorite(c *gin.Context) {
 		return
 	}
 	if err := userService.RemoveFavorite(uid, body.CID); err != nil {
-		response.ServerError(c, "移除收藏失败")
+		response.ServerErrorf(c, err, "移除收藏失败")
 		return
 	}
 	response.SuccessMsg(c, "移除成功")
@@ -392,7 +392,7 @@ func UserGradeList(c *gin.Context) {
 
 	list, err := loadGradeList()
 	if err != nil {
-		response.ServerError(c, "查询等级列表失败")
+		response.ServerErrorf(c, err, "查询等级列表失败")
 		return
 	}
 
@@ -436,7 +436,7 @@ func UserSetMyGrade(c *gin.Context) {
 	}
 	_, err = database.DB.Exec("UPDATE qingka_wangke_user SET grade_id = ?, addprice = ? WHERE uid = ?", record.ID, record.Rate, uid)
 	if err != nil {
-		response.ServerError(c, "设置失败")
+		response.ServerErrorf(c, err, "设置失败")
 		return
 	}
 	response.SuccessMsg(c, "等级已更新")
@@ -492,7 +492,7 @@ func UserSetPushToken(c *gin.Context) {
 	}
 	_, err := database.DB.Exec("UPDATE qingka_wangke_user SET tuisongtoken = ? WHERE uid = ?", body.Token, uid)
 	if err != nil {
-		response.ServerError(c, "设置失败")
+		response.ServerErrorf(c, err, "设置失败")
 		return
 	}
 	response.SuccessMsg(c, "设置成功")
@@ -508,7 +508,7 @@ func UserLogList(c *gin.Context) {
 
 	list, total, err := userService.LogList(uid, grade, page, limit, logType, keywords)
 	if err != nil {
-		response.ServerError(c, "查询日志失败")
+		response.ServerErrorf(c, err, "查询日志失败")
 		return
 	}
 	response.Success(c, gin.H{

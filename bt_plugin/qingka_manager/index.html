@@ -652,11 +652,43 @@ function toggleLogSource(source) {
   $('#btnLogPhp').css({'background': source === 'php' ? 'var(--primary)' : '', 'color': source === 'php' ? '#fff' : '', 'border-color': source === 'php' ? 'var(--primary)' : ''});
   loadLog();
 }
+function formatJsonLogLine(line) {
+  var text = (line || '').trim();
+  if (!text || text[0] !== '{') return line;
+  try {
+    var obj = JSON.parse(text);
+    if (!obj || typeof obj !== 'object') return line;
+    var parts = [];
+    if (obj.ts) parts.push(obj.ts);
+    if (obj.level) parts.push('[' + String(obj.level).toUpperCase() + ']');
+    if (obj.service) parts.push('[' + obj.service + ']');
+    if (obj.request_id && obj.request_id !== '-') parts.push('[RID:' + obj.request_id + ']');
+    if (obj.message) {
+      parts.push(obj.message);
+    } else {
+      parts.push(text);
+    }
+    var detail = [];
+    if (obj.method && obj.path) detail.push(obj.method + ' ' + obj.path);
+    if (obj.status) detail.push('status=' + obj.status);
+    if (obj.uid !== undefined && obj.uid !== null && obj.uid !== '' && obj.uid !== 0) detail.push('uid=' + obj.uid);
+    if (obj.error && typeof obj.error === 'string') detail.push('error=' + obj.error);
+    if (detail.length) parts.push('(' + detail.join(', ') + ')');
+    return parts.join(' ');
+  } catch (e) {
+    return line;
+  }
+}
+function formatLogText(text) {
+  var raw = text || '暂无日志';
+  if (QK.logSource !== 'go') return raw;
+  return String(raw).split('\n').map(formatJsonLogLine).join('\n');
+}
 function loadLog() {
   var method = QK.logSource === 'php' ? 'get_php_log' : 'get_log';
   req(method, {line_count: 200}, function(res) {
     var text = res.msg || res || '暂无日志';
-    $('#logViewer').text(text);
+    $('#logViewer').text(formatLogText(text));
     var el = document.getElementById('logViewer');
     el.scrollTop = el.scrollHeight;
   });

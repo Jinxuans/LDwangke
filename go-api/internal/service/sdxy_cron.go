@@ -3,10 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"go-api/internal/database"
+	obslogger "go-api/internal/observability/logger"
 )
 
 func RunSDXYCron(ctx context.Context) {
@@ -41,14 +41,14 @@ func sdxyCronSync(svc *SDXYService) {
 			"limit": fmt.Sprintf("%d", limit),
 		})
 		if err != nil {
-			log.Printf("[SDXY Cron] 获取订单失败: %v", err)
+			obslogger.L().Warn("SDXY Cron 获取订单失败", "error", err)
 			break
 		}
 
 		code := mapGetFloat(result, "code")
 		if code != 0 {
 			msg := mapGetString(result, "msg")
-			log.Printf("[SDXY Cron] 上游返回错误: %s", msg)
+			obslogger.L().Warn("SDXY Cron 上游返回错误", "message", msg)
 			break
 		}
 
@@ -80,6 +80,6 @@ func sdxyCronSync(svc *SDXYService) {
 	}
 
 	if updateTotal > 0 {
-		log.Printf("[SDXY Cron] 同步订单状态: %d 条", updateTotal)
+		obslogger.L().Info("SDXY Cron 同步订单状态完成", "updated", updateTotal)
 	}
 }
