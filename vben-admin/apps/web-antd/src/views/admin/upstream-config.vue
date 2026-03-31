@@ -23,36 +23,36 @@ import {
 import {
   appuiConfigGetApi, appuiConfigSaveApi,
   type AppuiConfig,
-} from '#/api/appui';
+} from '#/api/plugins/appui';
 import {
   sdxyConfigGetApi, sdxyConfigSaveApi,
   type SDXYConfig as SDXYModuleConfig,
-} from '#/api/sdxy';
+} from '#/api/plugins/sdxy';
 import {
   ydsjConfigGetApi, ydsjConfigSaveApi,
   type YDSJConfig,
-} from '#/api/ydsj';
+} from '#/api/plugins/ydsj';
 import {
   xmProjectListApi, xmProjectSaveApi, xmProjectDeleteApi,
   type XMProjectItem,
-} from '#/api/xm-project';
+} from '#/api/plugins/xm-project';
 import {
   xmProviderListApi, xmProviderSaveApi, xmProviderDeleteApi,
   xmProviderTestApi, xmProviderFetchProjectsApi, xmProviderImportProjectsApi, xmProviderSyncProjectsApi,
   type XMProviderItem, type XMUpstreamProjectItem,
-} from '#/api/xm-provider';
+} from '#/api/plugins/xm-provider';
 import {
   wAppListApi, wAppSaveApi, wAppDeleteApi,
   type WAppItem,
-} from '#/api/w-app';
+} from '#/api/plugins/w-app';
 import {
   getYongyeConfig, saveYongyeConfig,
   type YongyeConfig,
-} from '#/api/yongye';
+} from '#/api/plugins/yongye';
 import {
   paperConfigGetApi, paperConfigSaveApi,
   type PaperConfig,
-} from '#/api/paper';
+} from '#/api/plugins/paper';
 import {
   getYFDKProjectsApi, syncYFDKProjectsApi, updateYFDKProjectApi, deleteYFDKProjectApi,
   type YFDKAdminProject,
@@ -61,7 +61,7 @@ import {
   tuzhiConfigGetApi, tuzhiConfigSaveApi,
   tuzhiAdminGetGoodsApi, tuzhiGoodsOverridesGetApi, tuzhiGoodsOverridesSaveApi,
   type TuZhiConfig, type TuZhiGoodsOverride,
-} from '#/api/tuzhi';
+} from '#/api/plugins/tuzhi';
 
 // ========== 状态 ==========
 const loading = ref(false);

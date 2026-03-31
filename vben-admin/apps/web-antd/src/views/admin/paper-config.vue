@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { Page } from '@vben/common-ui';
 import { Card, Form, FormItem, Input, Button, Tabs, TabPane, message, Spin } from 'ant-design-vue';
-import { paperConfigGetApi, paperConfigSaveApi, type PaperConfig } from '#/api/paper';
+import { paperConfigGetApi, paperConfigSaveApi, type PaperConfig } from '#/api/plugins/paper';
 
 const loading = ref(false);
 const saving = ref(false);

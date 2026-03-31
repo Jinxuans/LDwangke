@@ -26,7 +26,7 @@ import {
   getTopConsumersApi,
   type DashboardStats, type AnnouncementItem, type DockSchedulerStats, type TopConsumer,
 } from '#/api/admin';
-import { userCheckinApi, userCheckinStatusApi } from '#/api/checkin';
+import { userCheckinApi, userCheckinStatusApi } from '#/api/plugins/checkin';
 
 const router = useRouter();
 const accessStore = useAccessStore();
