@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue';
 import { Page } from '@vben/common-ui';
 import { Card, Button, message, Result } from 'ant-design-vue';
 import { GiftOutlined, CheckCircleOutlined } from '@ant-design/icons-vue';
-import { userCheckinApi, userCheckinStatusApi } from '#/api/checkin';
+import { userCheckinApi, userCheckinStatusApi } from '#/api/plugins/checkin';
 
 const loading = ref(false);
 const checkedIn = ref(false);

@@ -3,7 +3,7 @@ package pluginruntime
 import (
 	"context"
 
-	xmmodule "go-api/internal/modules/xm"
+	xmmodule "go-api/internal/plugins/xm"
 	"go-api/internal/service"
 )
 

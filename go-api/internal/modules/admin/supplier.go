@@ -5,8 +5,8 @@ import (
 
 	"go-api/internal/model"
 	suppliermodule "go-api/internal/modules/supplier"
-	wmodule "go-api/internal/modules/w"
-	xmmodule "go-api/internal/modules/xm"
+	wmodule "go-api/internal/plugins/w"
+	xmmodule "go-api/internal/plugins/xm"
 	"go-api/internal/response"
 
 	"github.com/gin-gonic/gin"

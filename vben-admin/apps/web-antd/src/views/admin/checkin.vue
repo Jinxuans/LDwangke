@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { Page } from '@vben/common-ui';
 import { Card, Table, DatePicker, Row, Col, Statistic } from 'ant-design-vue';
-import { adminCheckinStatsApi, type CheckinStatsResult } from '#/api/checkin';
+import { adminCheckinStatsApi, type CheckinStatsResult } from '#/api/plugins/checkin';
 import dayjs, { type Dayjs } from 'dayjs';
 
 const loading = ref(false);
