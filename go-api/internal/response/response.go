@@ -79,6 +79,7 @@ func ServerErrorf(c *gin.Context, err error, msg string) {
 }
 
 func BusinessError(c *gin.Context, code int, msg string) {
+	obslogger.Request(c).Warn("business error", "code", code, "message", msg)
 	Error(c, http.StatusOK, code, msg)
 }
 
