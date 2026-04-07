@@ -307,6 +307,7 @@ func (r *legacyRepository) AddOrders(uid int, req model.OrderAddRequest) (*model
 	var totalDeducted float64
 	var skippedCount int
 	var skippedDetails []string
+	var insertErrors []string
 
 	for _, item := range req.Data {
 		parts := strings.Fields(item.UserInfo)
@@ -320,6 +321,7 @@ func (r *legacyRepository) AddOrders(uid int, req model.OrderAddRequest) (*model
 			user = parts[0]
 			pass = parts[1]
 		} else {
+			insertErrors = append(insertErrors, fmt.Sprintf("格式错误: %q", item.UserInfo))
 			continue
 		}
 
@@ -348,6 +350,7 @@ func (r *legacyRepository) AddOrders(uid int, req model.OrderAddRequest) (*model
 			uid, cls.CID, dockingID, cls.Name, school, item.UserName, user, pass, kcid, kcname, kcjs, fmt.Sprintf("%.4f", unitPrice), cls.Noun, now, "", dockStatus,
 		)
 		if err != nil {
+			insertErrors = append(insertErrors, fmt.Sprintf("%s-%s: %s", user, kcname, err.Error()))
 			continue
 		}
 
@@ -365,6 +368,12 @@ func (r *legacyRepository) AddOrders(uid int, req model.OrderAddRequest) (*model
 	}
 
 	if successCount == 0 {
+		if len(insertErrors) > 0 {
+			return nil, fmt.Errorf("提交失败: %s", strings.Join(insertErrors, "; "))
+		}
+		if skippedCount > 0 {
+			return nil, fmt.Errorf("提交失败，所选课程均已下单过（共 %d 条重复）", skippedCount)
+		}
 		return nil, errors.New("提交失败，请检查下单信息")
 	}
 

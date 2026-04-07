@@ -39,7 +39,7 @@ func (s *Service) GetMallOpenPrice() float64 {
 	if v := getAdminConfigValue("mall_open_price"); v != "" {
 		var price float64
 		fmt.Sscanf(v, "%f", &price)
-		if price > 0 {
+		if price >= 0 {
 			return price
 		}
 	}

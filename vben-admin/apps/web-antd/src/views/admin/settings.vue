@@ -400,6 +400,11 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                     配置后，店铺设置页可直接填写子域名前缀，最终商城地址形如 <code>前缀.主域名/mall</code>。
                   </div>
                 </Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">商城开通价格</label>
+                  <Input :value="getVal('mall_open_price')" @update:value="(v: string) => setVal('mall_open_price', v)" placeholder="如 500" prefix="¥" />
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">租户开通专属商城时需支付的费用，留空或0表示免费开通</div>
+                </Col>
 
                 <Col :span="24"><Divider orientation="left" class="!my-0">系统功能开关</Divider></Col>
                 <Col :xs="24" :lg="12">
@@ -466,6 +471,13 @@ onMounted(async () => { await loadAll(); parseBonusConfig(); });
                     </div>
                     <Switch :checked="getVal('user_htkh', '0') === '1'" @change="(v: any) => setVal('user_htkh', v ? '1' : '0')" />
                   </div>
+                </Col>
+
+                <Col :span="24"><Divider orientation="left" class="!my-0">开户设置</Divider></Col>
+                <Col :xs="24" :lg="12">
+                  <label class="field-label">开户费用</label>
+                  <Input :value="getVal('user_ktmoney')" @update:value="(v: string) => setVal('user_ktmoney', v)" placeholder="如 100" prefix="¥" />
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-1">代理开设下级账号时需扣除的费用，留空或0表示免费开户</div>
                 </Col>
 
                 <Col :span="24"><Divider orientation="left" class="!my-0">平开代理限制</Divider></Col>
