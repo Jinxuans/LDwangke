@@ -2,19 +2,15 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { Page } from '@vben/common-ui';
 import {
-  Card, Table, Button, Tag, Input, Modal, InputNumber,
-  Pagination, Select, message, Collapse, CollapsePanel,
+  Card, Table, Button, Tag, Input, Modal,
+  Pagination, Select, message,
 } from 'ant-design-vue';
-import { SendOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons-vue';
+import { SendOutlined, ReloadOutlined } from '@ant-design/icons-vue';
 import {
   sendMassEmailApi,
   getEmailLogsApi,
   previewEmailRecipientsApi,
-  getSMTPConfigApi,
-  saveSMTPConfigApi,
-  testSMTPApi,
   type EmailLog,
-  type SMTPConfig,
 } from '#/api/mail';
 import { getEmailTemplatesApi, type EmailTemplate } from '#/api/email-template';
 
@@ -30,7 +26,7 @@ const previewing = ref(false);
 
 // 模板
 const emailTemplates = ref<EmailTemplate[]>([]);
-const selectedTemplateId = ref<number | null>(null);
+const selectedTemplateId = ref<number | undefined>();
 
 async function loadTemplates() {
   try {
@@ -39,70 +35,17 @@ async function loadTemplates() {
   } catch (e) { /* ignore */ }
 }
 
-function onTemplateSelect(tplId: number | null) {
-  if (!tplId) {
+function onTemplateSelect(tplId: any) {
+  const normalizedId = typeof tplId === 'string' ? Number(tplId) : tplId;
+  if (!normalizedId) {
     subject.value = '';
     content.value = '';
     return;
   }
-  const tpl = emailTemplates.value.find((t) => t.id === tplId);
+  const tpl = emailTemplates.value.find((t) => t.id === normalizedId);
   if (tpl) {
     subject.value = tpl.subject;
     content.value = tpl.content;
-  }
-}
-
-// SMTP 配置
-const smtpForm = reactive<SMTPConfig>({
-  host: 'smtp.qq.com',
-  port: 465,
-  user: '',
-  password: '',
-  from_name: '',
-  encryption: 'ssl',
-});
-const smtpSaving = ref(false);
-const smtpTesting = ref(false);
-const testEmail = ref('');
-
-async function loadSMTPConfig() {
-  try {
-    const raw = await getSMTPConfigApi();
-    const res = raw;
-    Object.assign(smtpForm, res);
-  } catch (e) {}
-}
-
-async function saveSMTP() {
-  if (!smtpForm.host || !smtpForm.user) {
-    message.warning('请填写 SMTP 服务器和发件邮箱');
-    return;
-  }
-  smtpSaving.value = true;
-  try {
-    await saveSMTPConfigApi({ ...smtpForm });
-    message.success('SMTP 配置已保存');
-  } catch (e: any) {
-    message.error(e?.message || '保存失败');
-  } finally {
-    smtpSaving.value = false;
-  }
-}
-
-async function testSMTP() {
-  if (!testEmail.value.trim()) {
-    message.warning('请输入测试收件邮箱');
-    return;
-  }
-  smtpTesting.value = true;
-  try {
-    const raw = await testSMTPApi(testEmail.value);
-    const res = raw;
-    message.success(res?.message || '测试邮件已发送');
-  } catch (e: any) {
-    message.error(e?.message || '测试失败');
-  } finally {
-    smtpTesting.value = false;
   }
 }
 
@@ -226,7 +169,6 @@ const columns = [
 ];
 
 onMounted(() => {
-  loadSMTPConfig();
   loadLogs(1);
   loadPreview();
   loadTemplates();
@@ -235,55 +177,6 @@ onMounted(() => {
 
 <template>
   <Page title="邮件群发" content-class="p-4">
-    <!-- SMTP 配置 -->
-    <Collapse class="mb-4">
-      <CollapsePanel key="smtp" header="SMTP 邮箱配置">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl">
-          <div>
-            <label class="block text-sm font-medium mb-1">SMTP 服务器</label>
-            <Input v-model:value="smtpForm.host" placeholder="如 smtp.qq.com">
-              <template #addonBefore>
-                <Select v-model:value="smtpForm.encryption" style="width: 110px">
-                  <Select.Option value="ssl">SSL</Select.Option>
-                  <Select.Option value="starttls">STARTTLS</Select.Option>
-                  <Select.Option value="none">无加密</Select.Option>
-                </Select>
-              </template>
-            </Input>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">端口</label>
-            <InputNumber v-model:value="smtpForm.port" :min="1" :max="65535" style="width: 100%" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">发件邮箱</label>
-            <Input v-model:value="smtpForm.user" placeholder="your@qq.com" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">授权码</label>
-            <Input.Password v-model:value="smtpForm.password" placeholder="邮箱授权码（非登录密码）" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">发件人名称</label>
-            <Input v-model:value="smtpForm.from_name" placeholder="系统通知" />
-          </div>
-        </div>
-        <div class="flex flex-wrap items-center gap-3 mt-4">
-          <Button type="primary" :loading="smtpSaving" @click="saveSMTP">
-            <template #icon><SettingOutlined /></template>
-            保存配置
-          </Button>
-          <div class="flex items-center gap-2">
-            <Input v-model:value="testEmail" placeholder="测试收件邮箱" style="width: 220px" />
-            <Button :loading="smtpTesting" @click="testSMTP">发送测试</Button>
-          </div>
-        </div>
-        <div class="mt-3 text-gray-400 text-xs">
-          常用配置：QQ邮箱 smtp.qq.com:465(SSL) | 163邮箱 smtp.163.com:465(SSL) | Gmail smtp.gmail.com:587(STARTTLS) | Outlook smtp-mail.outlook.com:587(STARTTLS)
-        </div>
-      </CollapsePanel>
-    </Collapse>
-
     <!-- 写邮件 -->
     <Card title="发送邮件" class="mb-4">
       <div class="space-y-4 max-w-3xl">

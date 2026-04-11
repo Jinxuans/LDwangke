@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"go-api/internal/config"
 	"go-api/internal/database"
 	"go-api/internal/middleware"
 	"go-api/internal/model"
@@ -319,9 +318,6 @@ func registerContentRoutes(admin *gin.RouterGroup) {
 	admin.POST("/email/send", AdminEmailSend)
 	admin.GET("/email/logs", AdminEmailLogs)
 	admin.GET("/email/preview", AdminEmailPreview)
-	admin.GET("/smtp/config", AdminSMTPGet)
-	admin.POST("/smtp/config", AdminSMTPSave)
-	admin.POST("/smtp/test", AdminSMTPTest)
 
 	admin.GET("/tickets", AdminTicketList)
 	admin.GET("/ticket/stats", AdminTicketStats)
@@ -617,74 +613,6 @@ func AdminSetDemoMode(c *gin.Context) {
 		"enabled": req.Enabled,
 		"message": msg,
 	})
-}
-
-func AdminSMTPGet(c *gin.Context) {
-	cfg := mailmodule.Mail().GetSMTPConfig()
-	pwd := ""
-	if cfg.Password != "" {
-		pwd = "******"
-	}
-	response.Success(c, gin.H{
-		"host":       cfg.Host,
-		"port":       cfg.Port,
-		"user":       cfg.User,
-		"password":   pwd,
-		"from_name":  cfg.FromName,
-		"encryption": cfg.Encryption,
-	})
-}
-
-func AdminSMTPSave(c *gin.Context) {
-	var req struct {
-		Host       string `json:"host" binding:"required"`
-		Port       int    `json:"port" binding:"required"`
-		User       string `json:"user" binding:"required"`
-		Password   string `json:"password"`
-		FromName   string `json:"from_name"`
-		Encryption string `json:"encryption" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "请填写完整的 SMTP 配置")
-		return
-	}
-
-	if req.Password == "******" || req.Password == "" {
-		old := mailmodule.Mail().GetSMTPConfig()
-		req.Password = old.Password
-	}
-
-	cfg := config.SMTPConfig{
-		Host:       req.Host,
-		Port:       req.Port,
-		User:       req.User,
-		Password:   req.Password,
-		FromName:   req.FromName,
-		Encryption: req.Encryption,
-	}
-
-	if err := mailmodule.Mail().SaveSMTPConfig(cfg); err != nil {
-		response.ServerErrorf(c, err, "保存失败")
-		return
-	}
-	response.SuccessMsg(c, "保存成功")
-}
-
-func AdminSMTPTest(c *gin.Context) {
-	var req struct {
-		TestTo string `json:"test_to" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "请填写测试收件邮箱")
-		return
-	}
-
-	cfg := mailmodule.Mail().GetSMTPConfig()
-	if err := mailmodule.Mail().TestSMTPConfig(cfg, req.TestTo); err != nil {
-		response.BusinessError(c, 1003, "测试失败: "+err.Error())
-		return
-	}
-	response.SuccessMsg(c, "测试邮件发送成功")
 }
 
 func AdminEmailTemplateList(c *gin.Context) {

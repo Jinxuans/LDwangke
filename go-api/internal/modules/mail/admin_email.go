@@ -41,46 +41,6 @@ func emailPool() *emailPoolService {
 	return poolInstance
 }
 
-func (s *Service) GetSMTPConfig() config.SMTPConfig {
-	var cfg config.SMTPConfig
-	err := database.DB.QueryRow(
-		"SELECT host, port, user, password, from_name, encryption FROM qingka_smtp_config WHERE id = 1",
-	).Scan(&cfg.Host, &cfg.Port, &cfg.User, &cfg.Password, &cfg.FromName, &cfg.Encryption)
-	if err != nil || cfg.Host == "" {
-		return config.Global.SMTP
-	}
-	return cfg
-}
-
-func (s *Service) SaveSMTPConfig(cfg config.SMTPConfig) error {
-	_, err := database.DB.Exec(
-		"INSERT INTO qingka_smtp_config (id, host, port, user, password, from_name, encryption) VALUES (1, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE host=VALUES(host), port=VALUES(port), user=VALUES(user), password=VALUES(password), from_name=VALUES(from_name), encryption=VALUES(encryption)",
-		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.FromName, cfg.Encryption,
-	)
-	return err
-}
-
-func (s *Service) TestSMTPConfig(cfg config.SMTPConfig, testTo string) error {
-	if cfg.Host == "" || cfg.User == "" {
-		return fmt.Errorf("SMTP 配置不完整")
-	}
-	from := cfg.User
-	fromName := cfg.FromName
-	if fromName == "" {
-		fromName = "System"
-	}
-	msg := s.buildMessage(from, fromName, testTo, "SMTP 测试邮件", "<p>这是一封测试邮件，如果您收到此邮件说明 SMTP 配置正确。</p>")
-	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
-	switch strings.ToLower(cfg.Encryption) {
-	case "ssl", "tls":
-		return s.sendSSL(addr, cfg, from, testTo, msg)
-	case "starttls":
-		return s.sendSTARTTLS(addr, cfg, from, testTo, msg)
-	default:
-		return s.sendPlain(addr, cfg, from, testTo, msg)
-	}
-}
-
 func (s *Service) SendEmailWithType(to, subject, htmlBody, mailType string) error {
 	maxRetry := s.getEmailPoolMaxRetry()
 	for attempt := 0; attempt <= maxRetry; attempt++ {
@@ -121,30 +81,7 @@ func (s *Service) SendEmailWithType(to, subject, htmlBody, mailType string) erro
 		s.logEmailPoolSend(account.ID, from, to, subject, mailType, false, err.Error())
 	}
 
-	cfg := s.GetSMTPConfig()
-	if cfg.Host == "" || cfg.User == "" {
-		return fmt.Errorf("邮箱池无可用账号且 SMTP 未配置")
-	}
-
-	from := cfg.User
-	fromName := cfg.FromName
-	if fromName == "" {
-		fromName = "System"
-	}
-	msg := s.buildMessage(from, fromName, to, subject, htmlBody)
-	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
-
-	var err error
-	switch strings.ToLower(cfg.Encryption) {
-	case "ssl", "tls":
-		err = s.sendSSL(addr, cfg, from, to, msg)
-	case "starttls":
-		err = s.sendSTARTTLS(addr, cfg, from, to, msg)
-	default:
-		err = s.sendPlain(addr, cfg, from, to, msg)
-	}
-	s.logEmailPoolSend(0, from, to, subject, mailType, err == nil, s.errString(err))
-	return err
+	return fmt.Errorf("邮箱池无可用账号")
 }
 
 func (s *Service) SendEmail(to, subject, htmlBody string) error {
@@ -398,7 +335,28 @@ func (s *Service) TestEmailPoolAccount(id int, testTo string) error {
 
 	subject := "邮箱池测试"
 	body := "<p>这是一封测试邮件，如果您收到说明该邮箱配置正确。</p>"
-	return s.SendEmailWithType(testTo, subject, body, "pool_test")
+	from := account.User
+	if account.FromEmail != "" {
+		from = account.FromEmail
+	}
+	fromName := account.Name
+	if fromName == "" {
+		fromName = "System"
+	}
+	msg := s.buildMessage(from, fromName, testTo, subject, body)
+	addr := fmt.Sprintf("%s:%d", account.Host, account.Port)
+	cfg := s.toSMTPConfig(account)
+
+	switch strings.ToLower(account.Encryption) {
+	case "ssl", "tls":
+		err = s.sendSSL(addr, cfg, from, testTo, msg)
+	case "starttls":
+		err = s.sendSTARTTLS(addr, cfg, from, testTo, msg)
+	default:
+		err = s.sendPlain(addr, cfg, from, testTo, msg)
+	}
+	s.logEmailPoolSend(account.ID, from, testTo, subject, "pool_test", err == nil, s.errString(err))
+	return err
 }
 
 func (s *Service) QueryEmailPoolLogs(q model.EmailSendLogQuery) ([]model.EmailSendLog, int64, error) {
@@ -542,7 +500,7 @@ func (s *Service) pickEmailPoolByWeight(accounts []model.EmailPoolAccount) *mode
 
 func (s *Service) getEmailPoolStrategy() string {
 	var value string
-	database.DB.QueryRow("SELECT `value` FROM qingka_wangke_config WHERE `key`='email_pool_strategy'").Scan(&value)
+	database.DB.QueryRow("SELECT `k` FROM qingka_wangke_config WHERE `v`='email_pool_strategy'").Scan(&value)
 	if value == "" {
 		return "round"
 	}
@@ -551,7 +509,7 @@ func (s *Service) getEmailPoolStrategy() string {
 
 func (s *Service) getEmailPoolFailThreshold() int {
 	var value int
-	database.DB.QueryRow("SELECT CAST(`value` AS SIGNED) FROM qingka_wangke_config WHERE `key`='email_pool_fail_threshold'").Scan(&value)
+	database.DB.QueryRow("SELECT CAST(`k` AS SIGNED) FROM qingka_wangke_config WHERE `v`='email_pool_fail_threshold'").Scan(&value)
 	if value <= 0 {
 		return 5
 	}
@@ -560,7 +518,7 @@ func (s *Service) getEmailPoolFailThreshold() int {
 
 func (s *Service) getEmailPoolMaxRetry() int {
 	var value int
-	database.DB.QueryRow("SELECT CAST(`value` AS SIGNED) FROM qingka_wangke_config WHERE `key`='email_pool_max_retry'").Scan(&value)
+	database.DB.QueryRow("SELECT CAST(`k` AS SIGNED) FROM qingka_wangke_config WHERE `v`='email_pool_max_retry'").Scan(&value)
 	if value < 0 {
 		return 2
 	}

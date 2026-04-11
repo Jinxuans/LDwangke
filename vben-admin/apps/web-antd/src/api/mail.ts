@@ -38,27 +38,3 @@ export async function getEmailLogsApi(params: { page?: number; limit?: number })
 export async function previewEmailRecipientsApi(target: string) {
   return requestClient.get<{ count: number }>('/admin/email/preview', { params: { target } });
 }
-
-export interface SMTPConfig {
-  host: string;
-  port: number;
-  user: string;
-  password: string;
-  from_name: string;
-  encryption: string;
-}
-
-/** 获取 SMTP 配置 */
-export async function getSMTPConfigApi() {
-  return requestClient.get<SMTPConfig>('/admin/smtp/config');
-}
-
-/** 保存 SMTP 配置 */
-export async function saveSMTPConfigApi(data: SMTPConfig) {
-  return requestClient.post('/admin/smtp/config', data);
-}
-
-/** 测试 SMTP 配置 */
-export async function testSMTPApi(testTo: string) {
-  return requestClient.post('/admin/smtp/test', { test_to: testTo });
-}

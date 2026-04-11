@@ -15,7 +15,6 @@ type Config struct {
 	Redis     RedisConfig     `yaml:"redis"`
 	JWT       JWTConfig       `yaml:"jwt"`
 	Cache     CacheConfig     `yaml:"cache"`
-	SMTP      SMTPConfig      `yaml:"smtp"`
 	License   LicenseConfig   `yaml:"license"`
 	Security  SecurityConfig  `yaml:"security"`
 	Bootstrap BootstrapConfig `yaml:"bootstrap"`
@@ -166,13 +165,6 @@ func applyEnvOverrides(cfg *Config) {
 
 	cfg.Cache.OrderListTTL = envInt("GO_API_CACHE_ORDER_LIST_TTL", cfg.Cache.OrderListTTL)
 	cfg.Cache.ClassListTTL = envInt("GO_API_CACHE_CLASS_LIST_TTL", cfg.Cache.ClassListTTL)
-
-	cfg.SMTP.Host = envString("GO_API_SMTP_HOST", cfg.SMTP.Host)
-	cfg.SMTP.Port = envInt("GO_API_SMTP_PORT", cfg.SMTP.Port)
-	cfg.SMTP.User = envString("GO_API_SMTP_USER", cfg.SMTP.User)
-	cfg.SMTP.Password = envString("GO_API_SMTP_PASSWORD", cfg.SMTP.Password)
-	cfg.SMTP.FromName = envString("GO_API_SMTP_FROM_NAME", cfg.SMTP.FromName)
-	cfg.SMTP.Encryption = envString("GO_API_SMTP_ENCRYPTION", cfg.SMTP.Encryption)
 
 	cfg.License.ServerURL = envString("GO_API_LICENSE_SERVER_URL", cfg.License.ServerURL)
 	cfg.License.LicenseKey = envString("GO_API_LICENSE_LICENSE_KEY", cfg.License.LicenseKey)
