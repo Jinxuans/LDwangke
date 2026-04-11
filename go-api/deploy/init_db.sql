@@ -1084,17 +1084,6 @@ CREATE TABLE IF NOT EXISTS `qingka_withdraw_request` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='提现申请';
 
 -- 43. SMTP邮箱配置表
-CREATE TABLE IF NOT EXISTS `qingka_smtp_config` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `host` varchar(255) NOT NULL DEFAULT '' COMMENT 'SMTP服务器',
-  `port` int(11) NOT NULL DEFAULT 465 COMMENT '端口',
-  `user` varchar(255) NOT NULL DEFAULT '' COMMENT 'SMTP账号',
-  `password` varchar(255) NOT NULL DEFAULT '' COMMENT 'SMTP密码/授权码',
-  `from_name` varchar(100) NOT NULL DEFAULT '' COMMENT '发件人名称',
-  `encryption` varchar(20) NOT NULL DEFAULT 'ssl' COMMENT '加密方式 ssl/starttls/none',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SMTP邮箱配置';
-
 -- =============================================
 -- 第十一部分：菜单配置
 -- =============================================

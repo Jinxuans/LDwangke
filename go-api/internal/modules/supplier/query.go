@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"go-api/internal/model"
@@ -232,6 +233,12 @@ func (s *Service) callSupplierQuery(sup *model.SupplierFull, cls *model.ClassFul
 func toString(v interface{}) string {
 	if v == nil {
 		return ""
+	}
+	if val, ok := v.(float64); ok {
+		if val == float64(int64(val)) {
+			return strconv.FormatInt(int64(val), 10)
+		}
+		return strconv.FormatFloat(val, 'f', -1, 64)
 	}
 	return fmt.Sprintf("%v", v)
 }
