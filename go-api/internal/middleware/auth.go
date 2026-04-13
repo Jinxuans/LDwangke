@@ -59,11 +59,11 @@ func JWTAuth() gin.HandlerFunc {
 		c.Set("uid", claims.UID)
 		c.Set("username", claims.User)
 		c.Set("grade", claims.Grade)
-		// 限制同一用户每分钟最多更新一次 lasttime
+		// 限制同一用户每分钟最多更新一次在线时间
 		if v, ok := lastTimeCache.Load(claims.UID); !ok || time.Since(v.(time.Time)) >= time.Minute {
 			lastTimeCache.Store(claims.UID, time.Now())
 			go func(uid int) {
-				database.DB.Exec("UPDATE qingka_wangke_user SET lasttime = NOW() WHERE uid = ?", uid)
+				database.DB.Exec("UPDATE qingka_wangke_user SET endtime = NOW() WHERE uid = ?", uid)
 			}(claims.UID)
 		}
 		c.Next()

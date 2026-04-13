@@ -48,14 +48,14 @@ func (s *Service) AdminSessions() ([]model.AdminChatSession, error) {
 		session.User2Name = fmt.Sprintf("%d", session.User2)
 
 		var la1 sql.NullString
-		_ = database.DB.QueryRow("SELECT lasttime FROM qingka_wangke_user WHERE uid = ?", session.User1).Scan(&la1)
+		_ = database.DB.QueryRow("SELECT endtime FROM qingka_wangke_user WHERE uid = ?", session.User1).Scan(&la1)
 		if la1.Valid && la1.String != "" {
 			if t, err := time.Parse("2006-01-02 15:04:05", la1.String); err == nil {
 				session.User1Online = time.Since(t) < 5*time.Minute
 			}
 		}
 		var la2 sql.NullString
-		_ = database.DB.QueryRow("SELECT lasttime FROM qingka_wangke_user WHERE uid = ?", session.User2).Scan(&la2)
+		_ = database.DB.QueryRow("SELECT endtime FROM qingka_wangke_user WHERE uid = ?", session.User2).Scan(&la2)
 		if la2.Valid && la2.String != "" {
 			if t, err := time.Parse("2006-01-02 15:04:05", la2.String); err == nil {
 				session.User2Online = time.Since(t) < 5*time.Minute
