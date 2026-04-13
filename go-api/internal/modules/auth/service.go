@@ -105,7 +105,7 @@ func (s *Service) Login(req LoginRequest) (*model.VbenLoginResponse, string, err
 		return nil, "", errors.New("生成 RefreshToken 失败")
 	}
 
-	_, _ = database.DB.Exec("UPDATE qingka_wangke_user SET lasttime = NOW(), endtime = NOW() WHERE uid = ?", user.UID)
+	_, _ = database.DB.Exec("UPDATE qingka_wangke_user SET endtime = NOW() WHERE uid = ?", user.UID)
 
 	return &model.VbenLoginResponse{
 		AccessToken: accessToken,

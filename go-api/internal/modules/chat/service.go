@@ -82,7 +82,7 @@ func (s *Service) Sessions(uid int) ([]model.ChatSession, error) {
 		}
 		item.TargetName = fmt.Sprintf("%d", item.TargetUID)
 		var qqUser, lastActive sql.NullString
-		_ = database.DB.QueryRow("SELECT COALESCE(user,''), lasttime FROM qingka_wangke_user WHERE uid = ?", item.TargetUID).Scan(&qqUser, &lastActive)
+		_ = database.DB.QueryRow("SELECT COALESCE(user,''), endtime FROM qingka_wangke_user WHERE uid = ?", item.TargetUID).Scan(&qqUser, &lastActive)
 		if qqUser.Valid && qqUser.String != "" {
 			item.Avatar = "https://q1.qlogo.cn/g?b=qq&nk=" + qqUser.String + "&s=100"
 		}
