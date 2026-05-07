@@ -7,6 +7,7 @@ import (
 	_ "go-api/internal/plugins/paper"
 	_ "go-api/internal/plugins/sdxy"
 	_ "go-api/internal/plugins/sxdk"
+	_ "go-api/internal/plugins/sxgz"
 	_ "go-api/internal/plugins/tuboshu"
 	_ "go-api/internal/plugins/tutuqg"
 	_ "go-api/internal/plugins/tuzhi"

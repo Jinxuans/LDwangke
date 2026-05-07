@@ -7,6 +7,7 @@ import (
 	auxmodule "go-api/internal/modules/auxiliary"
 	pushmodule "go-api/internal/modules/push"
 	usermodule "go-api/internal/modules/user"
+	sxgzplugin "go-api/internal/plugins/sxgz"
 	"go-api/internal/ws"
 	"time"
 
@@ -31,6 +32,7 @@ func registerPublicRoutes(r *gin.Engine) {
 	auxmodule.RegisterPublicRoutes(r)
 	pushmodule.RegisterPublicRoutes(r)
 	usermodule.RegisterPublicRoutes(r)
+	sxgzplugin.RegisterCompatRoutes(r)
 }
 
 func newProtectedAPIGroup(r *gin.Engine) *gin.RouterGroup {

@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"go-api/internal/middleware"
+	sxgzplugin "go-api/internal/plugins/sxgz"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,6 +17,7 @@ func RegisterCompatRoutes(r *gin.Engine) {
 func RegisterRoutes(r *gin.Engine) {
 	openapi := r.Group("/api/v1/open", middleware.APIKeyAuth())
 	{
+		sxgzplugin.RegisterOpenRoutes(openapi)
 		openapi.GET("/classlist", OpenAPIGetClass)
 		openapi.POST("/classlist", OpenAPIGetClass)
 		openapi.GET("/query", OpenAPIQuery)
