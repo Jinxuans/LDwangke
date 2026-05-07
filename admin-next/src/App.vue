@@ -40,7 +40,7 @@
     const username = userInfo.username || userInfo.userName || ''
     const userId = userInfo.userId ? String(userInfo.userId) : ''
 
-    return [systemName.value, username, userId].filter(Boolean).join('\n')
+    return [systemName.value, username, userId].filter(Boolean)
   })
 
   onBeforeMount(() => {

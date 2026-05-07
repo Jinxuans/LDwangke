@@ -67,7 +67,7 @@ export const globalComponentsConfig: GlobalComponentConfig[] = [
     component: defineAsyncComponent(
       () => import('@/components/core/others/art-watermark/index.vue')
     ),
-    enabled: true
+    enabled: false
   }
 ]
 
