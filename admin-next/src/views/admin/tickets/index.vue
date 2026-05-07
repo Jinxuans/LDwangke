@@ -1,121 +1,39 @@
 <template>
-  <div class="flex min-h-[calc(100vh-180px)] flex-col gap-5">
-    <section class="art-card-sm overflow-hidden">
-      <div class="border-b-d px-5 py-4">
-        <div class="space-y-4">
-          <div class="flex flex-wrap items-start justify-between gap-4">
-            <div class="flex flex-wrap gap-2">
-              <ElTag effect="plain">总工单 {{ stats.total }}</ElTag>
-              <ElTag type="warning" effect="plain">待回复 {{ stats.pending }}</ElTag>
-              <ElTag type="success" effect="plain">已回复 {{ stats.replied }}</ElTag>
-              <ElTag type="info" effect="plain">已关闭 {{ stats.closed }}</ElTag>
-              <ElTag type="primary" effect="plain">上游处理中 {{ stats.upstream_pending }}</ElTag>
-            </div>
-            <div class="inline-flex flex-wrap items-center gap-3 rounded-[calc(var(--custom-radius)+6px)] border border-[var(--art-card-border)] bg-[var(--el-fill-color-light)] px-4 py-3">
-              <span class="text-sm text-g-500">自动关闭已回复工单</span>
-              <ElInputNumber v-model="autoCloseDays" :min="1" :max="90" />
-              <ElButton type="primary" plain :loading="autoCloseLoading" @click="handleAutoClose">
-                执行
-              </ElButton>
-            </div>
-          </div>
+  <div class="admin-tickets-page art-full-height">
+    <ArtSearchBar
+      v-model="filters"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="resetFilters"
+    />
 
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <div class="text-sm text-g-500">支持筛选、回复、关闭、上游反馈和一键跳到聊天页。</div>
-            <div class="flex flex-wrap gap-3">
-              <ElSelect v-model="filters.status" class="w-[132px]" @change="handleSearch">
-                <ElOption label="全部状态" :value="0" />
-                <ElOption label="待回复" :value="1" />
-                <ElOption label="已回复" :value="2" />
-                <ElOption label="已关闭" :value="3" />
-              </ElSelect>
-              <ElInput
-                v-model="filters.uid"
-                class="w-[132px]"
-                placeholder="用户 UID"
-                clearable
-                @keyup.enter="handleSearch"
-              />
-              <ElInput
-                v-model="filters.search"
-                class="w-[220px]"
-                placeholder="搜内容 / 订单号"
-                clearable
-                @keyup.enter="handleSearch"
-              />
-              <ElButton type="primary" @click="handleSearch">搜索</ElButton>
-              <ElButton plain @click="refreshAll">刷新</ElButton>
-            </div>
-          </div>
-        </div>
-      </div>
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshAll">
+        <template #left>
+          <ElSpace wrap>
+            <ElTag effect="plain">总工单 {{ stats.total }}</ElTag>
+            <ElTag type="warning" effect="plain">待回复 {{ stats.pending }}</ElTag>
+            <ElTag type="success" effect="plain">已回复 {{ stats.replied }}</ElTag>
+            <ElTag type="info" effect="plain">已关闭 {{ stats.closed }}</ElTag>
+            <ElTag type="primary" effect="plain">上游处理中 {{ stats.upstream_pending }}</ElTag>
+            <ElInputNumber v-model="autoCloseDays" :min="1" :max="90" size="small" />
+            <ElButton type="primary" plain :loading="autoCloseLoading" @click="handleAutoClose">
+              自动关闭已回复
+            </ElButton>
+          </ElSpace>
+        </template>
+      </ArtTableHeader>
 
-      <ElTable :data="tickets" v-loading="loading" stripe class="w-full">
-        <ElTableColumn prop="id" label="ID" width="82" />
-        <ElTableColumn prop="uid" label="UID" width="94" />
-        <ElTableColumn label="关联订单" min-width="190">
-          <template #default="{ row }">
-            <div v-if="row.oid > 0" class="leading-6">
-              <p class="font-medium text-g-900">#{{ row.oid }}</p>
-              <p class="truncate text-xs text-g-500">
-                {{ row.order_pt || '-' }} / {{ row.order_user || '-' }}
-              </p>
-            </div>
-            <span v-else class="text-sm text-g-400">无关联订单</span>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="内容" min-width="320">
-          <template #default="{ row }">
-            <p class="line-clamp-2 text-sm leading-6 text-g-700">{{ row.content }}</p>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="工单状态" width="110">
-          <template #default="{ row }">
-            <ElTag :type="getTicketStatusTag(row.status)">{{ getTicketStatusText(row.status) }}</ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="上游反馈" width="132">
-          <template #default="{ row }">
-            <ElTag :type="getSupplierStatusTag(row.supplier_status, row.supplier_report_id)">
-              {{ getSupplierStatusText(row.supplier_status, row.supplier_report_id) }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="addtime" label="提交时间" width="172" />
-        <ElTableColumn label="操作" width="300" fixed="right">
-          <template #default="{ row }">
-            <div class="flex flex-wrap gap-2">
-              <ElButton text type="primary" @click="showDetail(row)">查看</ElButton>
-              <ElButton text @click="goChat(row.uid)">聊天</ElButton>
-              <ElButton
-                v-if="row.oid > 0 && row.supplier_report_id === 0 && row.supplier_report_switch"
-                text
-                @click="handleReport(row)"
-              >
-                提交上游
-              </ElButton>
-              <ElButton v-if="row.supplier_report_id > 0" text @click="handleSyncReport(row)">
-                同步
-              </ElButton>
-              <ElButton v-if="row.status !== 3" text type="danger" @click="handleClose(row)">
-                关闭
-              </ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadTickets"
-        />
-      </div>
-    </section>
+      <ArtTable
+        :loading="loading"
+        :data="tickets"
+        :columns="columns"
+        :pagination="tablePagination"
+        @pagination:current-change="loadTickets"
+        @pagination:size-change="handleSizeChange"
+      />
+    </ElCard>
 
     <ElDialog v-model="detailVisible" title="工单详情" width="860px">
       <div v-if="currentTicket" class="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
@@ -244,8 +162,9 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
   import { useRouter } from 'vue-router'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
   import { createLegacyChatSession } from '@/api/legacy/chat'
   import {
     autoCloseLegacyAdminTickets,
@@ -276,6 +195,12 @@
     search: ''
   })
 
+  const tablePagination = computed(() => ({
+    current: pagination.page,
+    size: pagination.limit,
+    total: pagination.total
+  }))
+
   const stats = ref<LegacyTicketStats>({
     total: 0,
     pending: 0,
@@ -291,6 +216,41 @@
   const currentTicket = ref<LegacyTicket | null>(null)
   const replyContent = ref('')
   const replyLoading = ref(false)
+
+  const searchItems = computed(() => [
+    {
+      label: '状态',
+      key: 'status',
+      type: 'select',
+      props: {
+        placeholder: '全部状态',
+        options: [
+          { label: '全部状态', value: 0 },
+          { label: '待回复', value: 1 },
+          { label: '已回复', value: 2 },
+          { label: '已关闭', value: 3 }
+        ]
+      }
+    },
+    {
+      label: '用户 UID',
+      key: 'uid',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '用户 UID'
+      }
+    },
+    {
+      label: '关键词',
+      key: 'search',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '搜内容 / 订单号'
+      }
+    }
+  ])
 
   const getTicketStatusText = (status: number) => {
     if (status === 1) return '待回复'
@@ -330,6 +290,73 @@
     return 'info'
   }
 
+  const { columns, columnChecks } = useTableColumns<LegacyTicket>(() => [
+    {
+      prop: 'id',
+      label: 'ID',
+      width: 82
+    },
+    {
+      prop: 'uid',
+      label: 'UID',
+      width: 94
+    },
+    {
+      prop: 'oid',
+      label: '关联订单',
+      minWidth: 190,
+      formatter: (row) =>
+        row.oid > 0
+          ? h('div', { class: 'leading-6' }, [
+              h('p', { class: 'font-medium text-g-900' }, `#${row.oid}`),
+              h('p', { class: 'truncate text-xs text-g-500' }, `${row.order_pt || '-'} / ${row.order_user || '-'}`)
+            ])
+          : h('span', { class: 'text-sm text-g-400' }, '无关联订单')
+    },
+    {
+      prop: 'content',
+      label: '内容',
+      minWidth: 320,
+      formatter: (row) => h('p', { class: 'line-clamp-2 text-sm leading-6 text-g-700' }, row.content || '-')
+    },
+    {
+      prop: 'status',
+      label: '工单状态',
+      width: 110,
+      formatter: (row) => h(ElTag, { type: getTicketStatusTag(row.status) }, () => getTicketStatusText(row.status))
+    },
+    {
+      prop: 'supplier_status',
+      label: '上游反馈',
+      width: 132,
+      formatter: (row) =>
+        h(ElTag, { type: getSupplierStatusTag(row.supplier_status, row.supplier_report_id) }, () =>
+          getSupplierStatusText(row.supplier_status, row.supplier_report_id)
+        )
+    },
+    {
+      prop: 'addtime',
+      label: '提交时间',
+      width: 172
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 300,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElButton, { text: true, type: 'primary', onClick: () => showDetail(row) }, () => '查看'),
+          h(ElButton, { text: true, onClick: () => goChat(row.uid) }, () => '聊天'),
+          row.oid > 0 && row.supplier_report_id === 0 && row.supplier_report_switch
+            ? h(ElButton, { text: true, onClick: () => handleReport(row) }, () => '提交上游')
+            : null,
+          row.supplier_report_id > 0 ? h(ElButton, { text: true, onClick: () => handleSyncReport(row) }, () => '同步') : null,
+          row.status !== 3 ? h(ElButton, { text: true, type: 'danger', onClick: () => handleClose(row) }, () => '关闭') : null
+        ])
+    }
+  ])
+
   const loadStats = async () => {
     stats.value = await fetchLegacyAdminTicketStats()
   }
@@ -358,6 +385,18 @@
 
   const handleSearch = async () => {
     await loadTickets(1)
+  }
+
+  const resetFilters = () => {
+    filters.status = 0
+    filters.uid = ''
+    filters.search = ''
+    loadTickets(1)
+  }
+
+  const handleSizeChange = (size: number) => {
+    pagination.limit = size
+    loadTickets(1)
   }
 
   const showDetail = (ticket: LegacyTicket) => {

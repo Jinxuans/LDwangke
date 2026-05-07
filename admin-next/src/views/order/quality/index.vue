@@ -1,95 +1,35 @@
 <template>
-  <div class="flex min-h-[calc(100vh-180px)] flex-col gap-5">
+  <div class="order-quality-page art-full-height">
+    <ArtSearchBar
+      v-model="searchForm"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="handleReset"
+    />
+
     <ElCard class="art-table-card">
-      <div class="border-b-d px-5 py-4">
-        <ArtTableHeader :loading="loading" layout="refresh" @refresh="loadOrders(pagination.page)">
-          <template #left>
-            <ElSpace wrap>
-              <ElTag effect="plain">质量查询</ElTag>
-              <ElTag type="info" effect="plain">当前 {{ orders.length }} 条</ElTag>
-            </ElSpace>
-          </template>
-        </ArtTableHeader>
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadOrders(pagination.current)">
+        <template #left>
+          <ElSpace wrap>
+            <ElTag effect="plain">质量查询</ElTag>
+            <ElTag type="info" effect="plain">当前 {{ orders.length }} 条</ElTag>
+            <ElTag v-if="appliedSearch.status_text" type="primary" effect="plain">
+              状态 {{ appliedSearch.status_text }}
+            </ElTag>
+          </ElSpace>
+        </template>
+      </ArtTableHeader>
 
-        <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <ElInput
-            v-model="filters.kcname"
-            clearable
-            placeholder="课程名称"
-            @keyup.enter="handleSearch"
-          />
-          <ElInput
-            v-model="filters.cid"
-            clearable
-            placeholder="课程 ID"
-            @keyup.enter="handleSearch"
-          />
-          <ElSelect
-            v-model="filters.status_text"
-            clearable
-            filterable
-            placeholder="任务状态"
-          >
-            <ElOption v-for="item in statusOptions" :key="item" :label="item" :value="item" />
-          </ElSelect>
-          <div class="flex gap-3">
-            <ElButton type="primary" @click="handleSearch">搜索</ElButton>
-            <ElButton plain @click="handleReset">重置</ElButton>
-          </div>
-        </div>
-      </div>
-
-      <ElTable :data="orders" v-loading="loading" stripe class="w-full">
-        <ElTableColumn prop="ptname" label="平台名称" min-width="180" />
-        <ElTableColumn label="课程信息" min-width="260">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="line-clamp-2 text-sm font-medium text-g-900">{{ row.kcname || '-' }}</p>
-              <p class="text-xs text-g-400">课程 ID：{{ row.kcid || row.cid || '-' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="任务状态" width="120" align="center">
-          <template #default="{ row }">
-            <ElTag :type="getStatusTagType(row.status)">{{ row.status || '待处理' }}</ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="进度" min-width="180">
-          <template #default="{ row }">
-            <div class="space-y-2">
-              <ElProgress :percentage="progressPercent(row.process)" :stroke-width="8" />
-              <p class="text-xs text-g-500">{{ row.process || '0' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="详情 / 考试状态" min-width="260">
-          <template #default="{ row }">
-            <p class="line-clamp-2 text-sm leading-6 text-g-600">{{ row.remarks || '暂无备注' }}</p>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="addtime" label="提交时间" width="180" />
-        <ElTableColumn label="操作" width="180" fixed="right">
-          <template #default="{ row }">
-            <div class="flex flex-wrap gap-2">
-              <ElButton text type="primary" @click="showDetail(row)">详情</ElButton>
-              <ElButton text @click="openLogs(row.oid)">日志</ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, sizes, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :page-sizes="[20, 50, 100]"
-          :total="pagination.total"
-          @current-change="loadOrders"
-          @size-change="handlePageSizeChange"
-        />
-      </div>
+      <ArtTable
+        :loading="loading"
+        :data="orders"
+        :columns="columns"
+        :pagination="pagination"
+        row-key="oid"
+        @pagination:current-change="handleCurrentChange"
+        @pagination:size-change="handlePageSizeChange"
+      />
     </ElCard>
 
     <ElDialog v-model="detailVisible" title="质量详情" width="760px">
@@ -163,6 +103,8 @@
 </template>
 
 <script setup lang="ts">
+  import { h } from 'vue'
+  import { ElButton, ElProgress, ElTag } from 'element-plus'
   import {
     fetchLegacyOrderList,
     fetchLegacyOrderLogs,
@@ -170,18 +112,25 @@
     type LegacyOrderListParams,
     type LegacyOrderLogEntry
   } from '@/api/legacy/order'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
 
   defineOptions({ name: 'OrderQualityPage' })
 
   const loading = ref(false)
   const orders = ref<LegacyOrderItem[]>([])
   const pagination = reactive({
-    page: 1,
-    limit: 20,
+    current: 1,
+    size: 20,
     total: 0
   })
 
-  const filters = reactive<LegacyOrderListParams>({
+  const searchForm = ref<LegacyOrderListParams>({
+    kcname: '',
+    cid: '',
+    status_text: ''
+  })
+
+  const appliedSearch = reactive<LegacyOrderListParams>({
     kcname: '',
     cid: '',
     status_text: ''
@@ -196,6 +145,38 @@
   const logOrderId = ref<number>()
 
   const statusOptions = ['待处理', '进行中', '已完成', '异常', '已取消', '补刷中', '出错啦']
+
+  const searchItems = computed(() => [
+    {
+      label: '课程名称',
+      key: 'kcname',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '课程名称'
+      }
+    },
+    {
+      label: '课程 ID',
+      key: 'cid',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '课程 ID'
+      }
+    },
+    {
+      label: '任务状态',
+      key: 'status_text',
+      type: 'select',
+      props: {
+        clearable: true,
+        filterable: true,
+        placeholder: '任务状态',
+        options: statusOptions.map((item) => ({ label: item, value: item }))
+      }
+    }
+  ])
 
   const getStatusTagType = (
     status?: string
@@ -214,37 +195,96 @@
     return Math.max(0, Math.min(100, percent))
   }
 
-  const loadOrders = async (page = pagination.page) => {
+  const { columns, columnChecks } = useTableColumns<LegacyOrderItem>(() => [
+    { prop: 'ptname', label: '平台名称', minWidth: 180 },
+    {
+      prop: 'kcname',
+      label: '课程信息',
+      minWidth: 260,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'line-clamp-2 text-sm font-medium text-g-900' }, row.kcname || '-'),
+          h('p', { class: 'text-xs text-g-400' }, `课程 ID：${row.kcid || row.cid || '-'}`)
+        ])
+    },
+    {
+      prop: 'status',
+      label: '任务状态',
+      width: 120,
+      align: 'center',
+      formatter: (row) => h(ElTag, { type: getStatusTagType(row.status) }, () => row.status || '待处理')
+    },
+    {
+      prop: 'process',
+      label: '进度',
+      minWidth: 180,
+      formatter: (row) =>
+        h('div', { class: 'space-y-2' }, [
+          h(ElProgress, { percentage: progressPercent(row.process), 'stroke-width': 8 }),
+          h('p', { class: 'text-xs text-g-500' }, row.process || '0')
+        ])
+    },
+    {
+      prop: 'remarks',
+      label: '详情 / 考试状态',
+      minWidth: 260,
+      formatter: (row) => h('p', { class: 'line-clamp-2 text-sm leading-6 text-g-600' }, row.remarks || '暂无备注')
+    },
+    { prop: 'addtime', label: '提交时间', width: 180 },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 180,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElButton, { text: true, type: 'primary', onClick: () => showDetail(row) }, () => '详情'),
+          h(ElButton, { text: true, onClick: () => openLogs(row.oid) }, () => '日志')
+        ])
+    }
+  ])
+
+  const loadOrders = async (page = pagination.current) => {
     loading.value = true
-    pagination.page = page
+    pagination.current = page
     try {
       const result = await fetchLegacyOrderList({
-        ...filters,
-        page: pagination.page,
-        limit: pagination.limit
+        ...appliedSearch,
+        page: pagination.current,
+        limit: pagination.size
       })
       orders.value = result.list || []
       pagination.total = Number(result.pagination?.total || 0)
-      pagination.page = Number(result.pagination?.page || page)
-      pagination.limit = Number(result.pagination?.limit || pagination.limit)
+      pagination.current = Number(result.pagination?.page || page)
+      pagination.size = Number(result.pagination?.limit || pagination.size)
     } finally {
       loading.value = false
     }
   }
 
-  const handleSearch = async () => {
-    await loadOrders(1)
+  const handleSearch = (params: LegacyOrderListParams) => {
+    appliedSearch.kcname = params.kcname?.trim() || ''
+    appliedSearch.cid = params.cid?.trim() || ''
+    appliedSearch.status_text = params.status_text || ''
+    loadOrders(1)
   }
 
-  const handleReset = async () => {
-    filters.kcname = ''
-    filters.cid = ''
-    filters.status_text = ''
-    await loadOrders(1)
+  const handleReset = () => {
+    appliedSearch.kcname = ''
+    appliedSearch.cid = ''
+    appliedSearch.status_text = ''
+    searchForm.value.kcname = ''
+    searchForm.value.cid = ''
+    searchForm.value.status_text = ''
+    loadOrders(1)
+  }
+
+  const handleCurrentChange = (page: number) => {
+    loadOrders(page)
   }
 
   const handlePageSizeChange = async (size: number) => {
-    pagination.limit = size
+    pagination.size = size
     await loadOrders(1)
   }
 

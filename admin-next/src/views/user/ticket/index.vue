@@ -1,70 +1,24 @@
 <template>
   <div class="art-full-height">
     <ElCard class="art-table-card">
-      <div class="border-b-d px-5 py-4">
-        <ArtTableHeader layout="refresh" @refresh="loadTickets(pagination.page)">
-          <template #left>
-            <ElSpace wrap>
-              <ElTag effect="plain">我的工单</ElTag>
-              <ElTag type="info" effect="plain">共 {{ pagination.total }} 条</ElTag>
-              <ElButton type="primary" plain @click="openCreateDialog">提交工单</ElButton>
-            </ElSpace>
-          </template>
-        </ArtTableHeader>
-      </div>
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadTickets(pagination.current)">
+        <template #left>
+          <ElSpace wrap>
+            <ElTag effect="plain">我的工单</ElTag>
+            <ElTag type="info" effect="plain">共 {{ pagination.total }} 条</ElTag>
+            <ElButton type="primary" plain @click="openCreateDialog">提交工单</ElButton>
+          </ElSpace>
+        </template>
+      </ArtTableHeader>
 
-      <ElTable :data="tickets" v-loading="loading" stripe class="w-full">
-        <ElTableColumn prop="id" label="ID" width="84" />
-        <ElTableColumn label="关联订单" min-width="170">
-          <template #default="{ row }">
-            <div v-if="row.oid > 0" class="leading-6">
-              <p class="font-medium text-g-900">#{{ row.oid }}</p>
-              <p class="truncate text-xs text-g-500">{{ row.type || '订单反馈' }}</p>
-            </div>
-            <span v-else class="text-sm text-g-400">未关联订单</span>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="内容" min-width="320">
-          <template #default="{ row }">
-            <p class="line-clamp-2 text-sm leading-6 text-g-700">{{ row.content }}</p>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="状态" width="110">
-          <template #default="{ row }">
-            <ElTag :type="getTicketStatusTag(row.status)">{{ getTicketStatusText(row.status) }}</ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="回复摘要" min-width="220">
-          <template #default="{ row }">
-            <p class="line-clamp-2 text-sm leading-6 text-g-500">
-              {{ row.reply || '暂无回复' }}
-            </p>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="addtime" label="提交时间" width="172" />
-        <ElTableColumn label="操作" width="220" fixed="right">
-          <template #default="{ row }">
-            <div class="flex flex-wrap gap-2">
-              <ElButton text type="primary" @click="showDetail(row)">查看</ElButton>
-              <ElButton text @click="goChat">去聊天</ElButton>
-              <ElButton v-if="row.status !== 3" text type="danger" @click="handleClose(row)">
-                关闭
-              </ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadTickets"
-        />
-      </div>
+      <ArtTable
+        :loading="loading"
+        :data="tickets"
+        :columns="columns"
+        :pagination="pagination"
+        @pagination:current-change="handleCurrentChange"
+        @pagination:size-change="handleSizeChange"
+      />
     </ElCard>
 
     <ElDialog v-model="createVisible" title="提交工单" width="720px">
@@ -209,7 +163,8 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { h } from 'vue'
+  import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
   import { useRouter } from 'vue-router'
   import { createLegacyChatSession, sendLegacyChatMessage } from '@/api/legacy/chat'
   import { fetchLegacyOrderList, type LegacyOrderItem } from '@/api/legacy/order'
@@ -219,6 +174,7 @@
     fetchLegacyUserTickets,
     type LegacyTicket
   } from '@/api/legacy/ticket'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
 
   defineOptions({ name: 'UserTicketPage' })
 
@@ -233,8 +189,8 @@
   const loading = ref(false)
   const tickets = ref<LegacyTicket[]>([])
   const pagination = reactive({
-    page: 1,
-    limit: 20,
+    current: 1,
+    size: 20,
     total: 0
   })
 
@@ -272,13 +228,65 @@
     label: `${order.ptname || '未知平台'} / ${order.user || '-'} / ${order.kcname || '-'}`.trim()
   })
 
-  const loadTickets = async (page = pagination.page) => {
+  const { columns, columnChecks } = useTableColumns<LegacyTicket>(() => [
+    { prop: 'id', label: 'ID', width: 84 },
+    {
+      prop: 'oid',
+      label: '关联订单',
+      minWidth: 170,
+      formatter: (row) =>
+        row.oid > 0
+          ? h('div', { class: 'leading-6' }, [
+              h('p', { class: 'font-medium text-g-900' }, `#${row.oid}`),
+              h('p', { class: 'truncate text-xs text-g-500' }, row.type || '订单反馈')
+            ])
+          : h('span', { class: 'text-sm text-g-400' }, '未关联订单')
+    },
+    {
+      prop: 'content',
+      label: '内容',
+      minWidth: 320,
+      formatter: (row) => h('p', { class: 'line-clamp-2 text-sm leading-6 text-g-700' }, row.content || '-')
+    },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 110,
+      formatter: (row) =>
+        h(ElTag, { type: getTicketStatusTag(row.status), effect: 'plain' }, () => getTicketStatusText(row.status))
+    },
+    {
+      prop: 'reply',
+      label: '回复摘要',
+      minWidth: 220,
+      formatter: (row) => h('p', { class: 'line-clamp-2 text-sm leading-6 text-g-500' }, row.reply || '暂无回复')
+    },
+    { prop: 'addtime', label: '提交时间', width: 172 },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 220,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElButton, { text: true, type: 'primary', onClick: () => showDetail(row) }, () => '查看'),
+          h(ElButton, { text: true, onClick: () => goChat() }, () => '去聊天'),
+          row.status !== 3
+            ? h(ElButton, { text: true, type: 'danger', onClick: () => handleClose(row) }, () => '关闭')
+            : null
+        ])
+    }
+  ])
+
+  const loadTickets = async (page = pagination.current) => {
     loading.value = true
-    pagination.page = page
+    pagination.current = page
     try {
-      const result = await fetchLegacyUserTickets(pagination.page, pagination.limit)
+      const result = await fetchLegacyUserTickets(pagination.current, pagination.size)
       tickets.value = result.list || []
       pagination.total = Number(result.pagination?.total || 0)
+      pagination.current = Number(result.pagination?.page || pagination.current)
+      pagination.size = Number(result.pagination?.limit || pagination.size)
     } finally {
       loading.value = false
     }
@@ -363,7 +371,16 @@
     if (currentTicket.value?.id === ticket.id) {
       currentTicket.value.status = 3
     }
-    await loadTickets(pagination.page)
+    await loadTickets(pagination.current)
+  }
+
+  const handleCurrentChange = (page: number) => {
+    loadTickets(page)
+  }
+
+  const handleSizeChange = (size: number) => {
+    pagination.size = size
+    loadTickets(1)
   }
 
   onMounted(() => {

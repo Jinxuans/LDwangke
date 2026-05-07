@@ -1,101 +1,35 @@
 <template>
   <div class="tenant-cuser-withdraw-page art-full-height">
-    <ElCard class="art-table-card">
-      <div class="grid gap-4 xl:grid-cols-[180px_180px_auto]">
-        <div>
-          <label class="mb-2 block text-sm font-medium text-g-800">会员 ID</label>
-          <ElInput v-model="filters.c_uid" clearable placeholder="输入会员 ID" @keyup.enter="loadData(1)" />
-        </div>
-        <div>
-          <label class="mb-2 block text-sm font-medium text-g-800">状态</label>
-          <ElSelect v-model="filters.status" class="w-full" clearable placeholder="全部状态">
-            <ElOption label="待审核" value="0" />
-            <ElOption label="已通过" value="1" />
-            <ElOption label="已驳回" value="-1" />
-          </ElSelect>
-        </div>
-        <div class="flex items-end gap-3">
-          <ElButton type="primary" @click="loadData(1)">搜索</ElButton>
-          <ElButton @click="handleReset">重置</ElButton>
-        </div>
-      </div>
-    </ElCard>
+    <ArtSearchBar
+      v-model="searchForm"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="handleReset"
+    />
 
-    <ElCard class="art-table-card mt-4">
-      <ArtTableHeader :loading="loading" layout="refresh" @refresh="loadData(pagination.page)">
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadData(pagination.current)">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">会员提现</ElTag>
             <ElTag effect="plain">申请 {{ pagination.total }} 条</ElTag>
             <ElTag type="warning" effect="plain">
-              待审核 {{ requests.filter((item) => Number(item.status) === 0).length }} 条
+              待审核 {{ pendingCount }} 条
             </ElTag>
           </ElSpace>
         </template>
       </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="requests" row-key="id">
-        <ElTableColumn prop="id" label="ID" width="80" align="center" />
-        <ElTableColumn label="会员信息" min-width="220">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm font-medium text-g-900">{{ row.nickname || '-' }}</p>
-              <p class="mt-1 text-xs text-g-500">{{ row.account || '-' }} / UID {{ row.c_uid }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="提现金额" width="120" align="right">
-          <template #default="{ row }">¥{{ formatMoney(row.amount) }}</template>
-        </ElTableColumn>
-        <ElTableColumn label="收款信息" min-width="260">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm font-medium text-g-900">{{ row.account_name || '-' }} / {{ row.account_no || '-' }}</p>
-              <p class="mt-1 text-xs text-g-500">{{ row.bank_name || row.method || '-' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="状态" width="120" align="center">
-          <template #default="{ row }">
-            <ElTag :type="statusMeta(row.status).type" effect="plain">
-              {{ statusMeta(row.status).text }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="note" label="备注" min-width="180">
-          <template #default="{ row }">{{ row.note || '-' }}</template>
-        </ElTableColumn>
-        <ElTableColumn prop="addtime" label="申请时间" width="180" />
-        <ElTableColumn label="审核信息" min-width="220">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm text-g-700">{{ row.audit_user || '-' }}</p>
-              <p class="mt-1 text-xs text-g-500">{{ row.audit_time || '-' }}</p>
-              <p class="mt-1 text-xs text-g-500">{{ row.audit_remark || '-' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="操作" width="160" fixed="right">
-          <template #default="{ row }">
-            <div v-if="Number(row.status) === 0" class="flex items-center gap-2">
-              <ElButton text type="primary" @click="openReviewDialog(row, 1)">确认打款</ElButton>
-              <ElButton text type="danger" @click="openReviewDialog(row, -1)">驳回</ElButton>
-            </div>
-            <span v-else class="text-sm text-g-400">已处理</span>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadData"
-        />
-      </div>
+      <ArtTable
+        :loading="loading"
+        :data="requests"
+        :columns="columns"
+        :pagination="pagination"
+        row-key="id"
+        @pagination:current-change="handleCurrentChange"
+        @pagination:size-change="handleSizeChange"
+      />
     </ElCard>
 
     <ElDialog
@@ -134,12 +68,14 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage } from 'element-plus'
+  import { h } from 'vue'
+  import { ElButton, ElMessage, ElTag } from 'element-plus'
   import {
     fetchTenantCUserWithdrawRequests,
     reviewTenantCUserWithdraw,
     type LegacyTenantCUserWithdrawItem
   } from '@/api/legacy/tenant'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
 
   defineOptions({ name: 'TenantCUserWithdrawPage' })
 
@@ -151,12 +87,12 @@
   const currentRequest = ref<LegacyTenantCUserWithdrawItem | null>(null)
 
   const pagination = reactive({
-    page: 1,
-    limit: 20,
+    current: 1,
+    size: 20,
     total: 0
   })
 
-  const filters = reactive({
+  const searchForm = ref({
     c_uid: '',
     status: ''
   })
@@ -167,6 +103,33 @@
   })
 
   const formatMoney = (value?: number | string) => Number(value || 0).toFixed(2)
+  const pendingCount = computed(() => requests.value.filter((item) => Number(item.status) === 0).length)
+
+  const searchItems = computed(() => [
+    {
+      label: '会员 ID',
+      key: 'c_uid',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '输入会员 ID'
+      }
+    },
+    {
+      label: '状态',
+      key: 'status',
+      type: 'select',
+      props: {
+        clearable: true,
+        placeholder: '全部状态',
+        options: [
+          { label: '待审核', value: '0' },
+          { label: '已通过', value: '1' },
+          { label: '已驳回', value: '-1' }
+        ]
+      }
+    }
+  ])
 
   function statusMeta(status: number): { text: string; type: 'danger' | 'info' | 'success' | 'warning' } {
     if (status === 1) return { text: '已通过', type: 'success' }
@@ -174,26 +137,99 @@
     return { text: '待审核', type: 'warning' }
   }
 
-  async function loadData(page = pagination.page) {
+  const { columns, columnChecks } = useTableColumns<LegacyTenantCUserWithdrawItem>(() => [
+    { prop: 'id', label: 'ID', width: 80, align: 'center' },
+    {
+      prop: 'c_uid',
+      label: '会员信息',
+      minWidth: 220,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm font-medium text-g-900' }, row.nickname || '-'),
+          h('p', { class: 'mt-1 text-xs text-g-500' }, `${row.account || '-'} / UID ${row.c_uid}`)
+        ])
+    },
+    {
+      prop: 'amount',
+      label: '提现金额',
+      width: 120,
+      align: 'right',
+      formatter: (row) => `¥${formatMoney(row.amount)}`
+    },
+    {
+      prop: 'account_no',
+      label: '收款信息',
+      minWidth: 260,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm font-medium text-g-900' }, `${row.account_name || '-'} / ${row.account_no || '-'}`),
+          h('p', { class: 'mt-1 text-xs text-g-500' }, row.bank_name || row.method || '-')
+        ])
+    },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 120,
+      align: 'center',
+      formatter: (row) =>
+        h(ElTag, { type: statusMeta(row.status).type, effect: 'plain' }, () => statusMeta(row.status).text)
+    },
+    { prop: 'note', label: '备注', minWidth: 180, formatter: (row) => row.note || '-' },
+    { prop: 'addtime', label: '申请时间', width: 180 },
+    {
+      prop: 'audit_user',
+      label: '审核信息',
+      minWidth: 220,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm text-g-700' }, row.audit_user || '-'),
+          h('p', { class: 'mt-1 text-xs text-g-500' }, row.audit_time || '-'),
+          h('p', { class: 'mt-1 text-xs text-g-500' }, row.audit_remark || '-')
+        ])
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 160,
+      fixed: 'right',
+      formatter: (row) =>
+        Number(row.status) === 0
+          ? h('div', { class: 'flex items-center gap-2' }, [
+              h(ElButton, { text: true, type: 'primary', onClick: () => openReviewDialog(row, 1) }, () => '确认打款'),
+              h(ElButton, { text: true, type: 'danger', onClick: () => openReviewDialog(row, -1) }, () => '驳回')
+            ])
+          : h('span', { class: 'text-sm text-g-400' }, '已处理')
+    }
+  ])
+
+  async function loadData(page = pagination.current) {
     loading.value = true
-    pagination.page = page
+    pagination.current = page
     try {
       const result = await fetchTenantCUserWithdrawRequests({
-        page: pagination.page,
-        limit: pagination.limit,
-        c_uid: filters.c_uid || undefined,
-        status: filters.status || undefined
+        page: pagination.current,
+        limit: pagination.size,
+        c_uid: searchForm.value.c_uid?.trim() || undefined,
+        status: searchForm.value.status || undefined
       })
       requests.value = result.list || []
       pagination.total = Number(result.total || result.pagination?.total || 0)
+      pagination.current = Number(result.pagination?.page || pagination.current)
+      pagination.size = Number(result.pagination?.limit || pagination.size)
     } finally {
       loading.value = false
     }
   }
 
+  function handleSearch(params: { c_uid?: string; status?: string }) {
+    searchForm.value.c_uid = params.c_uid?.trim() || ''
+    searchForm.value.status = params.status || ''
+    loadData(1)
+  }
+
   function handleReset() {
-    filters.c_uid = ''
-    filters.status = ''
+    searchForm.value.c_uid = ''
+    searchForm.value.status = ''
     loadData(1)
   }
 
@@ -214,10 +250,19 @@
       })
       ElMessage.success('审核已完成')
       reviewVisible.value = false
-      await loadData(pagination.page)
+      await loadData(pagination.current)
     } finally {
       reviewing.value = false
     }
+  }
+
+  function handleCurrentChange(page: number) {
+    loadData(page)
+  }
+
+  function handleSizeChange(size: number) {
+    pagination.size = size
+    loadData(1)
   }
 
   onMounted(() => {

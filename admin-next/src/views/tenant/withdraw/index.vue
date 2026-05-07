@@ -8,68 +8,39 @@
       show-icon
     />
 
-    <ElCard class="art-table-card mt-4">
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b-d px-5 py-4">
-        <div>
-          <h2 class="text-lg font-semibold text-g-900">提现记录</h2>
-          <p class="mt-1 text-sm text-g-500">支持按状态筛选，便于快速查看待审核、已通过和已驳回申请。</p>
-          <div class="mt-3 flex flex-wrap gap-3">
+    <ArtSearchBar
+      v-model="searchForm"
+      class="mt-4"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="handleReset"
+    />
+
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadAll(pagination.current)">
+        <template #left>
+          <ElSpace wrap>
             <ElTag effect="plain">商城提现</ElTag>
             <ElTag type="success" effect="plain">可提现 {{ moneyLabel(availableBalance) }}</ElTag>
             <ElTag type="warning" effect="plain">冻结中 {{ moneyLabel(frozenBalance) }}</ElTag>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap gap-3">
-          <ElSelect v-model="statusFilter" clearable placeholder="全部状态" style="width: 140px" @change="loadRecords(1)">
-            <ElOption label="待审核" :value="0" />
-            <ElOption label="已通过" :value="1" />
-            <ElOption label="已驳回" :value="-1" />
-          </ElSelect>
-          <ElButton plain :loading="loading" @click="loadAll(pagination.page)">刷新</ElButton>
+            <ElTag type="info" effect="plain">记录 {{ pagination.total }} 条</ElTag>
+          </ElSpace>
+        </template>
+        <template #right>
           <ElButton type="primary" plain @click="openApplyDialog">申请提现</ElButton>
-          <ElButton plain @click="handleReset">重置</ElButton>
-        </div>
-      </div>
+        </template>
+      </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="records" row-key="id">
-        <ElTableColumn prop="addtime" label="申请时间" width="180" />
-        <ElTableColumn label="提现金额" width="120" align="right">
-          <template #default="{ row }">¥{{ formatMoney(row.amount) }}</template>
-        </ElTableColumn>
-        <ElTableColumn label="收款信息" min-width="260">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm font-medium text-g-900">{{ row.account_name || '-' }} / {{ row.account_no || '-' }}</p>
-              <p class="mt-1 text-xs text-g-500">{{ row.bank_name || row.method || '-' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="状态" width="120" align="center">
-          <template #default="{ row }">
-            <ElTag :type="statusMeta(row.status).type" effect="plain">
-              {{ statusMeta(row.status).text }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="audit_remark" label="审核备注" min-width="220">
-          <template #default="{ row }">{{ row.audit_remark || '-' }}</template>
-        </ElTableColumn>
-        <ElTableColumn prop="audit_time" label="审核时间" width="180">
-          <template #default="{ row }">{{ row.audit_time || '-' }}</template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadRecords"
-        />
-      </div>
+      <ArtTable
+        :loading="loading"
+        :data="records"
+        :columns="columns"
+        :pagination="pagination"
+        row-key="id"
+        @pagination:current-change="handleCurrentChange"
+        @pagination:size-change="handleSizeChange"
+      />
     </ElCard>
 
     <ElDialog v-model="dialogVisible" title="申请提现" width="640px" destroy-on-close>
@@ -116,7 +87,8 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage } from 'element-plus'
+  import { h } from 'vue'
+  import { ElMessage, ElTag } from 'element-plus'
   import {
     createLegacyWithdrawRequest,
     fetchLegacyUserProfile,
@@ -124,6 +96,7 @@
     type LegacyUserProfile,
     type LegacyWithdrawRequestItem
   } from '@/api/legacy/user-center'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
 
   defineOptions({ name: 'TenantWithdrawPage' })
 
@@ -133,12 +106,17 @@
 
   const profile = ref<LegacyUserProfile | null>(null)
   const records = ref<LegacyWithdrawRequestItem[]>([])
-  const statusFilter = ref<number | undefined>(undefined)
 
   const pagination = reactive({
-    page: 1,
-    limit: 20,
+    current: 1,
+    size: 20,
     total: 0
+  })
+
+  const searchForm = ref<{
+    status?: number
+  }>({
+    status: undefined
   })
 
   const form = reactive({
@@ -156,11 +134,59 @@
   const formatMoney = (value?: number | string) => Number(value || 0).toFixed(2)
   const moneyLabel = (value?: number | string) => `¥${formatMoney(value)}`
 
+  const searchItems = computed(() => [
+    {
+      label: '状态',
+      key: 'status',
+      type: 'select',
+      props: {
+        clearable: true,
+        placeholder: '全部状态',
+        options: [
+          { label: '待审核', value: 0 },
+          { label: '已通过', value: 1 },
+          { label: '已驳回', value: -1 }
+        ]
+      }
+    }
+  ])
+
   function statusMeta(status: number): { text: string; type: 'danger' | 'info' | 'success' | 'warning' } {
     if (status === 1) return { text: '已通过', type: 'success' }
     if (status === -1) return { text: '已驳回', type: 'danger' }
     return { text: '待审核', type: 'warning' }
   }
+
+  const { columns, columnChecks } = useTableColumns<LegacyWithdrawRequestItem>(() => [
+    { prop: 'addtime', label: '申请时间', width: 180 },
+    {
+      prop: 'amount',
+      label: '提现金额',
+      width: 120,
+      align: 'right',
+      formatter: (row) => `¥${formatMoney(row.amount)}`
+    },
+    {
+      prop: 'account_no',
+      label: '收款信息',
+      minWidth: 260,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm font-medium text-g-900' }, `${row.account_name || '-'} / ${row.account_no || '-'}`),
+          h('p', { class: 'mt-1 text-xs text-g-500' }, row.bank_name || row.method || '-')
+        ])
+    },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 120,
+      align: 'center',
+      formatter: (row) =>
+        h(ElTag, { type: statusMeta(row.status).type, effect: 'plain' }, () => statusMeta(row.status).text)
+    },
+    { prop: 'audit_remark', label: '审核备注', minWidth: 220, formatter: (row) => row.audit_remark || '-' },
+    { prop: 'audit_time', label: '审核时间', width: 180, formatter: (row) => row.audit_time || '-' }
+  ])
 
   function resetForm() {
     form.amount = undefined
@@ -180,23 +206,25 @@
     profile.value = await fetchLegacyUserProfile()
   }
 
-  async function loadRecords(page = pagination.page) {
+  async function loadRecords(page = pagination.current) {
     loading.value = true
-    pagination.page = page
+    pagination.current = page
     try {
       const result = await fetchLegacyWithdrawRequests({
-        page: pagination.page,
-        limit: pagination.limit,
-        status: statusFilter.value
+        page: pagination.current,
+        limit: pagination.size,
+        status: searchForm.value.status
       })
       records.value = result.list || []
       pagination.total = Number(result.pagination?.total || 0)
+      pagination.current = Number(result.pagination?.page || pagination.current)
+      pagination.size = Number(result.pagination?.limit || pagination.size)
     } finally {
       loading.value = false
     }
   }
 
-  async function loadAll(page = pagination.page) {
+  async function loadAll(page = pagination.current) {
     await Promise.all([loadProfile(), loadRecords(page)])
   }
 
@@ -228,8 +256,22 @@
     }
   }
 
+  function handleSearch(params: { status?: number }) {
+    searchForm.value.status = params.status
+    loadRecords(1)
+  }
+
   function handleReset() {
-    statusFilter.value = undefined
+    searchForm.value.status = undefined
+    loadRecords(1)
+  }
+
+  function handleCurrentChange(page: number) {
+    loadRecords(page)
+  }
+
+  function handleSizeChange(size: number) {
+    pagination.size = size
     loadRecords(1)
   }
 

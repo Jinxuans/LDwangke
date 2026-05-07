@@ -1,30 +1,23 @@
 <template>
-  <div class="flex min-h-[calc(100vh-180px)] flex-col gap-5">
-    <section class="art-card-sm p-5">
-      <ElAlert
-        type="warning"
-        :closable="false"
-        show-icon
-        title="下单前请确认账号密码正确，跑步期间不要登录账号。短信验证码登录仅用于查询学生信息。"
-      />
+  <div class="plugin-sdxy-page art-full-height">
+    <ElAlert
+      type="warning"
+      :closable="false"
+      show-icon
+      title="下单前请确认账号密码正确，跑步期间不要登录账号。短信验证码登录仅用于查询学生信息。"
+      class="mb-5"
+    />
 
-      <div class="mt-4 grid gap-4 xl:grid-cols-[180px_140px_1fr_auto]">
-        <ElSelect v-model="filters.status" clearable placeholder="订单状态">
-          <ElOption v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
-        </ElSelect>
-        <ElSelect v-model="filters.searchType" placeholder="搜索项">
-          <ElOption v-for="item in searchFieldOptions" :key="item.value" :label="item.label" :value="item.value" />
-        </ElSelect>
-        <ElInput v-model="filters.keyword" clearable placeholder="搜索订单ID、账号、密码或UID" @keyup.enter="loadOrders(1)" />
-        <div class="flex flex-wrap gap-3">
-          <ElButton type="primary" @click="loadOrders(1)">查询</ElButton>
-          <ElButton plain @click="resetFilters">重置</ElButton>
-        </div>
-      </div>
-    </section>
+    <ArtSearchBar
+      v-model="filters"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="resetFilters"
+    />
 
-    <section class="art-card-sm overflow-hidden">
-      <ArtTableHeader :loading="loading" layout="refresh" @refresh="loadOrders(pagination.page)">
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadOrders(pagination.page)">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">当前页 {{ orders.length }} 条</ElTag>
@@ -35,93 +28,15 @@
         </template>
       </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="orders" size="large">
-        <ElTableColumn label="订单" width="110">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-semibold text-g-900">#{{ row.id }}</p>
-              <p class="text-xs text-g-500">{{ row.agg_order_id || '未下发源台ID' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="账号信息" min-width="180">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-semibold text-g-900">{{ row.user }}</p>
-              <p class="text-xs text-g-500">{{ row.pass || '无密码' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="学校 / 跑区" min-width="180">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm text-g-800">{{ row.school || '未识别学校' }}</p>
-              <p class="text-xs text-g-500">{{ row.run_rule || '未识别规则' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="任务配置" min-width="160">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm text-g-800">{{ getRunTypeLabel(row.run_type) }}</p>
-              <p class="text-xs text-g-500">{{ row.num }} 次，{{ row.distance }} km/次</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="状态" width="140" align="center">
-          <template #default="{ row }">
-            <div class="flex flex-col items-center gap-2">
-              <ElTag :type="getStatusType(row.status)" effect="plain">{{ getStatusLabel(row.status) }}</ElTag>
-              <ElTag v-if="row.pause === 1" type="warning" effect="plain">已暂停</ElTag>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="费用" width="110" align="right">
-          <template #default="{ row }">
-            <span class="font-semibold text-[var(--el-color-danger)]">¥{{ Number(row.fees || 0).toFixed(2) }}</span>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn prop="created_at" label="创建时间" min-width="160" />
-
-        <ElTableColumn label="操作" width="300" fixed="right">
-          <template #default="{ row }">
-            <div class="flex flex-wrap gap-2">
-              <ElButton size="small" @click="openLogsDialog(row)">日志</ElButton>
-              <ElButton size="small" :disabled="!row.agg_order_id" @click="handleTogglePause(row)">
-                {{ row.pause === 1 ? '恢复' : '暂停' }}
-              </ElButton>
-              <ElButton size="small" :disabled="!row.agg_order_id" @click="handleDelay(row)">延时</ElButton>
-              <ElButton
-                size="small"
-                type="danger"
-                plain
-                :disabled="!row.agg_order_id || row.status === '5'"
-                @click="handleRefund(row)"
-              >
-                退款
-              </ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadOrders"
-        />
-      </div>
-    </section>
+      <ArtTable
+        :loading="loading"
+        :data="orders"
+        :columns="columns"
+        :pagination="tablePagination"
+        @pagination:current-change="loadOrders"
+        @pagination:size-change="handleSizeChange"
+      />
+    </ElCard>
 
     <ElDialog v-model="addVisible" title="新增闪电运动订单" width="780px">
       <div class="space-y-5">
@@ -330,7 +245,8 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
   import {
     createLegacySDXYOrder,
     delayLegacySDXYTask,
@@ -404,6 +320,12 @@
     total: 0
   })
 
+  const tablePagination = computed(() => ({
+    current: pagination.page,
+    size: pagination.limit,
+    total: pagination.total
+  }))
+
   const logsPagination = reactive({
     orderId: '',
     page: 1,
@@ -416,6 +338,37 @@
     searchType: '1',
     status: ''
   })
+
+  const searchItems = computed(() => [
+    {
+      label: '订单状态',
+      key: 'status',
+      type: 'select',
+      props: {
+        clearable: true,
+        placeholder: '订单状态',
+        options: statusOptions
+      }
+    },
+    {
+      label: '搜索项',
+      key: 'searchType',
+      type: 'select',
+      props: {
+        placeholder: '搜索项',
+        options: searchFieldOptions
+      }
+    },
+    {
+      label: '关键词',
+      key: 'keyword',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '搜索订单ID、账号、密码或UID'
+      }
+    }
+  ])
 
   const addForm = reactive({
     code: '',
@@ -457,6 +410,85 @@
   const taskList = computed(() => generateTaskList())
   const taskCount = computed(() => taskList.value.length)
   const estimatedPrice = computed(() => (Number(pricePerTask.value || 0) * taskCount.value).toFixed(2))
+
+  const { columns, columnChecks } = useTableColumns<LegacySDXYOrder>(() => [
+    {
+      prop: 'id',
+      label: '订单',
+      width: 110,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-semibold text-g-900' }, `#${row.id}`),
+          h('p', { class: 'text-xs text-g-500' }, row.agg_order_id || '未下发源台ID')
+        ])
+    },
+    {
+      prop: 'user',
+      label: '账号信息',
+      minWidth: 180,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-semibold text-g-900' }, row.user || '-'),
+          h('p', { class: 'text-xs text-g-500' }, row.pass || '无密码')
+        ])
+    },
+    {
+      prop: 'school',
+      label: '学校 / 跑区',
+      minWidth: 180,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm text-g-800' }, row.school || '未识别学校'),
+          h('p', { class: 'text-xs text-g-500' }, row.run_rule || '未识别规则')
+        ])
+    },
+    {
+      prop: 'num',
+      label: '任务配置',
+      minWidth: 160,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm text-g-800' }, getRunTypeLabel(row.run_type)),
+          h('p', { class: 'text-xs text-g-500' }, `${row.num} 次，${row.distance} km/次`)
+        ])
+    },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 140,
+      align: 'center',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-col items-center gap-2' }, [
+          h(ElTag, { type: getStatusType(row.status), effect: 'plain' }, () => getStatusLabel(row.status)),
+          row.pause === 1 ? h(ElTag, { type: 'warning', effect: 'plain' }, () => '已暂停') : null
+        ])
+    },
+    {
+      prop: 'fees',
+      label: '费用',
+      width: 110,
+      align: 'right',
+      formatter: (row) => h('span', { class: 'font-semibold text-[var(--el-color-danger)]' }, `¥${Number(row.fees || 0).toFixed(2)}`)
+    },
+    {
+      prop: 'created_at',
+      label: '创建时间',
+      minWidth: 160
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 300,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElButton, { size: 'small', onClick: () => openLogsDialog(row) }, () => '日志'),
+          h(ElButton, { size: 'small', disabled: !row.agg_order_id, onClick: () => handleTogglePause(row) }, () => (row.pause === 1 ? '恢复' : '暂停')),
+          h(ElButton, { size: 'small', disabled: !row.agg_order_id, onClick: () => handleDelay(row) }, () => '延时'),
+          h(ElButton, { size: 'small', type: 'danger', plain: true, disabled: !row.agg_order_id || row.status === '5', onClick: () => handleRefund(row) }, () => '退款')
+        ])
+    }
+  ])
 
   const syncWeekState = () => {
     const count = addForm.run_week.length
@@ -582,6 +614,15 @@
     } finally {
       loading.value = false
     }
+  }
+
+  const handleSearch = () => {
+    loadOrders(1)
+  }
+
+  const handleSizeChange = (size: number) => {
+    pagination.limit = size
+    loadOrders(1)
   }
 
   const loadLogs = async (page = logsPagination.page) => {

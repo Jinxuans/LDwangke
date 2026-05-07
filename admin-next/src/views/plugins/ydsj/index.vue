@@ -1,30 +1,23 @@
 <template>
-  <div class="flex min-h-[calc(100vh-180px)] flex-col gap-5">
-    <section class="art-card-sm p-5">
-      <ElAlert
-        type="warning"
-        :closable="false"
-        show-icon
-        title="下单后请提醒学生退出账号，不是关闭 App。跑步时段建议保留足够跨度，避免过窄。"
-      />
+  <div class="plugin-ydsj-page art-full-height">
+    <ElAlert
+      type="warning"
+      :closable="false"
+      show-icon
+      title="下单后请提醒学生退出账号，不是关闭 App。跑步时段建议保留足够跨度，避免过窄。"
+      class="mb-5"
+    />
 
-      <div class="mt-4 grid gap-4 xl:grid-cols-[160px_140px_1fr_auto]">
-        <ElSelect v-model="filters.status" clearable placeholder="订单状态">
-          <ElOption v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
-        </ElSelect>
-        <ElSelect v-model="filters.searchType" placeholder="搜索项">
-          <ElOption v-for="item in searchTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
-        </ElSelect>
-        <ElInput v-model="filters.keyword" clearable placeholder="搜索订单ID、账号、密码或UID" @keyup.enter="loadOrders(1)" />
-        <div class="flex flex-wrap gap-3">
-          <ElButton type="primary" @click="loadOrders(1)">查询</ElButton>
-          <ElButton plain @click="resetFilters">重置</ElButton>
-        </div>
-      </div>
-    </section>
+    <ArtSearchBar
+      v-model="filters"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="resetFilters"
+    />
 
-    <section class="art-card-sm overflow-hidden">
-      <ArtTableHeader :loading="loading" layout="refresh" @refresh="loadOrders(pagination.page)">
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadOrders(pagination.page)">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">当前页 {{ orders.length }} 条</ElTag>
@@ -35,91 +28,15 @@
         </template>
       </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="orders" size="large">
-        <ElTableColumn label="账号信息" min-width="180">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-semibold text-g-900">{{ row.user }}</p>
-              <p class="text-xs text-g-500">{{ row.pass || '无密码' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="学校" min-width="160">
-          <template #default="{ row }">
-            <p class="text-sm text-g-800">{{ row.school || '自动识别' }}</p>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="跑步参数" min-width="220">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm text-g-800">{{ getRunTypeText(row.run_type) }}</p>
-              <p class="text-xs text-g-500">{{ row.distance }} km，{{ getRunWeekText(row.run_week) }}</p>
-              <p class="text-xs text-g-500">{{ formatTimeRange(row.start_hour, row.start_minute, row.end_hour, row.end_minute) }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="运行状态" width="100" align="center">
-          <template #default="{ row }">
-            <ElTag :type="row.is_run === 1 ? 'success' : 'info'" effect="plain">
-              {{ row.is_run === 1 ? '运行中' : '已暂停' }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="订单状态" width="120" align="center">
-          <template #default="{ row }">
-            <ElTag :type="getStatusType(row.status)" effect="plain">{{ getStatusText(row.status) }}</ElTag>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="费用" width="120" align="right">
-          <template #default="{ row }">
-            <div class="leading-5">
-              <p class="font-semibold text-[var(--el-color-danger)]">¥{{ Number(row.fees || 0).toFixed(2) }}</p>
-              <p v-if="row.refund_money" class="text-xs text-emerald-600">退 ¥{{ Number(row.refund_money || 0).toFixed(2) }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="备注" min-width="180">
-          <template #default="{ row }">
-            <span class="line-clamp-2 text-sm text-g-500">{{ row.remarks || '暂无备注' }}</span>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn prop="addtime" label="下单时间" min-width="160" />
-
-        <ElTableColumn label="操作" width="300" fixed="right">
-          <template #default="{ row }">
-            <div class="flex flex-wrap gap-2">
-              <ElButton size="small" @click="openDetailDialog(row)">详情</ElButton>
-              <ElButton size="small" @click="openRemarksDialog(row)">备注</ElButton>
-              <ElButton size="small" @click="handleToggleRun(row)">
-                {{ row.is_run === 1 ? '暂停' : '开启' }}
-              </ElButton>
-              <ElButton size="small" @click="handleSync(row)">同步</ElButton>
-              <ElButton size="small" type="danger" plain :disabled="row.status === 4 || row.status === 5" @click="handleRefund(row)">
-                退款
-              </ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadOrders"
-        />
-      </div>
-    </section>
+      <ArtTable
+        :loading="loading"
+        :data="orders"
+        :columns="columns"
+        :pagination="tablePagination"
+        @pagination:current-change="loadOrders"
+        @pagination:size-change="handleSizeChange"
+      />
+    </ElCard>
 
     <ElDialog v-model="addVisible" title="新增运动世界订单" width="760px">
       <div class="space-y-4">
@@ -276,7 +193,8 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
   import {
     createLegacyYDSJOrder,
     editLegacyYDSJRemarks,
@@ -346,11 +264,48 @@
     total: 0
   })
 
+  const tablePagination = computed(() => ({
+    current: pagination.page,
+    size: pagination.limit,
+    total: pagination.total
+  }))
+
   const filters = reactive({
     keyword: '',
     searchType: '1',
     status: ''
   })
+
+  const searchItems = computed(() => [
+    {
+      label: '订单状态',
+      key: 'status',
+      type: 'select',
+      props: {
+        clearable: true,
+        placeholder: '订单状态',
+        options: statusOptions
+      }
+    },
+    {
+      label: '搜索项',
+      key: 'searchType',
+      type: 'select',
+      props: {
+        placeholder: '搜索项',
+        options: searchTypeOptions
+      }
+    },
+    {
+      label: '关键词',
+      key: 'keyword',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '搜索订单ID、账号、密码或UID'
+      }
+    }
+  ])
 
   const addForm = reactive({
     distance: 2,
@@ -426,6 +381,86 @@
       } as Record<number, 'danger' | 'info' | 'success' | 'warning'>
     )[value] || 'info'
 
+  const { columns, columnChecks } = useTableColumns<LegacyYDSJOrder>(() => [
+    {
+      prop: 'user',
+      label: '账号信息',
+      minWidth: 180,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-semibold text-g-900' }, row.user || '-'),
+          h('p', { class: 'text-xs text-g-500' }, row.pass || '无密码')
+        ])
+    },
+    {
+      prop: 'school',
+      label: '学校',
+      minWidth: 160,
+      formatter: (row) => h('p', { class: 'text-sm text-g-800' }, row.school || '自动识别')
+    },
+    {
+      prop: 'run_type',
+      label: '跑步参数',
+      minWidth: 220,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm text-g-800' }, getRunTypeText(row.run_type)),
+          h('p', { class: 'text-xs text-g-500' }, `${row.distance} km，${getRunWeekText(row.run_week)}`),
+          h('p', { class: 'text-xs text-g-500' }, formatTimeRange(row.start_hour, row.start_minute, row.end_hour, row.end_minute))
+        ])
+    },
+    {
+      prop: 'is_run',
+      label: '运行状态',
+      width: 100,
+      align: 'center',
+      formatter: (row) => h(ElTag, { type: row.is_run === 1 ? 'success' : 'info', effect: 'plain' }, () => (row.is_run === 1 ? '运行中' : '已暂停'))
+    },
+    {
+      prop: 'status',
+      label: '订单状态',
+      width: 120,
+      align: 'center',
+      formatter: (row) => h(ElTag, { type: getStatusType(row.status), effect: 'plain' }, () => getStatusText(row.status))
+    },
+    {
+      prop: 'fees',
+      label: '费用',
+      width: 120,
+      align: 'right',
+      formatter: (row) =>
+        h('div', { class: 'leading-5' }, [
+          h('p', { class: 'font-semibold text-[var(--el-color-danger)]' }, `¥${Number(row.fees || 0).toFixed(2)}`),
+          row.refund_money ? h('p', { class: 'text-xs text-emerald-600' }, `退 ¥${Number(row.refund_money || 0).toFixed(2)}`) : null
+        ])
+    },
+    {
+      prop: 'remarks',
+      label: '备注',
+      minWidth: 180,
+      formatter: (row) => h('span', { class: 'line-clamp-2 text-sm text-g-500' }, row.remarks || '暂无备注')
+    },
+    {
+      prop: 'addtime',
+      label: '下单时间',
+      minWidth: 160
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 300,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElButton, { size: 'small', onClick: () => openDetailDialog(row) }, () => '详情'),
+          h(ElButton, { size: 'small', onClick: () => openRemarksDialog(row) }, () => '备注'),
+          h(ElButton, { size: 'small', onClick: () => handleToggleRun(row) }, () => (row.is_run === 1 ? '暂停' : '开启')),
+          h(ElButton, { size: 'small', onClick: () => handleSync(row) }, () => '同步'),
+          h(ElButton, { size: 'small', type: 'danger', plain: true, disabled: row.status === 4 || row.status === 5, onClick: () => handleRefund(row) }, () => '退款')
+        ])
+    }
+  ])
+
   const loadSchools = async () => {
     schools.value = (await fetchLegacyYDSJSchools()) || []
   }
@@ -462,6 +497,15 @@
     } finally {
       loading.value = false
     }
+  }
+
+  const handleSearch = () => {
+    loadOrders(1)
+  }
+
+  const handleSizeChange = (size: number) => {
+    pagination.limit = size
+    loadOrders(1)
   }
 
   const resetFilters = () => {

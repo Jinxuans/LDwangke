@@ -198,36 +198,24 @@
         </div>
       </div>
 
-      <ElTable class="mt-5" :data="parsedLines" border>
-        <ElTableColumn label="#" type="index" width="60" align="center" />
-        <ElTableColumn label="学校" min-width="180">
-          <template #default="{ row }">
-            <span>{{ row.school || '自动识别' }}</span>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="user" label="账号" min-width="180" />
-        <ElTableColumn prop="pass" label="密码" min-width="160" />
-        <ElTableColumn label="状态" width="100" align="center">
-          <template #default="{ row }">
-            <ElTag :type="row.valid ? 'success' : 'danger'">{{ row.valid ? '有效' : '无效' }}</ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="原始内容" min-width="220">
-          <template #default="{ row }">
-            <span class="text-g-500">{{ row.raw }}</span>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="操作" width="90" align="center">
-          <template #default="{ row }">
-            <ElButton text type="danger" @click="removeLine(row.key)">删除</ElButton>
-          </template>
-        </ElTableColumn>
-      </ElTable>
+      <ArtTableHeader class="mt-5" :loading="submitLoading">
+        <template #left>
+          <ElSpace wrap>
+            <ElTag effect="plain">预览 {{ parsedLines.length }} 条</ElTag>
+            <ElTag type="success" effect="plain">有效 {{ validCount }}</ElTag>
+            <ElTag type="danger" effect="plain">无效 {{ invalidCount }}</ElTag>
+          </ElSpace>
+        </template>
+      </ArtTableHeader>
+
+      <ArtTable :data="parsedLines" :columns="columns" :show-table-header="true" row-key="key" />
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
+  import { h } from 'vue'
+  import { ElButton, ElMessage, ElTag } from 'element-plus'
   import {
     createLegacyOrder,
     type LegacyOrderAddItem
@@ -236,6 +224,7 @@
     formatLegacyPrice,
     useLegacyCourseCatalog
   } from '../shared/useLegacyCourseCatalog'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
 
   defineOptions({ name: 'OrderBatchAddPage' })
 
@@ -296,6 +285,27 @@
     }
     return (validCount.value * Number(selectedClass.value.price || 0)).toFixed(2)
   })
+
+  const { columns } = useTableColumns<ParsedLine>(() => [
+    { prop: 'school', label: '学校', minWidth: 180, formatter: (row) => row.school || '自动识别' },
+    { prop: 'user', label: '账号', minWidth: 180, formatter: (row) => row.user || '-' },
+    { prop: 'pass', label: '密码', minWidth: 160, formatter: (row) => row.pass || '-' },
+    {
+      prop: 'valid',
+      label: '状态',
+      width: 100,
+      align: 'center',
+      formatter: (row) => h(ElTag, { type: row.valid ? 'success' : 'danger' }, () => (row.valid ? '有效' : '无效'))
+    },
+    { prop: 'raw', label: '原始内容', minWidth: 220, formatter: (row) => h('span', { class: 'text-g-500' }, row.raw || '-') },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 90,
+      align: 'center',
+      formatter: (row) => h(ElButton, { text: true, type: 'danger', onClick: () => removeLine(row.key) }, () => '删除')
+    }
+  ])
 
   const normalizeInputText = (value: string) =>
     value

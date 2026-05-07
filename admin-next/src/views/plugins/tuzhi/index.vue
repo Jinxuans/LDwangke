@@ -1,17 +1,15 @@
 <template>
-  <div class="flex min-h-[calc(100vh-180px)] flex-col gap-5">
-    <section class="art-card-sm p-5">
-      <div class="grid gap-4 md:grid-cols-[1fr_auto]">
-        <ElInput v-model="keyword" clearable placeholder="搜索账号或姓名" @keyup.enter="loadOrders(1)" />
-        <div class="flex flex-wrap gap-3">
-          <ElButton type="primary" @click="loadOrders(1)">查询</ElButton>
-          <ElButton plain @click="resetFilters">重置</ElButton>
-        </div>
-      </div>
-    </section>
+  <div class="plugin-tuzhi-page art-full-height">
+    <ArtSearchBar
+      v-model="filters"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="resetFilters"
+    />
 
-    <section class="art-card-sm overflow-hidden">
-      <ArtTableHeader :loading="loading || syncing" layout="refresh" @refresh="loadOrders(pagination.page)">
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading || syncing" @refresh="loadOrders(pagination.page)">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">商品 {{ goods.length }} 个</ElTag>
@@ -23,78 +21,15 @@
         </template>
       </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="orders" size="large">
-        <ElTableColumn label="账号信息" min-width="200">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-semibold text-g-900">{{ row.username }}</p>
-              <p class="text-xs text-g-500">{{ row.nickname || '未填写姓名' }}</p>
-              <p class="text-xs text-g-500">{{ row.school || row.postname || '未填写学校/岗位' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="商品 / 天数" min-width="180">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-medium text-g-900">{{ getGoodsName(row.goods_id) }}</p>
-              <p class="text-xs text-g-500">已打 {{ row.work_days_ok_num || 0 }} / {{ row.work_days_num || 0 }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="时间设置" min-width="180">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm text-g-800">{{ row.work_time || '-' }} - {{ row.off_time || '-' }}</p>
-              <p class="text-xs text-g-500">截止 {{ row.work_deadline || '-' }}</p>
-              <p class="text-xs text-g-500">周期 {{ row.work_days || '-' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="状态" width="120" align="center">
-          <template #default="{ row }">
-            <div class="space-y-2">
-              <ElTag :type="getMainStatusType(row.status)" effect="plain">{{ getMainStatusText(row.status) }}</ElTag>
-              <ElTag :type="getSignStatusType(row.is_status)" effect="plain">{{ getSignStatusText(row.is_status) }}</ElTag>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="地址 / 备注" min-width="240">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="line-clamp-2 text-sm text-g-700">{{ row.address || '未填写地址' }}</p>
-              <p class="line-clamp-2 text-xs text-g-500">{{ row.remark || '暂无备注' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="操作" width="360" fixed="right">
-          <template #default="{ row }">
-            <div class="flex flex-wrap gap-2">
-              <ElButton size="small" @click="openEditDialog(row)">编辑</ElButton>
-              <ElButton size="small" @click="openSignInfoDialog(row)">签到信息</ElButton>
-              <ElButton size="small" type="success" plain @click="handleCheckIn(row)">上班</ElButton>
-              <ElButton size="small" type="primary" plain @click="handleCheckOut(row)">下班</ElButton>
-              <ElButton size="small" type="danger" plain @click="handleDelete(row)">删除</ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadOrders"
-        />
-      </div>
-    </section>
+      <ArtTable
+        :loading="loading"
+        :data="orders"
+        :columns="columns"
+        :pagination="tablePagination"
+        @pagination:current-change="loadOrders"
+        @pagination:size-change="handleSizeChange"
+      />
+    </ElCard>
 
     <ElDialog v-model="addVisible" title="新增凸知订单" width="860px">
       <div class="grid gap-5 lg:grid-cols-[1fr_300px]">
@@ -407,7 +342,8 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
   import {
     checkInLegacyTuzhiOrder,
     checkOutLegacyTuzhiOrder,
@@ -445,12 +381,21 @@
   const orders = ref<any[]>([])
   const goods = ref<LegacyTuzhiGoodsItem[]>([])
   const signInfoData = ref<any>(null)
-  const keyword = ref('')
 
   const pagination = reactive({
     page: 1,
     limit: 10,
     total: 0
+  })
+
+  const tablePagination = computed(() => ({
+    current: pagination.page,
+    size: pagination.limit,
+    total: pagination.total
+  }))
+
+  const filters = reactive({
+    keyword: ''
   })
 
   const addForm = reactive<Record<string, any>>({
@@ -487,6 +432,88 @@
   const normalCount = computed(() => orders.value.filter((item) => Number(item.is_status) === 1).length)
   const finishedCount = computed(() => orders.value.filter((item) => Number(item.status) === 3).length)
 
+  const searchItems = computed(() => [
+    {
+      label: '关键词',
+      key: 'keyword',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '搜索账号或姓名'
+      }
+    }
+  ])
+
+  const { columns, columnChecks } = useTableColumns<any>(() => [
+    {
+      prop: 'username',
+      label: '账号信息',
+      minWidth: 200,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-semibold text-g-900' }, row.username || '-'),
+          h('p', { class: 'text-xs text-g-500' }, row.nickname || '未填写姓名'),
+          h('p', { class: 'text-xs text-g-500' }, row.school || row.postname || '未填写学校/岗位')
+        ])
+    },
+    {
+      prop: 'goods_id',
+      label: '商品 / 天数',
+      minWidth: 180,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-medium text-g-900' }, getGoodsName(row.goods_id)),
+          h('p', { class: 'text-xs text-g-500' }, `已打 ${row.work_days_ok_num || 0} / ${row.work_days_num || 0}`)
+        ])
+    },
+    {
+      prop: 'work_time',
+      label: '时间设置',
+      minWidth: 180,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm text-g-800' }, `${row.work_time || '-'} - ${row.off_time || '-'}`),
+          h('p', { class: 'text-xs text-g-500' }, `截止 ${row.work_deadline || '-'}`),
+          h('p', { class: 'text-xs text-g-500' }, `周期 ${row.work_days || '-'}`)
+        ])
+    },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 120,
+      align: 'center',
+      formatter: (row) =>
+        h('div', { class: 'space-y-2' }, [
+          h(ElTag, { type: getMainStatusType(row.status), effect: 'plain' }, () => getMainStatusText(row.status)),
+          h(ElTag, { type: getSignStatusType(row.is_status), effect: 'plain' }, () => getSignStatusText(row.is_status))
+        ])
+    },
+    {
+      prop: 'address',
+      label: '地址 / 备注',
+      minWidth: 240,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'line-clamp-2 text-sm text-g-700' }, row.address || '未填写地址'),
+          h('p', { class: 'line-clamp-2 text-xs text-g-500' }, row.remark || '暂无备注')
+        ])
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 360,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElButton, { size: 'small', onClick: () => openEditDialog(row) }, () => '编辑'),
+          h(ElButton, { size: 'small', onClick: () => openSignInfoDialog(row) }, () => '签到信息'),
+          h(ElButton, { size: 'small', type: 'success', plain: true, onClick: () => handleCheckIn(row) }, () => '上班'),
+          h(ElButton, { size: 'small', type: 'primary', plain: true, onClick: () => handleCheckOut(row) }, () => '下班'),
+          h(ElButton, { size: 'small', type: 'danger', plain: true, onClick: () => handleDelete(row) }, () => '删除')
+        ])
+    }
+  ])
+
   const getGoodsName = (goodsId: number) =>
     goods.value.find((item) => Number(item.id) === Number(goodsId))?.display_name ||
     goods.value.find((item) => Number(item.id) === Number(goodsId))?.name ||
@@ -520,7 +547,7 @@
   }
 
   const resetFilters = () => {
-    keyword.value = ''
+    filters.keyword = ''
     loadOrders(1)
   }
 
@@ -564,7 +591,7 @@
       const result = await fetchLegacyTuzhiOrders({
         page: pagination.page,
         limit: pagination.limit,
-        keyword: keyword.value || undefined
+        keyword: filters.keyword || undefined
       })
       orders.value = Array.isArray(result?.list) ? result.list : []
       pagination.total = Number(result?.total || 0)
@@ -579,6 +606,15 @@
     }
     resetAddForm()
     addVisible.value = true
+  }
+
+  const handleSearch = () => {
+    loadOrders(1)
+  }
+
+  const handleSizeChange = (size: number) => {
+    pagination.limit = size
+    loadOrders(1)
   }
 
   const handleAdd = async () => {

@@ -1,23 +1,15 @@
 <template>
-  <div class="flex min-h-[calc(100vh-180px)] flex-col gap-5">
-    <section class="art-card-sm p-5">
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.2fr_180px_220px_auto]">
-        <ElInput v-model="filters.keyword" clearable placeholder="搜索账号、姓名或学校" @keyup.enter="loadOrders(1)" />
-        <ElSelect v-model="filters.status" clearable placeholder="状态筛选">
-          <ElOption v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
-        </ElSelect>
-        <ElSelect v-model="filters.cid" clearable filterable placeholder="项目筛选">
-          <ElOption v-for="item in projects" :key="item.cid" :label="item.name" :value="item.cid" />
-        </ElSelect>
-        <div class="flex flex-wrap gap-3">
-          <ElButton type="primary" @click="loadOrders(1)">查询</ElButton>
-          <ElButton plain @click="resetFilters">重置</ElButton>
-        </div>
-      </div>
-    </section>
+  <div class="plugin-yfdk-page art-full-height">
+    <ArtSearchBar
+      v-model="filters"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="resetFilters"
+    />
 
-    <section class="art-card-sm overflow-hidden">
-      <ArtTableHeader :loading="loading" layout="refresh" @refresh="loadOrders(pagination.page)">
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadOrders(pagination.page)">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">当前页 {{ orders.length }} 条</ElTag>
@@ -28,83 +20,15 @@
         </template>
       </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="orders" class="w-full" size="large">
-        <ElTableColumn label="账号信息" min-width="220">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-semibold text-g-900">{{ row.username }}</p>
-              <p class="text-xs text-g-500">密码 {{ row.password || '-' }}</p>
-              <p class="text-xs text-g-500">{{ row.school || row.name || '未填写学校/姓名' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="项目" min-width="120">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-medium text-g-900">{{ getProjectName(row.cid) }}</p>
-              <p class="text-xs text-g-500">CID {{ row.cid }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="订单信息" min-width="180">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-medium text-[var(--el-color-danger)]">¥{{ Number(row.total_fee || 0).toFixed(2) }}</p>
-              <p class="text-xs text-g-500">{{ row.day }} 天，单日 ¥{{ Number(row.daily_fee || 0).toFixed(2) }}</p>
-              <p class="text-xs text-g-500">创建于 {{ row.create_time || '-' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="状态" width="120" align="center">
-          <template #default="{ row }">
-            <ElTag :type="getStatusType(row)" effect="plain">{{ getStatusText(row) }}</ElTag>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="到期时间" min-width="150">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-medium text-g-900">{{ row.endtime || '-' }}</p>
-              <p class="text-xs text-g-500">{{ formatRemainDays(row.endtime) }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="最近日志" min-width="220">
-          <template #default="{ row }">
-            <span class="line-clamp-2 text-sm text-g-500">{{ row.mark || '暂无日志' }}</span>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="操作" width="320" fixed="right">
-          <template #default="{ row }">
-            <div class="flex flex-wrap gap-2">
-              <ElButton size="small" @click="handleToggleStatus(row)">
-                {{ row.status === 1 ? '暂停' : '启用' }}
-              </ElButton>
-              <ElButton size="small" @click="handleManualClock(row)">手动打卡</ElButton>
-              <ElButton size="small" @click="openRenewDialog(row)">续费</ElButton>
-              <ElButton size="small" @click="openLogsDialog(row)">日志</ElButton>
-              <ElButton size="small" type="danger" plain @click="handleDelete(row)">删除</ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadOrders"
-        />
-      </div>
-    </section>
+      <ArtTable
+        :loading="loading"
+        :data="orders"
+        :columns="columns"
+        :pagination="tablePagination"
+        @pagination:current-change="loadOrders"
+        @pagination:size-change="handleSizeChange"
+      />
+    </ElCard>
 
     <ElDialog v-model="addVisible" title="新增 YF 打卡订单" width="760px">
       <div class="grid gap-5 lg:grid-cols-[1fr_280px]">
@@ -245,7 +169,8 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
   import {
     createLegacyYFDKOrder,
     deleteLegacyYFDKOrder,
@@ -288,6 +213,12 @@
     cid: ''
   })
 
+  const tablePagination = computed(() => ({
+    current: pagination.page,
+    size: pagination.limit,
+    total: pagination.total
+  }))
+
   const addForm = reactive({
     cid: '',
     user: '',
@@ -316,6 +247,42 @@
 
   const runningCount = computed(() => orders.value.filter((item) => item.status === 1).length)
   const expiringCount = computed(() => orders.value.filter((item) => getRemainDays(item.endtime) <= 3 && getRemainDays(item.endtime) >= 0).length)
+
+  const searchItems = computed(() => [
+    {
+      label: '关键词',
+      key: 'keyword',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '搜索账号、姓名或学校'
+      }
+    },
+    {
+      label: '状态',
+      key: 'status',
+      type: 'select',
+      props: {
+        clearable: true,
+        placeholder: '状态筛选',
+        options: statusOptions
+      }
+    },
+    {
+      label: '项目',
+      key: 'cid',
+      type: 'select',
+      props: {
+        clearable: true,
+        filterable: true,
+        placeholder: '项目筛选',
+        options: projects.value.map((item) => ({
+          label: item.name,
+          value: item.cid
+        }))
+      }
+    }
+  ])
 
   const getRemainDays = (value?: string) => {
     if (!value) return 0
@@ -348,6 +315,78 @@
     if (order.status === 1) return days <= 3 ? 'warning' : 'success'
     return 'info'
   }
+
+  const { columns, columnChecks } = useTableColumns<LegacyYFDKOrder>(() => [
+    {
+      prop: 'username',
+      label: '账号信息',
+      minWidth: 220,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-semibold text-g-900' }, row.username || '-'),
+          h('p', { class: 'text-xs text-g-500' }, `密码 ${row.password || '-'}`),
+          h('p', { class: 'text-xs text-g-500' }, row.school || row.name || '未填写学校/姓名')
+        ])
+    },
+    {
+      prop: 'cid',
+      label: '项目',
+      minWidth: 140,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-medium text-g-900' }, getProjectName(row.cid)),
+          h('p', { class: 'text-xs text-g-500' }, `CID ${row.cid || '-'}`)
+        ])
+    },
+    {
+      prop: 'total_fee',
+      label: '订单信息',
+      minWidth: 190,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-medium text-[var(--el-color-danger)]' }, `¥${Number(row.total_fee || 0).toFixed(2)}`),
+          h('p', { class: 'text-xs text-g-500' }, `${row.day || 0} 天，单日 ¥${Number(row.daily_fee || 0).toFixed(2)}`),
+          h('p', { class: 'text-xs text-g-500' }, `创建于 ${row.create_time || '-'}`)
+        ])
+    },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 120,
+      align: 'center',
+      formatter: (row) => h(ElTag, { type: getStatusType(row), effect: 'plain' }, () => getStatusText(row))
+    },
+    {
+      prop: 'endtime',
+      label: '到期时间',
+      minWidth: 150,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-medium text-g-900' }, row.endtime || '-'),
+          h('p', { class: 'text-xs text-g-500' }, formatRemainDays(row.endtime))
+        ])
+    },
+    {
+      prop: 'mark',
+      label: '最近日志',
+      minWidth: 220,
+      formatter: (row) => h('span', { class: 'line-clamp-2 text-sm text-g-500' }, row.mark || '暂无日志')
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 320,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElButton, { size: 'small', onClick: () => handleToggleStatus(row) }, () => (row.status === 1 ? '暂停' : '启用')),
+          h(ElButton, { size: 'small', onClick: () => handleManualClock(row) }, () => '手动打卡'),
+          h(ElButton, { size: 'small', onClick: () => openRenewDialog(row) }, () => '续费'),
+          h(ElButton, { size: 'small', onClick: () => openLogsDialog(row) }, () => '日志'),
+          h(ElButton, { size: 'small', type: 'danger', plain: true, onClick: () => handleDelete(row) }, () => '删除')
+        ])
+    }
+  ])
 
   const resetAddForm = () => {
     Object.assign(addForm, {
@@ -393,10 +432,19 @@
     }
   }
 
+  const handleSearch = () => {
+    loadOrders(1)
+  }
+
   const resetFilters = () => {
     filters.keyword = ''
     filters.status = ''
     filters.cid = ''
+    loadOrders(1)
+  }
+
+  const handleSizeChange = (size: number) => {
+    pagination.limit = size
     loadOrders(1)
   }
 

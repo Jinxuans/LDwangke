@@ -116,53 +116,12 @@
             </div>
 
             <div class="hidden md:block">
-              <ElTable
+              <ArtTable
                 :data="list"
-                border
-                stripe
-                empty-text="暂无数据"
-                style="width: 100%"
-              >
-                <ElTableColumn prop="oid" label="订单号" width="96" align="center" />
-                <ElTableColumn prop="ptname" label="平台" min-width="140" />
-                <ElTableColumn prop="account" label="账号信息" min-width="220" show-overflow-tooltip />
-                <ElTableColumn prop="kcname" label="课程名称" min-width="220" show-overflow-tooltip />
-                <ElTableColumn label="状态" width="110" align="center">
-                  <template #default="{ row }">
-                    <ElTag :type="statusMeta(row.status).type">{{ statusMeta(row.status).label }}</ElTag>
-                  </template>
-                </ElTableColumn>
-                <ElTableColumn prop="process" label="进度" width="130" align="center" show-overflow-tooltip />
-                <ElTableColumn prop="remarks" label="备注" min-width="180" show-overflow-tooltip />
-                <ElTableColumn prop="addtime" label="时间" width="170" />
-                <ElTableColumn label="操作" min-width="240" fixed="right">
-                  <template #default="{ row }">
-                    <div class="flex flex-wrap gap-2">
-                      <ElButton
-                        size="small"
-                        @click="row.pushUid ? handleUnbindWx(row.account || '') : openWxBind(row.account || '')"
-                      >
-                        {{ row.pushUid ? '解绑微信' : '绑定微信' }}
-                      </ElButton>
-                      <ElButton
-                        size="small"
-                        @click="row.pushEmail ? handleUnbindEmail(row.account || '') : openEmailBind(row.account || '')"
-                      >
-                        {{ row.pushEmail ? '解绑邮箱' : '绑定邮箱' }}
-                      </ElButton>
-                      <ElButton
-                        v-if="row.status !== '等待中'"
-                        size="small"
-                        type="primary"
-                        plain
-                        @click="handlePupLogin(row.oid)"
-                      >
-                        一键登录
-                      </ElButton>
-                    </div>
-                  </template>
-                </ElTableColumn>
-              </ElTable>
+                :columns="columns"
+                :show-table-header="true"
+                row-key="oid"
+              />
             </div>
           </div>
         </div>
@@ -202,8 +161,9 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onUnmounted, reactive, ref } from 'vue'
+  import { computed, h, onUnmounted, reactive, ref } from 'vue'
   import QrcodeVue from 'qrcode.vue'
+  import { ElButton, ElMessage, ElTag } from 'element-plus'
   import {
     bindLegacyEmailPush,
     bindLegacyWxPush,
@@ -215,7 +175,7 @@
     unbindLegacyEmailPush,
     unbindLegacyWxPush
   } from '@/api/legacy/auxiliary'
-  import { ElMessage } from 'element-plus'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
 
   defineOptions({ name: 'PublicQueryPage' })
 
@@ -260,6 +220,45 @@
         return { label: status || '等待中', type: 'info' as const }
     }
   }
+
+  const { columns } = useTableColumns<LegacyCheckOrderResult>(() => [
+    { prop: 'oid', label: '订单号', width: 96, align: 'center' },
+    { prop: 'ptname', label: '平台', minWidth: 140, formatter: (row) => row.ptname || '-' },
+    { prop: 'account', label: '账号信息', minWidth: 220, formatter: (row) => row.account || '-' },
+    { prop: 'kcname', label: '课程名称', minWidth: 220, formatter: (row) => row.kcname || '-' },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 110,
+      align: 'center',
+      formatter: (row) => h(ElTag, { type: statusMeta(row.status).type }, () => statusMeta(row.status).label)
+    },
+    { prop: 'process', label: '进度', width: 130, align: 'center', formatter: (row) => row.process || '-' },
+    { prop: 'remarks', label: '备注', minWidth: 180, formatter: (row) => row.remarks || '-' },
+    { prop: 'addtime', label: '时间', width: 170, formatter: (row) => row.addtime || '-' },
+    {
+      prop: 'operation',
+      label: '操作',
+      minWidth: 240,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(
+            ElButton,
+            { size: 'small', onClick: () => (row.pushUid ? handleUnbindWx(row.account || '') : openWxBind(row.account || '')) },
+            () => (row.pushUid ? '解绑微信' : '绑定微信')
+          ),
+          h(
+            ElButton,
+            { size: 'small', onClick: () => (row.pushEmail ? handleUnbindEmail(row.account || '') : openEmailBind(row.account || '')) },
+            () => (row.pushEmail ? '解绑邮箱' : '绑定邮箱')
+          ),
+          row.status !== '等待中'
+            ? h(ElButton, { size: 'small', type: 'primary', plain: true, onClick: () => handlePupLogin(row.oid) }, () => '一键登录')
+            : null
+        ])
+    }
+  ])
 
   const stopWxPolling = () => {
     if (wxPollingTimer.value) {

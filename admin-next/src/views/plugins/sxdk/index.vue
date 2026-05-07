@@ -1,20 +1,15 @@
 <template>
-  <div class="flex min-h-[calc(100vh-180px)] flex-col gap-5">
-    <section class="art-card-sm p-5">
-      <div class="grid gap-4 md:grid-cols-[120px_1fr_auto]">
-        <ElSelect v-model="searchField" placeholder="搜索项">
-          <ElOption v-for="item in searchFieldOptions" :key="item.value" :label="item.label" :value="item.value" />
-        </ElSelect>
-        <ElInput v-model="searchValue" clearable placeholder="输入手机号、姓名或平台" @keyup.enter="loadOrders(1)" />
-        <div class="flex flex-wrap gap-3">
-          <ElButton type="primary" @click="loadOrders(1)">查询</ElButton>
-          <ElButton plain @click="resetFilters">重置</ElButton>
-        </div>
-      </div>
-    </section>
+  <div class="plugin-sxdk-page art-full-height">
+    <ArtSearchBar
+      v-model="filters"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="resetFilters"
+    />
 
-    <section class="art-card-sm overflow-hidden">
-      <ArtTableHeader :loading="loading || syncing" layout="refresh" @refresh="loadOrders(pagination.page)">
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading || syncing" @refresh="loadOrders(pagination.page)">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">当前页 {{ orders.length }} 条</ElTag>
@@ -26,83 +21,15 @@
         </template>
       </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="orders" size="large">
-        <ElTableColumn label="平台" width="120">
-          <template #default="{ row }">
-            <ElTag effect="plain" type="primary">{{ getPlatformLabel(row.platform) }}</ElTag>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="账号信息" min-width="220">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-semibold text-g-900">{{ row.phone }}</p>
-              <p class="text-xs text-g-500">密码 {{ row.password || '-' }}</p>
-              <p class="text-xs text-g-500">{{ row.name || '未填写姓名' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="打卡时间" min-width="180">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm text-g-800">上班 {{ row.up_check_time || '-' }}</p>
-              <p class="text-sm text-g-800">下班 {{ row.down_check_time || '-' }}</p>
-              <p class="text-xs text-g-500">周期 {{ row.check_week || '-' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="状态" width="120" align="center">
-          <template #default="{ row }">
-            <ElTag :type="getStatusType(row)" effect="plain">{{ getStatusText(row) }}</ElTag>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="到期时间" min-width="160">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-medium text-g-900">{{ row.end_time || '-' }}</p>
-              <p class="text-xs text-g-500">{{ formatRemainDays(row.end_time) }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="地址 / 备注" min-width="220">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="line-clamp-2 text-sm text-g-700">{{ row.address || '未填写地址' }}</p>
-              <p class="line-clamp-2 text-xs text-g-500">{{ row.remark || row.wxpush || '暂无备注' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="操作" width="360" fixed="right">
-          <template #default="{ row }">
-            <div class="flex flex-wrap gap-2">
-              <ElButton size="small" @click="handleToggleStatus(row)">
-                {{ row.code === 1 ? '暂停' : '启用' }}
-              </ElButton>
-              <ElButton size="small" @click="handleNowCheck(row)">立即打卡</ElButton>
-              <ElButton size="small" @click="openEditDialog(row)">编辑</ElButton>
-              <ElButton size="small" @click="openLogDialog(row)">日志</ElButton>
-              <ElButton size="small" type="danger" plain @click="handleDelete(row)">删除</ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.size"
-          :total="pagination.total"
-          @current-change="loadOrders"
-        />
-      </div>
-    </section>
+      <ArtTable
+        :loading="loading"
+        :data="orders"
+        :columns="columns"
+        :pagination="tablePagination"
+        @pagination:current-change="loadOrders"
+        @pagination:size-change="handleSizeChange"
+      />
+    </ElCard>
 
     <ElDialog v-model="addVisible" title="新增泰山打卡订单" width="720px">
       <div class="grid gap-5 lg:grid-cols-[1fr_280px]">
@@ -304,8 +231,9 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
   import { useUserStore } from '@/store/modules/user'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
   import {
     changeLegacySXDKCheckCode,
     createLegacySXDKOrder,
@@ -352,14 +280,23 @@
   const logData = ref<any>(null)
 
   const orders = ref<LegacySXDKOrder[]>([])
-  const searchField = ref('phone')
-  const searchValue = ref('')
 
   const pagination = reactive({
     page: 1,
     size: 10,
     total: 0
   })
+
+  const filters = reactive({
+    searchField: 'phone',
+    searchValue: ''
+  })
+
+  const tablePagination = computed(() => ({
+    current: pagination.page,
+    size: pagination.size,
+    total: pagination.total
+  }))
 
   const addForm = reactive({
     platform: '',
@@ -402,6 +339,27 @@
     () => orders.value.filter((item) => getRemainDays(item.end_time) <= 3 && getRemainDays(item.end_time) >= 0).length
   )
 
+  const searchItems = computed(() => [
+    {
+      label: '搜索项',
+      key: 'searchField',
+      type: 'select',
+      props: {
+        placeholder: '搜索项',
+        options: searchFieldOptions
+      }
+    },
+    {
+      label: '关键词',
+      key: 'searchValue',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '输入手机号、姓名或平台'
+      }
+    }
+  ])
+
   const getPlatformLabel = (value: string) => platformOptions.find((item) => item.value === value)?.label || value
 
   const getRemainDays = (endTime?: string) => {
@@ -440,9 +398,82 @@
     addForm.end_time = next.toISOString().slice(0, 10)
   }
 
+  const { columns, columnChecks } = useTableColumns<LegacySXDKOrder>(() => [
+    {
+      prop: 'platform',
+      label: '平台',
+      width: 120,
+      align: 'center',
+      formatter: (row) => h(ElTag, { effect: 'plain', type: 'primary' }, () => getPlatformLabel(row.platform))
+    },
+    {
+      prop: 'phone',
+      label: '账号信息',
+      minWidth: 220,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-semibold text-g-900' }, row.phone || '-'),
+          h('p', { class: 'text-xs text-g-500' }, `密码 ${row.password || '-'}`),
+          h('p', { class: 'text-xs text-g-500' }, row.name || '未填写姓名')
+        ])
+    },
+    {
+      prop: 'up_check_time',
+      label: '打卡时间',
+      minWidth: 180,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm text-g-800' }, `上班 ${row.up_check_time || '-'}`),
+          h('p', { class: 'text-sm text-g-800' }, `下班 ${row.down_check_time || '-'}`),
+          h('p', { class: 'text-xs text-g-500' }, `周期 ${row.check_week || '-'}`)
+        ])
+    },
+    {
+      prop: 'code',
+      label: '状态',
+      width: 120,
+      align: 'center',
+      formatter: (row) => h(ElTag, { type: getStatusType(row), effect: 'plain' }, () => getStatusText(row))
+    },
+    {
+      prop: 'end_time',
+      label: '到期时间',
+      minWidth: 160,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-medium text-g-900' }, row.end_time || '-'),
+          h('p', { class: 'text-xs text-g-500' }, formatRemainDays(row.end_time))
+        ])
+    },
+    {
+      prop: 'address',
+      label: '地址 / 备注',
+      minWidth: 220,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'line-clamp-2 text-sm text-g-700' }, row.address || '未填写地址'),
+          h('p', { class: 'line-clamp-2 text-xs text-g-500' }, row.remark || row.wxpush || '暂无备注')
+        ])
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 360,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElButton, { size: 'small', onClick: () => handleToggleStatus(row) }, () => (row.code === 1 ? '暂停' : '启用')),
+          h(ElButton, { size: 'small', onClick: () => handleNowCheck(row) }, () => '立即打卡'),
+          h(ElButton, { size: 'small', onClick: () => openEditDialog(row) }, () => '编辑'),
+          h(ElButton, { size: 'small', onClick: () => openLogDialog(row) }, () => '日志'),
+          h(ElButton, { size: 'small', type: 'danger', plain: true, onClick: () => handleDelete(row) }, () => '删除')
+        ])
+    }
+  ])
+
   const resetFilters = () => {
-    searchField.value = 'phone'
-    searchValue.value = ''
+    filters.searchField = 'phone'
+    filters.searchValue = ''
     loadOrders(1)
   }
 
@@ -468,14 +499,23 @@
       const result = await fetchLegacySXDKOrders({
         page: pagination.page,
         size: pagination.size,
-        searchField: searchValue.value ? searchField.value : undefined,
-        searchValue: searchValue.value || undefined
+        searchField: filters.searchValue ? filters.searchField : undefined,
+        searchValue: filters.searchValue || undefined
       })
       orders.value = Array.isArray(result?.list) ? result.list : []
       pagination.total = Number(result?.total || 0)
     } finally {
       loading.value = false
     }
+  }
+
+  const handleSearch = () => {
+    loadOrders(1)
+  }
+
+  const handleSizeChange = (size: number) => {
+    pagination.size = size
+    loadOrders(1)
   }
 
   const openAddDialog = () => {

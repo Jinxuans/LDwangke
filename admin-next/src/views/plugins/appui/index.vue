@@ -1,20 +1,15 @@
 <template>
-  <div class="flex min-h-[calc(100vh-180px)] flex-col gap-5">
-    <section class="art-card-sm p-5">
-      <div class="grid gap-4 md:grid-cols-[140px_1fr_auto]">
-        <ElSelect v-model="search.type" placeholder="搜索项">
-          <ElOption v-for="item in searchTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
-        </ElSelect>
-        <ElInput v-model="search.keyword" clearable placeholder="输入关键词" @keyup.enter="loadOrders(1)" />
-        <div class="flex flex-wrap gap-3">
-          <ElButton type="primary" @click="loadOrders(1)">查询</ElButton>
-          <ElButton plain @click="resetFilters">重置</ElButton>
-        </div>
-      </div>
-    </section>
+  <div class="plugin-appui-page art-full-height">
+    <ArtSearchBar
+      v-model="search"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="resetFilters"
+    />
 
-    <section class="art-card-sm overflow-hidden">
-      <ArtTableHeader :loading="loading" layout="refresh" @refresh="loadOrders(pagination.page)">
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadOrders(pagination.page)">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">平台 {{ courses.length }} 个</ElTag>
@@ -25,79 +20,15 @@
         </template>
       </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="orders" size="large">
-        <ElTableColumn label="平台" min-width="180">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-semibold text-g-900">{{ getCourseName(row.pid) }}</p>
-              <p class="text-xs text-g-500">PID {{ row.pid }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="账号信息" min-width="180">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-semibold text-g-900">{{ row.user }}</p>
-              <p class="text-xs text-g-500">密码 {{ row.pass || '-' }}</p>
-              <p class="text-xs text-g-500">{{ row.name || row.school || '未填写姓名/学校' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="天数 / 状态" min-width="170">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm text-g-800">剩余 {{ row.residue_day }} / 总计 {{ row.total_day }}</p>
-              <ElTag :type="getStatusType(row.status)" effect="plain">{{ row.status }}</ElTag>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="工作时间" min-width="180">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm text-g-800">{{ row.shangban_time || '-' }} - {{ row.xiaban_time || '-' }}</p>
-              <p class="text-xs text-g-500">周期 {{ row.week || '-' }}</p>
-              <p class="text-xs text-g-500">报表 {{ row.report || '-' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="签到地址" min-width="220">
-          <template #default="{ row }">
-            <span class="line-clamp-2 text-sm text-g-500">{{ row.address || '未填写地址' }}</span>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="下单时间" min-width="160">
-          <template #default="{ row }">
-            <span class="text-sm text-g-500">{{ row.addtime || '-' }}</span>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="操作" width="280" fixed="right">
-          <template #default="{ row }">
-            <div class="flex flex-wrap gap-2">
-              <ElButton size="small" @click="openEditDialog(row)">编辑</ElButton>
-              <ElButton size="small" @click="openRenewDialog(row)">续费</ElButton>
-              <ElButton size="small" type="danger" plain @click="handleDelete(row)">退款</ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadOrders"
-        />
-      </div>
-    </section>
+      <ArtTable
+        :loading="loading"
+        :data="orders"
+        :columns="columns"
+        :pagination="tablePagination"
+        @pagination:current-change="loadOrders"
+        @pagination:size-change="handleSizeChange"
+      />
+    </ElCard>
 
     <ElDialog v-model="addVisible" title="新增 Appui 订单" width="760px">
       <div class="grid gap-5 lg:grid-cols-[1fr_280px]">
@@ -315,7 +246,8 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
   import {
     createLegacyAppuiOrder,
     deleteLegacyAppuiOrder,
@@ -377,6 +309,12 @@
     keyword: ''
   })
 
+  const tablePagination = computed(() => ({
+    current: pagination.page,
+    size: pagination.limit,
+    total: pagination.total
+  }))
+
   const addForm = reactive({
     pid: '',
     week: [] as string[],
@@ -412,6 +350,27 @@
   const showSchoolInput = computed(() => selectedCourse.value?.yes_school === 1)
   const processingCount = computed(() => orders.value.filter((item) => item.status === '进行中').length)
 
+  const searchItems = computed(() => [
+    {
+      label: '搜索项',
+      key: 'type',
+      type: 'select',
+      props: {
+        placeholder: '搜索项',
+        options: searchTypeOptions
+      }
+    },
+    {
+      label: '关键词',
+      key: 'keyword',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '输入关键词'
+      }
+    }
+  ])
+
   const getCourseName = (pid: string) => courses.value.find((item) => item.pid === pid)?.name || pid
 
   const getStatusType = (status: string) => {
@@ -427,6 +386,74 @@
     search.keyword = ''
     loadOrders(1)
   }
+
+  const { columns, columnChecks } = useTableColumns<LegacyAppuiOrder>(() => [
+    {
+      prop: 'pid',
+      label: '平台',
+      minWidth: 180,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-semibold text-g-900' }, getCourseName(row.pid)),
+          h('p', { class: 'text-xs text-g-500' }, `PID ${row.pid}`)
+        ])
+    },
+    {
+      prop: 'user',
+      label: '账号信息',
+      minWidth: 180,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-semibold text-g-900' }, row.user || '-'),
+          h('p', { class: 'text-xs text-g-500' }, `密码 ${row.pass || '-'}`),
+          h('p', { class: 'text-xs text-g-500' }, row.name || row.school || '未填写姓名/学校')
+        ])
+    },
+    {
+      prop: 'residue_day',
+      label: '天数 / 状态',
+      minWidth: 170,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm text-g-800' }, `剩余 ${row.residue_day} / 总计 ${row.total_day}`),
+          h(ElTag, { type: getStatusType(row.status), effect: 'plain' }, () => row.status)
+        ])
+    },
+    {
+      prop: 'shangban_time',
+      label: '工作时间',
+      minWidth: 180,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm text-g-800' }, `${row.shangban_time || '-'} - ${row.xiaban_time || '-'}`),
+          h('p', { class: 'text-xs text-g-500' }, `周期 ${row.week || '-'}`),
+          h('p', { class: 'text-xs text-g-500' }, `报表 ${row.report || '-'}`)
+        ])
+    },
+    {
+      prop: 'address',
+      label: '签到地址',
+      minWidth: 220,
+      formatter: (row) => h('span', { class: 'line-clamp-2 text-sm text-g-500' }, row.address || '未填写地址')
+    },
+    {
+      prop: 'addtime',
+      label: '下单时间',
+      minWidth: 160
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 280,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElButton, { size: 'small', onClick: () => openEditDialog(row) }, () => '编辑'),
+          h(ElButton, { size: 'small', onClick: () => openRenewDialog(row) }, () => '续费'),
+          h(ElButton, { size: 'small', type: 'danger', plain: true, onClick: () => handleDelete(row) }, () => '退款')
+        ])
+    }
+  ])
 
   const resetAddForm = () => {
     addForm.pid = ''
@@ -462,6 +489,15 @@
     } finally {
       loading.value = false
     }
+  }
+
+  const handleSearch = () => {
+    loadOrders(1)
+  }
+
+  const handleSizeChange = (size: number) => {
+    pagination.limit = size
+    loadOrders(1)
   }
 
   const calcAddPrice = async () => {

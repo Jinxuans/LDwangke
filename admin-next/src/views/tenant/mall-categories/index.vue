@@ -1,20 +1,15 @@
 <template>
   <div class="tenant-mall-categories-page art-full-height">
-    <ElCard class="art-table-card">
-      <div class="grid gap-4 lg:grid-cols-[1fr_auto]">
-        <div>
-          <label class="mb-2 block text-sm font-medium text-g-800">关键词</label>
-          <ElInput v-model="keyword" clearable placeholder="搜索分类名称" />
-        </div>
-        <div class="flex items-end gap-3">
-          <ElButton @click="keyword = ''">重置</ElButton>
-          <ElButton type="primary" @click="openCreateDialog">新增</ElButton>
-        </div>
-      </div>
-    </ElCard>
+    <ArtSearchBar
+      v-model="searchForm"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="handleReset"
+    />
 
-    <ElCard class="art-table-card mt-4">
-      <ArtTableHeader :loading="loading" layout="refresh" @refresh="loadData">
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadData">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">商城分类</ElTag>
@@ -25,39 +20,12 @@
             </ElButton>
           </ElSpace>
         </template>
+        <template #right>
+          <ElButton type="primary" plain @click="openCreateDialog">新增</ElButton>
+        </template>
       </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="filteredList" row-key="id">
-        <ElTableColumn prop="id" label="ID" width="90" align="center" />
-        <ElTableColumn prop="name" label="分类名称" min-width="220" />
-        <ElTableColumn label="排序" width="160" align="center">
-          <template #default="{ row }">
-            <ElInputNumber
-              v-model="row.sort"
-              class="w-full"
-              :min="0"
-              :step="1"
-              @change="markSortChanged(row)"
-            />
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="状态" width="120" align="center">
-          <template #default="{ row }">
-            <ElTag :type="Number(row.status) === 1 ? 'success' : 'info'" effect="plain">
-              {{ Number(row.status) === 1 ? '启用' : '禁用' }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="addtime" label="添加时间" width="180" />
-        <ElTableColumn label="操作" width="160" fixed="right">
-          <template #default="{ row }">
-            <div class="flex items-center gap-2">
-              <ElButton text type="primary" @click="openEditDialog(row)">编辑</ElButton>
-              <ElButton text type="danger" @click="handleDelete(row)">删除</ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
+      <ArtTable :loading="loading" :data="filteredList" :columns="columns" :show-table-header="true" row-key="id" />
     </ElCard>
 
     <ElDialog v-model="dialogVisible" :title="form.id ? '编辑分类' : '新增分类'" width="520px" destroy-on-close>
@@ -94,6 +62,7 @@
 </template>
 
 <script setup lang="ts">
+  import { h } from 'vue'
   import {
     deleteTenantMallCategory,
     fetchTenantMallCategories,
@@ -101,7 +70,8 @@
     updateTenantMallCategorySort,
     type LegacyTenantMallCategory
   } from '@/api/legacy/tenant'
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { ElButton, ElInputNumber, ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
 
   defineOptions({ name: 'TenantMallCategoriesPage' })
 
@@ -110,6 +80,9 @@
   const sortSaving = ref(false)
   const dialogVisible = ref(false)
   const keyword = ref('')
+  const searchForm = ref({
+    keyword: ''
+  })
 
   const list = ref<LegacyTenantMallCategory[]>([])
   const originalSortMap = ref<Record<number, number>>({})
@@ -133,6 +106,62 @@
       list.value.filter((item) => Number(originalSortMap.value[item.id]) !== Number(item.sort || 0)).length
   )
 
+  const searchItems = computed(() => [
+    {
+      label: '关键词',
+      key: 'keyword',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '搜索分类名称'
+      }
+    }
+  ])
+
+  const { columns, columnChecks } = useTableColumns<LegacyTenantMallCategory>(() => [
+    { prop: 'id', label: 'ID', width: 90, align: 'center' },
+    { prop: 'name', label: '分类名称', minWidth: 220 },
+    {
+      prop: 'sort',
+      label: '排序',
+      width: 160,
+      align: 'center',
+      formatter: (row) =>
+        h(ElInputNumber, {
+          modelValue: row.sort,
+          class: 'w-full',
+          min: 0,
+          step: 1,
+          'onUpdate:modelValue': (value: number) => {
+            row.sort = Number(value || 0)
+          },
+          onChange: () => markSortChanged(row)
+        })
+    },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 120,
+      align: 'center',
+      formatter: (row) =>
+        h(ElTag, { type: Number(row.status) === 1 ? 'success' : 'info', effect: 'plain' }, () =>
+          Number(row.status) === 1 ? '启用' : '禁用'
+        )
+    },
+    { prop: 'addtime', label: '添加时间', width: 180 },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 160,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex items-center gap-2' }, [
+          h(ElButton, { text: true, type: 'primary', onClick: () => openEditDialog(row) }, () => '编辑'),
+          h(ElButton, { text: true, type: 'danger', onClick: () => handleDelete(row) }, () => '删除')
+        ])
+    }
+  ])
+
   function resetForm() {
     Object.assign(form, {
       id: 0,
@@ -140,6 +169,15 @@
       sort: 10,
       status: 1
     })
+  }
+
+  function handleSearch(params: { keyword?: string }) {
+    keyword.value = params.keyword?.trim() || ''
+  }
+
+  function handleReset() {
+    keyword.value = ''
+    searchForm.value.keyword = ''
   }
 
   function syncOriginalSortMap(items: LegacyTenantMallCategory[]) {

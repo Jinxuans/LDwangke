@@ -165,7 +165,7 @@
     </section>
 
     <ElCard class="art-table-card">
-      <ArtTableHeader :loading="loading" layout="refresh" @refresh="loadOrders(pagination.page)">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadOrders(pagination.current)">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">充值记录</ElTag>
@@ -176,52 +176,22 @@
         </template>
       </ArtTableHeader>
 
-      <ElTable :data="orders" v-loading="loading" stripe class="w-full">
-        <ElTableColumn prop="out_trade_no" label="订单号" min-width="220" />
-        <ElTableColumn label="金额" width="120" align="right">
-          <template #default="{ row }">
-            <span class="font-semibold text-[var(--el-color-success)]">¥{{ formatMoney(row.money) }}</span>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="状态" width="110">
-          <template #default="{ row }">
-            <ElTag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="addtime" label="创建时间" width="180" />
-        <ElTableColumn label="操作" width="120" fixed="right">
-          <template #default="{ row }">
-            <ElButton
-              v-if="row.status === 0"
-              text
-              type="primary"
-              @click="handleCheckPay(row.out_trade_no)"
-            >
-              检测到账
-            </ElButton>
-            <span v-else class="text-sm text-g-400">已完成</span>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadOrders"
-        />
-      </div>
+      <ArtTable
+        :loading="loading"
+        :data="orders"
+        :columns="columns"
+        :pagination="pagination"
+        @pagination:current-change="handleCurrentChange"
+        @pagination:size-change="handleSizeChange"
+      />
     </ElCard>
   </div>
 </template>
 
 <script setup lang="ts">
-  import { nextTick } from 'vue'
+  import { h, nextTick } from 'vue'
   import { storeToRefs } from 'pinia'
-  import { ElMessage } from 'element-plus'
+  import { ElButton, ElMessage, ElTag } from 'element-plus'
   import { useRouter } from 'vue-router'
   import {
     checkLegacyPayStatus,
@@ -233,6 +203,7 @@
     type LegacyPayOrder
   } from '@/api/legacy/user-center'
   import { useSiteStore } from '@/store/modules/site'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
 
   defineOptions({ name: 'UserRechargePage' })
 
@@ -273,8 +244,8 @@
   const loading = ref(false)
   const orders = ref<LegacyPayOrder[]>([])
   const pagination = reactive({
-    page: 1,
-    limit: 10,
+    current: 1,
+    size: 10,
     total: 0
   })
 
@@ -347,6 +318,35 @@
     return 'primary'
   }
 
+  const { columns, columnChecks } = useTableColumns<LegacyPayOrder>(() => [
+    { prop: 'out_trade_no', label: '订单号', minWidth: 220 },
+    {
+      prop: 'money',
+      label: '金额',
+      width: 120,
+      align: 'right',
+      formatter: (row) =>
+        h('span', { class: 'font-semibold text-[var(--el-color-success)]' }, `¥${formatMoney(row.money)}`)
+    },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 110,
+      formatter: (row) => h(ElTag, { type: getStatusType(row.status), effect: 'plain' }, () => getStatusText(row.status))
+    },
+    { prop: 'addtime', label: '创建时间', width: 180 },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 120,
+      fixed: 'right',
+      formatter: (row) =>
+        row.status === 0
+          ? h(ElButton, { text: true, type: 'primary', onClick: () => handleCheckPay(row.out_trade_no) }, () => '检测到账')
+          : h('span', { class: 'text-sm text-g-400' }, '已完成')
+    }
+  ])
+
   const loadChannels = async () => {
     channelLoading.value = true
     try {
@@ -360,13 +360,15 @@
     }
   }
 
-  const loadOrders = async (page = pagination.page) => {
+  const loadOrders = async (page = pagination.current) => {
     loading.value = true
-    pagination.page = page
+    pagination.current = page
     try {
-      const result = await fetchLegacyPayOrders(pagination.page, pagination.limit)
+      const result = await fetchLegacyPayOrders(pagination.current, pagination.size)
       orders.value = result.list || []
       pagination.total = Number(result.pagination?.total || 0)
+      pagination.current = Number(result.pagination?.page || pagination.current)
+      pagination.size = Number(result.pagination?.limit || pagination.size)
     } finally {
       loading.value = false
     }
@@ -417,10 +419,19 @@
     const result = await checkLegacyPayStatus(outTradeNo)
     if (result.status === 1) {
       ElMessage.success(result.msg || '订单已到账')
-      await loadOrders(pagination.page)
+      await loadOrders(pagination.current)
       return
     }
     ElMessage.info(result.msg || '订单暂未到账')
+  }
+
+  const handleCurrentChange = (page: number) => {
+    loadOrders(page)
+  }
+
+  const handleSizeChange = (size: number) => {
+    pagination.size = size
+    loadOrders(1)
   }
 
   const getPayReturnParams = () => {

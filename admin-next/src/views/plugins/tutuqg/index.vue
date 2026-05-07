@@ -1,17 +1,15 @@
 <template>
-  <div class="flex min-h-[calc(100vh-180px)] flex-col gap-5">
-    <section class="art-card-sm p-5">
-      <div class="grid gap-4 xl:grid-cols-[1fr_auto]">
-        <ElInput v-model="searchText" clearable placeholder="搜索账号" @keyup.enter="loadOrders(1)" />
-        <div class="flex flex-wrap gap-3">
-          <ElButton type="primary" @click="loadOrders(1)">查询</ElButton>
-          <ElButton plain @click="resetFilters">重置</ElButton>
-        </div>
-      </div>
-    </section>
+  <div class="plugin-tutuqg-page art-full-height">
+    <ArtSearchBar
+      v-model="filters"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="resetFilters"
+    />
 
-    <section class="art-card-sm overflow-hidden">
-      <ArtTableHeader :loading="loading || batchSyncLoading" layout="refresh" @refresh="loadOrders(pagination.page)">
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading || batchSyncLoading" @refresh="loadOrders(pagination.page)">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">当前页 {{ orders.length }} 条</ElTag>
@@ -24,95 +22,15 @@
         </template>
       </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="orders" size="large">
-        <ElTableColumn label="账号信息" min-width="180">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-semibold text-g-900">{{ row.user }}</p>
-              <p class="text-xs text-g-500">{{ row.pass }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="推送 Token" min-width="150">
-          <template #default="{ row }">
-            <span class="text-sm text-g-700">{{ row.kcname || '未填写' }}</span>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="订单信息" min-width="150">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm text-g-800">{{ row.days }} 天</p>
-              <p class="text-xs text-g-500">¥{{ Number(row.fees || 0).toFixed(2) }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="分数" min-width="120">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm text-g-800">今日 {{ row.score || '待更新' }}</p>
-              <p class="text-xs text-g-500">累计 {{ row.scores || '-' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="状态" width="140" align="center">
-          <template #default="{ row }">
-            <ElTag :type="getStatusType(row.status)" effect="plain">{{ row.status || '未知' }}</ElTag>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="到期时间" min-width="150">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm text-g-800">{{ row.remarks || '-' }}</p>
-              <p class="text-xs text-g-500">{{ getExpireText(row.remarks) }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="自动续费" width="110" align="center">
-          <template #default="{ row }">
-            <ElTag
-              class="cursor-pointer"
-              :type="row.zdxf === '2' ? 'success' : 'info'"
-              effect="plain"
-              @click="handleToggleRenew(row)"
-            >
-              {{ row.zdxf === '2' ? '已开启' : '已关闭' }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn prop="addtime" label="下单时间" min-width="160" />
-
-        <ElTableColumn label="操作" width="380" fixed="right">
-          <template #default="{ row }">
-            <div class="flex flex-wrap gap-2">
-              <ElButton size="small" @click="handleSync(row)">同步</ElButton>
-              <ElButton size="small" @click="handleRenew(row)">续费</ElButton>
-              <ElButton size="small" @click="handleChangePassword(row)">改密</ElButton>
-              <ElButton size="small" @click="handleChangeToken(row)">改 Token</ElButton>
-              <ElButton size="small" type="danger" plain @click="handleRefund(row)">退单</ElButton>
-              <ElButton size="small" type="danger" plain @click="handleDelete(row)">删除</ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadOrders"
-        />
-      </div>
-    </section>
+      <ArtTable
+        :loading="loading"
+        :data="orders"
+        :columns="columns"
+        :pagination="tablePagination"
+        @pagination:current-change="loadOrders"
+        @pagination:size-change="handleSizeChange"
+      />
+    </ElCard>
 
     <ElDialog v-model="addVisible" title="新增图图强国订单" width="520px">
       <div class="space-y-4">
@@ -180,8 +98,9 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
   import { useUserStore } from '@/store/modules/user'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
   import {
     batchSyncLegacyTutuQGOrders,
     changeLegacyTutuQGPassword,
@@ -212,13 +131,22 @@
   const batchSyncLoading = ref(false)
 
   const orders = ref<LegacyTutuQGOrder[]>([])
-  const searchText = ref('')
   const estimatedCost = ref('0.00')
 
   const pagination = reactive({
     limit: 10,
     page: 1,
     total: 0
+  })
+
+  const tablePagination = computed(() => ({
+    current: pagination.page,
+    size: pagination.limit,
+    total: pagination.total
+  }))
+
+  const filters = reactive({
+    searchText: ''
   })
 
   const addForm = reactive({
@@ -241,6 +169,111 @@
   const onlineCount = computed(() => orders.value.filter((item) => item.status === '已上号').length)
   const pendingCount = computed(() => orders.value.filter((item) => item.status === '待处理').length)
 
+  const searchItems = computed(() => [
+    {
+      label: '关键词',
+      key: 'searchText',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '搜索账号'
+      }
+    }
+  ])
+
+  const { columns, columnChecks } = useTableColumns<LegacyTutuQGOrder>(() => [
+    {
+      prop: 'user',
+      label: '账号信息',
+      minWidth: 180,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-semibold text-g-900' }, row.user || '-'),
+          h('p', { class: 'text-xs text-g-500' }, row.pass || '-')
+        ])
+    },
+    {
+      prop: 'kcname',
+      label: '推送 Token',
+      minWidth: 150,
+      formatter: (row) => h('span', { class: 'text-sm text-g-700' }, row.kcname || '未填写')
+    },
+    {
+      prop: 'days',
+      label: '订单信息',
+      minWidth: 150,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm text-g-800' }, `${row.days} 天`),
+          h('p', { class: 'text-xs text-g-500' }, `¥${Number(row.fees || 0).toFixed(2)}`)
+        ])
+    },
+    {
+      prop: 'score',
+      label: '分数',
+      minWidth: 120,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm text-g-800' }, `今日 ${row.score || '待更新'}`),
+          h('p', { class: 'text-xs text-g-500' }, `累计 ${row.scores || '-'}`)
+        ])
+    },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 140,
+      align: 'center',
+      formatter: (row) => h(ElTag, { type: getStatusType(row.status), effect: 'plain' }, () => row.status || '未知')
+    },
+    {
+      prop: 'remarks',
+      label: '到期时间',
+      minWidth: 150,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm text-g-800' }, row.remarks || '-'),
+          h('p', { class: 'text-xs text-g-500' }, getExpireText(row.remarks))
+        ])
+    },
+    {
+      prop: 'zdxf',
+      label: '自动续费',
+      width: 110,
+      align: 'center',
+      formatter: (row) =>
+        h(
+          ElTag,
+          {
+            class: 'cursor-pointer',
+            type: row.zdxf === '2' ? 'success' : 'info',
+            effect: 'plain',
+            onClick: () => handleToggleRenew(row)
+          },
+          () => (row.zdxf === '2' ? '已开启' : '已关闭')
+        )
+    },
+    {
+      prop: 'addtime',
+      label: '下单时间',
+      minWidth: 160
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 380,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElButton, { size: 'small', onClick: () => handleSync(row) }, () => '同步'),
+          h(ElButton, { size: 'small', onClick: () => handleRenew(row) }, () => '续费'),
+          h(ElButton, { size: 'small', onClick: () => handleChangePassword(row) }, () => '改密'),
+          h(ElButton, { size: 'small', onClick: () => handleChangeToken(row) }, () => '改 Token'),
+          h(ElButton, { size: 'small', type: 'danger', plain: true, onClick: () => handleRefund(row) }, () => '退单'),
+          h(ElButton, { size: 'small', type: 'danger', plain: true, onClick: () => handleDelete(row) }, () => '删除')
+        ])
+    }
+  ])
+
   const loadOrders = async (page = pagination.page) => {
     loading.value = true
     pagination.page = page
@@ -248,7 +281,7 @@
       const result = await fetchLegacyTutuQGOrders({
         limit: pagination.limit,
         page: pagination.page,
-        search: searchText.value || undefined
+        search: filters.searchText || undefined
       })
       orders.value = Array.isArray(result?.list) ? result.list : []
       pagination.total = Number(result?.total || 0)
@@ -271,7 +304,16 @@
   }
 
   const resetFilters = () => {
-    searchText.value = ''
+    filters.searchText = ''
+    loadOrders(1)
+  }
+
+  const handleSearch = () => {
+    loadOrders(1)
+  }
+
+  const handleSizeChange = (size: number) => {
+    pagination.limit = size
     loadOrders(1)
   }
 

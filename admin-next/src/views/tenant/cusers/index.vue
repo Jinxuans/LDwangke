@@ -1,7 +1,7 @@
 <template>
   <div class="tenant-cusers-page art-full-height">
     <ElCard class="art-table-card">
-      <ArtTableHeader :loading="loading" layout="refresh" @refresh="loadData(pagination.page)">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadData(pagination.current)">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">会员管理</ElTag>
@@ -12,30 +12,15 @@
         </template>
       </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="members" row-key="id">
-        <ElTableColumn prop="account" label="账号" min-width="180" />
-        <ElTableColumn prop="nickname" label="昵称" min-width="180" />
-        <ElTableColumn prop="addtime" label="注册时间" width="180" />
-        <ElTableColumn label="操作" width="160" fixed="right">
-          <template #default="{ row }">
-            <div class="flex items-center gap-2">
-              <ElButton text type="primary" @click="openEditDialog(row)">编辑</ElButton>
-              <ElButton text type="danger" @click="handleDelete(row)">删除</ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadData"
-        />
-      </div>
+      <ArtTable
+        :loading="loading"
+        :data="members"
+        :columns="columns"
+        :pagination="pagination"
+        row-key="id"
+        @pagination:current-change="handleCurrentChange"
+        @pagination:size-change="handleSizeChange"
+      />
     </ElCard>
 
     <ElDialog v-model="editVisible" :title="editForm.id ? '编辑会员' : '新增会员'" width="620px" destroy-on-close>
@@ -67,13 +52,15 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { h } from 'vue'
+  import { ElButton, ElMessage, ElMessageBox } from 'element-plus'
   import {
     deleteTenantCUser,
     fetchTenantCUsers,
     saveTenantCUser,
     type LegacyTenantCUser
   } from '@/api/legacy/tenant'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
 
   defineOptions({ name: 'TenantCUsersPage' })
 
@@ -84,8 +71,8 @@
   const members = ref<LegacyTenantCUser[]>([])
 
   const pagination = reactive({
-    page: 1,
-    limit: 20,
+    current: 1,
+    size: 20,
     total: 0
   })
 
@@ -103,16 +90,40 @@
     editForm.nickname = ''
   }
 
-  async function loadData(page = pagination.page) {
+  const { columns, columnChecks } = useTableColumns<LegacyTenantCUser>(() => [
+    { prop: 'account', label: '账号', minWidth: 180 },
+    {
+      prop: 'nickname',
+      label: '昵称',
+      minWidth: 180,
+      formatter: (row) => row.nickname || '-'
+    },
+    { prop: 'addtime', label: '注册时间', width: 180 },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 160,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex items-center gap-2' }, [
+          h(ElButton, { text: true, type: 'primary', onClick: () => openEditDialog(row) }, () => '编辑'),
+          h(ElButton, { text: true, type: 'danger', onClick: () => handleDelete(row) }, () => '删除')
+        ])
+    }
+  ])
+
+  async function loadData(page = pagination.current) {
     loading.value = true
-    pagination.page = page
+    pagination.current = page
     try {
       const result = await fetchTenantCUsers({
-        page: pagination.page,
-        limit: pagination.limit
+        page: pagination.current,
+        limit: pagination.size
       })
       members.value = result.list || []
       pagination.total = Number(result.total || result.pagination?.total || 0)
+      pagination.current = Number(result.pagination?.page || pagination.current)
+      pagination.size = Number(result.pagination?.limit || pagination.size)
     } finally {
       loading.value = false
     }
@@ -148,7 +159,7 @@
       })
       ElMessage.success('会员已保存')
       editVisible.value = false
-      await loadData(editForm.id ? pagination.page : 1)
+      await loadData(editForm.id ? pagination.current : 1)
     } finally {
       saving.value = false
     }
@@ -164,7 +175,16 @@
     }
     await deleteTenantCUser(member.id)
     ElMessage.success('会员已删除')
-    await loadData(pagination.page)
+    await loadData(pagination.current)
+  }
+
+  function handleCurrentChange(page: number) {
+    loadData(page)
+  }
+
+  function handleSizeChange(size: number) {
+    pagination.size = size
+    loadData(1)
   }
 
   onMounted(() => {

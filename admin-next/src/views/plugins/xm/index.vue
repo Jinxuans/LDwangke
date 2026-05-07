@@ -1,28 +1,15 @@
 <template>
-  <div class="flex min-h-[calc(100vh-180px)] flex-col gap-5">
-    <section class="art-card-sm p-5">
-      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-[220px_220px_1fr_auto]">
-        <ElSelect v-model="filters.status" clearable placeholder="状态筛选">
-          <ElOption v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
-        </ElSelect>
-        <ElSelect v-model="filters.project" clearable filterable placeholder="项目筛选">
-          <ElOption v-for="item in projects" :key="item.id" :label="item.name" :value="String(item.id)" />
-        </ElSelect>
-        <ElInput
-          v-model="filters.account"
-          clearable
-          placeholder="搜索账号、学校或订单号"
-          @keyup.enter="loadOrders(1)"
-        />
-        <div class="flex flex-wrap gap-3">
-          <ElButton type="primary" @click="loadOrders(1)">查询</ElButton>
-          <ElButton plain @click="resetFilters">重置</ElButton>
-        </div>
-      </div>
-    </section>
+  <div class="plugin-xm-page art-full-height">
+    <ArtSearchBar
+      v-model="filters"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="resetFilters"
+    />
 
-    <section class="art-card-sm overflow-hidden">
-      <ArtTableHeader :loading="loading" layout="refresh" @refresh="loadOrders(pagination.page)">
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" layout="refresh" @refresh="loadOrders(pagination.page)">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">项目 {{ projects.length }} 个</ElTag>
@@ -33,82 +20,15 @@
         </template>
       </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="orders" class="w-full" size="large">
-        <ElTableColumn label="项目 / 类型" min-width="160">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-semibold text-g-900">{{ getProjectName(row.project_id) }}</p>
-              <p class="text-xs text-g-500">{{ row.type || '默认类型' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="账号信息" min-width="220">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="font-semibold text-g-900">{{ row.account }}</p>
-              <p class="text-xs text-g-500">{{ row.password || '无密码展示' }}</p>
-              <p class="text-xs text-g-500">{{ row.school || '未填写学校/跑区' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="跑步参数" min-width="190">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="text-sm text-g-800">总次数 {{ row.total_km }}，已跑 {{ row.run_km ?? 0 }}</p>
-              <p class="text-xs text-g-500">配速 {{ row.pace ?? '-' }}，距离 {{ row.distance ?? '-' }}</p>
-              <p class="text-xs text-g-500">{{ row.start_time || '--:--' }} - {{ row.end_time || '--:--' }}</p>
-            </div>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="状态" width="120" align="center">
-          <template #default="{ row }">
-            <ElTag :type="getStatusType(row.status_name)" effect="plain">{{ row.status_name }}</ElTag>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="扣费" width="110" align="right">
-          <template #default="{ row }">
-            <span class="font-semibold text-[var(--el-color-danger)]">¥{{ Number(row.deduction || 0).toFixed(2) }}</span>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="更新时间" min-width="160">
-          <template #default="{ row }">
-            <span class="text-sm text-g-500">{{ row.updated_at || '-' }}</span>
-          </template>
-        </ElTableColumn>
-
-        <ElTableColumn label="操作" width="340" fixed="right">
-          <template #default="{ row }">
-            <div class="flex flex-wrap gap-2">
-              <ElButton size="small" @click="openLogsDialog(row)">日志</ElButton>
-              <ElButton size="small" :disabled="!canAddKM(row)" @click="openAddKMDialog(row)">加次</ElButton>
-              <ElButton size="small" @click="handleSync(row)">同步</ElButton>
-              <ElButton size="small" type="warning" plain :disabled="!canRefund(row)" @click="handleRefund(row)">
-                退款
-              </ElButton>
-              <ElButton size="small" type="danger" plain :disabled="row.is_deleted" @click="handleDelete(row)">
-                删除
-              </ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.pageSize"
-          :total="pagination.total"
-          @current-change="loadOrders"
-        />
-      </div>
-    </section>
+      <ArtTable
+        :loading="loading"
+        :data="orders"
+        :columns="columns"
+        :pagination="tablePagination"
+        @pagination:current-change="loadOrders"
+        @pagination:size-change="handleSizeChange"
+      />
+    </ElCard>
 
     <ElDialog v-model="addVisible" title="新增小米运动订单" width="860px">
       <div class="grid gap-5 lg:grid-cols-[1fr_300px]">
@@ -341,7 +261,8 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
   import {
     addLegacyXMOrderKM,
     createLegacyXMOrder,
@@ -403,6 +324,12 @@
     total: 0
   })
 
+  const tablePagination = computed(() => ({
+    current: pagination.page,
+    size: pagination.pageSize,
+    total: pagination.total
+  }))
+
   const logsPagination = reactive({
     orderId: 0,
     page: 1,
@@ -416,6 +343,39 @@
     project: '',
     status: ''
   })
+
+  const searchItems = computed(() => [
+    {
+      label: '状态',
+      key: 'status',
+      type: 'select',
+      props: {
+        clearable: true,
+        placeholder: '状态筛选',
+        options: statusOptions
+      }
+    },
+    {
+      label: '项目',
+      key: 'project',
+      type: 'select',
+      props: {
+        clearable: true,
+        filterable: true,
+        placeholder: '项目筛选',
+        options: projects.value.map((item) => ({ label: item.name, value: String(item.id) }))
+      }
+    },
+    {
+      label: '关键词',
+      key: 'account',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '搜索账号、学校或订单号'
+      }
+    }
+  ])
 
   const addForm = reactive({
     project_id: undefined as number | undefined,
@@ -517,6 +477,74 @@
   const canAddKM = (order: LegacyXMOrder) => !['已退款', '已删除'].includes(order.status_name)
   const canRefund = (order: LegacyXMOrder) => !['已退款', '已删除'].includes(order.status_name)
 
+  const { columns, columnChecks } = useTableColumns<LegacyXMOrder>(() => [
+    {
+      prop: 'project_id',
+      label: '项目 / 类型',
+      minWidth: 160,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-semibold text-g-900' }, getProjectName(row.project_id)),
+          h('p', { class: 'text-xs text-g-500' }, row.type || '默认类型')
+        ])
+    },
+    {
+      prop: 'account',
+      label: '账号信息',
+      minWidth: 220,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'font-semibold text-g-900' }, row.account || '-'),
+          h('p', { class: 'text-xs text-g-500' }, row.password || '无密码展示'),
+          h('p', { class: 'text-xs text-g-500' }, row.school || '未填写学校/跑区')
+        ])
+    },
+    {
+      prop: 'total_km',
+      label: '跑步参数',
+      minWidth: 190,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'text-sm text-g-800' }, `总次数 ${row.total_km}，已跑 ${row.run_km ?? 0}`),
+          h('p', { class: 'text-xs text-g-500' }, `配速 ${row.pace ?? '-'}，距离 ${row.distance ?? '-'}`),
+          h('p', { class: 'text-xs text-g-500' }, `${row.start_time || '--:--'} - ${row.end_time || '--:--'}`)
+        ])
+    },
+    {
+      prop: 'status_name',
+      label: '状态',
+      width: 120,
+      align: 'center',
+      formatter: (row) => h(ElTag, { type: getStatusType(row.status_name), effect: 'plain' }, () => row.status_name)
+    },
+    {
+      prop: 'deduction',
+      label: '扣费',
+      width: 110,
+      align: 'right',
+      formatter: (row) => h('span', { class: 'font-semibold text-[var(--el-color-danger)]' }, `¥${Number(row.deduction || 0).toFixed(2)}`)
+    },
+    {
+      prop: 'updated_at',
+      label: '更新时间',
+      minWidth: 160
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 340,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElButton, { size: 'small', onClick: () => openLogsDialog(row) }, () => '日志'),
+          h(ElButton, { size: 'small', disabled: !canAddKM(row), onClick: () => openAddKMDialog(row) }, () => '加次'),
+          h(ElButton, { size: 'small', onClick: () => handleSync(row) }, () => '同步'),
+          h(ElButton, { size: 'small', type: 'warning', plain: true, disabled: !canRefund(row), onClick: () => handleRefund(row) }, () => '退款'),
+          h(ElButton, { size: 'small', type: 'danger', plain: true, disabled: row.is_deleted, onClick: () => handleDelete(row) }, () => '删除')
+        ])
+    }
+  ])
+
   const normalizeQueryRows = (result: any) => {
     if (Array.isArray(result?.data)) return result.data
     if (Array.isArray(result)) return result
@@ -602,6 +630,15 @@
     } finally {
       loading.value = false
     }
+  }
+
+  const handleSearch = () => {
+    loadOrders(1)
+  }
+
+  const handleSizeChange = (size: number) => {
+    pagination.pageSize = size
+    loadOrders(1)
   }
 
   const resetFilters = () => {

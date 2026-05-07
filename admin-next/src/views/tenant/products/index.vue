@@ -1,38 +1,15 @@
 <template>
   <div class="tenant-products-page art-full-height">
-    <ElCard class="art-table-card">
-      <div class="grid gap-4 xl:grid-cols-[1fr_220px_220px_auto]">
-        <div>
-          <label class="mb-2 block text-sm font-medium text-g-800">关键词</label>
-          <ElInput v-model="filters.keyword" clearable placeholder="搜索商品名、课程名或 CID" />
-        </div>
-        <div>
-          <label class="mb-2 block text-sm font-medium text-g-800">商城分类</label>
-          <ElSelect v-model="filters.categoryId" class="w-full" clearable placeholder="全部分类">
-            <ElOption
-              v-for="item in mallCategories"
-              :key="item.id"
-              :label="item.name"
-              :value="item.id"
-            />
-          </ElSelect>
-        </div>
-        <div>
-          <label class="mb-2 block text-sm font-medium text-g-800">状态</label>
-          <ElSelect v-model="filters.status" class="w-full" clearable placeholder="全部状态">
-            <ElOption label="已上架" :value="1" />
-            <ElOption label="已下架" :value="0" />
-          </ElSelect>
-        </div>
-        <div class="flex items-end gap-3">
-          <ElButton @click="resetFilters">重置</ElButton>
-          <ElButton type="primary" @click="openEditDialog()">新增</ElButton>
-        </div>
-      </div>
-    </ElCard>
+    <ArtSearchBar
+      v-model="searchForm"
+      :items="searchItems"
+      :showExpand="false"
+      @search="handleSearch"
+      @reset="handleReset"
+    />
 
-    <ElCard class="art-table-card mt-4">
-      <ArtTableHeader :loading="loading" layout="refresh" @refresh="loadData">
+    <ElCard class="art-table-card">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadData">
         <template #left>
           <ElSpace wrap>
             <ElTag effect="plain">选品管理</ElTag>
@@ -41,66 +18,12 @@
             <ElButton plain @click="openPicker('batch')">批量选品</ElButton>
           </ElSpace>
         </template>
+        <template #right>
+          <ElButton type="primary" plain @click="openEditDialog()">新增</ElButton>
+        </template>
       </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="filteredProducts" row-key="id">
-        <ElTableColumn prop="cid" label="CID" width="90" align="center" />
-        <ElTableColumn label="商城展示" min-width="260">
-          <template #default="{ row }">
-            <div class="flex items-center gap-3">
-              <img
-                v-if="row.cover_url"
-                :src="row.cover_url"
-                alt="cover"
-                class="h-12 w-12 rounded-custom-sm border-full-d object-cover"
-              />
-              <div
-                v-else
-                class="flex h-12 w-12 items-center justify-center rounded-custom-sm border-full-d bg-g-100 text-xs text-g-400"
-              >
-                无图
-              </div>
-              <div class="min-w-0">
-                <p class="line-clamp-1 text-sm font-medium text-g-900">
-                  {{ row.display_name || row.class_name || '-' }}
-                </p>
-                <p class="mt-1 line-clamp-1 text-xs text-g-500">
-                  原课程：{{ row.class_name || '-' }}
-                </p>
-              </div>
-            </div>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="分类" min-width="140">
-          <template #default="{ row }">
-            {{ row.category_name || row.fenlei || '-' }}
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="供货价" width="120" align="right">
-          <template #default="{ row }">¥{{ formatMoney(row.supply_price) }}</template>
-        </ElTableColumn>
-        <ElTableColumn label="零售价" width="120" align="right">
-          <template #default="{ row }">
-            <span class="font-semibold text-[var(--el-color-danger)]">¥{{ formatMoney(row.retail_price) }}</span>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="sort" label="排序" width="90" align="center" />
-        <ElTableColumn label="状态" width="110" align="center">
-          <template #default="{ row }">
-            <ElTag :type="Number(row.status) === 1 ? 'success' : 'info'" effect="plain">
-              {{ Number(row.status) === 1 ? '上架' : '下架' }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="操作" width="160" fixed="right">
-          <template #default="{ row }">
-            <div class="flex items-center gap-2">
-              <ElButton text type="primary" @click="openEditDialog(row)">编辑</ElButton>
-              <ElButton text type="danger" @click="handleDelete(row)">下架</ElButton>
-            </div>
-          </template>
-        </ElTableColumn>
-      </ElTable>
+      <ArtTable :loading="loading" :data="filteredProducts" :columns="columns" :show-table-header="true" row-key="id" />
     </ElCard>
 
     <ElDialog v-model="editVisible" :title="editForm.id ? '编辑商品' : '新增商品'" width="760px" destroy-on-close>
@@ -357,7 +280,8 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { h } from 'vue'
+  import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
   import {
     fetchLegacyClassCategories,
     fetchLegacyClassListPaged,
@@ -372,6 +296,7 @@
     type LegacyTenantMallCategory,
     type LegacyTenantProduct
   } from '@/api/legacy/tenant'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
 
   defineOptions({ name: 'TenantProductsPage' })
 
@@ -406,6 +331,12 @@
   const pickerSelectedCourses = ref<LegacyClassItem[]>([])
 
   const filters = reactive({
+    categoryId: undefined as number | undefined,
+    keyword: '',
+    status: undefined as number | undefined
+  })
+
+  const searchForm = ref({
     categoryId: undefined as number | undefined,
     keyword: '',
     status: undefined as number | undefined
@@ -466,10 +397,130 @@
 
   const formatMoney = (value?: number | string) => Number(value || 0).toFixed(2)
 
+  const searchItems = computed(() => [
+    {
+      label: '关键词',
+      key: 'keyword',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '搜索商品名、课程名或 CID'
+      }
+    },
+    {
+      label: '商城分类',
+      key: 'categoryId',
+      type: 'select',
+      props: {
+        clearable: true,
+        placeholder: '全部分类',
+        options: mallCategories.value.map((item) => ({ label: item.name, value: item.id }))
+      }
+    },
+    {
+      label: '状态',
+      key: 'status',
+      type: 'select',
+      props: {
+        clearable: true,
+        placeholder: '全部状态',
+        options: [
+          { label: '已上架', value: 1 },
+          { label: '已下架', value: 0 }
+        ]
+      }
+    }
+  ])
+
+  const { columns, columnChecks } = useTableColumns<LegacyTenantProduct>(() => [
+    { prop: 'cid', label: 'CID', width: 90, align: 'center' },
+    {
+      prop: 'display_name',
+      label: '商城展示',
+      minWidth: 260,
+      formatter: (row) =>
+        h('div', { class: 'flex items-center gap-3' }, [
+          row.cover_url
+            ? h('img', {
+                src: row.cover_url,
+                alt: 'cover',
+                class: 'h-12 w-12 rounded-custom-sm border-full-d object-cover'
+              })
+            : h(
+                'div',
+                {
+                  class:
+                    'flex h-12 w-12 items-center justify-center rounded-custom-sm border-full-d bg-g-100 text-xs text-g-400'
+                },
+                '无图'
+              ),
+          h('div', { class: 'min-w-0' }, [
+            h('p', { class: 'line-clamp-1 text-sm font-medium text-g-900' }, row.display_name || row.class_name || '-'),
+            h('p', { class: 'mt-1 line-clamp-1 text-xs text-g-500' }, `原课程：${row.class_name || '-'}`)
+          ])
+        ])
+    },
+    {
+      prop: 'category_name',
+      label: '分类',
+      minWidth: 140,
+      formatter: (row) => row.category_name || row.fenlei || '-'
+    },
+    {
+      prop: 'supply_price',
+      label: '供货价',
+      width: 120,
+      align: 'right',
+      formatter: (row) => `¥${formatMoney(row.supply_price)}`
+    },
+    {
+      prop: 'retail_price',
+      label: '零售价',
+      width: 120,
+      align: 'right',
+      formatter: (row) => h('span', { class: 'font-semibold text-[var(--el-color-danger)]' }, `¥${formatMoney(row.retail_price)}`)
+    },
+    { prop: 'sort', label: '排序', width: 90, align: 'center' },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 110,
+      align: 'center',
+      formatter: (row) =>
+        h(ElTag, { type: Number(row.status) === 1 ? 'success' : 'info', effect: 'plain' }, () =>
+          Number(row.status) === 1 ? '上架' : '下架'
+        )
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 160,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex items-center gap-2' }, [
+          h(ElButton, { text: true, type: 'primary', onClick: () => openEditDialog(row) }, () => '编辑'),
+          h(ElButton, { text: true, type: 'danger', onClick: () => handleDelete(row) }, () => '下架')
+        ])
+    }
+  ])
+
   function resetFilters() {
     filters.categoryId = undefined
     filters.keyword = ''
     filters.status = undefined
+    searchForm.value.categoryId = undefined
+    searchForm.value.keyword = ''
+    searchForm.value.status = undefined
+  }
+
+  function handleSearch(params: { categoryId?: number; keyword?: string; status?: number }) {
+    filters.categoryId = params.categoryId
+    filters.keyword = params.keyword?.trim() || ''
+    filters.status = params.status
+  }
+
+  function handleReset() {
+    resetFilters()
   }
 
   function resetEditForm() {

@@ -1,71 +1,28 @@
 <template>
   <div class="tenant-mall-orders-page art-full-height">
     <ElCard class="art-table-card">
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b-d px-5 py-4">
-        <div class="flex flex-wrap items-center gap-3">
-          <h2 class="text-lg font-semibold text-g-900">支付订单</h2>
-          <ElTag effect="plain">订单总数 {{ pagination.total }}</ElTag>
-          <ElTag type="success" effect="plain">已下单 {{ linkedCount }}</ElTag>
-          <ElTag type="warning" effect="plain">待支付 {{ pendingCount }}</ElTag>
-        </div>
-
-        <div class="flex flex-wrap gap-3">
-          <ElButton plain :loading="loading" @click="loadData(pagination.page)">刷新</ElButton>
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="loadData(pagination.current)">
+        <template #left>
+          <ElSpace wrap>
+            <ElTag effect="plain">订单总数 {{ pagination.total }}</ElTag>
+            <ElTag type="success" effect="plain">已下单 {{ linkedCount }}</ElTag>
+            <ElTag type="warning" effect="plain">待支付 {{ pendingCount }}</ElTag>
+          </ElSpace>
+        </template>
+        <template #right>
           <ElButton plain @click="router.push('/tenant/withdraw')">商城提现</ElButton>
-        </div>
-      </div>
+        </template>
+      </ArtTableHeader>
 
-      <ElTable v-loading="loading" :data="orders" row-key="id">
-        <ElTableColumn prop="out_trade_no" label="支付订单号" min-width="220" />
-        <ElTableColumn label="商品信息" min-width="260">
-          <template #default="{ row }">
-            <div class="leading-6">
-              <p class="line-clamp-1 text-sm font-medium text-g-900">
-                {{ row.product_name || `商品#${row.cid}` }}
-              </p>
-              <p class="mt-1 line-clamp-1 text-xs text-g-500">
-                {{ row.course_name || '未记录课程名' }}
-              </p>
-            </div>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="account" label="会员账号" min-width="140" />
-        <ElTableColumn label="支付方式" width="120" align="center">
-          <template #default="{ row }">{{ payTypeLabel(row.pay_type) }}</template>
-        </ElTableColumn>
-        <ElTableColumn label="金额" width="120" align="right">
-          <template #default="{ row }">¥{{ formatMoney(row.money) }}</template>
-        </ElTableColumn>
-        <ElTableColumn label="支付状态" width="120" align="center">
-          <template #default="{ row }">
-            <ElTag :type="statusMeta(row.status).type" effect="plain">
-              {{ statusMeta(row.status).text }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="关联业务单" width="120" align="center">
-          <template #default="{ row }">
-            {{ row.order_count || (row.order_id ? 1 : 0) }}
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="addtime" label="下单时间" width="180" />
-        <ElTableColumn label="操作" width="100" fixed="right">
-          <template #default="{ row }">
-            <ElButton text type="primary" @click="openDetail(row)">详情</ElButton>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <div class="flex justify-end border-t-d px-5 py-4">
-        <ElPagination
-          background
-          layout="total, prev, pager, next"
-          :current-page="pagination.page"
-          :page-size="pagination.limit"
-          :total="pagination.total"
-          @current-change="loadData"
-        />
-      </div>
+      <ArtTable
+        :loading="loading"
+        :data="orders"
+        :columns="columns"
+        :pagination="pagination"
+        row-key="id"
+        @pagination:current-change="handleCurrentChange"
+        @pagination:size-change="handleSizeChange"
+      />
     </ElCard>
 
     <ElDialog v-model="detailVisible" title="商城订单详情" width="980px" destroy-on-close>
@@ -170,6 +127,8 @@
 </template>
 
 <script setup lang="ts">
+  import { h } from 'vue'
+  import { ElButton, ElTag } from 'element-plus'
   import { useRouter } from 'vue-router'
   import { fetchLegacyOrderLogs, type LegacyOrderLogEntry } from '@/api/legacy/order'
   import {
@@ -178,6 +137,7 @@
     type LegacyTenantLinkedOrder,
     type LegacyTenantMallPayOrder
   } from '@/api/legacy/tenant'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
 
   defineOptions({ name: 'TenantMallOrdersPage' })
 
@@ -193,8 +153,8 @@
   const logLoadingMap = ref<Record<number, boolean>>({})
 
   const pagination = reactive({
-    page: 1,
-    limit: 20,
+    current: 1,
+    size: 20,
     total: 0
   })
 
@@ -229,16 +189,64 @@
     return 'info'
   }
 
-  async function loadData(page = pagination.page) {
+  const { columns, columnChecks } = useTableColumns<LegacyTenantMallPayOrder>(() => [
+    { prop: 'out_trade_no', label: '支付订单号', minWidth: 220 },
+    {
+      prop: 'product_name',
+      label: '商品信息',
+      minWidth: 260,
+      formatter: (row) =>
+        h('div', { class: 'leading-6' }, [
+          h('p', { class: 'line-clamp-1 text-sm font-medium text-g-900' }, row.product_name || `商品#${row.cid}`),
+          h('p', { class: 'mt-1 line-clamp-1 text-xs text-g-500' }, row.course_name || '未记录课程名')
+        ])
+    },
+    { prop: 'account', label: '会员账号', minWidth: 140, formatter: (row) => row.account || '-' },
+    { prop: 'pay_type', label: '支付方式', width: 120, align: 'center', formatter: (row) => payTypeLabel(row.pay_type) },
+    {
+      prop: 'money',
+      label: '金额',
+      width: 120,
+      align: 'right',
+      formatter: (row) => `¥${formatMoney(row.money)}`
+    },
+    {
+      prop: 'status',
+      label: '支付状态',
+      width: 120,
+      align: 'center',
+      formatter: (row) =>
+        h(ElTag, { type: statusMeta(row.status).type, effect: 'plain' }, () => statusMeta(row.status).text)
+    },
+    {
+      prop: 'order_count',
+      label: '关联业务单',
+      width: 120,
+      align: 'center',
+      formatter: (row) => row.order_count || (row.order_id ? 1 : 0)
+    },
+    { prop: 'addtime', label: '下单时间', width: 180 },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 100,
+      fixed: 'right',
+      formatter: (row) => h(ElButton, { text: true, type: 'primary', onClick: () => openDetail(row) }, () => '详情')
+    }
+  ])
+
+  async function loadData(page = pagination.current) {
     loading.value = true
-    pagination.page = page
+    pagination.current = page
     try {
       const result = await fetchTenantMallOrders({
-        page: pagination.page,
-        limit: pagination.limit
+        page: pagination.current,
+        limit: pagination.size
       })
       orders.value = result.list || []
       pagination.total = Number(result.total || result.pagination?.total || 0)
+      pagination.current = Number(result.pagination?.page || pagination.current)
+      pagination.size = Number(result.pagination?.limit || pagination.size)
     } finally {
       loading.value = false
     }
@@ -253,6 +261,15 @@
     } finally {
       detailLoading.value = false
     }
+  }
+
+  function handleCurrentChange(page: number) {
+    loadData(page)
+  }
+
+  function handleSizeChange(size: number) {
+    pagination.size = size
+    loadData(1)
   }
 
   async function loadLogs(oid: number) {

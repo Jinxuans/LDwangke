@@ -205,23 +205,16 @@
 
         <ElTabPane label="论文管理" name="list">
           <div class="space-y-5 p-5">
-            <section class="rounded-custom-sm border-full-d bg-g-100/60 p-5">
-              <div class="grid gap-4 xl:grid-cols-[1fr_180px_160px_120px_auto]">
-                <ElInput v-model="search.title" clearable placeholder="论文标题" />
-                <ElInput v-model="search.shopname" clearable placeholder="商品名称" />
-                <ElInput v-model="search.studentName" clearable placeholder="学生姓名" />
-                <ElSelect v-model="search.state" clearable placeholder="状态">
-                  <ElOption label="待处理" value="0" /><ElOption label="正在处理" value="1" /><ElOption label="处理完成" value="2" /><ElOption label="处理异常" value="3" />
-                </ElSelect>
-                <div class="flex flex-wrap gap-3">
-                  <ElButton type="primary" @click="searchList">查询</ElButton>
-                  <ElButton plain @click="resetList">重置</ElButton>
-                </div>
-              </div>
-            </section>
+            <ArtSearchBar
+              v-model="search"
+              :items="listSearchItems"
+              :showExpand="false"
+              @search="searchList"
+              @reset="resetList"
+            />
 
-            <section class="overflow-hidden rounded-custom-sm border-full-d bg-box">
-              <ArtTableHeader :loading="listLoading" layout="refresh" @refresh="loadList">
+            <ElCard class="art-table-card">
+              <ArtTableHeader v-model:columns="listColumnChecks" :loading="listLoading" @refresh="loadList">
                 <template #left>
                   <ElSpace wrap>
                     <ElTag effect="plain">当前页 {{ rows.length }} 条</ElTag>
@@ -231,37 +224,15 @@
                 </template>
               </ArtTableHeader>
 
-              <ElTable v-loading="listLoading" :data="rows" size="large">
-                <ElTableColumn prop="shopname" label="商品" min-width="120" />
-                <ElTableColumn label="论文名称" min-width="220"><template #default="{ row }"><span class="line-clamp-2 font-medium text-g-800">{{ row.title }}</span></template></ElTableColumn>
-                <ElTableColumn prop="studentName" label="姓名" width="100" />
-                <ElTableColumn prop="major" label="专业" min-width="120" />
-                <ElTableColumn label="服务" min-width="180">
-                  <template #default="{ row }">
-                    <div class="flex flex-wrap gap-2">
-                      <ElTag :type="row.jiangchong === 1 ? 'danger' : 'info'" effect="plain">{{ row.jiangchong === 1 ? '需降重' : '不降重' }}</ElTag>
-                      <ElTag :type="row.aigc === 1 ? 'danger' : 'info'" effect="plain">{{ row.aigc === 1 ? '需降AIGC' : '不降AIGC' }}</ElTag>
-                    </div>
-                  </template>
-                </ElTableColumn>
-                <ElTableColumn label="价格" width="100" align="right"><template #default="{ row }"><span class="font-semibold text-[var(--el-color-danger)]">¥{{ Number(row.price || 0).toFixed(2) }}</span></template></ElTableColumn>
-                <ElTableColumn label="状态" width="120" align="center"><template #default="{ row }"><ElTag :type="stateType(row.state)" effect="plain">{{ stateText(row.state) }}</ElTag></template></ElTableColumn>
-                <ElTableColumn prop="createTime" label="下单时间" min-width="160" />
-                <ElTableColumn label="操作" width="320" fixed="right">
-                  <template #default="{ row }">
-                    <div class="flex flex-wrap gap-2">
-                      <ElButton size="small" @click="downloadFile(row.url, `论文-${row.title}`)">下载论文</ElButton>
-                      <ElButton size="small" @click="row.rws ? downloadFile(row.rws, `任务书-${row.title}`) : makeTask(row.id)"> {{ row.rws ? '下载任务书' : '生成任务书' }} </ElButton>
-                      <ElButton size="small" @click="row.ktbg ? downloadFile(row.ktbg, `开题-${row.title}`) : makeProposal(row.id)"> {{ row.ktbg ? '下载开题' : '生成开题' }} </ElButton>
-                    </div>
-                  </template>
-                </ElTableColumn>
-              </ElTable>
-
-              <div class="flex justify-end border-t-d px-5 py-4">
-                <ElPagination background layout="total, prev, pager, next" :current-page="page" :page-size="pageSize" :total="total" @current-change="changePage" />
-              </div>
-            </section>
+              <ArtTable
+                :loading="listLoading"
+                :data="rows"
+                :columns="listColumns"
+                :pagination="listPagination"
+                @pagination:current-change="changePage"
+                @pagination:size-change="changePageSize"
+              />
+            </ElCard>
           </div>
         </ElTabPane>
       </ElTabs>
@@ -287,7 +258,8 @@
 </template>
 
 <script setup lang="ts">
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
   import {
     countLegacyPaperWords,
     createLegacyPaperOrder,
@@ -359,6 +331,121 @@
   const enabledServices = computed(() => [form.rws, form.ktbg, form.jiangchong].filter((item) => item === 1).length)
   const listCompletedCount = computed(() => rows.value.filter((item) => Number(item.state) === 2).length)
   const listPendingCount = computed(() => rows.value.filter((item) => [0, 1].includes(Number(item.state))).length)
+  const listPagination = computed(() => ({
+    current: page.value,
+    size: pageSize.value,
+    total: total.value
+  }))
+
+  const listSearchItems = computed(() => [
+    {
+      label: '论文标题',
+      key: 'title',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '论文标题'
+      }
+    },
+    {
+      label: '商品',
+      key: 'shopname',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '商品名称'
+      }
+    },
+    {
+      label: '学生',
+      key: 'studentName',
+      type: 'input',
+      props: {
+        clearable: true,
+        placeholder: '学生姓名'
+      }
+    },
+    {
+      label: '状态',
+      key: 'state',
+      type: 'select',
+      props: {
+        clearable: true,
+        placeholder: '状态',
+        options: [
+          { label: '待处理', value: '0' },
+          { label: '正在处理', value: '1' },
+          { label: '处理完成', value: '2' },
+          { label: '处理异常', value: '3' }
+        ]
+      }
+    }
+  ])
+
+  const { columns: listColumns, columnChecks: listColumnChecks } = useTableColumns<any>(() => [
+    {
+      prop: 'shopname',
+      label: '商品',
+      minWidth: 120
+    },
+    {
+      prop: 'title',
+      label: '论文名称',
+      minWidth: 220,
+      formatter: (row) => h('span', { class: 'line-clamp-2 font-medium text-g-800' }, row.title || '-')
+    },
+    {
+      prop: 'studentName',
+      label: '姓名',
+      width: 100
+    },
+    {
+      prop: 'major',
+      label: '专业',
+      minWidth: 120
+    },
+    {
+      prop: 'service',
+      label: '服务',
+      minWidth: 180,
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElTag, { type: row.jiangchong === 1 ? 'danger' : 'info', effect: 'plain' }, () => (row.jiangchong === 1 ? '需降重' : '不降重')),
+          h(ElTag, { type: row.aigc === 1 ? 'danger' : 'info', effect: 'plain' }, () => (row.aigc === 1 ? '需降AIGC' : '不降AIGC'))
+        ])
+    },
+    {
+      prop: 'price',
+      label: '价格',
+      width: 100,
+      align: 'right',
+      formatter: (row) => h('span', { class: 'font-semibold text-[var(--el-color-danger)]' }, `¥${Number(row.price || 0).toFixed(2)}`)
+    },
+    {
+      prop: 'state',
+      label: '状态',
+      width: 120,
+      align: 'center',
+      formatter: (row) => h(ElTag, { type: stateType(row.state), effect: 'plain' }, () => stateText(row.state))
+    },
+    {
+      prop: 'createTime',
+      label: '下单时间',
+      minWidth: 160
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 320,
+      fixed: 'right',
+      formatter: (row) =>
+        h('div', { class: 'flex flex-wrap gap-2' }, [
+          h(ElButton, { size: 'small', onClick: () => downloadFile(row.url, `论文-${row.title}`) }, () => '下载论文'),
+          h(ElButton, { size: 'small', onClick: () => (row.rws ? downloadFile(row.rws, `任务书-${row.title}`) : makeTask(row.id)) }, () => (row.rws ? '下载任务书' : '生成任务书')),
+          h(ElButton, { size: 'small', onClick: () => (row.ktbg ? downloadFile(row.ktbg, `开题-${row.title}`) : makeProposal(row.id)) }, () => (row.ktbg ? '下载开题' : '生成开题'))
+        ])
+    }
+  ])
 
   const orderPrice = computed(() => {
     if (!prices.value || !form.shopcode) return 0
@@ -520,6 +607,7 @@
   const searchList = () => { page.value = 1; loadList() }
   const resetList = () => { search.title = ''; search.shopname = ''; search.studentName = ''; search.state = ''; page.value = 1; loadList() }
   const changePage = (p: number) => { page.value = p; loadList() }
+  const changePageSize = (size: number) => { pageSize.value = size; page.value = 1; loadList() }
 
   const trigger = (url: string) => {
     const a = document.createElement('a')
