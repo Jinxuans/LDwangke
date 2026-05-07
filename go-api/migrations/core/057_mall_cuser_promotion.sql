@@ -1,20 +1,63 @@
 ALTER TABLE `qingka_tenant`
   ADD COLUMN `mall_config` TEXT NULL COMMENT '商城业务配置JSON' AFTER `pay_config`;
 
+CREATE TABLE IF NOT EXISTS `qingka_c_user` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `tid` int(11) NOT NULL COMMENT '所属店铺ID',
+  `phone` varchar(50) DEFAULT '' COMMENT '手机号',
+  `account` varchar(100) NOT NULL DEFAULT '' COMMENT '账号',
+  `password` varchar(255) NOT NULL DEFAULT '' COMMENT '密码',
+  `nickname` varchar(100) DEFAULT '' COMMENT '昵称',
+  `invite_code` varchar(64) NOT NULL DEFAULT '' COMMENT '推广码',
+  `referrer_id` int(11) NOT NULL DEFAULT 0 COMMENT '邀请人ID',
+  `commission_money` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '可用佣金余额',
+  `commission_cdmoney` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '冻结佣金余额',
+  `commission_total` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '累计佣金',
+  `status` tinyint(4) NOT NULL DEFAULT 1 COMMENT '状态 1正常 0禁用',
+  `openid` varchar(255) DEFAULT '' COMMENT '微信openid',
+  `token` varchar(255) DEFAULT '' COMMENT '登录token',
+  `addtime` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_tid` (`tid`),
+  KEY `idx_account` (`account`),
+  KEY `idx_invite_code` (`invite_code`),
+  KEY `idx_token` (`token`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='C端用户表';
+
 ALTER TABLE `qingka_c_user`
-  ADD COLUMN `invite_code` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '推广码' AFTER `nickname`,
-  ADD COLUMN `referrer_id` INT(11) NOT NULL DEFAULT 0 COMMENT '邀请人ID' AFTER `invite_code`,
-  ADD COLUMN `commission_money` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '可用佣金余额' AFTER `referrer_id`,
-  ADD COLUMN `commission_cdmoney` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '冻结佣金余额' AFTER `commission_money`,
-  ADD COLUMN `commission_total` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '累计佣金' AFTER `commission_cdmoney`,
-  ADD COLUMN `status` TINYINT(4) NOT NULL DEFAULT 1 COMMENT '状态 1正常 0禁用' AFTER `commission_total`,
+  ADD COLUMN `invite_code` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '推广码' AFTER `nickname`;
+
+ALTER TABLE `qingka_c_user`
+  ADD COLUMN `referrer_id` INT(11) NOT NULL DEFAULT 0 COMMENT '邀请人ID' AFTER `invite_code`;
+
+ALTER TABLE `qingka_c_user`
+  ADD COLUMN `commission_money` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '可用佣金余额' AFTER `referrer_id`;
+
+ALTER TABLE `qingka_c_user`
+  ADD COLUMN `commission_cdmoney` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '冻结佣金余额' AFTER `commission_money`;
+
+ALTER TABLE `qingka_c_user`
+  ADD COLUMN `commission_total` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '累计佣金' AFTER `commission_cdmoney`;
+
+ALTER TABLE `qingka_c_user`
+  ADD COLUMN `status` TINYINT(4) NOT NULL DEFAULT 1 COMMENT '状态 1正常 0禁用' AFTER `commission_total`;
+
+ALTER TABLE `qingka_c_user`
   ADD KEY `idx_invite_code` (`invite_code`);
 
 ALTER TABLE `qingka_mall_pay_order`
-  ADD COLUMN `promoter_c_uid` INT(11) NOT NULL DEFAULT 0 COMMENT '推广会员ID' AFTER `course_items`,
-  ADD COLUMN `promoter_code` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '推广码快照' AFTER `promoter_c_uid`,
-  ADD COLUMN `commission_rate` DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT '返利比例快照' AFTER `promoter_code`,
-  ADD COLUMN `commission_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '返利金额快照' AFTER `commission_rate`,
+  ADD COLUMN `promoter_c_uid` INT(11) NOT NULL DEFAULT 0 COMMENT '推广会员ID' AFTER `course_items`;
+
+ALTER TABLE `qingka_mall_pay_order`
+  ADD COLUMN `promoter_code` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '推广码快照' AFTER `promoter_c_uid`;
+
+ALTER TABLE `qingka_mall_pay_order`
+  ADD COLUMN `commission_rate` DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT '返利比例快照' AFTER `promoter_code`;
+
+ALTER TABLE `qingka_mall_pay_order`
+  ADD COLUMN `commission_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '返利金额快照' AFTER `commission_rate`;
+
+ALTER TABLE `qingka_mall_pay_order`
   ADD COLUMN `commission_status` TINYINT(4) NOT NULL DEFAULT 0 COMMENT '0待处理 1已返利 -1跳过' AFTER `commission_amount`;
 
 CREATE TABLE IF NOT EXISTS `qingka_c_user_commission_log` (
