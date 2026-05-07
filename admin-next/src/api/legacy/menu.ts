@@ -10,13 +10,32 @@ export function fetchLegacyMenuConfigs() {
 export function saveLegacyMenuConfigs(items: LegacyMenuConfigItem[]) {
   return request.post<void>({
     url: '/admin/menus',
-    params: { items },
-    showSuccessMessage: true
+    data: { items }
   })
 }
 
 export function fetchLegacyExtMenus() {
   return request.get<LegacyExtMenuItem[]>({
-    url: '/ext-menus'
+    url: '/admin/ext-menus'
+  })
+}
+
+export function saveLegacyExtMenu(data: Partial<LegacyExtMenuItem>) {
+  return request.post<void>({
+    url: '/admin/ext-menu/save',
+    data
+  })
+}
+
+export function reorderLegacyExtMenus(items: { id: number; sort_order: number }[]) {
+  return request.post<void>({
+    url: '/admin/ext-menu/reorder',
+    data: { items }
+  })
+}
+
+export function deleteLegacyExtMenu(id: number) {
+  return request.del<void>({
+    url: `/admin/ext-menu/${id}`
   })
 }

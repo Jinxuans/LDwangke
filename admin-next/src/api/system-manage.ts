@@ -1,5 +1,4 @@
 import request from '@/utils/http'
-import { AppRouteRecord } from '@/types/router'
 import { adaptLegacyMenus, type LegacyRouteRecord } from '@/router/core/legacy-menu-adapter'
 import type { LegacyMenuConfigItem } from '@/types/legacy-contract'
 import { isHttpError } from '@/utils/http/error'
@@ -22,8 +21,8 @@ export function fetchGetRoleList(params: Api.SystemManage.RoleSearchParams) {
 }
 
 // 获取菜单列表
-export function fetchGetMenuList() {
-  const routeRequest = request
+function fetchLegacyRouteRecords() {
+  return request
     .get<LegacyRouteRecord[]>({
       url: '/menu/all',
       showErrorMessage: false
@@ -36,14 +35,23 @@ export function fetchGetMenuList() {
 
       throw error
     })
+}
 
-  return Promise.all([
-    routeRequest,
-    request
-      .get<LegacyMenuConfigItem[]>({
-        url: '/menus',
-        showErrorMessage: false
-      })
-      .catch(() => [])
-  ]).then(([routes, menuConfigs]) => adaptLegacyMenus(routes, menuConfigs))
+export function fetchGetMenuListWithConfigs() {
+  const routeRequest = fetchLegacyRouteRecords()
+  const configRequest = request
+    .get<LegacyMenuConfigItem[]>({
+      url: '/menus',
+      showErrorMessage: false
+    })
+    .catch(() => [])
+
+  return Promise.all([routeRequest, configRequest]).then(([routes, menuConfigs]) => ({
+    routes: adaptLegacyMenus(routes, menuConfigs),
+    menuConfigs
+  }))
+}
+
+export function fetchGetMenuList() {
+  return fetchGetMenuListWithConfigs().then(({ routes }) => routes)
 }
