@@ -37,6 +37,23 @@ export function fetchLegacyAdminChatMessages(listId: number, limit = 100) {
   })
 }
 
+export function markLegacyAdminChatRead(listId: number) {
+  return request.post<void>({
+    url: `/admin/chat/read/${listId}`
+  })
+}
+
+export function sendLegacyAdminChatMessage(params: {
+  list_id: number
+  to_uid: number
+  content: string
+}) {
+  return request.post<LegacyChatMessage>({
+    url: '/admin/chat/send',
+    params
+  })
+}
+
 export function fetchLegacyAdminChatStats() {
   return request.get<LegacyAdminChatStats>({
     url: '/admin/chat/stats'
@@ -49,4 +66,3 @@ export function cleanupLegacyAdminChat(days: number) {
     params: { days }
   })
 }
-

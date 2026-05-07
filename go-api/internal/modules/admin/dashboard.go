@@ -29,6 +29,8 @@ func registerDashboardRoutes(admin *gin.RouterGroup) {
 	admin.GET("/rank/agent-products", AdminAgentProductRanking)
 	admin.GET("/chat/sessions", AdminChatSessions)
 	admin.GET("/chat/messages/:list_id", AdminChatMessages)
+	admin.POST("/chat/read/:list_id", AdminChatRead)
+	admin.POST("/chat/send", AdminChatSend)
 	admin.GET("/chat/stats", AdminChatStats)
 	admin.POST("/chat/cleanup", AdminChatCleanup)
 }
@@ -195,7 +197,7 @@ func AdminAgentProductRanking(c *gin.Context) {
 }
 
 func AdminChatSessions(c *gin.Context) {
-	sessions, err := chatmodule.Chat().AdminSessions()
+	sessions, err := chatmodule.Chat().AdminSessions(c.GetInt("uid"))
 	if err != nil {
 		response.ServerErrorf(c, err, err.Error())
 		return
@@ -220,6 +222,34 @@ func AdminChatMessages(c *gin.Context) {
 		return
 	}
 	response.Success(c, rows)
+}
+
+func AdminChatRead(c *gin.Context) {
+	listID, err := strconv.Atoi(c.Param("list_id"))
+	if err != nil {
+		response.BadRequest(c, "无效的会话 ID")
+		return
+	}
+	if err := chatmodule.Chat().AdminMarkRead(c.GetInt("uid"), listID); err != nil {
+		response.BusinessError(c, 1001, err.Error())
+		return
+	}
+	response.SuccessMsg(c, "已标记已读")
+}
+
+func AdminChatSend(c *gin.Context) {
+	uid := c.GetInt("uid")
+	var req model.ChatSendRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "请填写消息内容")
+		return
+	}
+	msg, err := chatmodule.Chat().AdminSend(uid, req)
+	if err != nil {
+		response.BusinessError(c, 1002, err.Error())
+		return
+	}
+	response.Success(c, msg)
 }
 
 func AdminChatStats(c *gin.Context) {

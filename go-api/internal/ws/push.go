@@ -1,7 +1,10 @@
 package ws
 
 import (
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,7 +16,7 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // 开发阶段允许所有来源，生产环境需限制
+		return isAllowedOrigin(r)
 	},
 }
 
@@ -22,6 +25,45 @@ const (
 	pongWait   = 60 * time.Second
 	pingPeriod = (pongWait * 9) / 10
 )
+
+func isAllowedOrigin(r *http.Request) bool {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		return true
+	}
+
+	originURL, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+
+	host := strings.ToLower(strings.TrimSpace(originURL.Hostname()))
+	if host == "" {
+		return false
+	}
+
+	if host == normalizeHost(r.Host) {
+		return true
+	}
+
+	if host == "localhost" || host == "127.0.0.1" {
+		return true
+	}
+
+	if strings.HasSuffix(host, ".29.colnt.com") || host == "29.colnt.com" {
+		return true
+	}
+
+	return false
+}
+
+func normalizeHost(hostPort string) string {
+	hostPort = strings.ToLower(strings.TrimSpace(hostPort))
+	if host, _, err := net.SplitHostPort(hostPort); err == nil {
+		return host
+	}
+	return strings.Trim(hostPort, "[]")
+}
 
 func HandlePush(hub *Hub) gin.HandlerFunc {
 	return func(c *gin.Context) {

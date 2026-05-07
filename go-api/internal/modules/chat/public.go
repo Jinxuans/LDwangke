@@ -135,6 +135,11 @@ func SendImage(c *gin.Context) {
 		return
 	}
 
+	if err := chatService.ValidateTarget(uid, req.ListID, req.ToUID); err != nil {
+		response.BusinessError(c, 1002, err.Error())
+		return
+	}
+
 	uploadDir := filepath.Join("uploads", "chat")
 	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
 		response.ServerErrorf(c, err, "创建上传目录失败")

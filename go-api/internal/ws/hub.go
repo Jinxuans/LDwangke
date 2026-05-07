@@ -22,7 +22,7 @@ type Client struct {
 
 type Hub struct {
 	mu         sync.RWMutex
-	clients    map[int]*Client // uid -> client
+	clients    map[int]map[*Client]struct{} // uid -> clients
 	register   chan *Client
 	unregister chan *Client
 	done       chan struct{}
@@ -33,7 +33,7 @@ var GlobalHub *Hub
 
 func NewHub() *Hub {
 	hub := &Hub{
-		clients:    make(map[int]*Client),
+		clients:    make(map[int]map[*Client]struct{}),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		done:       make(chan struct{}),
@@ -47,27 +47,37 @@ func (h *Hub) Run() {
 		select {
 		case <-h.done:
 			h.mu.Lock()
-			for uid, client := range h.clients {
+			for uid, clients := range h.clients {
 				delete(h.clients, uid)
-				close(client.Send)
+				for client := range clients {
+					close(client.Send)
+				}
 			}
 			h.mu.Unlock()
 			return
 
 		case client := <-h.register:
 			h.mu.Lock()
-			h.clients[client.UID] = client
-			count := len(h.clients)
+			if h.clients[client.UID] == nil {
+				h.clients[client.UID] = make(map[*Client]struct{})
+			}
+			h.clients[client.UID][client] = struct{}{}
+			count := h.onlineCountLocked()
 			h.mu.Unlock()
 			obslogger.L().Info("WebSocket 客户端上线", "uid", client.UID, "online", count)
 
 		case client := <-h.unregister:
 			h.mu.Lock()
-			if _, ok := h.clients[client.UID]; ok {
-				delete(h.clients, client.UID)
-				close(client.Send)
+			if clients, ok := h.clients[client.UID]; ok {
+				if _, exists := clients[client]; exists {
+					delete(clients, client)
+					close(client.Send)
+				}
+				if len(clients) == 0 {
+					delete(h.clients, client.UID)
+				}
 			}
-			count := len(h.clients)
+			count := h.onlineCountLocked()
 			h.mu.Unlock()
 			obslogger.L().Info("WebSocket 客户端下线", "uid", client.UID, "online", count)
 		}
@@ -107,25 +117,26 @@ func (h *Hub) PushToUser(uid int, msg PushMessage) {
 	default:
 	}
 
-	h.mu.RLock()
-	client, ok := h.clients[uid]
-	h.mu.RUnlock()
-
-	if !ok {
-		return
-	}
-
 	data, err := json.Marshal(msg)
 	if err != nil {
 		obslogger.L().Warn("序列化推送消息失败", "error", err)
 		return
 	}
 
-	select {
-	case client.Send <- data:
-	default:
-		// 通道满了，丢弃
-		obslogger.L().Warn("推送消息失败：通道已满", "uid", uid)
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	clients := h.clients[uid]
+	if len(clients) == 0 {
+		return
+	}
+
+	for client := range clients {
+		select {
+		case client.Send <- data:
+		default:
+			// 通道满了，丢弃
+			obslogger.L().Warn("推送消息失败：通道已满", "uid", uid)
+		}
 	}
 }
 
@@ -146,10 +157,12 @@ func (h *Hub) Broadcast(msg PushMessage) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	for _, client := range h.clients {
-		select {
-		case client.Send <- data:
-		default:
+	for _, clients := range h.clients {
+		for client := range clients {
+			select {
+			case client.Send <- data:
+			default:
+			}
 		}
 	}
 }
@@ -158,5 +171,13 @@ func (h *Hub) Broadcast(msg PushMessage) {
 func (h *Hub) OnlineCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	return len(h.clients)
+	return h.onlineCountLocked()
+}
+
+func (h *Hub) onlineCountLocked() int {
+	total := 0
+	for _, clients := range h.clients {
+		total += len(clients)
+	}
+	return total
 }

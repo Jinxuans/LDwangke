@@ -4,17 +4,19 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"go-api/internal/database"
 	"go-api/internal/model"
 )
 
-func (s *Service) AdminSessions() ([]model.AdminChatSession, error) {
+const defaultSupportUID = 1
+
+func (s *Service) AdminSessions(adminUID int) ([]model.AdminChatSession, error) {
 	rows, err := database.DB.Query(`
 		SELECT cl.list_id, cl.user1, cl.user2,
 			COALESCE(cl.last_msg,''), COALESCE(DATE_FORMAT(cl.last_time,'%Y-%m-%d %H:%i:%s'),''),
-			cl.unread1, cl.unread2,
 			COALESCE(u1.user, ''), COALESCE(u2.user, '')
 		FROM qingka_chat_list cl
 		LEFT JOIN qingka_wangke_user u1 ON u1.uid = cl.user1
@@ -30,7 +32,6 @@ func (s *Service) AdminSessions() ([]model.AdminChatSession, error) {
 		var session model.AdminChatSession
 		var u1qq, u2qq sql.NullString
 		if err := rows.Scan(&session.ListID, &session.User1, &session.User2, &session.LastMsg, &session.LastTime,
-			&session.UnreadCount, &session.LastFromUID,
 			&u1qq, &u2qq); err != nil {
 			continue
 		}
@@ -40,10 +41,11 @@ func (s *Service) AdminSessions() ([]model.AdminChatSession, error) {
 		if u2qq.Valid && u2qq.String != "" {
 			session.User2Avatar = "https://q1.qlogo.cn/g?b=qq&nk=" + u2qq.String + "&s=100"
 		}
-		totalUnread := session.UnreadCount + session.LastFromUID
-		session.UnreadCount = totalUnread
-		session.LastFromUID = 0
 		database.DB.QueryRow("SELECT COALESCE(from_uid,0) FROM qingka_chat_msg WHERE list_id = ? ORDER BY msg_id DESC LIMIT 1", session.ListID).Scan(&session.LastFromUID)
+		attentionUID := adminAttentionUID(adminUID, session.User1, session.User2)
+		if attentionUID > 0 {
+			database.DB.QueryRow("SELECT COUNT(*) FROM qingka_chat_msg WHERE list_id = ? AND to_uid = ? AND status = '未读'", session.ListID, attentionUID).Scan(&session.UnreadCount)
+		}
 		session.User1Name = fmt.Sprintf("%d", session.User1)
 		session.User2Name = fmt.Sprintf("%d", session.User2)
 
@@ -95,6 +97,81 @@ func (s *Service) AdminMessages(listID, limit int) ([]model.ChatMsg, error) {
 		msgs = []model.ChatMsg{}
 	}
 	return msgs, nil
+}
+
+func (s *Service) AdminMarkRead(adminUID, listID int) error {
+	var user1, user2 int
+	err := database.DB.QueryRow("SELECT user1, user2 FROM qingka_chat_list WHERE list_id = ? LIMIT 1", listID).Scan(&user1, &user2)
+	if err == sql.ErrNoRows {
+		return errors.New("会话不存在")
+	}
+	if err != nil {
+		return err
+	}
+
+	attentionUID := adminAttentionUID(adminUID, user1, user2)
+	if attentionUID <= 0 {
+		return nil
+	}
+	return s.MarkRead(attentionUID, listID)
+}
+
+func (s *Service) AdminSend(adminUID int, req model.ChatSendRequest) (*model.ChatMsg, error) {
+	if err := s.checkRate(adminUID); err != nil {
+		return nil, err
+	}
+	content := strings.TrimSpace(req.Content)
+	if content == "" {
+		return nil, errors.New("消息不能为空")
+	}
+	if len(content) > 5000 {
+		return nil, errors.New("消息过长")
+	}
+
+	var user1, user2 int
+	err := database.DB.QueryRow("SELECT user1, user2 FROM qingka_chat_list WHERE list_id = ? LIMIT 1", req.ListID).Scan(&user1, &user2)
+	if err == sql.ErrNoRows {
+		return nil, errors.New("会话不存在")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if req.ToUID != user1 && req.ToUID != user2 {
+		return nil, errors.New("无效的接收者")
+	}
+
+	now := time.Now().Format("2006-01-02 15:04:05")
+	result, err := database.DB.Exec(
+		"INSERT INTO qingka_chat_msg (list_id, from_uid, to_uid, content, status, addtime) VALUES (?, ?, ?, ?, '未读', ?)",
+		req.ListID, adminUID, req.ToUID, content, now,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	msgID, _ := result.LastInsertId()
+	database.DB.Exec("UPDATE qingka_chat_list SET last_msg = ?, last_time = ? WHERE list_id = ?", content, now, req.ListID)
+	s.incrUnread(req.ListID, req.ToUID)
+
+	return &model.ChatMsg{
+		MsgID:   int(msgID),
+		ListID:  req.ListID,
+		FromUID: adminUID,
+		ToUID:   req.ToUID,
+		Content: content,
+		Status:  "未读",
+		AddTime: now,
+	}, nil
+}
+
+func adminAttentionUID(adminUID, user1, user2 int) int {
+	if user1 == adminUID || user2 == adminUID {
+		return adminUID
+	}
+	if user1 == defaultSupportUID || user2 == defaultSupportUID {
+		return defaultSupportUID
+	}
+	return 0
 }
 
 func (s *Service) TrimSessionMessages() (int64, error) {

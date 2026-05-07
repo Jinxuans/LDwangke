@@ -160,10 +160,11 @@
     fetchLegacyAdminChatMessages,
     fetchLegacyAdminChatSessions,
     fetchLegacyAdminChatStats,
+    markLegacyAdminChatRead,
+    sendLegacyAdminChatMessage,
     type LegacyAdminChatSession,
     type LegacyAdminChatStats
   } from '@/api/legacy/admin-chat'
-  import { markLegacyChatRead, sendLegacyChatMessage } from '@/api/legacy/chat'
   import { useUserStore } from '@/store/modules/user'
   import type { LegacyChatMessage } from '@/types/legacy-dashboard'
 
@@ -193,6 +194,7 @@
   const cleanupDays = ref(14)
   const messageText = ref('')
   const messageScrollbar = ref()
+  const defaultSupportUid = 1
   let pollTimer: ReturnType<typeof setInterval> | null = null
 
   const activeSession = computed(
@@ -219,8 +221,16 @@
     return value.slice(5, 16) || value
   }
 
-  const getPeerUid = (session: LegacyAdminChatSession) =>
-    session.user1 === myUid.value ? session.user2 : session.user1
+  const getPeerUid = (session: LegacyAdminChatSession) => {
+    if (session.user1 === myUid.value) return session.user2
+    if (session.user2 === myUid.value) return session.user1
+    if (session.user1 === defaultSupportUid) return session.user2
+    if (session.user2 === defaultSupportUid) return session.user1
+    if (session.last_from_uid === session.user1 || session.last_from_uid === session.user2) {
+      return session.last_from_uid
+    }
+    return session.user1
+  }
 
   const getSessionDisplayName = (session: LegacyAdminChatSession) => {
     if (session.user1 === myUid.value) return session.user2_name
@@ -291,7 +301,7 @@
   const selectSession = async (session: LegacyAdminChatSession) => {
     activeSessionId.value = session.list_id
     await loadMessages()
-    await markLegacyChatRead(session.list_id)
+    await markLegacyAdminChatRead(session.list_id)
     await loadSessions()
   }
 
@@ -300,7 +310,7 @@
 
     sending.value = true
     try {
-      const message = await sendLegacyChatMessage({
+      const message = await sendLegacyAdminChatMessage({
         list_id: activeSession.value.list_id,
         to_uid: getPeerUid(activeSession.value),
         content: messageText.value.trim()
