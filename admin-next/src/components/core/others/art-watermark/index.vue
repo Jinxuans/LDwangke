@@ -7,7 +7,7 @@
   >
     <ElWatermark
       :content="watermarkContent"
-      :font="{ fontSize: fontSize, color: fontColor, fontGap: fontGap }"
+      :font="{ fontSize: fontSize, color: fontColor }"
       :rotate="rotate"
       :gap="[gapX, gapY]"
       :offset="[offsetX, offsetY]"
