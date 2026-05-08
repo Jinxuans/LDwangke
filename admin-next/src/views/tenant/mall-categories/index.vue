@@ -132,7 +132,7 @@
           class: 'w-full',
           min: 0,
           step: 1,
-          'onUpdate:modelValue': (value: number) => {
+          'onUpdate:modelValue': (value: number | undefined) => {
             row.sort = Number(value || 0)
           },
           onChange: () => markSortChanged(row)
