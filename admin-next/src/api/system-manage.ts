@@ -1,7 +1,6 @@
 import request from '@/utils/http'
 import { adaptLegacyMenus, type LegacyRouteRecord } from '@/router/core/legacy-menu-adapter'
 import type { LegacyMenuConfigItem } from '@/types/legacy-contract'
-import { isHttpError } from '@/utils/http/error'
 import { localLegacyRoutes } from '@/router/core/legacy-local-routes'
 
 // 获取用户列表
@@ -20,25 +19,8 @@ export function fetchGetRoleList(params: Api.SystemManage.RoleSearchParams) {
   })
 }
 
-// 获取菜单列表
-function fetchLegacyRouteRecords() {
-  return request
-    .get<LegacyRouteRecord[]>({
-      url: '/menu/all',
-      showErrorMessage: false
-    })
-    .catch((error) => {
-      if (isHttpError(error) && error.code === 404) {
-        console.warn('[fetchGetMenuList] /menu/all 不存在，已切换到本地旧路由清单')
-        return localLegacyRoutes
-      }
-
-      throw error
-    })
-}
-
 export function fetchGetMenuListWithConfigs() {
-  const routeRequest = fetchLegacyRouteRecords()
+  const routeRequest = Promise.resolve(localLegacyRoutes as LegacyRouteRecord[])
   const configRequest = request
     .get<LegacyMenuConfigItem[]>({
       url: '/menus',
