@@ -103,6 +103,17 @@ var PluginSpecs = map[string]PluginSpec{
 		RuntimeEntry:     "pluginruntime/cron_bridge.go:RunWCron",
 		Notes:            "W plugin with background sync runtime; cron loop still bridged through pluginruntime/cron_bridge.go.",
 	},
+	"wuxin": {
+		Name:             "wuxin",
+		Kind:             "plugin",
+		Status:           "active",
+		HasRoutes:        true,
+		HasPluginRuntime: true,
+		RuntimeOwner:     "module",
+		RetirementRule:   "Retire only after routes, OpenAPI compatibility, and product obligations are removed.",
+		RuntimeEntry:     "plugins/wuxin/cron.go:RunCron",
+		Notes:            "Wuxin SDXY bridge plugin with source/source29/same_system upstream modes.",
+	},
 	"xm": {
 		Name:             "xm",
 		Kind:             "plugin",

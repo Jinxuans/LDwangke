@@ -25,6 +25,7 @@ var PluginModules = map[string]bool{
 	"tutuqg":  true,
 	"tuzhi":   true,
 	"w":       true,
+	"wuxin":   true,
 	"xm":      true,
 	"ydsj":    true,
 	"yfdk":    true,

@@ -66,6 +66,7 @@ export const localLegacyRoutes: LegacyRouteRecord[] = [
   ]),
   group('Sports', '/sports', '运动业务', 'lucide:activity', '/xm/index', [
     leaf('SDXYIndex', '/sdxy/index', '闪电运动', 'lucide:zap'),
+    leaf('WuxinIndex', '/wuxin/index', '无心闪动', 'lucide:route'),
     leaf('YDSJIndex', '/ydsj/index', '运动世界', 'lucide:footprints'),
     leaf('XMIndex', '/xm/index', '小米运动', 'lucide:activity'),
     leaf('WRunIndex', '/w/index', '鲸鱼运动', 'lucide:waves'),

@@ -12,6 +12,7 @@ import (
 	_ "go-api/internal/plugins/tutuqg"
 	_ "go-api/internal/plugins/tuzhi"
 	_ "go-api/internal/plugins/w"
+	_ "go-api/internal/plugins/wuxin"
 	_ "go-api/internal/plugins/xm"
 	_ "go-api/internal/plugins/ydsj"
 	_ "go-api/internal/plugins/yfdk"

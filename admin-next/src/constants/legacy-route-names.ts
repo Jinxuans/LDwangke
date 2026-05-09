@@ -29,6 +29,7 @@ export const LEGACY_ROUTE_NAMES = [
   'SXGZIndex',
   'Sports',
   'SDXYIndex',
+  'WuxinIndex',
   'YDSJIndex',
   'XMIndex',
   'WRunIndex',
