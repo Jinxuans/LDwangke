@@ -13,12 +13,6 @@
       <template #header>
         <div class="flex-cb">
           <h4 class="m-0">实习盖章订单</h4>
-          <div class="flex flex-wrap gap-2">
-            <ElTag type="success" effect="light">当前页 {{ currentOrderCount }} 条</ElTag>
-            <ElTag type="warning" effect="light">待处理 {{ pendingOrderCount }}</ElTag>
-            <ElTag type="primary" effect="light">已完成 {{ completedOrderCount }}</ElTag>
-            <ElTag type="info" effect="light">退款 {{ refundOrderCount }}</ElTag>
-          </div>
         </div>
       </template>
 
@@ -178,6 +172,20 @@
                         >¥{{ Number(selectedCompany.license_price || 0).toFixed(2) }}</span
                       >
                     </div>
+                  </div>
+                </div>
+
+                <div v-if="isCustomCompany" class="rounded-custom-sm border-full-d bg-box p-4">
+                  <p class="mb-2 text-sm font-medium text-g-800">
+                    公司名称（{{ customCompanyLabel }}）
+                  </p>
+                  <ElInput
+                    v-model.trim="orderForm.custom_company_name"
+                    clearable
+                    placeholder="请输入实际需要盖章的公司全称"
+                  />
+                  <div class="mt-2 text-xs text-g-500">
+                    当前选择的是{{ customCompanyLabel }}公司，请填写实际公司全称
                   </div>
                 </div>
 
@@ -788,10 +796,169 @@
     </ElDialog>
 
     <ElDialog
-      v-model="uploadVisible"
-      :title="`上传附件 - ${selectedOrder?.order_no || ''}`"
-      width="680px"
+      v-model="detailVisible"
+      :title="`订单详情 - ${selectedOrder?.order_no || ''}`"
+      width="860px"
     >
+      <div
+        v-if="detailLoading"
+        class="rounded-custom-sm border-full-d bg-g-100/60 p-8 text-center text-sm text-g-500"
+      >
+        正在加载订单详情...
+      </div>
+      <div v-else-if="selectedOrder" class="space-y-5">
+        <section class="grid gap-4 md:grid-cols-3">
+          <div class="rounded-custom-sm border-full-d bg-box p-4">
+            <p class="text-xs text-g-500">订单号</p>
+            <p class="mt-2 text-sm font-semibold text-g-900">{{ selectedOrder.order_no || '-' }}</p>
+          </div>
+          <div class="rounded-custom-sm border-full-d bg-box p-4">
+            <p class="text-xs text-g-500">订单状态</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <ElTag effect="plain" :type="statusType(selectedOrder.status)">
+                {{ statusLabel(selectedOrder.status) }}
+              </ElTag>
+              <ElTag v-if="selectedOrder.only_business_license" effect="plain" type="warning">
+                仅需营业执照
+              </ElTag>
+            </div>
+          </div>
+          <div class="rounded-custom-sm border-full-d bg-box p-4">
+            <p class="text-xs text-g-500">创建时间</p>
+            <p class="mt-2 text-sm font-medium text-g-900">{{ selectedOrder.created_at || '-' }}</p>
+          </div>
+        </section>
+
+        <section class="grid gap-4 md:grid-cols-2">
+          <div class="rounded-custom-sm border-full-d bg-box p-4">
+            <p class="mb-3 text-sm font-semibold text-g-900">客户信息</p>
+            <div class="space-y-2 text-sm text-g-600">
+              <p>姓名：{{ selectedOrder.customer_name || '-' }}</p>
+              <p>联系邮箱：{{ selectedOrder.customer_email || '未填写' }}</p>
+              <p>联系电话：{{ selectedOrder.customer_phone || '未填写' }}</p>
+              <p>收货地址：{{ selectedOrder.customer_address || '-' }}</p>
+            </div>
+          </div>
+          <div class="rounded-custom-sm border-full-d bg-box p-4">
+            <p class="mb-3 text-sm font-semibold text-g-900">公司与服务</p>
+            <div class="space-y-2 text-sm text-g-600">
+              <p>盖章公司：{{ selectedOrder.company_name || '-' }}</p>
+              <p v-if="selectedOrder.custom_company_name">
+                定制公司：{{ selectedOrder.custom_company_name }}
+              </p>
+              <p>CID：{{ selectedOrder.company_id || '-' }}</p>
+              <p>
+                业务类型：{{
+                  selectedOrder.only_business_license
+                    ? '仅需营业执照'
+                    : serviceTypeLabel(selectedOrder.service_type)
+                }}
+              </p>
+              <p>材料方式：{{ materialTypeLabel(selectedOrder.material_type) }}</p>
+              <p>打印份数：{{ selectedOrder.print_copies || 0 }}份</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="grid gap-4 md:grid-cols-3">
+          <div class="rounded-custom-sm border-full-d bg-box p-4">
+            <p class="mb-3 text-sm font-semibold text-g-900">快递信息</p>
+            <div class="space-y-2 text-sm text-g-600">
+              <p>快递公司：{{ selectedOrder.courier_company || '未选择' }}</p>
+              <p>快递单号：{{ selectedOrder.tracking_number || '暂无' }}</p>
+              <p>回寄单号：{{ selectedOrder.return_tracking_number || '暂无' }}</p>
+            </div>
+          </div>
+          <div class="rounded-custom-sm border-full-d bg-box p-4">
+            <p class="mb-3 text-sm font-semibold text-g-900">价格明细</p>
+            <div class="space-y-2 text-sm text-g-600">
+              <p>基础费用：{{ formatMoney(detailPrice(selectedOrder, 'base')) }}</p>
+              <p>打印费用：{{ formatMoney(detailPrice(selectedOrder, 'print')) }}</p>
+              <p>营业执照：{{ formatMoney(detailPrice(selectedOrder, 'license')) }}</p>
+              <p class="font-semibold text-g-900"
+                >合计：{{ formatMoney(detailPrice(selectedOrder, 'total')) }}</p
+              >
+              <p v-if="hasUpstreamPriceDiff(selectedOrder)" class="text-xs text-g-500">
+                上游价格：{{ formatMoney(selectedOrder.total_price) }}
+              </p>
+            </div>
+          </div>
+          <div class="rounded-custom-sm border-full-d bg-box p-4">
+            <p class="mb-3 text-sm font-semibold text-g-900">备注信息</p>
+            <div class="space-y-2 text-sm text-g-600">
+              <p>特殊要求：{{ selectedOrder.special_requirements || '无' }}</p>
+              <p>管理员备注：{{ selectedOrder.admin_notes || '无' }}</p>
+              <p>退款原因：{{ selectedOrder.refund_reason || '无' }}</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="grid gap-4 md:grid-cols-2">
+          <div class="rounded-custom-sm border-full-d bg-box p-4">
+            <div class="mb-2 flex items-center justify-between gap-3">
+              <p class="text-sm font-medium text-g-800">已上传文件</p>
+              <ElButton
+                v-if="selectedFiles.uploaded.length > 1"
+                size="small"
+                text
+                type="primary"
+                @click="openAllFiles(selectedFiles.uploaded)"
+              >
+                全部下载
+              </ElButton>
+            </div>
+            <div v-if="selectedFiles.uploaded.length" class="space-y-2 text-sm text-g-600">
+              <div
+                v-for="item in selectedFiles.uploaded"
+                :key="item.url"
+                class="flex items-center justify-between gap-3"
+              >
+                <span class="truncate">{{ item.name }}</span>
+                <div class="flex shrink-0 items-center gap-2">
+                  <span>{{ formatFileSize(item.size) }}</span>
+                  <ElButton size="small" text type="primary" @click="openFileUrl(item.url)">
+                    下载
+                  </ElButton>
+                </div>
+              </div>
+            </div>
+            <div v-else class="text-sm text-g-500">暂无上传文件</div>
+          </div>
+          <div class="rounded-custom-sm border-full-d bg-box p-4">
+            <div class="mb-2 flex items-center justify-between gap-3">
+              <p class="text-sm font-medium text-g-800">已回传文件</p>
+              <ElButton
+                v-if="selectedFiles.processed.length > 1"
+                size="small"
+                text
+                type="primary"
+                @click="openAllFiles(selectedFiles.processed)"
+              >
+                全部下载
+              </ElButton>
+            </div>
+            <div v-if="selectedFiles.processed.length" class="space-y-2 text-sm text-g-600">
+              <div
+                v-for="item in selectedFiles.processed"
+                :key="item.url"
+                class="flex items-center justify-between gap-3"
+              >
+                <span class="truncate">{{ item.name }}</span>
+                <div class="flex shrink-0 items-center gap-2">
+                  <span>{{ formatFileSize(item.size) }}</span>
+                  <ElButton size="small" text type="primary" @click="openFileUrl(item.url)">
+                    下载
+                  </ElButton>
+                </div>
+              </div>
+            </div>
+            <div v-else class="text-sm text-g-500">暂无处理文件</div>
+          </div>
+        </section>
+      </div>
+    </ElDialog>
+
+    <ElDialog v-model="uploadVisible" :title="fileDialogTitle" width="680px">
       <div class="space-y-4">
         <div class="rounded-custom-sm border-full-d bg-g-100/60 p-4 text-sm text-g-600">
           先选择文件并设置每个文件的打印参数，再上传到当前订单，支持多次追加。
@@ -962,6 +1129,7 @@
     fetchLegacySXGZAnnouncements,
     createLegacySXGZOrder,
     fetchLegacySXGZAdminOrders,
+    fetchLegacySXGZOrder,
     fetchLegacySXGZCompanies,
     fetchLegacySXGZConfig,
     fetchLegacySXGZLicenseCompanies,
@@ -1027,6 +1195,8 @@
   const announcementVisible = ref(false)
   const announcementLoading = ref(false)
   const uploadVisible = ref(false)
+  const detailVisible = ref(false)
+  const detailLoading = ref(false)
   const uploadSaving = ref(false)
   const adminVisible = ref(false)
   const selectedOrder = ref<LegacySXGZOrder | null>(null)
@@ -1076,6 +1246,7 @@
   const orderForm = reactive({
     business_license: false,
     company_id: null as number | null,
+    custom_company_name: '',
     courier_company: '',
     customer_address: '',
     customer_email: '',
@@ -1124,22 +1295,7 @@
     size: pagination.size,
     total: pagination.total
   }))
-
-  const currentOrderCount = computed(() => orders.value.length)
-  const pendingOrderCount = computed(
-    () => orders.value.filter((item) => item.status === 'pending').length
-  )
-  const completedOrderCount = computed(
-    () =>
-      orders.value.filter((item) => item.status === 'completed' || item.status === 'delivered')
-        .length
-  )
-  const refundOrderCount = computed(
-    () =>
-      orders.value.filter(
-        (item) => item.status === 'refund_requested' || item.status === 'refunded'
-      ).length
-  )
+  const fileDialogTitle = computed(() => `上传附件 - ${selectedOrder.value?.order_no || ''}`)
 
   const isAdmin = computed(() => {
     const roles = userStore.info?.roles || []
@@ -1157,6 +1313,17 @@
   const selectedCompany = computed(() =>
     companies.value.find((item) => item.cid === orderForm.company_id)
   )
+  const isCustomCompany = computed(() => {
+    const name = selectedCompany.value?.name || ''
+    return (
+      selectedServiceMode.value !== 'license_only' &&
+      (name.includes('定制') || name.includes('补盖'))
+    )
+  })
+  const customCompanyLabel = computed(() => {
+    const name = selectedCompany.value?.name || ''
+    return name.includes('补盖') ? '补盖' : '定制'
+  })
   const selectedLicenseCompanyRows = computed(
     () =>
       orderForm.selected_license_companies
@@ -1376,6 +1543,7 @@
     Object.assign(orderForm, {
       business_license: false,
       company_id: null,
+      custom_company_name: '',
       courier_company: '',
       customer_address: '',
       customer_email: '',
@@ -1411,6 +1579,7 @@
       orderForm.print_options = []
       orderForm.delivery_option = ''
       orderForm.company_id = null
+      orderForm.custom_company_name = ''
       orderForm.selected_license_companies = []
       materialUploadRef.value?.clearFiles()
       pendingMaterialFiles.value = []
@@ -1423,6 +1592,7 @@
       orderForm.print_options = []
       orderForm.delivery_option = deliveryOptionKeys.value[0] || ''
       orderForm.company_id = null
+      orderForm.custom_company_name = ''
       orderForm.selected_license_companies = []
       materialUploadRef.value?.clearFiles()
       pendingMaterialFiles.value = []
@@ -1434,6 +1604,7 @@
       orderForm.delivery_option = deliveryOptionKeys.value[2] || deliveryOptionKeys.value[0] || ''
       orderForm.print_copies = orderForm.print_copies > 0 ? orderForm.print_copies : 10
       orderForm.company_id = null
+      orderForm.custom_company_name = ''
       orderForm.selected_license_companies = []
     } else {
       orderForm.service_type = 'electronic'
@@ -1444,6 +1615,7 @@
       orderForm.print_options = []
       orderForm.delivery_option = ''
       orderForm.company_id = null
+      orderForm.custom_company_name = ''
       orderForm.selected_license_companies = []
       materialUploadRef.value?.clearFiles()
     }
@@ -1554,6 +1726,9 @@
     if (!orderForm.company_id) {
       return
     }
+    if (!isCustomCompany.value) {
+      orderForm.custom_company_name = ''
+    }
     if (orderForm.business_license) {
       orderForm.selected_license_companies = [orderForm.company_id]
     }
@@ -1600,6 +1775,9 @@
       } else if (!orderForm.company_id) {
         ElMessage.warning('请选择公司')
         return
+      } else if (isCustomCompany.value && !orderForm.custom_company_name.trim()) {
+        ElMessage.warning(`请填写公司名称（${customCompanyLabel.value}）`)
+        return
       }
     }
     if (
@@ -1645,7 +1823,8 @@
     if (currentStepKey.value === 'company') {
       return selectedServiceMode.value === 'license_only'
         ? Boolean(orderForm.selected_license_companies.length)
-        : Boolean(orderForm.company_id)
+        : Boolean(orderForm.company_id) &&
+            (!isCustomCompany.value || Boolean(orderForm.custom_company_name.trim()))
     }
     if (currentStepKey.value === 'material') return Boolean(orderForm.material_type)
     if (currentStepKey.value === 'contact') return Boolean(orderForm.customer_name)
@@ -1702,6 +1881,7 @@
     return {
       business_license: selectedServiceMode.value === 'license_only' || orderForm.business_license,
       company_id: companyID,
+      custom_company_name: isCustomCompany.value ? orderForm.custom_company_name.trim() : '',
       courier_company: needsCourier.value ? orderForm.courier_company : '',
       customer_address: needsAddress.value ? orderForm.customer_address : '',
       customer_email: needsEmail.value ? orderForm.customer_email : '',
@@ -1901,6 +2081,10 @@
       ElMessage.warning('请先选择公司')
       return
     }
+    if (isCustomCompany.value && !payload.custom_company_name) {
+      ElMessage.warning(`请填写公司名称（${customCompanyLabel.value}）`)
+      return
+    }
     if (!payload.customer_name) {
       ElMessage.warning('请填写联系人姓名')
       return
@@ -1997,6 +2181,25 @@
     }
   }
 
+  const openFileUrl = (url?: string) => {
+    if (!url) {
+      ElMessage.warning('文件链接为空')
+      return
+    }
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const openAllFiles = (files: LegacySXGZFileRecord[]) => {
+    const urls = files.map((item) => item.url).filter(Boolean)
+    if (!urls.length) {
+      ElMessage.warning('没有可下载的文件')
+      return
+    }
+    urls.forEach((url, index) => {
+      window.setTimeout(() => openFileUrl(url), index * 120)
+    })
+  }
+
   const handleRefund = async (order: LegacySXGZOrder) => {
     if (!canRefundOrder(order)) {
       ElMessage.warning('当前订单状态不允许申请退款')
@@ -2083,6 +2286,17 @@
 
   const formatMoney = (value?: number) => `¥${Number(value || 0).toFixed(2)}`
 
+  const detailPrice = (order: LegacySXGZOrder, type: 'base' | 'license' | 'print' | 'total') => {
+    if (type === 'base') return order.actual_base_price ?? order.base_price
+    if (type === 'print') return order.actual_print_price ?? order.print_price
+    if (type === 'license') return order.actual_license_price ?? order.license_price
+    return order.actual_total_price ?? order.total_price
+  }
+
+  const hasUpstreamPriceDiff = (order: LegacySXGZOrder) =>
+    typeof order.actual_total_price === 'number' &&
+    Number(order.actual_total_price) !== Number(order.total_price)
+
   const materialTypeLabel = (value?: string) => {
     if (value === 'mail') return '邮寄材料'
     return '上传材料'
@@ -2146,6 +2360,11 @@
       formatter: (row) =>
         h('div', { class: 'sxgz-table-cell' }, [
           h('p', { class: 'sxgz-cell-title' }, row.company_name || '-'),
+          row.custom_company_name
+            ? h('p', { class: 'text-xs font-semibold text-[var(--el-color-warning)]' }, [
+                `定制：${row.custom_company_name}`
+              ])
+            : null,
           h('p', { class: 'text-xs text-g-500' }, `CID ${row.company_id || '-'}`),
           row.only_business_license
             ? h(
@@ -2271,8 +2490,8 @@
             }),
             h(ArtButtonTable, {
               type: 'view',
-              title: '查看文件',
-              onClick: () => openOrderFiles(row)
+              title: '订单详情',
+              onClick: () => openOrderDetail(row)
             }),
             canRefundOrder(row)
               ? h(ArtButtonTable, {
@@ -2295,11 +2514,24 @@
     }
   ])
 
-  const openOrderFiles = async (order: LegacySXGZOrder) => {
+  const openOrderDetail = async (order: LegacySXGZOrder) => {
     selectedOrder.value = order
     selectedFiles.uploaded = order.files?.uploaded || []
     selectedFiles.processed = order.files?.processed || []
-    uploadVisible.value = true
+    clearOrderUploadFiles()
+    detailVisible.value = true
+    detailLoading.value = true
+    try {
+      const detail = await fetchLegacySXGZOrder(order.order_id)
+      selectedOrder.value = detail
+      const files = detail.files || { uploaded: [], processed: [] }
+      selectedFiles.uploaded = files.uploaded || []
+      selectedFiles.processed = files.processed || []
+    } catch {
+      ElMessage.error('获取订单详情失败')
+    } finally {
+      detailLoading.value = false
+    }
   }
 
   const statusLabel = (status: string) => {

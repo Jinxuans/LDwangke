@@ -346,6 +346,7 @@ func compatOrderRequest(payload map[string]any) OrderQuoteRequest {
 	return OrderQuoteRequest{
 		ServiceType:              compatString(payload, "service_type"),
 		CompanyID:                compatInt(payload, "company_id"),
+		CustomCompanyName:        compatString(payload, "custom_company_name"),
 		CustomerName:             compatString(payload, "customer_name"),
 		CustomerEmail:            compatString(payload, "customer_email"),
 		CustomerPhone:            compatString(payload, "customer_phone"),

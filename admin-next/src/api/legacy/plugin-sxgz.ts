@@ -39,6 +39,7 @@ export interface LegacySXGZCompany {
 export interface LegacySXGZQuoteRequest {
   business_license: boolean
   company_id: number
+  custom_company_name?: string
   courier_company?: string
   customer_address?: string
   customer_email?: string
@@ -99,6 +100,10 @@ export interface LegacySXGZFileRecord {
 }
 
 export interface LegacySXGZOrder {
+  actual_base_price?: number
+  actual_license_price?: number
+  actual_print_price?: number
+  actual_total_price?: number
   admin_notes?: string
   agent_order_id?: number
   base_price: number
@@ -106,6 +111,7 @@ export interface LegacySXGZOrder {
   company_id: number
   company_name: string
   completed_at?: string
+  custom_company_name?: string
   courier_company?: string
   created_at: string
   customer_address?: string
@@ -239,6 +245,12 @@ export function fetchLegacySXGZOrders(params: {
   return request.get<{ list: LegacySXGZOrder[]; total: number }>({
     url: '/sxgz/orders',
     params
+  })
+}
+
+export function fetchLegacySXGZOrder(orderId: number) {
+  return request.get<LegacySXGZOrder>({
+    url: `/sxgz/orders/${orderId}`
   })
 }
 

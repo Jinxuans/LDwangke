@@ -144,7 +144,7 @@ func (s *SxgzService) upstreamApplyRefund(ctx context.Context, cfg SxgzConfig, o
 		if msg == "" {
 			msg = "upstream refund request failed"
 		}
-		return resp, fmt.Errorf(msg)
+		return resp, fmt.Errorf("%s", msg)
 	}
 	return resp, nil
 }

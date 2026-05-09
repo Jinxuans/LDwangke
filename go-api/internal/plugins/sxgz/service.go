@@ -36,6 +36,7 @@ func Sxgz() *SxgzService {
 type OrderQuoteRequest struct {
 	ServiceType              string                 `json:"service_type"`
 	CompanyID                int                    `json:"company_id"`
+	CustomCompanyName        string                 `json:"custom_company_name"`
 	CustomerName             string                 `json:"customer_name"`
 	CustomerEmail            string                 `json:"customer_email"`
 	CustomerPhone            string                 `json:"customer_phone"`
@@ -62,6 +63,7 @@ type SxgzOrder struct {
 	ServiceType          string         `json:"service_type"`
 	CompanyID            int            `json:"company_id"`
 	CompanyName          string         `json:"company_name"`
+	CustomCompanyName    sql.NullString `json:"-"`
 	BusinessLicense      int            `json:"business_license"`
 	OnlyBusinessLicense  int            `json:"only_business_license"`
 	MaterialType         sql.NullString `json:"-"`
@@ -312,7 +314,7 @@ func (s *SxgzService) RefreshCompanies(ctx context.Context) ([]SxgzCompany, erro
 		if msg == "" {
 			msg = "upstream returned failure"
 		}
-		return nil, fmt.Errorf(msg)
+		return nil, fmt.Errorf("%s", msg)
 	}
 
 	companies := decodeCompaniesPayload(body)
@@ -367,7 +369,7 @@ func (s *SxgzService) GetAnnouncements(ctx context.Context, req SxgzAnnouncement
 		if msg == "" {
 			msg = "upstream returned failure"
 		}
-		return nil, fmt.Errorf(msg)
+		return nil, fmt.Errorf("%s", msg)
 	}
 	if v, ok := body["code"]; ok {
 		code := asInt(v)
@@ -379,7 +381,7 @@ func (s *SxgzService) GetAnnouncements(ctx context.Context, req SxgzAnnouncement
 			if msg == "" {
 				msg = "upstream returned failure"
 			}
-			return nil, fmt.Errorf(msg)
+			return nil, fmt.Errorf("%s", msg)
 		}
 	}
 
@@ -683,13 +685,13 @@ func (s *SxgzService) CreateOrder(uid int, req OrderQuoteRequest, baseURL string
 
 	result, err := tx.Exec(
 		`INSERT INTO fd_sxgz_orders (
-			uid, order_no, service_type, company_id, company_name, business_license, only_business_license,
+			uid, order_no, service_type, company_id, company_name, custom_company_name, business_license, only_business_license,
 			material_type, uploaded_file, original_filename, customer_name, customer_email, customer_phone, customer_address,
 			courier_company, tracking_number, return_tracking_number, print_copies, print_options, paper_size,
 			special_requirements, base_price, mail_price, print_price, license_price, total_price, status, source,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'direct', ?, ?)`,
-		uid, orderNo, req.ServiceType, req.CompanyID, quote.CompanyName, boolToInt(req.BusinessLicense), boolToInt(req.OnlyBusinessLicense),
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'direct', ?, ?)`,
+		uid, orderNo, req.ServiceType, req.CompanyID, quote.CompanyName, strings.TrimSpace(req.CustomCompanyName), boolToInt(req.BusinessLicense), boolToInt(req.OnlyBusinessLicense),
 		req.MaterialType, uploadedFiles, originalFilename, req.CustomerName, req.CustomerEmail, req.CustomerPhone, req.CustomerAddress,
 		req.CourierCompany, req.TrackingNumber, req.ReturnTrackingNumber, effectivePrintCopies, mustJSON(effectivePrintOptions), effectivePaperSize,
 		req.SpecialRequirements, quote.BasePrice, 0, quote.PrintPrice, quote.LicensePrice, quote.TotalPrice, now, now,
@@ -722,6 +724,7 @@ func (s *SxgzService) CreateOrder(uid int, req OrderQuoteRequest, baseURL string
 			"service_type":               req.ServiceType,
 			"company_id":                 req.CompanyID,
 			"company_name":               quote.CompanyName,
+			"custom_company_name":        strings.TrimSpace(req.CustomCompanyName),
 			"customer_name":              req.CustomerName,
 			"customer_email":             req.CustomerEmail,
 			"customer_phone":             req.CustomerPhone,
@@ -750,7 +753,7 @@ func (s *SxgzService) CreateOrder(uid int, req OrderQuoteRequest, baseURL string
 			}
 			_ = s.markFailedAndRefund(orderID, uid, quote.TotalPrice, msg)
 			created.NeedRefund = true
-			return created, fmt.Errorf(msg)
+			return created, fmt.Errorf("%s", msg)
 		}
 		if data, ok := upstreamResp["data"].(map[string]any); ok {
 			if upstreamOrderNo := asString(data["order_no"]); upstreamOrderNo != "" {
@@ -812,7 +815,7 @@ func (s *SxgzService) GetOrder(uid int, orderID int64, isAdmin bool) (*SxgzOrder
 	}
 
 	row := database.DB.QueryRow(
-		"SELECT order_id, uid, order_no, service_type, company_id, company_name, business_license, only_business_license, material_type, uploaded_file, original_filename, file_size, customer_name, customer_email, customer_phone, customer_address, courier_company, tracking_number, return_tracking_number, print_copies, print_options, paper_size, special_requirements, base_price, mail_price, print_price, license_price, total_price, status, admin_notes, refund_reason, processed_files, processed_file_url, source, agent_uid, agent_order_id, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(completed_at, '%Y-%m-%d %H:%i:%s') FROM fd_sxgz_orders WHERE "+where+" LIMIT 1",
+		"SELECT order_id, uid, order_no, service_type, company_id, company_name, custom_company_name, business_license, only_business_license, material_type, uploaded_file, original_filename, file_size, customer_name, customer_email, customer_phone, customer_address, courier_company, tracking_number, return_tracking_number, print_copies, print_options, paper_size, special_requirements, base_price, mail_price, print_price, license_price, total_price, status, admin_notes, refund_reason, processed_files, processed_file_url, source, agent_uid, agent_order_id, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(completed_at, '%Y-%m-%d %H:%i:%s') FROM fd_sxgz_orders WHERE "+where+" LIMIT 1",
 		args...,
 	)
 	return scanOrder(row)
@@ -848,7 +851,7 @@ func (s *SxgzService) ListOrders(uid int, isAdmin bool, page, size int, search, 
 		return nil, err
 	}
 
-	query := "SELECT order_id, uid, order_no, service_type, company_id, company_name, business_license, only_business_license, material_type, uploaded_file, original_filename, file_size, customer_name, customer_email, customer_phone, customer_address, courier_company, tracking_number, return_tracking_number, print_copies, print_options, paper_size, special_requirements, base_price, mail_price, print_price, license_price, total_price, status, admin_notes, refund_reason, processed_files, processed_file_url, source, agent_uid, agent_order_id, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(completed_at, '%Y-%m-%d %H:%i:%s') FROM fd_sxgz_orders WHERE " + where + " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+	query := "SELECT order_id, uid, order_no, service_type, company_id, company_name, custom_company_name, business_license, only_business_license, material_type, uploaded_file, original_filename, file_size, customer_name, customer_email, customer_phone, customer_address, courier_company, tracking_number, return_tracking_number, print_copies, print_options, paper_size, special_requirements, base_price, mail_price, print_price, license_price, total_price, status, admin_notes, refund_reason, processed_files, processed_file_url, source, agent_uid, agent_order_id, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(completed_at, '%Y-%m-%d %H:%i:%s') FROM fd_sxgz_orders WHERE " + where + " ORDER BY created_at DESC LIMIT ? OFFSET ?"
 	args = append(args, size, offset)
 
 	rows, err := database.DB.Query(query, args...)
@@ -875,7 +878,7 @@ func (s *SxgzService) ListOrders(uid int, isAdmin bool, page, size int, search, 
 func scanOrder(scanner interface{ Scan(...any) error }) (*SxgzOrder, error) {
 	var order SxgzOrder
 	err := scanner.Scan(
-		&order.OrderID, &order.UID, &order.OrderNo, &order.ServiceType, &order.CompanyID, &order.CompanyName, &order.BusinessLicense, &order.OnlyBusinessLicense,
+		&order.OrderID, &order.UID, &order.OrderNo, &order.ServiceType, &order.CompanyID, &order.CompanyName, &order.CustomCompanyName, &order.BusinessLicense, &order.OnlyBusinessLicense,
 		&order.MaterialType, &order.UploadedFile, &order.OriginalFilename, &order.FileSize, &order.CustomerName, &order.CustomerEmail, &order.CustomerPhone,
 		&order.CustomerAddress, &order.CourierCompany, &order.TrackingNumber, &order.ReturnTrackingNumber, &order.PrintCopies, &order.PrintOptions, &order.PaperSize,
 		&order.SpecialRequirements, &order.BasePrice, &order.MailPrice, &order.PrintPrice, &order.LicensePrice, &order.TotalPrice, &order.Status, &order.AdminNotes,
@@ -895,6 +898,7 @@ func orderToMap(order *SxgzOrder) map[string]any {
 		"service_type":           order.ServiceType,
 		"company_id":             order.CompanyID,
 		"company_name":           order.CompanyName,
+		"custom_company_name":    nullString(order.CustomCompanyName),
 		"business_license":       order.BusinessLicense,
 		"only_business_license":  order.OnlyBusinessLicense,
 		"material_type":          nullString(order.MaterialType),
@@ -973,14 +977,14 @@ func (s *SxgzService) UpdateOrderStatus(uid int, orderID int64, status, notes, r
 	defer tx.Rollback()
 
 	var current SxgzOrder
-	query := "SELECT order_id, uid, order_no, service_type, company_id, company_name, business_license, only_business_license, material_type, uploaded_file, original_filename, file_size, customer_name, customer_email, customer_phone, customer_address, courier_company, tracking_number, return_tracking_number, print_copies, print_options, paper_size, special_requirements, base_price, mail_price, print_price, license_price, total_price, status, admin_notes, refund_reason, processed_files, processed_file_url, source, agent_uid, agent_order_id, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(completed_at, '%Y-%m-%d %H:%i:%s') FROM fd_sxgz_orders WHERE order_id = ?"
+	query := "SELECT order_id, uid, order_no, service_type, company_id, company_name, custom_company_name, business_license, only_business_license, material_type, uploaded_file, original_filename, file_size, customer_name, customer_email, customer_phone, customer_address, courier_company, tracking_number, return_tracking_number, print_copies, print_options, paper_size, special_requirements, base_price, mail_price, print_price, license_price, total_price, status, admin_notes, refund_reason, processed_files, processed_file_url, source, agent_uid, agent_order_id, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), DATE_FORMAT(completed_at, '%Y-%m-%d %H:%i:%s') FROM fd_sxgz_orders WHERE order_id = ?"
 	args := []any{orderID}
 	if !isAdmin {
 		query += " AND uid = ?"
 		args = append(args, uid)
 	}
 	row := tx.QueryRow(query, args...)
-	if err := row.Scan(&current.OrderID, &current.UID, &current.OrderNo, &current.ServiceType, &current.CompanyID, &current.CompanyName, &current.BusinessLicense, &current.OnlyBusinessLicense, &current.MaterialType, &current.UploadedFile, &current.OriginalFilename, &current.FileSize, &current.CustomerName, &current.CustomerEmail, &current.CustomerPhone, &current.CustomerAddress, &current.CourierCompany, &current.TrackingNumber, &current.ReturnTrackingNumber, &current.PrintCopies, &current.PrintOptions, &current.PaperSize, &current.SpecialRequirements, &current.BasePrice, &current.MailPrice, &current.PrintPrice, &current.LicensePrice, &current.TotalPrice, &current.Status, &current.AdminNotes, &current.RefundReason, &current.ProcessedFiles, &current.ProcessedFileURL, &current.Source, &current.AgentUID, &current.AgentOrderID, &current.CreatedAt, &current.UpdatedAt, &current.CompletedAt); err != nil {
+	if err := row.Scan(&current.OrderID, &current.UID, &current.OrderNo, &current.ServiceType, &current.CompanyID, &current.CompanyName, &current.CustomCompanyName, &current.BusinessLicense, &current.OnlyBusinessLicense, &current.MaterialType, &current.UploadedFile, &current.OriginalFilename, &current.FileSize, &current.CustomerName, &current.CustomerEmail, &current.CustomerPhone, &current.CustomerAddress, &current.CourierCompany, &current.TrackingNumber, &current.ReturnTrackingNumber, &current.PrintCopies, &current.PrintOptions, &current.PaperSize, &current.SpecialRequirements, &current.BasePrice, &current.MailPrice, &current.PrintPrice, &current.LicensePrice, &current.TotalPrice, &current.Status, &current.AdminNotes, &current.RefundReason, &current.ProcessedFiles, &current.ProcessedFileURL, &current.Source, &current.AgentUID, &current.AgentOrderID, &current.CreatedAt, &current.UpdatedAt, &current.CompletedAt); err != nil {
 		return err
 	}
 	if !isAdmin && current.UID != uid {
@@ -1072,7 +1076,7 @@ func (s *SxgzService) SyncOrders(ctx context.Context) (int, error) {
 		if msg == "" {
 			msg = "upstream returned failure"
 		}
-		return 0, fmt.Errorf(msg)
+		return 0, fmt.Errorf("%s", msg)
 	}
 
 	items := decodeOrderSyncPayload(resp)

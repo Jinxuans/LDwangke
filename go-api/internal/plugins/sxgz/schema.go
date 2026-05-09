@@ -14,6 +14,7 @@ func (s *SxgzService) EnsureTable() {
 		service_type enum('electronic','mail','both') NOT NULL DEFAULT 'electronic',
 		company_id int(11) NOT NULL DEFAULT 0,
 		company_name varchar(255) NOT NULL DEFAULT '',
+		custom_company_name varchar(255) DEFAULT NULL,
 		business_license tinyint(1) NOT NULL DEFAULT 0,
 		only_business_license tinyint(1) NOT NULL DEFAULT 0,
 		material_type enum('upload','mail') DEFAULT 'upload',
@@ -58,6 +59,10 @@ func (s *SxgzService) EnsureTable() {
 	if err != nil {
 		obslogger.L().Warn("SXGZ create orders table failed", "error", err)
 	}
+	ensureSxgzOrdersColumn(
+		"custom_company_name",
+		"ALTER TABLE fd_sxgz_orders ADD COLUMN custom_company_name varchar(255) DEFAULT NULL AFTER company_name",
+	)
 
 	_, err = database.DB.Exec(`CREATE TABLE IF NOT EXISTS fd_sxgz_company_cache (
 		cid int(11) NOT NULL,
@@ -85,5 +90,19 @@ func (s *SxgzService) EnsureTable() {
 		if err != nil {
 			obslogger.L().Warn("SXGZ seed config failed", "error", err)
 		}
+	}
+}
+
+func ensureSxgzOrdersColumn(columnName, alterSQL string) {
+	var count int
+	err := database.DB.QueryRow(
+		"SELECT COUNT(*) FROM information_schema.COLUMNS WHERE table_schema = DATABASE() AND table_name = 'fd_sxgz_orders' AND column_name = ?",
+		columnName,
+	).Scan(&count)
+	if err != nil || count > 0 {
+		return
+	}
+	if _, err := database.DB.Exec(alterSQL); err != nil {
+		obslogger.L().Warn("SXGZ alter orders table failed", "column", columnName, "error", err)
 	}
 }
