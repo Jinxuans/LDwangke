@@ -223,7 +223,10 @@
 </template>
 
 <script setup lang="ts">
-  import { ElAvatar, ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import ArtButtonMore, {
+    type ButtonMoreItem
+  } from '@/components/core/forms/art-button-more/index.vue'
+  import { ElAvatar, ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus'
   import { fetchGetUserInfo } from '@/api/auth'
   import {
     adminChangeLegacyAgentSuperior,
@@ -455,62 +458,38 @@
       {
         prop: 'operation',
         label: '操作',
-        minWidth: 420,
+        width: isAdmin.value ? 190 : 140,
         fixed: 'right',
         formatter: (row: LegacyAgentListItem) =>
-          h('div', { class: 'flex flex-wrap items-center gap-2 py-1' }, [
+          h('div', { class: 'flex items-center gap-1.5' }, [
             h(
-              'button',
-              { class: 'agent-action-btn primary', onClick: () => openGradeDialog(row.uid) },
-              '改价'
-            ),
-            h(
-              'button',
-              { class: 'agent-action-btn', onClick: () => promptRecharge(row.uid) },
-              '充值'
+              ElButton,
+              {
+                type: 'primary',
+                plain: true,
+                size: 'small',
+                onClick: () => promptRecharge(row.uid)
+              },
+              () => '充值'
             ),
             ...(isAdmin.value
               ? [
                   h(
-                    'button',
-                    { class: 'agent-action-btn warning', onClick: () => openSuperiorDialog(row) },
-                    '迁上级'
-                  ),
-                  h(
-                    'button',
-                    { class: 'agent-action-btn danger', onClick: () => promptDeduct(row.uid) },
-                    '扣款'
-                  ),
-                  h(
-                    'button',
-                    { class: 'agent-action-btn', onClick: () => handleResetPassword(row.uid) },
-                    '重置'
-                  ),
-                  h(
-                    'button',
-                    { class: 'agent-action-btn success', onClick: () => handleImpersonate(row.uid) },
-                    '进入'
+                    ElButton,
+                    {
+                      type: 'warning',
+                      plain: true,
+                      size: 'small',
+                      onClick: () => promptDeduct(row.uid)
+                    },
+                    () => '扣款'
                   )
                 ]
               : []),
-            h(
-              'button',
-              {
-                class: 'agent-action-btn',
-                onClick: () => handleChangeStatus(row.uid, Number(row.active || 0))
-              },
-              Number(row.active || 0) === 1 ? '封禁' : '解封'
-            ),
-            h(
-              'button',
-              { class: 'agent-action-btn', onClick: () => handleOpenKey(row.uid) },
-              Number(row.key) === 1 ? '密钥已开' : '开通密钥'
-            ),
-            h(
-              'button',
-              { class: 'agent-action-btn', onClick: () => promptInviteCode(row.uid) },
-              row.yqm ? '改邀请码' : '设邀请码'
-            )
+            h(ArtButtonMore, {
+              list: getAgentMoreActions(row),
+              onClick: (item: ButtonMoreItem) => handleAgentMoreAction(row, item)
+            })
           ])
       }
     )
@@ -579,6 +558,85 @@
     pagination.size = size
     pagination.current = 1
     loadData()
+  }
+
+  const getAgentMoreActions = (row: LegacyAgentListItem): ButtonMoreItem[] => {
+    const statusActive = Number(row.active || 0) === 1
+    const keyOpened = Number(row.key) === 1
+
+    return [
+      {
+        key: 'grade',
+        label: '修改等级',
+        icon: 'ri:price-tag-3-line'
+      },
+      {
+        key: 'invite',
+        label: row.yqm ? '修改邀请码' : '设置邀请码',
+        icon: 'ri:coupon-3-line'
+      },
+      {
+        key: 'key',
+        label: keyOpened ? '密钥已开通' : '开通密钥',
+        icon: 'ri:key-2-line',
+        disabled: keyOpened
+      },
+      ...(isAdmin.value
+        ? [
+            {
+              key: 'impersonate',
+              label: '进入账号',
+              icon: 'ri:login-circle-line',
+              color: 'var(--el-color-success)'
+            },
+            {
+              key: 'superior',
+              label: '调整上级',
+              icon: 'ri:node-tree',
+              color: 'var(--el-color-warning)'
+            },
+            {
+              key: 'reset',
+              label: '重置密码',
+              icon: 'ri:lock-password-line'
+            }
+          ]
+        : []),
+      {
+        key: 'status',
+        label: statusActive ? '封禁账号' : '解封账号',
+        icon: statusActive ? 'ri:forbid-2-line' : 'ri:checkbox-circle-line',
+        color: statusActive ? 'var(--el-color-danger)' : 'var(--el-color-success)'
+      }
+    ]
+  }
+
+  const handleAgentMoreAction = async (row: LegacyAgentListItem, item: ButtonMoreItem) => {
+    switch (item.key) {
+      case 'grade':
+        await openGradeDialog(row.uid)
+        break
+      case 'invite':
+        await promptInviteCode(row.uid)
+        break
+      case 'key':
+        if (Number(row.key) !== 1) {
+          await handleOpenKey(row.uid)
+        }
+        break
+      case 'impersonate':
+        await handleImpersonate(row.uid)
+        break
+      case 'superior':
+        openSuperiorDialog(row)
+        break
+      case 'reset':
+        await handleResetPassword(row.uid)
+        break
+      case 'status':
+        await handleChangeStatus(row.uid, Number(row.active || 0))
+        break
+    }
   }
 
   const openCreateDialog = async () => {
@@ -795,47 +853,3 @@
     await loadData()
   })
 </script>
-
-<style scoped lang="scss">
-  .agent-action-btn {
-    padding: 4px 10px;
-    font-size: 12px;
-    line-height: 1;
-    color: var(--art-gray-700);
-    cursor: pointer;
-    background: var(--el-fill-color-light);
-    border: 1px solid var(--art-card-border);
-    border-radius: 999px;
-    transition: all 0.2s ease;
-
-    &:hover {
-      color: var(--el-color-primary);
-      border-color: var(--el-color-primary-light-5);
-      background: var(--el-color-primary-light-9);
-    }
-
-    &.primary {
-      color: var(--el-color-primary);
-      background: var(--el-color-primary-light-9);
-      border-color: var(--el-color-primary-light-6);
-    }
-
-    &.success {
-      color: var(--el-color-success);
-      background: var(--el-color-success-light-9);
-      border-color: var(--el-color-success-light-5);
-    }
-
-    &.warning {
-      color: var(--el-color-warning);
-      background: var(--el-color-warning-light-9);
-      border-color: var(--el-color-warning-light-5);
-    }
-
-    &.danger {
-      color: var(--el-color-danger);
-      background: var(--el-color-danger-light-9);
-      border-color: var(--el-color-danger-light-5);
-    }
-  }
-</style>
