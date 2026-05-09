@@ -188,17 +188,26 @@
     "title": "Create account",
     "subTitle": "Welcome to join us, please fill in the following information to complete the registration",
     "placeholder": {
-      "username": "Please enter your account",
+      "username": "Please enter QQ number as account",
+      "nickname": "Please enter your nickname",
       "password": "Please enter your password",
-      "confirmPassword": "Please enter your password again"
+      "confirmPassword": "Please enter your password again",
+      "inviteCode": "Please enter invite code",
+      "inviteCodeOptional": "Please enter invite code (optional)",
+      "email": "Please enter your email",
+      "verifyCode": "Please enter verification code"
     },
     "rule": {
       "confirmPasswordRequired": "Please enter your password again",
       "passwordMismatch": "The two passwords are inconsistent!",
-      "usernameLength": "The length is 3 to 20 characters",
+      "usernameLength": "The account length is 5 to 11 digits",
+      "usernameQQ": "Account must be a valid QQ number (5-11 digits, not starting with 0)",
       "passwordLength": "The password length cannot be less than 6 digits",
+      "inviteCodeRequired": "Please enter invite code",
+      "emailInvalid": "Please enter a valid email",
       "agreementRequired": "Please agree to the privacy policy"
     },
+    "sendCode": "Send code",
     "agreeText": "I agree",
     "privacyPolicy": "Privacy policy",
     "submitBtnText": "Register",

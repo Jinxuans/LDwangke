@@ -49,6 +49,33 @@ export function fetchLogin(params: Api.Auth.LoginParams) {
 }
 
 /**
+ * 注册
+ * @param params 注册参数
+ */
+export function fetchRegister(params: Api.Auth.RegisterParams) {
+  return request.post<void>({
+    url: '/auth/register',
+    params,
+    showSuccessMessage: true
+  })
+}
+
+/**
+ * 发送注册验证码
+ * @param email 邮箱
+ */
+export function fetchSendRegisterCode(email: string) {
+  return request.post<void>({
+    url: '/auth/send-code',
+    params: {
+      email,
+      purpose: 'register'
+    },
+    showSuccessMessage: true
+  })
+}
+
+/**
  * 获取用户信息
  * @returns 用户信息
  */
@@ -56,10 +83,10 @@ export function fetchGetUserInfo() {
   return request
     .get<Record<string, any>>({
       url: '/user/info'
-    // 自定义请求头
-    // headers: {
-    //   'X-Custom-Header': 'your-custom-value'
-    // }
+      // 自定义请求头
+      // headers: {
+      //   'X-Custom-Header': 'your-custom-value'
+      // }
     })
     .then(normalizeLegacyUserInfo)
 }

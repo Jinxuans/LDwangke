@@ -79,6 +79,16 @@ declare namespace Api {
       error?: string
     }
 
+    /** 注册参数 */
+    interface RegisterParams {
+      user: string
+      pass: string
+      name: string
+      yqm?: string
+      email?: string
+      verify_code?: string
+    }
+
     /** 用户信息 */
     interface UserInfo {
       buttons: string[]

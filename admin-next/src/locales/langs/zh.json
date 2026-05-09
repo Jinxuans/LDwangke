@@ -188,17 +188,26 @@
     "title": "创建账号",
     "subTitle": "欢迎加入我们，请填写以下信息完成注册",
     "placeholder": {
-      "username": "请输入账号",
+      "username": "请输入 QQ 号作为账号",
+      "nickname": "请输入昵称",
       "password": "请输入密码",
-      "confirmPassword": "请再次输入密码"
+      "confirmPassword": "请再次输入密码",
+      "inviteCode": "请输入邀请码",
+      "inviteCodeOptional": "请输入邀请码（如有）",
+      "email": "请输入邮箱",
+      "verifyCode": "请输入验证码"
     },
     "rule": {
       "confirmPasswordRequired": "请再次输入密码",
       "passwordMismatch": "两次输入密码不一致!",
-      "usernameLength": "长度在 3 到 20 个字符",
+      "usernameLength": "账号长度为 5 到 11 位",
+      "usernameQQ": "账号必须为有效 QQ 号（5-11 位数字，首位不为 0）",
       "passwordLength": "密码长度不能小于6位",
+      "inviteCodeRequired": "请输入邀请码",
+      "emailInvalid": "请输入有效邮箱",
       "agreementRequired": "请同意隐私协议"
     },
+    "sendCode": "发送验证码",
     "agreeText": "我同意",
     "privacyPolicy": "《隐私政策》",
     "submitBtnText": "注册",
