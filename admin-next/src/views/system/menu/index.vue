@@ -1,9 +1,10 @@
 <template>
   <div class="menu-page art-full-height">
     <ArtSearchBar
-      v-model="formFilters"
+      :model-value="formFilters"
       :items="formItems"
       :showExpand="false"
+      @update:model-value="updateFormFilters"
       @reset="handleReset"
       @search="handleSearch"
     />
@@ -113,7 +114,7 @@
     >
       <ArtForm
         ref="extFormRef"
-        v-model="extForm"
+        :model-value="extForm"
         :items="extFormItems"
         :rules="extRules"
         :span="width > 640 ? 12 : 24"
@@ -121,6 +122,7 @@
         label-width="96px"
         :show-reset="false"
         :show-submit="false"
+        @update:model-value="updateExtForm"
       />
 
       <template #footer>
@@ -144,10 +146,7 @@
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import type { FormItem } from '@/components/core/forms/art-form/index.vue'
   import ArtForm from '@/components/core/forms/art-form/index.vue'
-  import MenuDialog, {
-    type MenuDialogData,
-    type MenuParentOption
-  } from './modules/menu-dialog.vue'
+  import MenuDialog, { type MenuDialogData, type MenuParentOption } from './modules/menu-dialog.vue'
   import { useMenuStore } from '@/store/modules/menu'
   import {
     deleteLegacyExtMenu,
@@ -242,10 +241,18 @@
   ])
 
   const menuColumnChecks = ref(
-    getMenuColumns().map((item) => ({ ...item, checked: item.visible ?? true, visible: item.visible ?? true }))
+    getMenuColumns().map((item) => ({
+      ...item,
+      checked: item.visible ?? true,
+      visible: item.visible ?? true
+    }))
   )
   const extColumnChecks = ref(
-    getExtColumns().map((item) => ({ ...item, checked: item.visible ?? true, visible: item.visible ?? true }))
+    getExtColumns().map((item) => ({
+      ...item,
+      checked: item.visible ?? true,
+      visible: item.visible ?? true
+    }))
   )
 
   const menuColumns = computed(() =>
@@ -367,7 +374,10 @@
         label: '状态',
         width: 90,
         align: 'center',
-        formatter: (row) => h(ElTag, { type: row.visible === 1 ? 'success' : 'danger' }, () => (row.visible === 1 ? '启用' : '停用'))
+        formatter: (row) =>
+          h(ElTag, { type: row.visible === 1 ? 'success' : 'danger' }, () =>
+            row.visible === 1 ? '启用' : '停用'
+          )
       },
       {
         prop: 'operation',
@@ -478,7 +488,12 @@
 
       if (route.children?.length) {
         items.push(
-          ...buildMenuItems(route.children as AppRouteRecord[], configMap, routeName || parentKey, scope)
+          ...buildMenuItems(
+            route.children as AppRouteRecord[],
+            configMap,
+            routeName || parentKey,
+            scope
+          )
         )
       }
     })
@@ -596,7 +611,11 @@
     return false
   }
 
-  function flattenTree(nodes: MenuNode[], scope: MenuScope, parentKey = ''): LegacyMenuConfigItem[] {
+  function flattenTree(
+    nodes: MenuNode[],
+    scope: MenuScope,
+    parentKey = ''
+  ): LegacyMenuConfigItem[] {
     const result: LegacyMenuConfigItem[] = []
 
     nodes.forEach((node) => {
@@ -615,7 +634,7 @@
     return result
   }
 
-  function menuRowClassName({ row }: { row: MenuNode }) {
+  function menuRowClassName({ row }: { row: Record<string, any> }) {
     return row.visible === 0 ? 'menu-row--hidden' : ''
   }
 
@@ -636,6 +655,10 @@
     }
   }
 
+  function updateFormFilters(value: Partial<typeof formFilters>) {
+    Object.assign(formFilters, value || {})
+  }
+
   function handleReset() {
     Object.assign(formFilters, {
       name: '',
@@ -651,11 +674,16 @@
     Object.assign(appliedFilters, { ...formFilters })
   }
 
+  function updateExtForm(value: Partial<ExtMenuForm>) {
+    Object.assign(extForm, value || {})
+  }
+
   function toggleExpand() {
     isExpanded.value = !isExpanded.value
     nextTick(() => {
       const table = menuTableRef.value?.elTableRef
-      const rows = activeTab.value === 'backend' ? filteredBackendMenus.value : filteredFrontendMenus.value
+      const rows =
+        activeTab.value === 'backend' ? filteredBackendMenus.value : filteredFrontendMenus.value
       if (!table || !rows.length) return
 
       const processRows = (list: MenuNode[]) => {
@@ -675,7 +703,10 @@
     menuScope.value = scope
     menuEditData.value = {
       menu_key: row.menu_key,
-      parent_key: findParentKey(scope === 'backend' ? menuTree.value.backend : menuTree.value.frontend, row.menu_key),
+      parent_key: findParentKey(
+        scope === 'backend' ? menuTree.value.backend : menuTree.value.frontend,
+        row.menu_key
+      ),
       path: row.path,
       name: row.title,
       icon: row.icon,
@@ -830,76 +861,76 @@
 </script>
 
 <style scoped>
-.menu-page {
-  min-height: 0;
-  overflow: hidden;
-}
+  .menu-page {
+    min-height: 0;
+    overflow: hidden;
+  }
 
-:deep(.art-table-card) {
-  min-height: 0;
-}
+  :deep(.art-table-card) {
+    min-height: 0;
+  }
 
-:deep(.art-table-card > .el-card__body) {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-}
+  :deep(.art-table-card > .el-card__body) {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+  }
 
-:deep(.menu-row--hidden) {
-  opacity: 0.55;
-}
+  :deep(.menu-row--hidden) {
+    opacity: 0.55;
+  }
 
-:deep(.menu-name-cell) {
-  display: inline-flex;
-  max-width: 100%;
-  align-items: center;
-  gap: 8px;
-  vertical-align: middle;
-}
+  :deep(.menu-name-cell) {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    gap: 8px;
+    vertical-align: middle;
+  }
 
-:deep(.menu-name-icon) {
-  width: 18px;
-  min-width: 18px;
-  height: 18px;
-  font-size: 18px;
-  color: var(--el-text-color-secondary);
-}
+  :deep(.menu-name-icon) {
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+    font-size: 18px;
+    color: var(--el-text-color-secondary);
+  }
 
-:deep(.menu-name-icon.is-empty) {
-  opacity: 0;
-}
+  :deep(.menu-name-icon.is-empty) {
+    opacity: 0;
+  }
 
-:deep(.menu-name-text) {
-  min-width: 0;
-  overflow: hidden;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+  :deep(.menu-name-text) {
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
-:deep(.menu-tabs) {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-}
+  :deep(.menu-tabs) {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+  }
 
-:deep(.menu-tabs > .el-tabs__content) {
-  min-height: 0;
-  flex: 1;
-  overflow: hidden;
-}
+  :deep(.menu-tabs > .el-tabs__content) {
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+  }
 
-:deep(.menu-tabs > .el-tabs__content > .el-tab-pane) {
-  display: flex;
-  height: 100%;
-  min-height: 0;
-  flex-direction: column;
-}
+  :deep(.menu-tabs > .el-tabs__content > .el-tab-pane) {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+  }
 
-:deep(.menu-tabs .art-table) {
-  min-height: 0;
-  flex: 1;
-}
+  :deep(.menu-tabs .art-table) {
+    min-height: 0;
+    flex: 1;
+  }
 </style>

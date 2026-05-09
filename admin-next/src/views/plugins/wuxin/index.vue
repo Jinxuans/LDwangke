@@ -9,7 +9,11 @@
       @search="handleSearch"
     />
 
-    <ElCard class="art-table-card wuxin-table-card" shadow="never">
+    <ElCard
+      class="art-table-card wuxin-table-card"
+      shadow="never"
+      :body-style="{ paddingTop: '14px' }"
+    >
       <ArtTableHeader
         v-model:columns="columnChecks"
         :loading="loading"
@@ -859,7 +863,8 @@
                     {
                       command: 'refund',
                       disabled: row.order_status === 4,
-                      class: 'wuxin-danger-action'
+                      class: 'wuxin-danger-action',
+                      style: { color: 'var(--el-color-danger)' }
                     },
                     () => '退款'
                   )
@@ -1280,10 +1285,6 @@
     flex-shrink: 0;
   }
 
-  .wuxin-table-card :deep(.el-card__body) {
-    padding-top: 14px;
-  }
-
   .wuxin-table-toolbar {
     @apply flex flex-wrap items-center gap-2;
   }
@@ -1376,9 +1377,5 @@
     overflow: hidden;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
-  }
-
-  :global(.wuxin-danger-action) {
-    color: var(--el-color-danger) !important;
   }
 </style>
