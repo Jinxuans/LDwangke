@@ -52,6 +52,17 @@ var PluginSpecs = map[string]PluginSpec{
 		RuntimeEntry:     "pluginruntime/cron_bridge.go:RunSDXYCron",
 		Notes:            "SDXY plugin with background sync runtime; cron loop still bridged through pluginruntime/cron_bridge.go.",
 	},
+	"shashou": {
+		Name:             "shashou",
+		Kind:             "plugin",
+		Status:           "active",
+		HasRoutes:        true,
+		HasPluginRuntime: true,
+		RuntimeOwner:     "module",
+		RetirementRule:   "Retire only after routes, 29 compatibility, and product obligations are removed.",
+		RuntimeEntry:     "plugins/shashou/cron.go:RunCron",
+		Notes:            "Shashou sports-world plugin with native project, order, account, refund, query, sync, and 29-compatible APIs.",
+	},
 	"sxdk": {
 		Name:           "sxdk",
 		Kind:           "plugin",

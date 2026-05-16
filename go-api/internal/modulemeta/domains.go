@@ -20,6 +20,7 @@ var PluginModules = map[string]bool{
 	"appui":   true,
 	"paper":   true,
 	"sdxy":    true,
+	"shashou": true,
 	"sxdk":    true,
 	"tuboshu": true,
 	"tutuqg":  true,

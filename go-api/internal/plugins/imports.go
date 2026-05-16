@@ -6,6 +6,7 @@ import (
 	_ "go-api/internal/plugins/appui"
 	_ "go-api/internal/plugins/paper"
 	_ "go-api/internal/plugins/sdxy"
+	_ "go-api/internal/plugins/shashou"
 	_ "go-api/internal/plugins/sxdk"
 	_ "go-api/internal/plugins/sxgz"
 	_ "go-api/internal/plugins/tuboshu"

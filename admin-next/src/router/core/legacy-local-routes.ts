@@ -66,6 +66,7 @@ export const localLegacyRoutes: LegacyRouteRecord[] = [
   ]),
   group('Sports', '/sports', '运动业务', 'lucide:activity', '/xm/index', [
     leaf('SDXYIndex', '/sdxy/index', '闪电运动', 'lucide:zap'),
+    leaf('ShashouIndex', '/shashou/index', '鲨兽运动世界', 'lucide:shield-check'),
     leaf('WuxinIndex', '/wuxin/index', '无心闪动', 'lucide:route'),
     leaf('YDSJIndex', '/ydsj/index', '运动世界', 'lucide:footprints'),
     leaf('XMIndex', '/xm/index', '小米运动', 'lucide:activity'),
@@ -217,6 +218,10 @@ export const localLegacyRoutes: LegacyRouteRecord[] = [
             'mdi:transit-connection-variant',
             ['super', 'admin']
           ),
+          leaf('AdminShashou', '/admin/shashou', '鲨兽运动配置', 'lucide:shield-check', [
+            'super',
+            'admin'
+          ]),
           leaf('AdminPlatformConfig', '/admin/platform-config', '平台配置', 'mdi:api', [
             'super',
             'admin'
