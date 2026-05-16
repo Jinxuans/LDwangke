@@ -1,4 +1,5 @@
 import request from '@/utils/http'
+import type { BaseResponse } from '@/types'
 
 export interface LegacyPagination {
   page: number
@@ -65,6 +66,8 @@ export interface LegacyOrderLogEntry {
   process: string
   remarks: string
 }
+
+type LegacyMessageResponse = BaseResponse<undefined>
 
 export interface LegacyOrderListResult {
   list: LegacyOrderItem[]
@@ -151,9 +154,10 @@ export function cancelLegacyOrder(oid: number) {
 }
 
 export function pauseLegacyOrder(oid: number) {
-  return request.get<{ message?: string; msg?: string }>({
+  return request.get<LegacyMessageResponse>({
     url: '/order/pause',
-    params: { oid }
+    params: { oid },
+    rawResponse: true
   })
 }
 
@@ -165,9 +169,10 @@ export function changeLegacyOrderPassword(oid: number, newPwd: string) {
 }
 
 export function resubmitLegacyOrder(oid: number) {
-  return request.get<{ message?: string; msg?: string }>({
+  return request.get<LegacyMessageResponse>({
     url: '/order/resubmit',
-    params: { oid }
+    params: { oid },
+    rawResponse: true
   })
 }
 

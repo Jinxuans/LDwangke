@@ -299,7 +299,13 @@
                 >
                   修改密码
                 </ElButton>
-                <ElButton plain @click="handleResubmit(currentOrder.oid)">补单</ElButton>
+                <ElButton
+                  plain
+                  :loading="resubmitSubmittingOid === currentOrder.oid"
+                  @click="handleResubmit(currentOrder.oid)"
+                >
+                  补单
+                </ElButton>
                 <ElButton
                   v-if="categorySwitches.allowpause"
                   plain
@@ -538,6 +544,7 @@
 
   const detailVisible = ref(false)
   const detailLoading = ref(false)
+  const resubmitSubmittingOid = ref<number>()
   const currentOrder = ref<LegacyOrderItem | null>(null)
   const categorySwitches = ref<LegacyCategorySwitches>({
     allowpause: 0,
@@ -1183,11 +1190,20 @@
   }
 
   const handleResubmit = async (oid: number) => {
-    const result = await resubmitLegacyOrder(oid)
-    ElMessage.success(result.message || result.msg || '补单成功')
-    await loadOrders(pagination.current)
-    if (currentOrder.value?.oid === oid) {
-      await showDetail(currentOrder.value)
+    if (resubmitSubmittingOid.value) {
+      return
+    }
+
+    resubmitSubmittingOid.value = oid
+    try {
+      const result = await resubmitLegacyOrder(oid)
+      ElMessage.success(result.message || result.msg || '补单成功')
+      await loadOrders(pagination.current)
+      if (currentOrder.value?.oid === oid) {
+        await showDetail(currentOrder.value)
+      }
+    } finally {
+      resubmitSubmittingOid.value = undefined
     }
   }
 
