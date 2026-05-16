@@ -1,29 +1,52 @@
 <template>
-  <div class="flex h-[calc(100vh-180px)] min-h-0 flex-col gap-5 overflow-hidden">
-    <section class="art-card-sm p-5">
+  <div
+    class="flex h-[calc(100vh-180px)] min-h-0 flex-col gap-5 overflow-hidden max-md:h-[calc(100dvh-128px)] max-md:gap-3"
+  >
+    <section v-show="!isMobile || !mobileConversationVisible" class="art-card-sm p-5 max-md:p-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap gap-2">
           <ElTag effect="plain">{{ chatSessions.length }} 个会话</ElTag>
           <ElTag :type="unreadChatCount ? 'warning' : 'success'" effect="plain">
             {{ unreadChatCount ? `${unreadChatCount} 条未读` : '已全部已读' }}
           </ElTag>
-          <ElTag v-if="activeSession" :type="activeSession.online ? 'success' : 'info'" effect="plain">
+          <ElTag
+            v-if="activeSession"
+            :type="activeSession.online ? 'success' : 'info'"
+            effect="plain"
+          >
             {{ activeSession.online ? '当前会话在线' : '当前会话离线' }}
           </ElTag>
         </div>
 
         <div class="flex flex-wrap gap-3">
-          <ElButton plain :loading="sessionLoading" @click="refreshCurrent">刷新会话</ElButton>
-          <ElButton plain :disabled="!unreadChatCount" @click="markAllRead">全部已读</ElButton>
+          <ElButton
+            plain
+            :size="isMobile ? 'small' : 'default'"
+            :loading="sessionLoading"
+            @click="refreshCurrent"
+          >
+            刷新会话
+          </ElButton>
+          <ElButton
+            plain
+            :size="isMobile ? 'small' : 'default'"
+            :disabled="!unreadChatCount"
+            @click="markAllRead"
+          >
+            全部已读
+          </ElButton>
         </div>
       </div>
     </section>
 
-    <div class="grid min-h-0 flex-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-      <section class="art-card-sm flex min-h-0 flex-col overflow-hidden">
+    <div class="grid min-h-0 flex-1 gap-5 max-md:block xl:grid-cols-[320px_minmax(0,1fr)]">
+      <section
+        v-show="!isMobile || !mobileConversationVisible"
+        class="art-card-sm flex min-h-0 flex-col overflow-hidden max-md:h-full"
+      >
         <div class="border-b-d px-5 py-4">
           <h2 class="text-lg font-semibold text-g-900">会话列表</h2>
-          <p class="mt-1 text-sm text-g-500">查看与你相关的会话并直接回复</p>
+          <p class="mt-1 text-sm text-g-500 max-md:hidden">查看与你相关的会话并直接回复</p>
         </div>
         <ElScrollbar class="min-h-0 flex-1">
           <div v-if="sessionLoading" class="px-5 py-6 text-sm text-g-500">加载会话中...</div>
@@ -35,7 +58,9 @@
             :key="session.list_id"
             type="button"
             class="w-full border-b-d px-5 py-4 text-left transition hover:bg-g-100/70"
-            :class="{ 'bg-[var(--el-color-primary-light-9)]': activeSession?.list_id === session.list_id }"
+            :class="{
+              'bg-[var(--el-color-primary-light-9)]': activeSession?.list_id === session.list_id
+            }"
             @click="selectSession(session.list_id)"
           >
             <div class="flex items-start gap-3">
@@ -45,7 +70,9 @@
               <div class="min-w-0 flex-1">
                 <div class="flex-cb gap-2">
                   <span class="truncate text-sm font-medium text-g-900">{{ session.name }}</span>
-                  <span class="shrink-0 text-xs text-g-500">{{ formatTime(session.last_time) }}</span>
+                  <span class="shrink-0 text-xs text-g-500">{{
+                    formatTime(session.last_time)
+                  }}</span>
                 </div>
                 <p class="mt-2 truncate text-xs text-g-500">{{ session.last_msg || '暂无消息' }}</p>
               </div>
@@ -54,14 +81,29 @@
         </ElScrollbar>
       </section>
 
-      <section class="art-card-sm flex min-h-0 flex-col overflow-hidden">
+      <section
+        v-show="!isMobile || mobileConversationVisible"
+        class="art-card-sm flex min-h-0 flex-col overflow-hidden max-md:h-full"
+      >
         <template v-if="activeSession">
-          <div class="flex-cb border-b-d px-5 py-4">
-            <div class="flex items-center gap-3">
-              <ElAvatar :src="activeSession.avatar" :size="42">{{ getInitial(activeSession.name) }}</ElAvatar>
-              <div>
-                <h2 class="text-lg font-semibold text-g-900">{{ activeSession.name }}</h2>
-                <p class="mt-1 text-sm text-g-500">
+          <div class="flex-cb border-b-d px-5 py-4 max-md:px-4 max-md:py-3">
+            <div class="flex min-w-0 items-center gap-3">
+              <ElButton
+                v-if="isMobile"
+                text
+                class="shrink-0"
+                @click="mobileConversationVisible = false"
+              >
+                返回
+              </ElButton>
+              <ElAvatar :src="activeSession.avatar" :size="42">{{
+                getInitial(activeSession.name)
+              }}</ElAvatar>
+              <div class="min-w-0">
+                <h2 class="truncate text-lg font-semibold text-g-900 max-md:text-base">{{
+                  activeSession.name
+                }}</h2>
+                <p class="mt-1 text-sm text-g-500 max-md:text-xs">
                   {{ activeSession.online ? '在线，可即时沟通' : '离线，回复将在上线后送达' }}
                 </p>
               </div>
@@ -69,8 +111,13 @@
             <ElButton text @click="refreshCurrent">刷新</ElButton>
           </div>
 
-          <ElScrollbar ref="messageScrollbar" class="min-h-0 flex-1 bg-g-100/40 px-5 py-5">
-            <div v-if="messageLoading" class="py-10 text-center text-sm text-g-500">加载消息中...</div>
+          <ElScrollbar
+            ref="messageScrollbar"
+            class="min-h-0 flex-1 bg-g-100/40 px-5 py-5 max-md:px-4 max-md:py-4"
+          >
+            <div v-if="messageLoading" class="py-10 text-center text-sm text-g-500"
+              >加载消息中...</div
+            >
             <div v-else-if="!chatMessages.length" class="py-10 text-center text-sm text-g-500">
               暂无聊天记录
             </div>
@@ -82,7 +129,7 @@
                 :class="isMyMessage(message) ? 'justify-end' : 'justify-start'"
               >
                 <div
-                  class="max-w-[78%] rounded-custom-sm border px-4 py-3 text-sm leading-6"
+                  class="max-w-[78%] rounded-custom-sm border px-4 py-3 text-sm leading-6 max-md:max-w-[86%]"
                   :class="
                     isMyMessage(message)
                       ? 'border-[var(--el-color-primary-light-6)] bg-[var(--el-color-primary-light-9)] text-g-900'
@@ -90,7 +137,8 @@
                   "
                 >
                   <div class="mb-2 text-xs text-g-500">
-                    {{ isMyMessage(message) ? myName : activeSession.name }} · {{ formatTime(message.addtime, true) }}
+                    {{ isMyMessage(message) ? myName : activeSession.name }} ·
+                    {{ formatTime(message.addtime, true) }}
                   </div>
                   <img
                     v-if="message.img"
@@ -98,24 +146,28 @@
                     class="mb-2 max-h-60 rounded-lg object-cover"
                     alt="chat image"
                   />
-                  <div v-if="message.content" class="whitespace-pre-wrap break-words">{{ message.content }}</div>
+                  <div v-if="message.content" class="whitespace-pre-wrap break-words">{{
+                    message.content
+                  }}</div>
                 </div>
               </div>
             </div>
           </ElScrollbar>
 
-          <div class="border-t-d px-5 py-4">
+          <div class="border-t-d px-5 py-4 max-md:px-4 max-md:py-3">
             <ElInput
               v-model="messageText"
               type="textarea"
-              :rows="4"
+              :rows="isMobile ? 3 : 4"
               resize="none"
               placeholder="输入消息，Enter 发送，Shift + Enter 换行"
               @keydown="handleKeydown"
             />
-            <div class="mt-3 flex-cb">
+            <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
               <span class="text-xs text-g-500">会话号：{{ activeSession.list_id }}</span>
-              <ElButton type="primary" :loading="sending" @click="handleSend" v-ripple>发送消息</ElButton>
+              <ElButton type="primary" :loading="sending" @click="handleSend" v-ripple
+                >发送消息</ElButton
+              >
             </div>
           </div>
         </template>
@@ -130,21 +182,34 @@
 </template>
 
 <script setup lang="ts">
+  import { useWindowSize } from '@vueuse/core'
   import { useRoute } from 'vue-router'
   import { useInboxStore } from '@/store/modules/inbox'
   import type { LegacyChatMessage } from '@/types/legacy-dashboard'
 
   defineOptions({ name: 'ChatPage' })
 
+  const MOBILE_BREAKPOINT = 768
+
   const route = useRoute()
   const inboxStore = useInboxStore()
+  const { width } = useWindowSize()
   const messageScrollbar = ref()
   const messageText = ref('')
+  const mobileConversationVisible = ref(false)
   let pollTimer: ReturnType<typeof setInterval> | null = null
 
-  const { chatSessions, chatMessages, activeSession, sessionLoading, messageLoading, sending, unreadChatCount } =
-    storeToRefs(inboxStore)
+  const {
+    chatSessions,
+    chatMessages,
+    activeSession,
+    sessionLoading,
+    messageLoading,
+    sending,
+    unreadChatCount
+  } = storeToRefs(inboxStore)
 
+  const isMobile = computed(() => width.value < MOBILE_BREAKPOINT)
   const myName = computed(() => '我')
   const getInitial = (name = '') => (name || 'U').slice(0, 1).toUpperCase()
 
@@ -188,6 +253,9 @@
 
   const selectSession = async (sessionId: number) => {
     await inboxStore.selectSession(sessionId, true)
+    if (isMobile.value) {
+      mobileConversationVisible.value = true
+    }
     await scrollToBottom()
   }
 
@@ -242,10 +310,18 @@
     }
   }
 
+  watch(isMobile, (mobile) => {
+    if (!mobile) {
+      mobileConversationVisible.value = false
+    }
+  })
+
   onMounted(async () => {
     const preferredId = Number(route.query.listId || 0) || undefined
     await inboxStore.loadInboxData()
     await inboxStore.openPreferredSession(preferredId)
+    mobileConversationVisible.value =
+      isMobile.value && Boolean(preferredId && inboxStore.activeSessionId)
     await scrollToBottom()
     pollTimer = setInterval(refreshInBackground, 10000)
   })
