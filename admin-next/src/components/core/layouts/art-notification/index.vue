@@ -11,12 +11,17 @@
   >
     <div class="flex-cb px-3.5 mt-3.5">
       <span class="text-base font-medium text-g-800">{{ $t('notice.title') }}</span>
-      <span
-        class="text-xs text-g-800 px-1.5 py-1 c-p select-none rounded hover:bg-g-200"
-        @click="emit('read-all')"
-      >
-        {{ $t('notice.btnRead') }}
-      </span>
+      <div class="flex items-center gap-1.5">
+        <span
+          class="text-xs text-g-800 px-1.5 py-1 c-p select-none rounded hover:bg-g-200"
+          @click="emit('read-all')"
+        >
+          {{ $t('notice.btnRead') }}
+        </span>
+        <ElButton text aria-label="关闭通知" @click="closeNotice">
+          <ArtSvgIcon icon="ri:close-line" class="text-lg" />
+        </ElButton>
+      </div>
     </div>
 
     <ul class="box-border flex items-end w-full h-12.5 px-3.5 border-b-d">
@@ -216,6 +221,10 @@
   const handleViewAll = () => {
     const tabs: NotificationTab[] = ['notice', 'message', 'pending']
     emit('view-all', tabs[barActiveIndex.value])
+    emit('update:value', false)
+  }
+
+  const closeNotice = () => {
     emit('update:value', false)
   }
 

@@ -16,7 +16,12 @@
             <h3 class="text-base font-semibold text-g-900">消息中心</h3>
             <p class="mt-1 text-xs text-g-500">客服与用户实时会话</p>
           </div>
-          <ElTag size="small" type="success">{{ unreadChatCount }} 未读</ElTag>
+          <div class="flex items-center gap-2">
+            <ElTag size="small" type="success">{{ unreadChatCount }} 未读</ElTag>
+            <ElButton text aria-label="关闭消息中心" @click="closeChat">
+              <ElIcon :size="18"><Close /></ElIcon>
+            </ElButton>
+          </div>
         </div>
 
         <ElScrollbar class="flex-1">
