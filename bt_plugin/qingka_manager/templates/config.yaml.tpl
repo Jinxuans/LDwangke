@@ -36,10 +36,3 @@ smtp:
   password: ""
   from_name: "系统通知"
   encryption: "ssl"
-
-license:
-  license_key: ""
-  domain: ""
-  key_file: ""
-  cache_file: ".sys_state"
-  secrets_file: ".secrets"

@@ -14,9 +14,6 @@ func (a *App) Close(_ context.Context) error {
 	if a == nil {
 		return nil
 	}
-	if a.License != nil {
-		a.License.Stop()
-	}
 	if a.Hub != nil {
 		a.Hub.Stop()
 	}

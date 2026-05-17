@@ -22,7 +22,6 @@ class qingka_manager_main:
     __version_file = '/www/wwwroot/qingka/version.json'
     __service_name = 'qingka-api'
     __update_server = 'https://raw.githubusercontent.com/Jinxuans/LD_Resources/refs/heads/main'
-    __license_file = '/www/wwwroot/qingka/license.key'
 
 
     def __init__(self):
@@ -74,179 +73,6 @@ class qingka_manager_main:
         """过滤数据库参数中的危险字符"""
         return re.sub(r'[;`$\\]', '', str(val).strip())
 
-    # ==================== 授权验证 ====================
-
-    def get_license_status(self, args):
-        key = self._get_license_key()
-        if not key:
-            return public.returnMsg(True, json.dumps({'licensed': False, 'msg': '未输入授权码'}))
-        ok, msg = self._verify_license(key)
-        return public.returnMsg(True, json.dumps({'licensed': ok, 'key': key[:8] + '****', 'msg': msg}))
-
-    def save_license(self, args):
-        key = getattr(args, 'license_key', '').strip()
-        if not key:
-            return public.returnMsg(False, '请输入授权码')
-        ok, msg = self._verify_license(key)
-        if not ok:
-            return public.returnMsg(False, msg)
-        os.makedirs(os.path.dirname(self.__license_file), exist_ok=True)
-        public.writeFile(self.__license_file, key)
-        # 同步写入 Go 端配置
-        self._sync_license_to_go(key)
-        # 自动注册心跳 cron
-        self.setup_heartbeat_cron()
-        # 重启 Go 服务使授权码生效
-        self._restart_go_service()
-        return public.returnMsg(True, '授权验证成功，Go 服务已重启')
-
-    def _sync_license_to_go(self, key):
-        """授权码写入后，同步生成 Go 端所需的密钥文件和配置"""
-        try:
-            go_dir = self.__go_dir
-            os.makedirs(go_dir, exist_ok=True)
-            # 1. 生成 .secrets 文件（Go 启动时读取）
-            secrets_path = os.path.join(go_dir, '.secrets')
-            client_secret = self._get_client_secret()
-            # 如果 .secrets 已存在，保留 AES/HMAC 密钥（避免离线缓存失效）
-            aes_key_hex = ''
-            hmac_key_hex = ''
-            if os.path.isfile(secrets_path):
-                try:
-                    old = json.loads(public.readFile(secrets_path))
-                    aes_key_hex = old.get('aes_key', '')
-                    hmac_key_hex = old.get('hmac_key', '')
-                except Exception:
-                    pass
-            # 首次部署：生成随机密钥
-            if not aes_key_hex:
-                aes_key_hex = hashlib.sha256(os.urandom(32)).hexdigest()  # 64位hex = 32字节
-            if not hmac_key_hex:
-                hmac_key_hex = hashlib.sha256(os.urandom(32)).hexdigest()
-            secrets_data = json.dumps({
-                'client_secret': client_secret,
-                'aes_key': aes_key_hex,
-                'hmac_key': hmac_key_hex
-            }, indent=2)
-            public.writeFile(secrets_path, secrets_data)
-            os.chmod(secrets_path, 0o600)
-            # 2. 写入 Go 的 config.yaml 中的 license 部分
-            domain = self._get_domain() or ''
-            config_path = self.__config_file
-            if os.path.isfile(config_path):
-                content = public.readFile(config_path)
-                # 更新 license_key
-                if 'license_key:' in content:
-                    content = re.sub(r'(license_key:\s*)(".*?"|\x27.*?\x27|[^\s#]*)', r'\1"%s"' % key, content)
-                else:
-                    content += '\nlicense:\n  license_key: "%s"\n  domain: "%s"\n  cache_file: ".sys_state"\n  secrets_file: ".secrets"\n' % (key, domain)
-                # 更新 domain
-                if 'domain:' in content and domain:
-                    content = re.sub(r'(  domain:\s*)(".*?"|\x27.*?\x27|[^\s#]*)', r'\1"%s"' % domain, content)
-                public.writeFile(config_path, content)
-            public.WriteLog('qingka_manager', '已同步授权配置到 Go 端（密钥文件 + config.yaml）')
-        except Exception as e:
-            public.WriteLog('qingka_manager', '同步授权配置到 Go 端失败: %s' % str(e))
-
-    def _get_license_key(self):
-        if os.path.isfile(self.__license_file):
-            return public.readFile(self.__license_file).strip()
-        return ''
-
-    def _cache_sign(self, data_str):
-        """对缓存数据生成 HMAC-SHA256 签名，防篡改"""
-        import hmac
-        secret = self.__update_server + self.__license_file
-        return hmac.new(secret.encode(), data_str.encode(), hashlib.sha256).hexdigest()
-
-    def _verify_license(self, key):
-        try:
-            import urllib.request, urllib.error, hmac as _hmac
-            domain = self._get_domain()
-            mid = ''
-            if os.path.isfile('/etc/machine-id'):
-                mid = open('/etc/machine-id').read().strip()
-            ts = int(time.time())
-            sign_str = 'domain=%s&license_key=%s&machine_id=%s&timestamp=%d&version=' % (domain or '', key, mid, ts)
-            sign = _hmac.new(self._get_client_secret().encode(), sign_str.encode(), hashlib.sha256).hexdigest()
-            url = self.__update_server + '/api/v1/license/verify'
-            body = json.dumps({
-                'license_key': key, 'domain': domain or '', 'machine_id': mid,
-                'version': '', 'timestamp': ts, 'sign': sign
-            }).encode()
-            req = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json', 'User-Agent': 'QingkaPlugin/1.0'})
-            try:
-                resp = urllib.request.urlopen(req, timeout=10)
-                result = json.loads(resp.read().decode())
-            except urllib.error.HTTPError as he:
-                # 服务器返回非200状态码时，读取响应体中的真实错误信息
-                try:
-                    err_body = json.loads(he.read().decode())
-                    err_msg = err_body.get('message', err_body.get('msg', str(he)))
-                except Exception:
-                    err_msg = 'HTTP %d: %s' % (he.code, he.reason)
-                public.WriteLog('qingka_manager', '授权验证被拒绝: %s (key=%s..)' % (err_msg, key[:8]))
-                return False, err_msg
-            if result.get('code') == 0 and result.get('data', {}).get('valid'):
-                # 缓存授权结果（带 HMAC 签名防篡改）
-                cache_path = os.path.join(self.__site_dir, '.license_cache')
-                os.makedirs(self.__site_dir, exist_ok=True)
-                cache_data = json.dumps({'key': key, 'ts': ts}, separators=(',', ':'))
-                cache_sign = self._cache_sign(cache_data)
-                public.writeFile(cache_path, json.dumps({'d': cache_data, 's': cache_sign}))
-                return True, '授权有效'
-            err_msg = result.get('message', result.get('msg', '授权码无效'))
-            public.WriteLog('qingka_manager', '授权验证失败: code=%s msg=%s (key=%s..)' % (result.get('code'), err_msg, key[:8]))
-            return False, err_msg
-        except Exception as e:
-            public.WriteLog('qingka_manager', '授权验证异常: %s (key=%s..)' % (str(e), key[:8]))
-            cache_path = os.path.join(self.__site_dir, '.license_cache')
-            if os.path.isfile(cache_path):
-                try:
-                    raw = json.loads(public.readFile(cache_path))
-                    cache_data = raw.get('d', '')
-                    cache_sign = raw.get('s', '')
-                    # 验证 HMAC 签名
-                    if cache_data and cache_sign == self._cache_sign(cache_data):
-                        c = json.loads(cache_data)
-                        if c.get('key') == key and time.time() - c.get('ts', 0) < 86400 * 7:
-                            return True, '授权有效（离线缓存）'
-                except Exception:
-                    pass
-            return False, '授权验证失败: %s' % str(e)
-
-    # 应用级共享签名密钥（与授权站 config.toml 中 client_secret 保持一致）
-    __client_secret = 'qk@2024!s3cReT#hmac_shared_key'
-
-    def _get_client_secret(self):
-        """获取客户端签名密钥"""
-        return self.__client_secret
-
-    def _require_license(self):
-        """快速授权校验（优先查本地缓存，未授权返回错误 returnMsg，已授权返回 None）"""
-        return None
-        key = self._get_license_key()
-        if not key:
-            return public.returnMsg(False, '请先在「首页概览」输入授权码')
-        # 优先检查本地缓存（无需网络请求）
-        cache_path = os.path.join(self.__site_dir, '.license_cache')
-        if os.path.isfile(cache_path):
-            try:
-                raw = json.loads(public.readFile(cache_path))
-                cache_data = raw.get('d', '')
-                cache_sign = raw.get('s', '')
-                if cache_data and cache_sign == self._cache_sign(cache_data):
-                    c = json.loads(cache_data)
-                    if c.get('key') == key and time.time() - c.get('ts', 0) < 86400 * 7:
-                        return None  # 缓存有效，放行
-            except Exception:
-                pass
-        # 缓存无效，走网络验证
-        ok, msg = self._verify_license(key)
-        if not ok:
-            return public.returnMsg(False, '授权验证失败: %s' % msg)
-        return None  # 验证通过
-
     # ==================== 状态 ==
 
     def get_status(self, args):
@@ -288,14 +114,6 @@ class qingka_manager_main:
         return os.path.isfile('/etc/systemd/system/%s.service' % service_name)
 
     def start(self, args):
-        # 授权验证
-        # key = self._get_license_key()
-        # if key:
-        #     ok, msg = self._verify_license(key)
-        #     if not ok:
-        #         return public.returnMsg(False, '授权验证失败: %s' % msg)
-        # else:
-        #     return public.returnMsg(False, '请先在「首页概览」输入授权码')
         pid = self._get_pid()
         if pid and os.path.exists('/proc/%s' % pid):
             return public.returnMsg(False, '服务已在运行中，PID: %s' % pid)
@@ -365,7 +183,7 @@ class qingka_manager_main:
             self._save_pid(pid)
 
     def _restart_go_service(self):
-        """内部重启 Go 服务（跳过授权检查），用于 save_license 后自动重启"""
+        """内部重启 Go 服务"""
         pid = self._get_pid()
         if pid:
             self._kill_process(pid)
@@ -435,14 +253,6 @@ class qingka_manager_main:
         return public.returnMsg(True, json.dumps(data))
 
     def php_start(self, args):
-        # 授权验证
-        # key = self._get_license_key()
-        # if key:
-        #     ok, msg = self._verify_license(key)
-        #     if not ok:
-        #         return public.returnMsg(False, '授权验证失败: %s' % msg)
-        # else:
-        #     return public.returnMsg(False, '请先在「首页概览」输入授权码')
         php_bin = self._find_php_bin()
         if not php_bin:
             return public.returnMsg(False, '未找到 PHP 可执行文件，请先在宝塔面板安装 PHP')
@@ -534,8 +344,6 @@ class qingka_manager_main:
 
     def restart_all(self, args):
         """同时重启 Go + PHP 两个服务"""
-        check = self._require_license()
-        if check: return check
         results = []
         has_error = False
         self.stop(args)
@@ -566,19 +374,11 @@ class qingka_manager_main:
         if not go_running:
             bin_path = os.path.join(self.__go_dir, self.__bin_name)
             if os.path.isfile(bin_path):
-                key = self._get_license_key()
-                if key:
-                    ok, _ = self._verify_license(key)
-                    if ok:
-                        # 仅在非 systemd 模式下自动拉起，systemd 会自动重启
-                        if not self._is_systemd_registered('qingka-api'):
-                            self.start(args)
-                            results.append('Go 服务已自动拉起')
-                            public.WriteLog('qingka_manager', '健康检查：Go 服务异常退出，已自动重启')
-                    else:
-                        results.append('Go 服务已停止（授权失效，未拉起）')
-                else:
-                    results.append('Go 服务已停止（未授权，未拉起）')
+                # 仅在非 systemd 模式下自动拉起，systemd 会自动重启
+                if not self._is_systemd_registered('qingka-api'):
+                    self.start(args)
+                    results.append('Go 服务已自动拉起')
+                    public.WriteLog('qingka_manager', '健康检查：Go 服务异常退出，已自动重启')
             else:
                 results.append('Go 二进制不存在，跳过')
         else:
@@ -601,61 +401,10 @@ class qingka_manager_main:
 
         return public.returnMsg(True, ' | '.join(results))
 
-    # ==================== 授权心跳（cron 调用） ====================
-
-    def cron_heartbeat(self, args=None):
-        """cron 定时调用：向授权站发送心跳（每5分钟）"""
-        key = self._get_license_key()
-        if not key:
-            return
-        try:
-            import urllib.request, hmac as _hmac
-            domain = self._get_domain() or ''
-            mid = ''
-            if os.path.isfile('/etc/machine-id'):
-                mid = open('/etc/machine-id').read().strip()
-            ts = int(time.time())
-            sign_str = 'license_key=%s&machine_id=%s&timestamp=%d&version=' % (key, mid, ts)
-            sign = _hmac.new(self._get_client_secret().encode(), sign_str.encode(), hashlib.sha256).hexdigest()
-            url = self.__update_server + '/api/v1/license/heartbeat'
-            body = json.dumps({
-                'license_key': key, 'machine_id': mid, 'domain': domain,
-                'version': '', 'timestamp': ts, 'sign': sign
-            }).encode()
-            req = urllib.request.Request(url, data=body, headers={
-                'Content-Type': 'application/json', 'User-Agent': 'QingkaPlugin/1.0'
-            })
-            urllib.request.urlopen(req, timeout=10)
-        except Exception as e:
-            public.WriteLog('qingka_manager', '心跳发送失败: %s' % str(e))
-
-    def setup_heartbeat_cron(self, args=None):
-        """注册心跳 cron 任务（每12小时）"""
-        cron_line = '0 */12 * * * cd %s && python3 -c "import qingka_manager_main; qingka_manager_main.qingka_manager_main().cron_heartbeat()" >> /dev/null 2>&1' % self.__plugin_path
-        cron_id = 'qingka_heartbeat'
-        # 检查是否已存在
-        try:
-            crons = public.ExecShell('crontab -l 2>/dev/null')[0]
-            if cron_id in crons:
-                return public.returnMsg(True, '心跳定时任务已存在')
-        except Exception:
-            pass
-        # 添加 cron
-        public.ExecShell('(crontab -l 2>/dev/null; echo "# %s"; echo "%s") | crontab -' % (cron_id, cron_line))
-        public.WriteLog('qingka_manager', '已注册心跳定时任务（每5分钟）')
-        return public.returnMsg(True, '心跳定时任务已注册')
-
-    def remove_heartbeat_cron(self, args=None):
-        """移除心跳 cron 任务"""
-        public.ExecShell("crontab -l 2>/dev/null | grep -v 'qingka_heartbeat' | grep -v 'cron_heartbeat' | crontab -")
-        return public.returnMsg(True, '心跳定时任务已移除')
-
     # ==================== Systemd 服务管理 ====================
 
     def setup_systemd(self, args):
         """注册 Go + PHP 为 systemd 服务，实现开机自启和崩溃自动重启"""
-        check = self._require_license()
-        if check: return check
         results = []
         # Go 服务
         go_service = '''[Unit]
@@ -712,8 +461,6 @@ WantedBy=multi-user.target
 
     def remove_systemd(self, args):
         """移除 systemd 服务"""
-        check = self._require_license()
-        if check: return check
         public.ExecShell('systemctl stop qingka-api.service 2>/dev/null')
         public.ExecShell('systemctl stop qingka-php.service 2>/dev/null')
         public.ExecShell('systemctl disable qingka-api.service 2>/dev/null')
@@ -761,8 +508,6 @@ WantedBy=multi-user.target
         return public.returnMsg(True, public.readFile(self.__config_file))
 
     def save_config(self, args):
-        check = self._require_license()
-        if check: return check
         if not hasattr(args, 'config'):
             return public.returnMsg(False, '未提供配置内容')
         try:
@@ -785,8 +530,6 @@ WantedBy=multi-user.target
     # ==================== 域名管理 ====================
 
     def setup_domain(self, args):
-        check = self._require_license()
-        if check: return check
         domain = getattr(args, 'domain', '').strip()
         if not domain:
             return public.returnMsg(False, '请输入域名')
@@ -936,8 +679,6 @@ WantedBy=multi-user.target
         return public.returnMsg(True, '域名 %s 绑定成功' % domain)
 
     def remove_domain(self, args):
-        check = self._require_license()
-        if check: return check
         domain = self._get_domain()
         if not domain:
             return public.returnMsg(False, '当前未绑定域名')
@@ -990,8 +731,6 @@ WantedBy=multi-user.target
         return public.returnMsg(True, json.dumps(data))
 
     def do_update(self, args):
-        check = self._require_license()
-        if check: return check
         update_type = getattr(args, 'type', 'full')
         if update_type not in ('full', 'backend', 'frontend', 'mall', 'php-api'):
             return public.returnMsg(False, '无效的更新类型: %s' % update_type)
@@ -1034,8 +773,6 @@ WantedBy=multi-user.target
             return public.returnMsg(False, '更新失败: %s' % str(e))
 
     def rollback(self, args):
-        check = self._require_license()
-        if check: return check
         bin_path = os.path.join(self.__go_dir, self.__bin_name)
         bak_path = bin_path + '.bak'
         if not os.path.isfile(bak_path):
@@ -1065,8 +802,6 @@ WantedBy=multi-user.target
         return public.returnMsg(True, json.dumps(data))
 
     def run_db_update(self, args):
-        check = self._require_license()
-        if check: return check
         try:
             self._run_migrations()
             return public.returnMsg(True, '数据库迁移执行完成')
@@ -1079,8 +814,6 @@ WantedBy=multi-user.target
 
     def verify_db(self, args):
         """模式1: 检验标准数据库并补全 —— 不删除任何已有数据，只补缺失的部分"""
-        check = self._require_license()
-        if check: return check
         db_info = self._read_db_config()
         if not db_info:
             return public.returnMsg(False, '无法读取数据库配置，请检查 config.yaml')
@@ -1174,8 +907,6 @@ WantedBy=multi-user.target
 
     def reset_db(self, args):
         """模式2: 重置一套全新的标准数据库 —— 删除所有表后重新创建"""
-        check = self._require_license()
-        if check: return check
         confirm = getattr(args, 'confirm', '')
         if confirm != 'YES':
             return public.returnMsg(False, '危险操作！请传入 confirm=YES 确认重置。此操作将删除所有数据！')
@@ -1270,12 +1001,6 @@ WantedBy=multi-user.target
             mall_root = self._get_mall_root()
             for d in [self.__go_dir + '/config', site_root, mall_root]:
                 os.makedirs(d, exist_ok=True)
-            # 写入 client_secret（与授权站一致）
-            secret_file = os.path.join(self.__site_dir, '.client_secret')
-            if not os.path.isfile(secret_file):
-                os.makedirs(self.__site_dir, exist_ok=True)
-                public.writeFile(secret_file, self.__client_secret)
-                os.chmod(secret_file, 0o600)
 
             # 2. 从更新源下载文件
             import urllib.request
@@ -1718,8 +1443,6 @@ WantedBy=multi-user.target
                 public.WriteLog('qingka_manager', '迁移 %s 失败: %s' % (sql, str(e)))
 
     def update_plugin(self, args):
-        check = self._require_license()
-        if check: return check
         try:
             import urllib.request, tempfile
             url = self.__update_server + '/update/plugin.tar.gz'

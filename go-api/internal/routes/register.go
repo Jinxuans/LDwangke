@@ -40,7 +40,7 @@ func registerPublicRoutes(r *gin.Engine) {
 }
 
 func newProtectedAPIGroup(r *gin.Engine) *gin.RouterGroup {
-	return r.Group("/api/v1", middleware.JWTAuth(), middleware.LicenseGuard())
+	return r.Group("/api/v1", middleware.JWTAuth())
 }
 
 func registerRealtimeRoutes(r *gin.Engine, hub *ws.Hub) {

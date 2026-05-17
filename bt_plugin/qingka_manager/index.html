@@ -188,17 +188,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hira
               </label>
             </div>
           </div>
-          <!-- Right: License & Domain -->
+          <!-- Right: Domain -->
           <div style="padding:10px;background:var(--bg);border-radius:var(--radius);display:flex;flex-direction:column;justify-content:center">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <span style="font-weight:600;font-size:12px">🔐 系统授权:</span>
-              <span id="licenseStatus" style="color:var(--danger);font-size:12px">检测中...</span>
-            </div>
-            <div id="licenseInput" style="display:flex;gap:6px;margin-bottom:8px">
-              <input class="form-input" id="licenseKey" placeholder="输入授权码" style="padding:4px 8px">
-              <button class="btn btn-primary" style="padding:4px 10px" onclick="saveLicense()">激活</button>
-            </div>
-            <div style="border-top:1px solid var(--border);padding-top:8px;display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="font-weight:600;font-size:12px">🌐 绑定域名:</span>
               <span id="ovDomain" style="font-size:12px;font-family:monospace">-</span>
             </div>
@@ -826,34 +818,6 @@ function setDemoMode(enabled) {
   });
 }
 
-// License
-function checkLicense() {
-  req('get_license_status', null, function(res) {
-    var d = parseMsg(res);
-    var el = $('#licenseStatus');
-    if (d.licensed) {
-      el.text('✅ 已授权 (' + d.key + ')').css('color', 'var(--success)');
-      $('#licenseInput').hide();
-    } else {
-      el.text('❌ ' + (d.msg || '未授权')).css('color', 'var(--danger)');
-      $('#licenseInput').show();
-    }
-  });
-}
-function saveLicense() {
-  if (QK._busy) return;
-  var key = $('#licenseKey').val().trim();
-  if (!key) return layer.msg('请输入授权码', {icon: 2});
-  QK._busy = true;
-  var idx = layer.msg('验证中...', {icon: 16, shade: 0.1, time: 0});
-  req('save_license', {license_key: key}, function(res) {
-    layer.close(idx);
-    QK._busy = false;
-    layer.msg((res.status ? '激活成功' : '激活失败'), {icon: res.status ? 1 : 2});
-    if (1) checkLicense();
-  });
-}
-
 // Tabs
 function switchTab(name) {
   $('.tab').removeClass('active');
@@ -872,7 +836,6 @@ $(function() {
   refreshStatus();
   checkInitStatus();
   loadRollbackInfo();
-  checkLicense();
   loadDemoMode();
   loadSystemdStatus();
   toggleLogSource('go');

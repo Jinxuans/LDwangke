@@ -36,10 +36,6 @@ for SVC in qingka-api qingka-php; do
 done
 systemctl daemon-reload 2>/dev/null
 
-# 移除心跳 cron 任务
-crontab -l 2>/dev/null | grep -v 'qingka_heartbeat' | grep -v 'cron_heartbeat' | crontab - 2>/dev/null
-echo "✅ 已移除心跳定时任务"
-
 # 删除 Nginx 域名配置
 DOMAIN_FILE="/www/wwwroot/qingka/domain.txt"
 if [ -f "$DOMAIN_FILE" ]; then

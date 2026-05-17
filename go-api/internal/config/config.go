@@ -15,7 +15,6 @@ type Config struct {
 	Redis     RedisConfig     `yaml:"redis"`
 	JWT       JWTConfig       `yaml:"jwt"`
 	Cache     CacheConfig     `yaml:"cache"`
-	License   LicenseConfig   `yaml:"license"`
 	Security  SecurityConfig  `yaml:"security"`
 	Bootstrap BootstrapConfig `yaml:"bootstrap"`
 }
@@ -28,15 +27,6 @@ type BootstrapConfig struct {
 	CreateDefaultAdmin *bool  `yaml:"create_default_admin"`
 	AutoMigrate        *bool  `yaml:"auto_migrate"`
 	MigrationsDir      string `yaml:"migrations_dir"`
-}
-
-type LicenseConfig struct {
-	ServerURL   string `yaml:"server_url"`   // 授权站地址，如 https://29.colnt.com
-	LicenseKey  string `yaml:"license_key"`  // 授权码（也可从 key_file 读取）
-	KeyFile     string `yaml:"key_file"`     // 授权码文件路径，优先级低于 license_key
-	Domain      string `yaml:"domain"`       // 当前站点域名
-	CacheFile   string `yaml:"cache_file"`   // 离线缓存文件路径，默认 .sys_state
-	SecretsFile string `yaml:"secrets_file"` // 密钥文件路径，默认 .secrets（宝塔插件生成）
 }
 
 type SMTPConfig struct {
@@ -165,13 +155,6 @@ func applyEnvOverrides(cfg *Config) {
 
 	cfg.Cache.OrderListTTL = envInt("GO_API_CACHE_ORDER_LIST_TTL", cfg.Cache.OrderListTTL)
 	cfg.Cache.ClassListTTL = envInt("GO_API_CACHE_CLASS_LIST_TTL", cfg.Cache.ClassListTTL)
-
-	cfg.License.ServerURL = envString("GO_API_LICENSE_SERVER_URL", cfg.License.ServerURL)
-	cfg.License.LicenseKey = envString("GO_API_LICENSE_LICENSE_KEY", cfg.License.LicenseKey)
-	cfg.License.KeyFile = envString("GO_API_LICENSE_KEY_FILE", cfg.License.KeyFile)
-	cfg.License.Domain = envString("GO_API_LICENSE_DOMAIN", cfg.License.Domain)
-	cfg.License.CacheFile = envString("GO_API_LICENSE_CACHE_FILE", cfg.License.CacheFile)
-	cfg.License.SecretsFile = envString("GO_API_LICENSE_SECRETS_FILE", cfg.License.SecretsFile)
 
 	if v, ok := envBool("GO_API_SECURITY_ALLOW_LEGACY_PLAINTEXT_PASSWORDS"); ok {
 		cfg.Security.AllowLegacyPlaintextPasswords = &v

@@ -6,7 +6,6 @@ import (
 
 	"go-api/internal/app"
 	"go-api/internal/autosync"
-	"go-api/internal/license"
 	"go-api/internal/pluginruntime"
 	shashouplugin "go-api/internal/plugins/shashou"
 	wuxinplugin "go-api/internal/plugins/wuxin"
@@ -16,7 +15,6 @@ import (
 
 var (
 	initSyncTickerFn      = runtimeops.InitSyncTicker
-	startLicenseFn        = func(m *license.Manager) { m.Start() }
 	runHubFn              = func(h *ws.Hub) { h.Run() }
 	startHZWSocketFn      = pluginruntime.StartHZWSocket
 	runYDSJCronFn         = pluginruntime.RunYDSJCron
@@ -34,11 +32,8 @@ var (
 	sleepContextFn        = sleepContext
 )
 
-// StartCoreJobs 启动授权、WebSocket 和各类历史后台任务。
+// StartCoreJobs 启动 WebSocket 和各类历史后台任务。
 func StartCoreJobs(ctx context.Context, a *app.App) {
-	if a != nil && a.License != nil {
-		startLicenseFn(a.License)
-	}
 	if a != nil && a.Hub != nil {
 		go runHubFn(a.Hub)
 	}

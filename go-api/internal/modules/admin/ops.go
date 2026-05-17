@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"go-api/internal/database"
-	"go-api/internal/license"
 	"go-api/internal/model"
 	auxmodule "go-api/internal/modules/auxiliary"
 	supplier "go-api/internal/modules/supplier"
@@ -225,7 +224,6 @@ func registerOpsRoutes(admin *gin.RouterGroup) {
 	admin.GET("/hzw-socket/config", HZWSocketConfigGet)
 	admin.POST("/hzw-socket/config", HZWSocketConfigSave)
 
-	admin.GET("/license/status", AdminLicenseStatus)
 	admin.GET("/ops/dashboard", AdminOpsDashboard)
 	admin.GET("/ops/probe-suppliers", AdminOpsProbeSuppliers)
 	admin.GET("/ops/table-sizes", AdminOpsTableSizes)
@@ -253,15 +251,6 @@ func registerOpsRoutes(admin *gin.RouterGroup) {
 	admin.DELETE("/pledge/config/:id", AdminPledgeConfigDelete)
 	admin.POST("/pledge/config/toggle", AdminPledgeConfigToggle)
 	admin.GET("/pledge/records", AdminPledgeRecordList)
-}
-
-func AdminLicenseStatus(c *gin.Context) {
-	lm := license.Global
-	if lm == nil {
-		response.Success(c, gin.H{"status": "未初始化", "status_code": -1})
-		return
-	}
-	response.Success(c, lm.GetStatusInfo())
 }
 
 func AdminOpsDashboard(c *gin.Context) {
