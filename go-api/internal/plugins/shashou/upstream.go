@@ -89,17 +89,54 @@ func (s *Service) upstreamStatus(ctx context.Context, p Project, order Order) (m
 	}
 	if p.Type == 1 {
 		orderID := upstreamOrderID(order)
-		if orderID == "" {
+		if !isPositiveIntString(orderID) {
+			if recovered, err := s.upstream29OrderID(ctx, p, orderNo); err == nil {
+				orderID = recovered
+			}
+		}
+		if !isPositiveIntString(orderID) {
 			return nil, fmt.Errorf("上游订单ID为空")
 		}
-		return s.source29(ctx, p, "sync_order", map[string]any{
+		payload, err := s.source29(ctx, p, "sync_order", map[string]any{
 			"order_id": orderID,
 			"u_uid":    p.UserID,
 			"uid":      p.UserID,
 			"key":      p.APIKey,
 		})
+		if err != nil {
+			return payload, err
+		}
+		payload["upstream_order_id"] = orderID
+		return payload, nil
 	}
 	return s.source(ctx, p, http.MethodGet, "/api/v1/orders/status/"+url.PathEscape(orderNo), nil)
+}
+
+func (s *Service) upstream29OrderID(ctx context.Context, p Project, orderNo string) (string, error) {
+	if strings.TrimSpace(orderNo) == "" {
+		return "", fmt.Errorf("订单号为空")
+	}
+	payload, err := s.source29(ctx, p, "get_orders", map[string]any{
+		"order_no":  orderNo,
+		"page":      1,
+		"page_size": 10,
+		"limit":     10,
+	})
+	if err != nil {
+		return "", err
+	}
+	for _, row := range payloadRows(payload, "data", "list", "orders") {
+		if strings.TrimSpace(asString(row["order_no"])) != orderNo {
+			continue
+		}
+		if id := strings.TrimSpace(asString(row["id"])); isPositiveIntString(id) {
+			return id, nil
+		}
+		if id := strings.TrimSpace(asString(row["order_id"])); isPositiveIntString(id) {
+			return id, nil
+		}
+	}
+	return "", fmt.Errorf("未找到上游订单ID")
 }
 
 func (s *Service) VersionInfoPayload(ctx context.Context) map[string]any {
@@ -203,9 +240,11 @@ func (s *Service) source29(ctx context.Context, p Project, act string, payload m
 	values.Set("u_uid", p.UserID)
 	values.Set("uid", p.UserID)
 	values.Set("key", p.APIKey)
-	if act == "sync_order" {
-		if value := strings.TrimSpace(asString(payload["order_id"])); value != "" && value != "<nil>" {
-			values.Set("order_id", value)
+	if act == "sync_order" || act == "get_orders" {
+		for key, raw := range payload {
+			if value := strings.TrimSpace(asString(raw)); value != "" && value != "<nil>" {
+				values.Set(key, value)
+			}
 		}
 	}
 	body, err := json.Marshal(payload)
@@ -216,6 +255,10 @@ func (s *Service) source29(ctx context.Context, p Project, act string, payload m
 	method := http.MethodPost
 	var reader io.Reader = bytes.NewReader(body)
 	if act == "sync_order" {
+		method = http.MethodGet
+		reader = nil
+	}
+	if act == "get_orders" {
 		method = http.MethodGet
 		reader = nil
 	}

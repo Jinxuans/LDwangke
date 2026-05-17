@@ -955,6 +955,37 @@ func nestedAny(m map[string]any, keys ...string) any {
 	return cur
 }
 
+func payloadRows(payload map[string]any, keys ...string) []map[string]any {
+	for _, key := range keys {
+		value, ok := payload[key]
+		if !ok {
+			continue
+		}
+		rows := rowsFromAny(value)
+		if len(rows) > 0 {
+			return rows
+		}
+	}
+	return nil
+}
+
+func rowsFromAny(value any) []map[string]any {
+	switch typed := value.(type) {
+	case []any:
+		rows := make([]map[string]any, 0, len(typed))
+		for _, item := range typed {
+			if row, ok := item.(map[string]any); ok {
+				rows = append(rows, row)
+			}
+		}
+		return rows
+	case map[string]any:
+		return payloadRows(typed, "data", "list", "orders")
+	default:
+		return nil
+	}
+}
+
 func firstString(m map[string]any, keys ...string) string {
 	for _, key := range keys {
 		if v := strings.TrimSpace(asString(m[key])); v != "" && v != "<nil>" {
@@ -977,16 +1008,20 @@ func upstreamOrderID(order Order) string {
 	var payload map[string]any
 	_ = json.Unmarshal(order.ResultData, &payload)
 	for _, value := range []any{
+		payload["upstream_order_id"],
 		nestedAny(payload, "data", "order_id"),
 		nestedAny(payload, "data", "id"),
 		payload["order_id"],
 		payload["id"],
-		payload["order_no"],
-		order.OrderNo,
 	} {
-		if text := strings.TrimSpace(asString(value)); text != "" && text != "<nil>" {
+		if text := strings.TrimSpace(asString(value)); isPositiveIntString(text) {
 			return text
 		}
 	}
 	return ""
+}
+
+func isPositiveIntString(raw string) bool {
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	return err == nil && n > 0
 }
