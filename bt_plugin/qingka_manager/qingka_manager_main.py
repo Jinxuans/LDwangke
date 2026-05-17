@@ -15,10 +15,6 @@ class qingka_manager_main:
     __log_file = '/www/wwwroot/qingka/go-api/go-api.log'
     __pid_file = '/www/wwwroot/qingka/go-api/go-api.pid'
     __config_file = '/www/wwwroot/qingka/go-api/config/config.yaml'
-    __php_dir = '/www/wwwroot/qingka/php-api'
-    __php_pid_file = '/www/wwwroot/qingka/php-api/php-api.pid'
-    __php_log_file = '/www/wwwroot/qingka/php-api/php-api.log'
-    __php_port = '9000'
     __version_file = '/www/wwwroot/qingka/version.json'
     __service_name = 'qingka-api'
     __update_server = 'https://raw.githubusercontent.com/Jinxuans/LD_Resources/refs/heads/main'
@@ -191,182 +187,21 @@ class qingka_manager_main:
             time.sleep(1)
         self._start_no_auth()
 
-    def _php_start_no_auth(self):
-        """内部启动 PHP（跳过授权检查），仅供 init_install 等内部流程使用"""
-        php_bin = self._find_php_bin()
-        if not php_bin or not os.path.isdir(self.__php_dir):
-            return
-        if not os.path.isfile(os.path.join(self.__php_dir, 'public', 'index.php')):
-            return
-        pid = self._get_php_pid()
-        if pid and os.path.exists('/proc/%s' % pid):
-            return
-        self._kill_process_by_port(self.__php_port)
-        cmd = 'cd %s && nohup %s -S 127.0.0.1:%s -t public > %s 2>&1 & echo $!' % (
-            self.__php_dir, php_bin, self.__php_port, self.__php_log_file)
-        result = public.ExecShell(cmd)[0].strip()
-        pid = self._safe_pid(result)
-        if pid:
-            public.writeFile(self.__php_pid_file, str(pid))
-
-    # ==================== PHP 服务控制 ====================
-
-    def _find_php_bin(self):
-        """查找 PHP 可执行文件路径"""
-        candidates = [
-            '/usr/bin/php',
-            '/usr/local/bin/php',
-            '/www/server/php/80/bin/php',
-            '/www/server/php/81/bin/php',
-            '/www/server/php/82/bin/php',
-            '/www/server/php/83/bin/php',
-            '/www/server/php/74/bin/php',
-            '/www/server/php/73/bin/php',
-        ]
-        for p in candidates:
-            if os.path.isfile(p):
-                return p
-        # 尝试 which
-        result = public.ExecShell('which php 2>/dev/null')[0].strip()
-        if result and os.path.isfile(result):
-            return result
-        return None
-
-    def get_php_status(self, args):
-        pid = self._get_php_pid()
-        running = pid and os.path.exists('/proc/%s' % pid)
-        php_bin = self._find_php_bin()
-        data = {
-            'status': bool(running),
-            'pid': pid if running else 0,
-            'port': self.__php_port,
-            'php_bin': php_bin or '',
-            'php_dir_exists': os.path.isdir(self.__php_dir),
-            'has_index': os.path.isfile(os.path.join(self.__php_dir, 'public', 'index.php')),
-        }
-        if running:
-            try:
-                mem = public.ExecShell("cat /proc/%s/status | grep VmRSS | awk '{print $2}'" % pid)[0].strip()
-                if mem and mem.isdigit(): data['mem'] = str(round(int(mem) / 1024, 1)) + ' MB'
-            except Exception:
-                pass
-        return public.returnMsg(True, json.dumps(data))
-
-    def php_start(self, args):
-        php_bin = self._find_php_bin()
-        if not php_bin:
-            return public.returnMsg(False, '未找到 PHP 可执行文件，请先在宝塔面板安装 PHP')
-        if not os.path.isdir(self.__php_dir):
-            return public.returnMsg(False, 'PHP API 目录不存在: %s' % self.__php_dir)
-        if not os.path.isfile(os.path.join(self.__php_dir, 'public', 'index.php')):
-            return public.returnMsg(False, 'PHP API 入口文件不存在')
-
-        pid = self._get_php_pid()
-        if pid and os.path.exists('/proc/%s' % pid):
-            return public.returnMsg(False, 'PHP 服务已在运行中，PID: %s' % pid)
-
-        # 杀掉占用端口的旧进程
-        self._kill_process_by_port(self.__php_port)
-
-        # 优先使用 systemd
-        if self._is_systemd_registered('qingka-php'):
-            public.ExecShell('systemctl start qingka-php.service')
-            time.sleep(1)
-            pid = self._get_php_pid()
-            if pid and os.path.exists('/proc/%s' % pid):
-                return public.returnMsg(True, 'PHP 服务启动成功（systemd），PID: %s' % pid)
-            return public.returnMsg(False, 'PHP 服务启动失败，请查看日志')
-        cmd = 'cd %s && nohup %s -S 127.0.0.1:%s -t public > %s 2>&1 & echo $!' % (
-            self.__php_dir, php_bin, self.__php_port, self.__php_log_file)
-        result = public.ExecShell(cmd)[0].strip()
-        pid = self._safe_pid(result)
-        if pid:
-            public.writeFile(self.__php_pid_file, str(pid))
-            time.sleep(1)
-            if os.path.exists('/proc/%s' % pid):
-                return public.returnMsg(True, 'PHP 服务启动成功，PID: %s，端口: %s' % (pid, self.__php_port))
-        return public.returnMsg(False, 'PHP 服务启动失败，请查看日志: %s' % self.__php_log_file)
-
-    def php_stop(self, args):
-        pid = self._get_php_pid()
-        if not pid:
-            return public.returnMsg(False, 'PHP 服务未运行')
-        
-        # 优先使用 systemd
-        if self._is_systemd_registered('qingka-php'):
-            public.ExecShell('systemctl stop qingka-php.service')
-        
-        self._kill_process(pid)
-        
-        try:
-            if os.path.isfile(self.__php_pid_file):
-                os.remove(self.__php_pid_file)
-        except Exception:
-            pass
-        if os.path.exists('/proc/%s' % pid):
-            return public.returnMsg(False, 'PHP 服务停止失败，进程仍在运行')
-        return public.returnMsg(True, 'PHP 服务已停止')
-
-    def php_restart(self, args):
-        self.php_stop(args)
-        time.sleep(1)
-        return self.php_start(args)
-
-    def get_php_log(self, args):
-        if not os.path.isfile(self.__php_log_file):
-            return public.returnMsg(True, '暂无 PHP 日志')
-        try:
-            n = self._safe_int(getattr(args, 'line_count', 100), default=100, max_val=2000)
-            log = public.ExecShell('tail -n %d %s' % (n, self.__php_log_file))[0]
-            return public.returnMsg(True, log)
-        except Exception as e:
-            return public.returnMsg(False, '读取 PHP 日志失败: %s' % str(e))
-
-    def _get_php_pid(self):
-        if os.path.isfile(self.__php_pid_file):
-            try:
-                pid = public.readFile(self.__php_pid_file).strip()
-                if pid and pid.isdigit() and os.path.exists('/proc/%s' % pid):
-                    return pid
-            except Exception:
-                pass
-        # fallback: 通过端口查找
-        try:
-            pid = public.ExecShell('lsof -i :%s -t 2>/dev/null | head -1' % self.__php_port)[0].strip()
-            if pid and pid.isdigit():
-                public.writeFile(self.__php_pid_file, pid)
-                return pid
-        except Exception:
-            pass
-        return None
-
     # ==================== 联合操作 ====================
 
     def restart_all(self, args):
-        """同时重启 Go + PHP 两个服务"""
-        results = []
-        has_error = False
+        """重启 Go 服务"""
         self.stop(args)
-        self.php_stop(args)
         time.sleep(1)
         go_res = self.start(args)
         go_ok = go_res.get('status', False) if isinstance(go_res, dict) else False
-        results.append('Go: %s' % (go_res.get('msg', '') if isinstance(go_res, dict) else str(go_res)))
-        if not go_ok:
-            has_error = True
-        if os.path.isdir(self.__php_dir) and os.path.isfile(os.path.join(self.__php_dir, 'public', 'index.php')):
-            php_res = self.php_start(args)
-            php_ok = php_res.get('status', False) if isinstance(php_res, dict) else False
-            results.append('PHP: %s' % (php_res.get('msg', '') if isinstance(php_res, dict) else str(php_res)))
-            if not php_ok:
-                has_error = True
-        msg = ('全部重启完成' if not has_error else '部分服务启动失败') + ' | ' + ' | '.join(results)
-        return public.returnMsg(not has_error, msg)
+        msg = go_res.get('msg', '') if isinstance(go_res, dict) else str(go_res)
+        return public.returnMsg(go_ok, msg)
 
     # ==================== 健康检查 ====================
 
     def health_check(self, args):
-        """检查 Go 和 PHP 服务是否存活，挂掉则自动拉起"""
+        """检查 Go 服务是否存活，挂掉则自动拉起"""
         results = []
         # Go 服务检查
         go_pid = self._get_pid()
@@ -384,27 +219,12 @@ class qingka_manager_main:
         else:
             results.append('Go 服务正常 (PID: %s)' % go_pid)
 
-        # PHP 服务检查
-        php_pid = self._get_php_pid()
-        php_running = php_pid and os.path.exists('/proc/%s' % php_pid)
-        if not php_running:
-            if os.path.isdir(self.__php_dir) and os.path.isfile(os.path.join(self.__php_dir, 'public', 'index.php')):
-                # 仅在非 systemd 模式下自动拉起，systemd 会自动重启
-                if not self._is_systemd_registered('qingka-php'):
-                    self.php_start(args)
-                    results.append('PHP 服务已自动拉起')
-                    public.WriteLog('qingka_manager', '健康检查：PHP 服务异常退出，已自动重启')
-            else:
-                results.append('PHP API 未部署，跳过')
-        else:
-            results.append('PHP 服务正常 (PID: %s)' % php_pid)
-
         return public.returnMsg(True, ' | '.join(results))
 
     # ==================== Systemd 服务管理 ====================
 
     def setup_systemd(self, args):
-        """注册 Go + PHP 为 systemd 服务，实现开机自启和崩溃自动重启"""
+        """注册 Go 为 systemd 服务，实现开机自启和崩溃自动重启"""
         results = []
         # Go 服务
         go_service = '''[Unit]
@@ -428,33 +248,9 @@ WantedBy=multi-user.target
         public.writeFile('/etc/systemd/system/qingka-api.service', go_service)
         results.append('Go 服务已注册')
 
-        # PHP 服务
-        php_bin = self._find_php_bin()
-        if php_bin and os.path.isdir(self.__php_dir):
-            php_service = '''[Unit]
-Description=QingKa PHP Bridge API
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=%s
-ExecStart=%s -S 127.0.0.1:%s -t public
-Restart=always
-RestartSec=5
-StandardOutput=append:%s
-StandardError=append:%s
-
-[Install]
-WantedBy=multi-user.target
-''' % (self.__php_dir, php_bin, self.__php_port, self.__php_log_file, self.__php_log_file)
-            public.writeFile('/etc/systemd/system/qingka-php.service', php_service)
-            results.append('PHP 服务已注册')
-
         # reload + enable
         public.ExecShell('systemctl daemon-reload')
         public.ExecShell('systemctl enable qingka-api.service 2>/dev/null')
-        public.ExecShell('systemctl enable qingka-php.service 2>/dev/null')
         results.append('已设置开机自启')
 
         return public.returnMsg(True, ' | '.join(results))
@@ -462,10 +258,8 @@ WantedBy=multi-user.target
     def remove_systemd(self, args):
         """移除 systemd 服务"""
         public.ExecShell('systemctl stop qingka-api.service 2>/dev/null')
-        public.ExecShell('systemctl stop qingka-php.service 2>/dev/null')
         public.ExecShell('systemctl disable qingka-api.service 2>/dev/null')
-        public.ExecShell('systemctl disable qingka-php.service 2>/dev/null')
-        for f in ['/etc/systemd/system/qingka-api.service', '/etc/systemd/system/qingka-php.service']:
+        for f in ['/etc/systemd/system/qingka-api.service']:
             if os.path.isfile(f):
                 os.remove(f)
         public.ExecShell('systemctl daemon-reload')
@@ -474,17 +268,12 @@ WantedBy=multi-user.target
     def get_systemd_status(self, args):
         """获取 systemd 服务状态"""
         go_enabled = os.path.isfile('/etc/systemd/system/qingka-api.service')
-        php_enabled = os.path.isfile('/etc/systemd/system/qingka-php.service')
         data = {
             'go_registered': go_enabled,
-            'php_registered': php_enabled,
         }
         if go_enabled:
             result = public.ExecShell('systemctl is-active qingka-api.service 2>/dev/null')[0].strip()
             data['go_active'] = result == 'active'
-        if php_enabled:
-            result = public.ExecShell('systemctl is-active qingka-php.service 2>/dev/null')[0].strip()
-            data['php_active'] = result == 'active'
         return public.returnMsg(True, json.dumps(data))
 
     # ==================== 日志 ====================
@@ -615,28 +404,6 @@ WantedBy=multi-user.target
         proxy_read_timeout 120s;
     }
 
-    # PHP API 反向代理（Go 反向代理到 PHP 后端）
-    location /php-api/ {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_connect_timeout 60s;
-        proxy_read_timeout 120s;
-    }
-
-    # PHP 桥接内部 API
-    location /internal/ {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        # 仅允许本机访问
-        allow 127.0.0.1;
-        deny all;
-    }
 
     # WebSocket
     location /ws/ {
@@ -732,7 +499,7 @@ WantedBy=multi-user.target
 
     def do_update(self, args):
         update_type = getattr(args, 'type', 'full')
-        if update_type not in ('full', 'backend', 'frontend', 'mall', 'php-api'):
+        if update_type not in ('full', 'backend', 'frontend', 'mall'):
             return public.returnMsg(False, '无效的更新类型: %s' % update_type)
         try:
             import urllib.request
@@ -744,13 +511,6 @@ WantedBy=multi-user.target
                 self._download_and_extract(base + '/frontend.tar.gz', self._get_site_root())
             if update_type in ('mall', 'full'):
                 self._download_and_extract(base + '/mall.tar.gz', self._get_mall_root())
-            if update_type in ('php-api', 'full'):
-                try:
-                    self._download_and_extract(base + '/php-api.tar.gz', self.__php_dir)
-                except Exception as e:
-                    if update_type == 'php-api':
-                        return public.returnMsg(False, 'PHP API 更新失败: %s' % str(e))
-                    public.WriteLog('qingka_manager', 'PHP API 更新跳过: %s' % str(e))
             # 后端更新时执行新的数据库迁移
             if update_type in ('backend', 'full'):
                 self._run_migrations()
@@ -766,8 +526,6 @@ WantedBy=multi-user.target
             if update_type in ('backend', 'full'):
                 self._ensure_config()
                 self.restart(args)
-            if update_type in ('php-api', 'full'):
-                self.php_restart(args)
             return public.returnMsg(True, '更新成功（%s）' % update_type)
         except Exception as e:
             return public.returnMsg(False, '更新失败: %s' % str(e))
@@ -1056,24 +814,15 @@ WantedBy=multi-user.target
                 if result[1] and result[1].strip():
                     public.WriteLog('qingka_manager', '插入管理员账号失败: %s' % result[1].strip()[:200])
 
-            # 8. 下载 PHP API（如果更新源有）
-            try:
-                self._download_and_extract(base + '/php-api.tar.gz', self.__php_dir)
-            except Exception as e:
-                public.WriteLog('qingka_manager', 'PHP API 下载跳过（可手动部署）: %s' % str(e))
-
-            # 9. 生成 PHP API 配置（与 Go 共用 JWT 密钥和 bridge_secret）
-            self._ensure_php_config(db_user, db_pass, db_name, jwt_secret, bridge_secret)
-
-            # 10. 绑定域名
+            # 8. 绑定域名
             self.setup_domain(type('Args', (), {'domain': domain})())
 
-            # 11. 设置权限并启动
+            # 9. 设置权限并启动
             bin_path = os.path.join(self.__go_dir, self.__bin_name)
             if os.path.isfile(bin_path):
                 os.chmod(bin_path, 0o755)
 
-            # 11.5 验证关键数据表是否存在
+            # 9.5 验证关键数据表是否存在
             missing = self._verify_tables(db_user, db_pass, db_name)
             if missing:
                 public.WriteLog('qingka_manager', '安装后缺少数据表: %s，尝试自动修复...' % ', '.join(missing))
@@ -1084,7 +833,7 @@ WantedBy=multi-user.target
                 if still_missing:
                     public.WriteLog('qingka_manager', '自动修复后仍缺少: %s' % ', '.join(still_missing))
 
-            # 12. 保存版本
+            # 10. 保存版本
             try:
                 url = self.__update_server + '/update/version.json'
                 req = urllib.request.Request(url, headers={'User-Agent': 'QingkaPlugin/1.0'})
@@ -1094,11 +843,8 @@ WantedBy=multi-user.target
             except Exception as e:
                 public.WriteLog('qingka_manager', '获取初始版本号失败: %s' % str(e))
                 self._save_version('1.0.0')
-            # 13. 启动 Go 服务（安装阶段无授权码，使用内部启动）
+            # 11. 启动 Go 服务
             self._start_no_auth()
-
-            # 14. 启动 PHP 服务（如果 php-api 目录存在）
-            self._php_start_no_auth()
 
             return public.returnMsg(True, '安装成功！域名: %s' % domain)
         except Exception as e:
@@ -1142,12 +888,11 @@ WantedBy=multi-user.target
 
             # 停止服务
             self.stop(args)
-            self.php_stop(args)
             domain = self._get_domain()
             if domain:
                 self.remove_domain(args)
             # 清理统一部署目录（remove_domain 已删除宝塔DB和nginx配置）
-            dirs_to_clean = [self.__go_dir, self.__php_dir, self._get_site_root(), self._get_mall_root()]
+            dirs_to_clean = [self.__go_dir, self._get_site_root(), self._get_mall_root()]
             for d in dirs_to_clean:
                 if os.path.isdir(d):
                     public.ExecShell('rm -rf %s' % d)
@@ -1259,7 +1004,6 @@ WantedBy=multi-user.target
                     favicon_backup = public.readFile(favicon_path)
             # 后端特殊处理：备份旧二进制 + 保护配置文件
             config_backup = None
-            php_config_backup = None
             if '/backend' in url:
                 bin_path = os.path.join(self.__go_dir, self.__bin_name)
                 if os.path.isfile(bin_path):
@@ -1269,18 +1013,10 @@ WantedBy=multi-user.target
                 # 保护用户配置文件
                 if os.path.isfile(self.__config_file):
                     config_backup = public.readFile(self.__config_file)
-            # PHP API 特殊处理：保护 config.php
-            if '/php-api' in url:
-                php_config_file = os.path.join(self.__php_dir, 'config.php')
-                if os.path.isfile(php_config_file):
-                    php_config_backup = public.readFile(php_config_file)
             public.ExecShell('tar -xzf %s -C %s' % (tmp, target_dir))
             public.ExecShell('chown -R www:www %s' % target_dir)
-            # 恢复用户配置文件
             if config_backup is not None:
                 public.writeFile(self.__config_file, config_backup)
-            if php_config_backup is not None:
-                public.writeFile(os.path.join(self.__php_dir, 'config.php'), php_config_backup)
             if favicon_backup is not None:
                 public.writeFile(os.path.join(target_dir, 'favicon.ico'), favicon_backup)
         finally:
@@ -1304,22 +1040,6 @@ WantedBy=multi-user.target
         public.writeFile(self.__config_file, config)
         public.WriteLog('qingka_manager', '已自动生成默认配置文件 config.yaml')
 
-    def _ensure_php_config(self, db_user, db_pass, db_name, jwt_secret, bridge_secret):
-        """生成 PHP API 的 config.php（与 Go 共用 JWT 密钥和数据库）"""
-        php_config_file = os.path.join(self.__php_dir, 'config.php')
-        if os.path.isfile(php_config_file):
-            return  # 已有配置不覆盖
-        os.makedirs(self.__php_dir, exist_ok=True)
-        variables = {
-            'db_user': db_user, 'db_pass': db_pass, 'db_name': db_name,
-            'jwt_secret': jwt_secret, 'bridge_secret': bridge_secret,
-        }
-        config = self._render_template('config.php.tpl', variables)
-        if not config:
-            public.WriteLog('qingka_manager', 'PHP 模板文件不存在，跳过配置生成')
-            return
-        public.writeFile(php_config_file, config)
-        public.WriteLog('qingka_manager', '已自动生成 PHP API 配置文件 config.php')
 
     def _render_template(self, tpl_name, variables):
         """从 templates 目录读取模板并替换变量"""

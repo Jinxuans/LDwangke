@@ -18,7 +18,6 @@ GO_DIR="$ROOT/go-api"
 VBEN_DIR="$ROOT/vben-admin"
 MALL_DIR="$ROOT/mall-h5"
 PLUGIN_DIR="$ROOT/bt_plugin/qingka_manager"
-PHP_DIR="$ROOT/php-api"
 UPDATE_DIR="/var/www/admin/update"
 TMP_DIR="/tmp/qingka_publish_$$"
 
@@ -72,18 +71,6 @@ build_mall() {
     echo -e "${GREEN}✅ 商城前端构建完成${NC}"
 }
 
-build_php() {
-    echo -e "${YELLOW}[PHP API] 打包中...${NC}"
-    if [ -d "$PHP_DIR" ]; then
-        cp -r "$PHP_DIR"/* "$TMP_DIR/php-api/"
-        rm -f "$TMP_DIR/php-api/config.php"
-        cd "$TMP_DIR/php-api" && tar -czf "$UPDATE_DIR/php-api.tar.gz" .
-        echo -e "${GREEN}✅ PHP API 打包完成${NC}"
-    else
-        echo -e "${RED}⚠ PHP API 目录不存在，跳过${NC}"
-    fi
-}
-
 build_plugin() {
     echo -e "${YELLOW}[宝塔插件] 打包中...${NC}"
     cd "$PLUGIN_DIR" && tar -czf "$UPDATE_DIR/plugin.tar.gz" .
@@ -93,7 +80,7 @@ build_plugin() {
 show_sizes() {
     echo ""
     echo -e "${GREEN}📦 打包结果：${NC}"
-    for f in backend frontend mall php-api plugin; do
+    for f in backend frontend mall plugin; do
         if [ -f "$UPDATE_DIR/$f.tar.gz" ]; then
             SIZE=$(du -sh "$UPDATE_DIR/$f.tar.gz" | awk '{print $1}')
             echo "  $f: $SIZE"
@@ -110,13 +97,12 @@ echo "请选择要打包的模块："
 echo "  1) Go 后端"
 echo "  2) 管理前端 (Vben Admin)"
 echo "  3) 商城 H5"
-echo "  4) PHP API"
-echo "  5) 宝塔插件"
+echo "  4) 宝塔插件"
 echo "  a) 全部打包"
 echo ""
 read -p "输入编号（多选用空格分隔，如 1 2 4）: " -a CHOICES
 
-mkdir -p "$TMP_DIR"/{backend,frontend,mall,plugin,php-api}
+mkdir -p "$TMP_DIR"/{backend,frontend,mall,plugin}
 mkdir -p "$UPDATE_DIR"
 
 BUILD_ALL=false
@@ -131,7 +117,6 @@ if $BUILD_ALL; then
     build_backend
     build_frontend
     build_mall
-    build_php
     build_plugin
 else
     for c in "${CHOICES[@]}"; do
@@ -139,8 +124,7 @@ else
             1) build_backend ;;
             2) build_frontend ;;
             3) build_mall ;;
-            4) build_php ;;
-            5) build_plugin ;;
+            4) build_plugin ;;
             *) echo -e "${RED}⚠ 未知选项: $c，跳过${NC}" ;;
         esac
     done
@@ -179,4 +163,3 @@ echo "  https://29.colnt.com/update/version.json"
 echo "  https://29.colnt.com/update/backend.tar.gz"
 echo "  https://29.colnt.com/update/frontend.tar.gz"
 echo "  https://29.colnt.com/update/mall.tar.gz"
-echo "  https://29.colnt.com/update/php-api.tar.gz"

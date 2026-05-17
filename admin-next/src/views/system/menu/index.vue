@@ -273,7 +273,7 @@
       label: '地址',
       key: 'url',
       type: 'input',
-      props: { placeholder: '/php-api/ext/index.php 或完整URL' }
+      props: { placeholder: '/module/frame 或完整URL' }
     },
     { label: '图标', key: 'icon', type: 'input', props: { placeholder: 'mdi:puzzle-outline' } },
     {

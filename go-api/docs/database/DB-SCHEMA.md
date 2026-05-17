@@ -202,7 +202,7 @@
 | description | 描述 |
 | price | 展示价格 |
 | icon | Lucide 图标名 |
-| api_base | PHP API 路径 |
+| api_base | 模块 API 路径 |
 | view_url | PHP 前端页面路径 |
 | status | 0=禁用 1=启用 |
 | sort | 排序 |

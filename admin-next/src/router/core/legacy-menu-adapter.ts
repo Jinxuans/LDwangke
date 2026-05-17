@@ -47,7 +47,6 @@ const migratedComponentMap: Record<string, string> = {
   YDSJIndex: '/plugins/ydsj/index',
   WRunIndex: '/plugins/w/index',
   YongyeIndex: '/plugins/yongye/index',
-  SXZSIndex: '/plugins/sxgz/assistant/index',
   SXGZIndex: '/plugins/sxgz/mbh/index',
   TutuQGIndex: '/plugins/tutuqg/index',
   TuboshuIndex: '/plugins/tuboshu/index',

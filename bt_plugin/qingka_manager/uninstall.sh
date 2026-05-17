@@ -14,19 +14,8 @@ if [ -f "$PID_FILE" ]; then
     echo "✅ 已停止 Go API 服务"
 fi
 
-# 停止 PHP 桥接服务
-PHP_PID_FILE="/www/wwwroot/qingka/php-api/php-api.pid"
-if [ -f "$PHP_PID_FILE" ]; then
-    PHP_PID=$(cat "$PHP_PID_FILE")
-    kill "$PHP_PID" 2>/dev/null
-    sleep 1
-    kill -9 "$PHP_PID" 2>/dev/null
-    rm -f "$PHP_PID_FILE"
-    echo "✅ 已停止 PHP 桥接服务"
-fi
-
 # 移除 systemd 服务
-for SVC in qingka-api qingka-php; do
+for SVC in qingka-api; do
     if [ -f "/etc/systemd/system/${SVC}.service" ]; then
         systemctl stop "$SVC" 2>/dev/null
         systemctl disable "$SVC" 2>/dev/null
@@ -55,7 +44,6 @@ echo "✅ 已删除插件文件"
 echo ""
 echo "注意：项目文件保留在以下位置（如需彻底删除请手动操作）："
 echo "  Go API:   /www/wwwroot/qingka/go-api/"
-echo "  PHP API:  /www/wwwroot/qingka/php-api/"
 echo "  前端管理端: /www/wwwroot/qingka/admin/"
 echo "  商城 H5:    /www/wwwroot/qingka/mall/"
 echo ""

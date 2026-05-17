@@ -116,7 +116,6 @@
 - `SXDKIndex`
 - `AppuiIndex`
 - `TuZhiIndex`
-- `SXZSIndex`
 - `Sports`
 - `SDXYIndex`
 - `YDSJIndex`
@@ -221,7 +220,6 @@
 - `SXDKIndex`
 - `AppuiIndex`
 - `TuZhiIndex`
-- `SXZSIndex`
 - `SDXYIndex`
 - `YDSJIndex`
 - `XMIndex`

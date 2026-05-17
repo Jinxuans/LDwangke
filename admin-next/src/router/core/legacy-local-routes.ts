@@ -61,8 +61,7 @@ export const localLegacyRoutes: LegacyRouteRecord[] = [
     leaf('TuZhiIndex', '/tuzhi/index', '凸知打卡', 'lucide:map-pin-check')
   ]),
   group('InternshipSeal', '/sxgz', '实习盖章', 'lucide:stamp', '/sxgz/index', [
-    leaf('SXGZIndex', '/sxgz/index', '迈巴赫平台', 'lucide:stamp'),
-    leaf('SXZSIndex', '/sxzs/index', '实习助手', 'lucide:briefcase')
+    leaf('SXGZIndex', '/sxgz/index', '迈巴赫平台', 'lucide:stamp')
   ]),
   group('Sports', '/sports', '运动业务', 'lucide:activity', '/xm/index', [
     leaf('SDXYIndex', '/sdxy/index', '闪电运动', 'lucide:zap'),

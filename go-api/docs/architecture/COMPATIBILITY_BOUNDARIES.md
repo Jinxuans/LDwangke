@@ -40,8 +40,6 @@ If a new business feature needs logic that currently lives in `service`, extract
 
 - `internal/legacy/openapi`
   - Keeps old OpenAPI-compatible request/response shapes.
-- `internal/legacy/php`
-  - Keeps PHP bridge and reverse proxy behavior.
 - `internal/legacy/module`
   - Keeps legacy module-style routing compatibility.
 

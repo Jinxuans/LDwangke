@@ -22,7 +22,6 @@ cp -f "$SRC_DIR/templates/"*.tpl "$PLUGIN_DIR/templates/" 2>/dev/null
 
 # 创建项目目录
 mkdir -p /www/wwwroot/qingka/go-api/config
-mkdir -p /www/wwwroot/qingka/php-api
 
 echo "✅ 青卡管理器插件安装完成"
 echo "请在宝塔面板 → 软件商店 → 第三方插件 中找到「青卡管理器」"

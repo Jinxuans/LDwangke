@@ -37,22 +37,6 @@ Status:
 - These are clearly external protocol surfaces.
 - Internally they still call `service` and raw SQL in places, but that is acceptable as a compatibility host.
 
-### `internal/legacy/php`
-
-Routes:
-
-- `GET|POST /php-api/*path`
-- `POST /internal/php-bridge/money`
-- `GET /internal/php-bridge/user`
-- `POST /internal/php-bridge/order`
-- `GET /api/v1/php-bridge/auth-url`
-
-Status:
-
-- Keep.
-- `php-api` proxy and bridge endpoints are runtime integration points with the PHP side.
-- They should be treated as infrastructure compatibility, not business-domain APIs.
-
 ### `internal/legacy/module`
 
 Routes:
