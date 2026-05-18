@@ -3,7 +3,7 @@ import request from '@/utils/http'
 export interface ShashouProject {
   id: number
   name: string
-  type: number
+  type: 0 | 1 | 2
   remote_project_id: number
   api_url: string
   api_key: string
@@ -164,21 +164,40 @@ export function fetchAdminShashouAccounts(params: Record<string, any>) {
 }
 
 export function syncShashouOrder(id: number) {
-  return request.post<{ message: string }>({ url: `/shashou/orders/${id}/sync`, params: {} })
+  return request.post<{ message: string; order_id: number; status: string }>({
+    url: `/shashou/orders/${id}/sync`,
+    params: {},
+    timeout: 45000
+  })
 }
 
 export function syncAdminShashouOrder(id: number) {
-  return request.post<{ message: string }>({ url: `/shashou/admin/orders/${id}/sync`, params: {} })
+  return request.post<{ message: string; order_id: number; status: string }>({
+    url: `/shashou/admin/orders/${id}/sync`,
+    params: {},
+    timeout: 45000
+  })
 }
 
 export function syncAdminShashouPending(limit = 100) {
-  return request.post<{ updated: number }>({ url: '/shashou/admin/sync-pending', params: { limit } })
+  return request.post<{ updated: number }>({
+    url: '/shashou/admin/sync-pending',
+    params: { limit }
+  })
 }
 
-export function queryShashouAccount(data: { account: string; project_id: number; query_type: number }) {
+export function queryShashouAccount(data: {
+  account: string
+  project_id: number
+  query_type: number
+}) {
   return request.post<any>({ url: '/shashou/query', params: data })
 }
 
-export function refundShashouAccount(data: { account_id?: number; account?: string; project_id?: number }) {
+export function refundShashouAccount(data: {
+  account_id?: number
+  account?: string
+  project_id?: number
+}) {
   return request.post<any>({ url: '/shashou/refund', params: data })
 }

@@ -16,6 +16,10 @@ import (
 )
 
 const (
+	ProjectTypeSource     = 0
+	ProjectTypeSource29   = 1
+	ProjectTypeSameSystem = 2
+
 	OrderTypeNormal       = 1
 	OrderTypeMorning      = 2
 	OrderTypeQueryNormal  = 3
@@ -95,10 +99,10 @@ type Order struct {
 	RushOrderFee   float64         `json:"rush_order_fee"`
 	Status         string          `json:"status"`
 	PaymentStatus  string          `json:"payment_status"`
-	Accounts       json.RawMessage `json:"accounts"`
+	Accounts       json.RawMessage `json:"accounts,omitempty"`
 	QueryAccount   string          `json:"query_account"`
 	RefundAccount  string          `json:"refund_account"`
-	ResultData     json.RawMessage `json:"result_data"`
+	ResultData     json.RawMessage `json:"result_data,omitempty"`
 	CreatedAt      string          `json:"created_at"`
 	CompletedAt    string          `json:"completed_at"`
 	UpdatedAt      string          `json:"updated_at"`
@@ -129,7 +133,7 @@ type Account struct {
 	Status       string          `json:"status"`
 	ErrorMessage string          `json:"error_message"`
 	ProcessedAt  string          `json:"processed_at"`
-	QueryResult  json.RawMessage `json:"query_result"`
+	QueryResult  json.RawMessage `json:"query_result,omitempty"`
 	CreatedAt    string          `json:"created_at"`
 	UpdatedAt    string          `json:"updated_at"`
 }
@@ -224,8 +228,7 @@ func (s *Service) ListProjects(admin bool) ([]Project, error) {
 		var p Project
 		if err := rows.Scan(&p.ID, &p.Name, &p.Type, &p.RemoteProjectID, &p.APIURL, &p.APIKey, &p.UserID, &p.PriceNormal, &p.PriceMorning, &p.ActualRate, &p.RushFee, &p.QueryFee, &p.MinBalance, &p.Status, &p.AutoSync, &p.SyncInterval, &p.Timeout, &p.Remark, &p.CreatedAt, &p.UpdatedAt); err == nil {
 			if !admin {
-				p.APIKey = ""
-				p.UserID = ""
+				p = redactProject(p)
 			}
 			list = append(list, p)
 		}
@@ -244,7 +247,7 @@ func (s *Service) SaveProject(p Project) (int, error) {
 	if p.APIURL == "" || p.APIKey == "" || p.UserID == "" {
 		return 0, fmt.Errorf("API地址、密钥和用户ID不能为空")
 	}
-	if p.Type != 0 && p.Type != 1 {
+	if p.Type != ProjectTypeSource && p.Type != ProjectTypeSource29 && p.Type != ProjectTypeSameSystem {
 		return 0, fmt.Errorf("对接类型无效")
 	}
 	if p.RemoteProjectID < 0 {
@@ -291,6 +294,18 @@ func (s *Service) DeleteProject(id int) error {
 	}
 	_, err := database.DB.Exec("DELETE FROM ss_project WHERE id=?", id)
 	return err
+}
+
+func redactProject(p Project) Project {
+	p.APIURL = ""
+	p.APIKey = ""
+	p.UserID = ""
+	p.RemoteProjectID = 0
+	p.AutoSync = 0
+	p.SyncInterval = 0
+	p.Timeout = 0
+	p.Remark = ""
+	return p
 }
 
 func (s *Service) getProject(id int) (Project, error) {
@@ -369,10 +384,8 @@ func (s *Service) CreateOrder(ctx context.Context, uid int, req CreateOrderReque
 	if err != nil {
 		return nil, err
 	}
-	orderNo := strings.TrimSpace(firstString(upstream, "order_no", "orderNo", "order_id", "id"))
-	if orderNo == "" {
-		orderNo = strings.TrimSpace(asString(nestedAny(upstream, "data", "order_no")))
-	}
+	upstream = ensureUpstreamOrderID(upstream)
+	orderNo := extractUpstreamOrderNo(upstream)
 	if orderNo == "" {
 		orderNo = fmt.Sprintf("SS%d%d", time.Now().Unix(), uid)
 	}
@@ -416,7 +429,7 @@ func (s *Service) CreateOrder(ctx context.Context, uid int, req CreateOrderReque
 			return nil, fmt.Errorf("余额不足")
 		}
 		_, _ = tx.Exec("INSERT INTO qingka_wangke_moneylog (uid,type,money,mark,addtime) VALUES (?,?,?,?,?)",
-			uid, "shashou_add", -preDeduct, fmt.Sprintf("鲨兽运动下单，订单号:%s，预扣%.2f", orderNo, preDeduct), now)
+			uid, "鲨兽下单", -preDeduct, fmt.Sprintf("鲨兽运动下单，订单号:%s，预扣%.2f", orderNo, preDeduct), now)
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -444,7 +457,7 @@ func (s *Service) QueryAccount(ctx context.Context, uid int, req QueryOrderReque
 	if err != nil {
 		return nil, err
 	}
-	orderNo := strings.TrimSpace(firstString(upstream, "order_no", "orderNo", "order_id", "id"))
+	orderNo := extractUpstreamOrderNo(upstream)
 	if orderNo == "" {
 		orderNo = fmt.Sprintf("SSQ%d%d", time.Now().Unix(), uid)
 	}
@@ -472,7 +485,7 @@ func (s *Service) QueryAccount(ctx context.Context, uid int, req QueryOrderReque
 			return nil, fmt.Errorf("余额不足")
 		}
 		_, _ = tx.Exec("INSERT INTO qingka_wangke_moneylog (uid,type,money,mark,addtime) VALUES (?,?,?,?,?)",
-			uid, "shashou_query", -fee, fmt.Sprintf("鲨兽运动查单，账号:%s，扣费%.2f", req.Account, fee), now)
+			uid, "鲨兽查单", -fee, fmt.Sprintf("鲨兽运动查单，账号:%s，扣费%.2f", req.Account, fee), now)
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -492,7 +505,10 @@ func (s *Service) RefundAccount(ctx context.Context, uid int, req RefundOrderReq
 	if err != nil {
 		return nil, err
 	}
-	upstream, err := s.upstreamRefund(ctx, project, acc.Account, acc.OrderNo)
+	if isRefundExpired(acc.CreatedAt, 90) {
+		return nil, fmt.Errorf("该订单已超过90天退款期限，无法申请退款")
+	}
+	upstream, err := s.upstreamRefund(ctx, project, acc)
 	if err != nil {
 		return nil, err
 	}
@@ -508,6 +524,50 @@ func (s *Service) RefundAccount(ctx context.Context, uid int, req RefundOrderReq
 	id, _ := res.LastInsertId()
 	_, _ = database.DB.Exec("UPDATE ss_accounts SET status='refunding', updated_at=NOW() WHERE id=?", acc.ID)
 	return map[string]any{"id": id, "message": "退款请求已提交", "result": upstream}, nil
+}
+
+func (s *Service) QueryStoredAccount(ctx context.Context, uid int, accountID int64, force bool, isAdmin bool, source string, agentUID int) (map[string]any, error) {
+	acc, err := s.findAccount(uid, accountID, "", 0, isAdmin)
+	if err != nil {
+		return nil, err
+	}
+	if !force && jsonHasValue(acc.QueryResult) {
+		return map[string]any{"from_cache": true, "account_id": acc.ID, "query_result": json.RawMessage(acc.QueryResult)}, nil
+	}
+	queryType := OrderTypeQueryNormal
+	if acc.OrderType == OrderTypeMorning {
+		queryType = OrderTypeQueryMorning
+	}
+	result, err := s.QueryAccount(ctx, acc.UserID, QueryOrderRequest{
+		ProjectID: acc.ProjectID,
+		QueryType: queryType,
+		Account:   acc.Account,
+	}, source, agentUID)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *Service) CheckQueryStatus(uid int, accountID int64, isAdmin bool) (map[string]any, error) {
+	acc, err := s.findAccount(uid, accountID, "", 0, isAdmin)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"account_id":   acc.ID,
+		"has_result":   jsonHasValue(acc.QueryResult),
+		"query_result": json.RawMessage(acc.QueryResult),
+	}, nil
+}
+
+func (s *Service) ClearQueryResult(uid int, accountID int64, isAdmin bool) error {
+	acc, err := s.findAccount(uid, accountID, "", 0, isAdmin)
+	if err != nil {
+		return err
+	}
+	_, err = database.DB.Exec("UPDATE ss_accounts SET query_result=NULL, updated_at=NOW() WHERE id=?", acc.ID)
+	return err
 }
 
 func (s *Service) ListOrders(uid int, isAdmin bool, page, limit int, status, orderNo, account string, filterUserID int) ([]Order, int, error) {
@@ -581,6 +641,7 @@ func (s *Service) ListOrders(uid int, isAdmin bool, page, limit int, status, ord
 				o.RefundKM = &v
 			}
 			o.AccountDetails, _, _ = s.ListAccounts(uid, isAdmin, 1, 200, "", o.OrderNo, "", 0, 0)
+			o = sanitizeOrderResponse(o, false)
 			list = append(list, o)
 		}
 	}
@@ -638,10 +699,29 @@ func (s *Service) ListAccounts(uid int, isAdmin bool, page, limit int, status, o
 	for rows.Next() {
 		var a Account
 		if err := rows.Scan(&a.ID, &a.OrderID, &a.OrderNo, &a.UserID, &a.Username, &a.ProjectID, &a.Account, &a.Password, &a.Distance, &a.StartHour, &a.StartMinute, &a.EndHour, &a.EndMinute, &a.RunDays, &a.OrderType, &a.IsRushOrder, &a.Status, &a.ErrorMessage, &a.ProcessedAt, &a.QueryResult, &a.CreatedAt, &a.UpdatedAt); err == nil {
+			a = sanitizeAccountResponse(a, false)
 			list = append(list, a)
 		}
 	}
 	return list, total, nil
+}
+
+func sanitizeOrderResponse(o Order, includeRaw bool) Order {
+	if !includeRaw {
+		o.Accounts = nil
+		o.ResultData = nil
+	}
+	for i := range o.AccountDetails {
+		o.AccountDetails[i] = sanitizeAccountResponse(o.AccountDetails[i], false)
+	}
+	return o
+}
+
+func sanitizeAccountResponse(a Account, includeQueryResult bool) Account {
+	if !includeQueryResult {
+		a.QueryResult = nil
+	}
+	return a
 }
 
 func (s *Service) SyncOrder(ctx context.Context, uid, id int, isAdmin bool) (map[string]any, error) {
@@ -658,10 +738,10 @@ func (s *Service) SyncOrder(ctx context.Context, uid, id int, isAdmin bool) (map
 		_, _ = database.DB.Exec("UPDATE ss_order SET error_message=?, updated_at=NOW() WHERE id=?", err.Error(), order.ID)
 		return nil, err
 	}
-	if err := s.applySync(order, upstream); err != nil {
+	if err := s.applySync(order, project, upstream); err != nil {
 		return nil, err
 	}
-	return map[string]any{"message": "同步成功", "result": upstream}, nil
+	return map[string]any{"message": "同步成功", "order_id": order.ID, "status": localSyncStatus(order, upstream)}, nil
 }
 
 func (s *Service) SyncPending(ctx context.Context, limit int) (int, error) {
@@ -689,17 +769,12 @@ func (s *Service) SyncPending(ctx context.Context, limit int) (int, error) {
 	return updated, nil
 }
 
-func (s *Service) applySync(order Order, payload map[string]any) error {
-	status := strings.TrimSpace(firstString(payload, "status", "order_status"))
-	if status == "" {
-		status = strings.TrimSpace(asString(nestedAny(payload, "data", "status")))
-	}
-	localStatus := mapStatus(status)
-	if localStatus == "" {
-		localStatus = order.Status
-	}
-	actual := asFloat(firstNonNil(payload["actual_cost"], payload["actual"], nestedAny(payload, "data", "actual_cost")))
-	refundKM := asFloat(firstNonNil(payload["refund_km"], nestedAny(payload, "data", "refund_km")))
+func (s *Service) applySync(order Order, project Project, payload map[string]any) error {
+	localStatus := localSyncStatus(order, payload)
+	actualRaw := firstNonNil(payload["actual_cost"], payload["actual"], nestedAny(payload, "data", "actual_cost"), nestedAny(payload, "data", "actual"), nestedAny(payload, "amounts", "actual"), nestedAny(payload, "data", "amounts", "actual"))
+	hasActual := actualRaw != nil
+	actual := asFloat(actualRaw)
+	refundKM := asFloat(firstNonNil(payload["refund_km"], nestedAny(payload, "data", "refund_km"), nestedAny(payload, "refund_result", "refund_km"), nestedAny(payload, "data", "refund_result", "refund_km")))
 	resultRaw, _ := json.Marshal(payload)
 	tx, err := database.DB.Begin()
 	if err != nil {
@@ -711,10 +786,12 @@ func (s *Service) applySync(order Order, payload map[string]any) error {
 	if localStatus == "completed" || localStatus == "refunded" || localStatus == "failed" {
 		completeSQL = ", completed_at=NOW()"
 	}
-	_, err = tx.Exec("UPDATE ss_order SET status=?, result_data=?, updated_at=?"+completeSQL+" WHERE id=?", args...)
+	errMsg := orderSyncError(payload, localStatus)
+	_, err = tx.Exec("UPDATE ss_order SET status=?, result_data=?, updated_at=?, error_message=NULLIF(?, '')"+completeSQL+" WHERE id=?", append(args[:3], errMsg, order.ID)...)
 	if err != nil {
 		return err
 	}
+	s.applyAccountSync(tx, order, payload, localStatus)
 	if localStatus == "completed" {
 		_, _ = tx.Exec("UPDATE ss_accounts SET status='success', processed_at=NOW(), updated_at=NOW() WHERE order_id=? AND status IN ('pending','processing')", order.ID)
 	}
@@ -723,11 +800,52 @@ func (s *Service) applySync(order Order, payload map[string]any) error {
 		_, _ = tx.Exec("UPDATE ss_accounts SET status='failed', error_message=?, processed_at=NOW(), updated_at=NOW() WHERE order_id=? AND status IN ('pending','processing')", msg, order.ID)
 	}
 	if localStatus == "refunded" {
-		_, _ = tx.Exec("UPDATE ss_accounts SET status='refunded', processed_at=NOW(), updated_at=NOW() WHERE order_id=?", order.ID)
+		if order.OrderType == OrderTypeRefund && strings.TrimSpace(order.RefundAccount) != "" {
+			_, _ = tx.Exec("UPDATE ss_accounts SET status='refunded', processed_at=NOW(), updated_at=NOW() WHERE order_no=? AND account=? AND status IN ('success','completed','refunding')", order.OrderNo, order.RefundAccount)
+		} else {
+			_, _ = tx.Exec("UPDATE ss_accounts SET status='refunded', processed_at=NOW(), updated_at=NOW() WHERE order_id=?", order.ID)
+		}
 	}
-	if actual > 0 && order.PaymentStatus != "settled" && order.PaymentStatus != "refunded" {
-		finalCharge := roundMoney(actual)
-		diff := roundMoney(finalCharge - order.PreDeduct)
+	if noOrderRefund(payload) && order.OrderType == OrderTypeRefund {
+		_, _ = tx.Exec("UPDATE ss_order SET status='completed', payment_status='no_refund', error_message=?, completed_at=NOW() WHERE id=?", upstreamMsg(payload, nil), order.ID)
+		if strings.TrimSpace(order.RefundAccount) != "" {
+			_, _ = tx.Exec("UPDATE ss_accounts SET status='success', error_message=?, updated_at=NOW() WHERE order_no=? AND account=?", upstreamMsg(payload, nil), order.OrderNo, order.RefundAccount)
+		}
+	}
+	if order.OrderType == OrderTypeRefund && !noOrderRefund(payload) && (localStatus == "refunded" || refundSucceeded(payload)) {
+		if err := s.settleRefund(tx, order, payload, refundKM); err != nil {
+			return err
+		}
+	}
+	if !canApplyActualSettlement(localStatus) {
+		if err := s.repairPrematureSettlement(tx, order); err != nil {
+			return err
+		}
+		if refundKM > 0 {
+			_, _ = tx.Exec("UPDATE ss_order SET refund_km=? WHERE id=?", refundKM, order.ID)
+		}
+		return tx.Commit()
+	}
+	if hasActual && shouldSettleOrder(order) {
+		var currentPay string
+		var preDeduct float64
+		var currentFinal sql.NullFloat64
+		if err := tx.QueryRow("SELECT COALESCE(payment_status,''), COALESCE(pre_deduct,0), final_charge FROM ss_order WHERE id=? FOR UPDATE", order.ID).Scan(&currentPay, &preDeduct, &currentFinal); err != nil {
+			return err
+		}
+		finalCharge := s.finalCharge(order.UserID, project, actual)
+		if !canSettlePayment(currentPay) {
+			if strings.EqualFold(currentPay, "settled") && currentFinal.Valid && roundMoney(currentFinal.Float64) != finalCharge {
+				if err := s.correctSettledCharge(tx, order, preDeduct, roundMoney(currentFinal.Float64), actual, finalCharge); err != nil {
+					return err
+				}
+			}
+			if refundKM > 0 {
+				_, _ = tx.Exec("UPDATE ss_order SET refund_km=? WHERE id=?", refundKM, order.ID)
+			}
+			return tx.Commit()
+		}
+		diff := roundMoney(finalCharge - preDeduct)
 		payStatus := "settled"
 		if diff > 0 {
 			payStatus = "insufficient"
@@ -739,7 +857,7 @@ func (s *Service) applySync(order Order, payload map[string]any) error {
 				payStatus = "insufficient"
 			} else {
 				_, _ = tx.Exec("INSERT INTO qingka_wangke_moneylog (uid,type,money,mark,addtime) VALUES (?,?,?,?,NOW())",
-					order.UserID, "shashou_charge", -diff, fmt.Sprintf("鲨兽运动补扣，订单号:%s，补扣%.2f", order.OrderNo, diff))
+					order.UserID, "鲨兽补扣", -diff, fmt.Sprintf("鲨兽运动补扣，订单号:%s，补扣%.2f", order.OrderNo, diff))
 				payStatus = "settled"
 			}
 		}
@@ -747,14 +865,312 @@ func (s *Service) applySync(order Order, payload map[string]any) error {
 			refund := math.Abs(diff)
 			_, _ = tx.Exec("UPDATE qingka_wangke_user SET money=money+? WHERE uid=?", refund, order.UserID)
 			_, _ = tx.Exec("INSERT INTO qingka_wangke_moneylog (uid,type,money,mark,addtime) VALUES (?,?,?,?,NOW())",
-				order.UserID, "shashou_return", refund, fmt.Sprintf("鲨兽运动退差，订单号:%s，退还%.2f", order.OrderNo, refund))
+				order.UserID, "鲨兽退差", refund, fmt.Sprintf("鲨兽运动退差，订单号:%s，退还%.2f", order.OrderNo, refund))
 		}
 		_, _ = tx.Exec("UPDATE ss_order SET actual_cost=?, final_charge=?, difference=?, payment_status=? WHERE id=?", actual, finalCharge, diff, payStatus, order.ID)
+	}
+	if !hasActual && localStatus == "completed" && shouldSettleOrder(order) {
+		var currentPay string
+		var preDeduct float64
+		if err := tx.QueryRow("SELECT COALESCE(payment_status,''), COALESCE(pre_deduct,0) FROM ss_order WHERE id=? FOR UPDATE", order.ID).Scan(&currentPay, &preDeduct); err != nil {
+			return err
+		}
+		if canSettlePayment(currentPay) {
+			_, _ = tx.Exec("UPDATE ss_order SET actual_cost=?, final_charge=?, difference=0, payment_status='settled' WHERE id=?", preDeduct, preDeduct, order.ID)
+		}
 	}
 	if refundKM > 0 {
 		_, _ = tx.Exec("UPDATE ss_order SET refund_km=? WHERE id=?", refundKM, order.ID)
 	}
 	return tx.Commit()
+}
+
+func localSyncStatus(order Order, payload map[string]any) string {
+	status := strings.TrimSpace(firstString(payload, "status", "order_status"))
+	if status == "" {
+		status = strings.TrimSpace(asString(firstNonNil(
+			nestedAny(payload, "data", "status"),
+			nestedAny(payload, "data", "order_status"),
+		)))
+	}
+	localStatus := mapStatus(status)
+	if localStatus == "" {
+		localStatus = order.Status
+	}
+	if detailStatus := aggregateDetailStatus(payload); detailStatus != "" {
+		localStatus = detailStatus
+	}
+	return localStatus
+}
+
+func (s *Service) correctSettledCharge(tx *sql.Tx, order Order, preDeduct, currentFinal, actualCost, desiredFinal float64) error {
+	delta := roundMoney(desiredFinal - currentFinal)
+	if delta > 0 {
+		res, err := tx.Exec("UPDATE qingka_wangke_user SET money=money-? WHERE uid=? AND money>=?", delta, order.UserID, delta)
+		if err != nil {
+			return err
+		}
+		if affected, _ := res.RowsAffected(); affected <= 0 {
+			_, _ = tx.Exec("UPDATE ss_order SET payment_status='insufficient' WHERE id=?", order.ID)
+			return nil
+		}
+		_, _ = tx.Exec("INSERT INTO qingka_wangke_moneylog (uid,type,money,mark,addtime) VALUES (?,?,?,?,NOW())",
+			order.UserID, "鲨兽补扣修正", -delta, fmt.Sprintf("鲨兽运动结算修正，订单号:%s，补扣%.2f", order.OrderNo, delta))
+	}
+	if delta < 0 {
+		refund := math.Abs(delta)
+		_, _ = tx.Exec("UPDATE qingka_wangke_user SET money=money+? WHERE uid=?", refund, order.UserID)
+		_, _ = tx.Exec("INSERT INTO qingka_wangke_moneylog (uid,type,money,mark,addtime) VALUES (?,?,?,?,NOW())",
+			order.UserID, "鲨兽退差修正", refund, fmt.Sprintf("鲨兽运动结算修正，订单号:%s，退还%.2f", order.OrderNo, refund))
+	}
+	diff := roundMoney(desiredFinal - preDeduct)
+	_, _ = tx.Exec("UPDATE ss_order SET actual_cost=?, final_charge=?, difference=?, payment_status='settled' WHERE id=?", actualCost, desiredFinal, diff, order.ID)
+	return nil
+}
+
+func (s *Service) settleRefund(tx *sql.Tx, order Order, payload map[string]any, refundKM float64) error {
+	var currentPay string
+	if err := tx.QueryRow("SELECT COALESCE(payment_status,'') FROM ss_order WHERE id=? FOR UPDATE", order.ID).Scan(&currentPay); err != nil {
+		return err
+	}
+	if strings.EqualFold(currentPay, "refunded") {
+		return nil
+	}
+	amount := refundAmount(payload)
+	if amount > 0 {
+		_, _ = tx.Exec("UPDATE qingka_wangke_user SET money=money+? WHERE uid=?", amount, order.UserID)
+		_, _ = tx.Exec("INSERT INTO qingka_wangke_moneylog (uid,type,money,mark,addtime) VALUES (?,?,?,?,NOW())",
+			order.UserID, "鲨兽退款", amount, fmt.Sprintf("鲨兽运动退款，账号:%s，退还%.2f", order.RefundAccount, amount))
+	}
+	_, _ = tx.Exec(`UPDATE ss_order SET status='refunded', actual_cost=?, final_charge=?, difference=0,
+		refund_km=IF(? > 0, ?, refund_km), payment_status='refunded', completed_at=NOW() WHERE id=?`,
+		amount, amount, refundKM, refundKM, order.ID)
+	if strings.TrimSpace(order.RefundAccount) != "" {
+		_, _ = tx.Exec("UPDATE ss_accounts SET status='refunded', processed_at=NOW(), updated_at=NOW() WHERE order_no=? AND account=?", order.OrderNo, order.RefundAccount)
+	}
+	return nil
+}
+
+func (s *Service) applyAccountSync(tx *sql.Tx, order Order, payload map[string]any, orderStatus string) {
+	for _, row := range accountDetailRows(payload) {
+		account := firstString(row, "account", "username", "user")
+		if account == "" {
+			continue
+		}
+		status := mapStatus(firstString(row, "status", "order_status"))
+		if status == "" {
+			status = orderStatus
+		}
+		msg := firstString(row, "error_message", "message", "msg", "error", "detail")
+		processedAt := firstString(row, "processed_at", "complete_time", "updated_at")
+		if processedAt == "" {
+			processedAt = time.Now().Format("2006-01-02 15:04:05")
+		}
+		if status != "" {
+			_, _ = tx.Exec(`UPDATE ss_accounts SET status=?, error_message=NULLIF(?,''), processed_at=?, updated_at=NOW()
+				WHERE order_no=? AND account=?`, status, msg, processedAt, order.OrderNo, account)
+		}
+		queryResult := firstNonNil(row["query_result"], row["result"], row["query"], row["data"])
+		if queryResult != nil {
+			raw, _ := json.Marshal(queryResult)
+			if len(raw) > 0 && string(raw) != "null" {
+				_, _ = tx.Exec("UPDATE ss_accounts SET query_result=?, updated_at=NOW() WHERE account=? ORDER BY id DESC LIMIT 1", string(raw), account)
+			}
+		}
+	}
+	if order.QueryAccount != "" {
+		queryResult := firstNonNil(payload["query_result"], payload["result"], nestedAny(payload, "data", "query_result"), nestedAny(payload, "data", "result"))
+		if queryResult != nil {
+			raw, _ := json.Marshal(queryResult)
+			if len(raw) > 0 && string(raw) != "null" {
+				_, _ = tx.Exec("UPDATE ss_accounts SET query_result=?, updated_at=NOW() WHERE account=? ORDER BY id DESC LIMIT 1", string(raw), order.QueryAccount)
+			}
+		}
+	}
+}
+
+func accountDetailRows(payload map[string]any) []map[string]any {
+	rows := payloadRows(payload, "detail", "details", "accounts", "account_details")
+	if len(rows) > 0 {
+		return rows
+	}
+	if data, ok := payload["data"].(map[string]any); ok {
+		return payloadRows(data, "detail", "details", "accounts", "account_details", "list")
+	}
+	return nil
+}
+
+func aggregateDetailStatus(payload map[string]any) string {
+	rows := accountDetailRows(payload)
+	if len(rows) == 0 {
+		return ""
+	}
+	counts := map[string]int{}
+	for _, row := range rows {
+		status := mapStatus(firstString(row, "status", "order_status"))
+		if status == "" {
+			continue
+		}
+		counts[status]++
+	}
+	if counts["processing"] > 0 {
+		return "processing"
+	}
+	if counts["pending"] == len(rows) {
+		return "pending"
+	}
+	if counts["success"]+counts["completed"] == len(rows) {
+		return "completed"
+	}
+	if counts["failed"] == len(rows) {
+		return "failed"
+	}
+	if counts["refunded"] == len(rows) {
+		return "refunded"
+	}
+	if counts["pending"] > 0 {
+		return "processing"
+	}
+	return ""
+}
+
+func orderSyncError(payload map[string]any, status string) string {
+	if status != "failed" {
+		return ""
+	}
+	for _, row := range accountDetailRows(payload) {
+		if mapStatus(firstString(row, "status", "order_status")) == "failed" {
+			if msg := firstString(row, "error_message", "message", "msg", "error", "detail"); msg != "" {
+				return msg
+			}
+		}
+	}
+	if msg := firstString(payload, "error_message", "message", "error", "detail"); msg != "" {
+		return msg
+	}
+	if msg := firstString(mapFromAny(payload["data"]), "error_message", "message", "error", "detail"); msg != "" {
+		return msg
+	}
+	return "订单失败"
+}
+
+func noOrderRefund(payload map[string]any) bool {
+	for _, value := range []any{
+		payload["refund_result"],
+		nestedAny(payload, "data", "refund_result"),
+		nestedAny(payload, "refund_result", "status"),
+		nestedAny(payload, "data", "refund_result", "status"),
+	} {
+		if strings.EqualFold(strings.TrimSpace(asString(value)), "no_order") {
+			return true
+		}
+	}
+	return false
+}
+
+func refundSucceeded(payload map[string]any) bool {
+	for _, value := range []any{
+		payload["refund_result"],
+		nestedAny(payload, "data", "refund_result"),
+		nestedAny(payload, "refund_result", "status"),
+		nestedAny(payload, "data", "refund_result", "status"),
+	} {
+		raw := strings.ToLower(strings.TrimSpace(asString(value)))
+		if raw == "success" || raw == "completed" || raw == "complete" || raw == "refunded" || raw == "refund" {
+			return true
+		}
+	}
+	return refundAmount(payload) > 0
+}
+
+func refundAmount(payload map[string]any) float64 {
+	return roundMoney(asFloat(firstNonNil(
+		payload["refund_amount"],
+		payload["refund"],
+		nestedAny(payload, "amounts", "refund"),
+		nestedAny(payload, "data", "amounts", "refund"),
+		nestedAny(payload, "refund_result", "refund_amount"),
+		nestedAny(payload, "data", "refund_result", "refund_amount"),
+		nestedAny(payload, "refund_result", "amount"),
+		nestedAny(payload, "data", "refund_result", "amount"),
+	)))
+}
+
+func shouldSettleOrder(order Order) bool {
+	return order.OrderType == OrderTypeNormal || order.OrderType == OrderTypeMorning
+}
+
+func canApplyActualSettlement(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "completed", "failed":
+		return true
+	default:
+		return false
+	}
+}
+
+func canSettlePayment(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "", "pre_deducted", "partial_refund", "insufficient":
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Service) finalCharge(uid int, project Project, actual float64) float64 {
+	rate := project.ActualRate
+	if rate <= 0 {
+		rate = 1
+	}
+	return roundMoney(actual * rate * s.userRate(uid))
+}
+
+func (s *Service) repairPrematureSettlement(tx *sql.Tx, order Order) error {
+	if !shouldSettleOrder(order) || order.PreDeduct <= 0 {
+		return nil
+	}
+	var payment string
+	var preDeduct float64
+	var actual, finalCharge, difference sql.NullFloat64
+	if err := tx.QueryRow(`SELECT COALESCE(payment_status,''), COALESCE(pre_deduct,0), actual_cost, final_charge, difference
+		FROM ss_order WHERE id=? FOR UPDATE`, order.ID).Scan(&payment, &preDeduct, &actual, &finalCharge, &difference); err != nil {
+		return err
+	}
+	if !strings.EqualFold(payment, "settled") || preDeduct <= 0 {
+		return nil
+	}
+	if !actual.Valid || !finalCharge.Valid || finalCharge.Float64 > 0 || (difference.Valid && difference.Float64 >= 0) {
+		return nil
+	}
+	res, err := tx.Exec("UPDATE qingka_wangke_user SET money=money-? WHERE uid=? AND money>=?", preDeduct, order.UserID, preDeduct)
+	if err != nil {
+		return err
+	}
+	if affected, _ := res.RowsAffected(); affected <= 0 {
+		_, _ = tx.Exec("UPDATE ss_order SET payment_status='insufficient' WHERE id=?", order.ID)
+		return nil
+	}
+	_, _ = tx.Exec("INSERT INTO qingka_wangke_moneylog (uid,type,money,mark,addtime) VALUES (?,?,?,?,NOW())",
+		order.UserID, "鲨兽恢复预扣", -preDeduct, fmt.Sprintf("鲨兽运动同步修正，订单号:%s，恢复预扣%.2f", order.OrderNo, preDeduct))
+	_, _ = tx.Exec("UPDATE ss_order SET actual_cost=NULL, final_charge=NULL, difference=NULL, payment_status='pre_deducted' WHERE id=?", order.ID)
+	return nil
+}
+
+func isRefundExpired(createdAt string, days int) bool {
+	if days <= 0 || strings.TrimSpace(createdAt) == "" {
+		return false
+	}
+	t, err := time.ParseInLocation("2006-01-02 15:04:05", strings.TrimSpace(createdAt), time.Local)
+	if err != nil {
+		return false
+	}
+	return time.Since(t) > time.Duration(days)*24*time.Hour
+}
+
+func jsonHasValue(raw json.RawMessage) bool {
+	text := strings.TrimSpace(string(raw))
+	return text != "" && text != "null" && text != "{}" && text != "[]"
 }
 
 func (s *Service) requireBalance(uid int, amount, minBalance float64) error {
@@ -894,15 +1310,15 @@ func boolInt(v bool) int {
 
 func mapStatus(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "pending", "wait", "waiting", "0":
+	case "pending", "wait", "waiting", "queued", "queue", "待处理", "等待处理", "待提交", "排队中", "0", "1":
 		return "pending"
-	case "processing", "running", "1":
+	case "processing", "running", "doing", "处理中", "运行中", "执行中", "2":
 		return "processing"
-	case "completed", "complete", "success", "2", "3":
+	case "completed", "complete", "success", "已完成", "完成", "成功", "3":
 		return "completed"
-	case "refunded", "refund", "4":
+	case "refunded", "refund", "已退款", "退款成功", "4":
 		return "refunded"
-	case "failed", "fail", "error", "-1", "5":
+	case "failed", "fail", "error", "失败", "错误", "-1", "5":
 		return "failed"
 	default:
 		return raw
@@ -955,6 +1371,13 @@ func nestedAny(m map[string]any, keys ...string) any {
 	return cur
 }
 
+func mapFromAny(v any) map[string]any {
+	if row, ok := v.(map[string]any); ok {
+		return row
+	}
+	return nil
+}
+
 func payloadRows(payload map[string]any, keys ...string) []map[string]any {
 	for _, key := range keys {
 		value, ok := payload[key]
@@ -980,7 +1403,7 @@ func rowsFromAny(value any) []map[string]any {
 		}
 		return rows
 	case map[string]any:
-		return payloadRows(typed, "data", "list", "orders")
+		return payloadRows(typed, "detail", "details", "accounts", "account_details", "data", "list", "orders")
 	default:
 		return nil
 	}
@@ -1004,9 +1427,42 @@ func firstNonNil(values ...any) any {
 	return nil
 }
 
+func extractUpstreamOrderNo(payload map[string]any) string {
+	for _, value := range []any{
+		payload["order_no"],
+		payload["orderNo"],
+		nestedAny(payload, "data", "order_no"),
+		nestedAny(payload, "data", "orderNo"),
+		nestedAny(payload, "data", "order", "order_no"),
+		nestedAny(payload, "data", "order", "orderNo"),
+		payload["order_id"],
+		payload["id"],
+		nestedAny(payload, "data", "order_id"),
+		nestedAny(payload, "data", "id"),
+	} {
+		if text := strings.TrimSpace(asString(value)); text != "" && text != "<nil>" {
+			return text
+		}
+	}
+	return ""
+}
+
 func upstreamOrderID(order Order) string {
 	var payload map[string]any
 	_ = json.Unmarshal(order.ResultData, &payload)
+	if id := extractUpstreamOrderID(payload); isPositiveIntString(id) {
+		return id
+	}
+	if id := strings.TrimSpace(asString(nestedAny(payload, "data", "order", "id"))); isPositiveIntString(id) {
+		return id
+	}
+	if id := strings.TrimSpace(asString(nestedAny(payload, "data", "order", "order_id"))); isPositiveIntString(id) {
+		return id
+	}
+	return ""
+}
+
+func extractUpstreamOrderID(payload map[string]any) string {
 	for _, value := range []any{
 		payload["upstream_order_id"],
 		nestedAny(payload, "data", "order_id"),

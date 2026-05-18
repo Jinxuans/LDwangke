@@ -54,6 +54,12 @@
                       <ElTag :type="statusType(acc.status)" effect="plain">{{ statusLabel(acc.status) }}</ElTag>
                     </template>
                   </ElTableColumn>
+                  <ElTableColumn prop="error_message" label="错误信息" min-width="180">
+                    <template #default="{ row: acc }">{{ emptyText(acc.error_message) }}</template>
+                  </ElTableColumn>
+                  <ElTableColumn prop="processed_at" label="处理时间" width="170">
+                    <template #default="{ row: acc }">{{ emptyText(acc.processed_at) }}</template>
+                  </ElTableColumn>
                   <ElTableColumn label="操作" width="120">
                     <template #default="{ row: acc }">
                       <ElButton v-if="canRefund(acc)" link type="danger" @click="refundAccount(acc)">退单</ElButton>
@@ -70,15 +76,25 @@
             <ElTableColumn label="数量/公里" width="130">
               <template #default="{ row }">{{ row.account_count }} / {{ row.total_distance }}</template>
             </ElTableColumn>
-            <ElTableColumn prop="pre_deduct" label="预扣" width="100" />
-            <ElTableColumn label="结算" width="150">
+            <ElTableColumn label="预扣费" width="100">
+              <template #default="{ row }">{{ moneyText(row.pre_deduct) }}</template>
+            </ElTableColumn>
+            <ElTableColumn label="最终收费" width="110">
+              <template #default="{ row }">{{ moneyText(row.final_charge) }}</template>
+            </ElTableColumn>
+            <ElTableColumn label="差价" width="100">
               <template #default="{ row }">
-                <span>{{ settlementLabel(row) }}</span>
+                <span :class="diffClass(row.difference)">{{ signedMoneyText(row.difference) }}</span>
               </template>
             </ElTableColumn>
             <ElTableColumn label="状态" width="110">
               <template #default="{ row }">
                 <ElTag :type="statusType(row.status)" effect="plain">{{ statusLabel(row.status) }}</ElTag>
+              </template>
+            </ElTableColumn>
+            <ElTableColumn label="结算状态" width="110">
+              <template #default="{ row }">
+                <ElTag :type="paymentType(row.payment_status)" effect="plain">{{ paymentLabel(row.payment_status) }}</ElTag>
               </template>
             </ElTableColumn>
             <ElTableColumn prop="created_at" label="创建时间" width="170" />
@@ -435,19 +451,72 @@
       .map((value) => weekOptions.find((item) => item.value === value)?.label || value)
       .join('、')
   const orderTypeLabel = (value: number) => ({ 1: '课外跑', 2: '晨跑', 3: '查询课外跑', 4: '退款', 5: '查询晨跑' })[value] || '-'
-  const settlementLabel = (row: ShashouOrder) => {
-    if (row.final_charge !== null && row.final_charge !== undefined) return `实付 ¥${Number(row.final_charge).toFixed(2)}`
-    if (row.actual_cost !== null && row.actual_cost !== undefined) return `实际 ¥${Number(row.actual_cost).toFixed(2)}`
-    return '待结算'
+  const normalizeStatus = (value: string) => String(value || '').trim().toLowerCase()
+  const emptyText = (value: unknown) => {
+    const text = String(value ?? '').trim()
+    return text || '-'
+  }
+  const moneyText = (value: number | null | undefined) => (value === null || value === undefined ? '-' : `¥${Number(value).toFixed(2)}`)
+  const signedMoneyText = (value: number | null | undefined) => {
+    if (value === null || value === undefined) return '-'
+    const number = Number(value)
+    if (number > 0) return `+¥${number.toFixed(2)}`
+    if (number < 0) return `-¥${Math.abs(number).toFixed(2)}`
+    return '¥0.00'
+  }
+  const diffClass = (value: number | null | undefined) => {
+    const number = Number(value || 0)
+    if (number > 0) return 'text-danger'
+    if (number < 0) return 'text-success'
+    return 'text-g-700'
   }
   const statusLabel = (value: string) =>
-    ({ pending: '待处理', processing: '处理中', completed: '已完成', success: '成功', refunded: '已退款', refunding: '退款中', failed: '失败' })[
-      value
-    ] || value
+    ({
+      pending: '待处理',
+      wait: '待处理',
+      waiting: '待处理',
+      '0': '待处理',
+      '1': '待处理',
+      processing: '处理中',
+      running: '处理中',
+      '2': '处理中',
+      completed: '已完成',
+      complete: '已完成',
+      '3': '已完成',
+      success: '成功',
+      refunded: '已退款',
+      refund: '已退款',
+      '4': '已退款',
+      refunding: '退款中',
+      failed: '失败',
+      fail: '失败',
+      error: '失败',
+      '-1': '失败',
+      '5': '失败'
+    })[normalizeStatus(value)] || emptyText(value)
   const statusType = (value: string) => {
-    if (['completed', 'success'].includes(value)) return 'success'
-    if (['failed', 'refunded'].includes(value)) return 'danger'
-    if (['processing', 'refunding'].includes(value)) return 'warning'
+    const status = normalizeStatus(value)
+    if (['completed', 'complete', 'success', '3'].includes(status)) return 'success'
+    if (['failed', 'fail', 'error', 'refunded', 'refund', '-1', '4', '5'].includes(status)) return 'danger'
+    if (['processing', 'running', 'refunding', '2'].includes(status)) return 'warning'
+    return 'info'
+  }
+  const paymentLabel = (value: string) =>
+    ({
+      pre_deducted: '已预扣',
+      settled: '已结算',
+      insufficient: '待补款',
+      refunded: '已退款',
+      paid: '已支付',
+      pending: '待支付',
+      no_refund: '无需退款',
+      partial_refund: '部分退款'
+    })[normalizeStatus(value)] || emptyText(value)
+  const paymentType = (value: string) => {
+    const status = normalizeStatus(value)
+    if (['settled', 'paid'].includes(status)) return 'success'
+    if (['insufficient', 'partial_refund', 'no_refund'].includes(status)) return 'warning'
+    if (status === 'refunded') return 'danger'
     return 'info'
   }
 

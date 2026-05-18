@@ -16,7 +16,7 @@ import (
 
 func (s *Service) upstreamCreate(ctx context.Context, p Project, req CreateOrderRequest) (map[string]any, error) {
 	projectID := upstreamProjectID(p)
-	if p.Type == 1 {
+	if p.Type == ProjectTypeSource29 {
 		form := map[string]any{
 			"project_id":     projectID,
 			"order_type":     req.OrderType,
@@ -29,6 +29,14 @@ func (s *Service) upstreamCreate(ctx context.Context, p Project, req CreateOrder
 		}
 		return s.source29(ctx, p, "add_order", form)
 	}
+	if p.Type == ProjectTypeSameSystem {
+		return s.sameSystem(ctx, p, http.MethodPost, "/api/v1/open/shashou/orders", map[string]any{
+			"project_id":    projectID,
+			"order_type":    req.OrderType,
+			"is_rush_order": req.IsRushOrder,
+			"accounts":      req.Accounts,
+		})
+	}
 	return s.source(ctx, p, http.MethodPost, "/api/v1/orders/create", map[string]any{
 		"project_id":    projectID,
 		"order_type":    req.OrderType,
@@ -39,7 +47,7 @@ func (s *Service) upstreamCreate(ctx context.Context, p Project, req CreateOrder
 
 func (s *Service) upstreamQuery(ctx context.Context, p Project, account string, queryType int) (map[string]any, error) {
 	projectID := upstreamProjectID(p)
-	if p.Type == 1 {
+	if p.Type == ProjectTypeSource29 {
 		return s.source29(ctx, p, "query_order", map[string]any{
 			"project_id": projectID,
 			"query_type": queryType,
@@ -49,6 +57,13 @@ func (s *Service) upstreamQuery(ctx context.Context, p Project, account string, 
 			"key":        p.APIKey,
 		})
 	}
+	if p.Type == ProjectTypeSameSystem {
+		return s.sameSystem(ctx, p, http.MethodPost, "/api/v1/open/shashou/query", map[string]any{
+			"project_id": projectID,
+			"query_type": queryType,
+			"account":    account,
+		})
+	}
 	return s.source(ctx, p, http.MethodPost, "/api/v1/orders/query", map[string]any{
 		"project_id": projectID,
 		"query_type": queryType,
@@ -56,23 +71,48 @@ func (s *Service) upstreamQuery(ctx context.Context, p Project, account string, 
 	})
 }
 
-func (s *Service) upstreamRefund(ctx context.Context, p Project, account, orderNo string) (map[string]any, error) {
+func (s *Service) upstreamRefund(ctx context.Context, p Project, acc Account) (map[string]any, error) {
 	projectID := upstreamProjectID(p)
-	if p.Type == 1 {
+	if p.Type == ProjectTypeSource29 {
+		orderID, err := s.resolve29OrderID(ctx, p, acc)
+		if err != nil {
+			return nil, err
+		}
 		return s.source29(ctx, p, "refund_order", map[string]any{
 			"project_id": projectID,
-			"account":    account,
-			"order_no":   orderNo,
+			"order_id":   orderID,
+			"account":    acc.Account,
+			"order_no":   acc.OrderNo,
 			"u_uid":      p.UserID,
 			"uid":        p.UserID,
 			"key":        p.APIKey,
 		})
 	}
+	if p.Type == ProjectTypeSameSystem {
+		return s.sameSystem(ctx, p, http.MethodPost, "/api/v1/open/shashou/refund", map[string]any{
+			"project_id": projectID,
+			"account":    acc.Account,
+		})
+	}
 	return s.source(ctx, p, http.MethodPost, "/api/v1/orders/refund", map[string]any{
 		"project_id": projectID,
-		"account":    account,
-		"order_no":   orderNo,
+		"account":    acc.Account,
+		"order_no":   acc.OrderNo,
 	})
+}
+
+func (s *Service) resolve29OrderID(ctx context.Context, p Project, acc Account) (string, error) {
+	if acc.OrderID > 0 {
+		if order, err := s.findOrder(0, int(acc.OrderID), true); err == nil {
+			if id := upstreamOrderID(order); isPositiveIntString(id) {
+				return id, nil
+			}
+		}
+	}
+	if id, err := s.upstream29OrderID(ctx, p, acc.OrderNo); err == nil && isPositiveIntString(id) {
+		return id, nil
+	}
+	return "", fmt.Errorf("上游订单ID为空")
 }
 
 func upstreamProjectID(p Project) int {
@@ -87,7 +127,7 @@ func (s *Service) upstreamStatus(ctx context.Context, p Project, order Order) (m
 	if orderNo == "" {
 		return nil, fmt.Errorf("订单号为空")
 	}
-	if p.Type == 1 {
+	if p.Type == ProjectTypeSource29 {
 		orderID := upstreamOrderID(order)
 		if !isPositiveIntString(orderID) {
 			if recovered, err := s.upstream29OrderID(ctx, p, orderNo); err == nil {
@@ -109,7 +149,50 @@ func (s *Service) upstreamStatus(ctx context.Context, p Project, order Order) (m
 		payload["upstream_order_id"] = orderID
 		return payload, nil
 	}
+	if p.Type == ProjectTypeSameSystem {
+		orderID := upstreamOrderID(order)
+		if !isPositiveIntString(orderID) {
+			if recovered, err := s.upstreamSameSystemOrderID(ctx, p, orderNo); err == nil {
+				orderID = recovered
+			}
+		}
+		if !isPositiveIntString(orderID) {
+			return nil, fmt.Errorf("上游订单ID为空")
+		}
+		payload, err := s.sameSystem(ctx, p, http.MethodPost, "/api/v1/open/shashou/orders/"+url.PathEscape(orderID)+"/sync", map[string]any{})
+		if err != nil {
+			return payload, err
+		}
+		payload["upstream_order_id"] = orderID
+		return payload, nil
+	}
 	return s.source(ctx, p, http.MethodGet, "/api/v1/orders/status/"+url.PathEscape(orderNo), nil)
+}
+
+func (s *Service) upstreamSameSystemOrderID(ctx context.Context, p Project, orderNo string) (string, error) {
+	if strings.TrimSpace(orderNo) == "" {
+		return "", fmt.Errorf("订单号为空")
+	}
+	payload, err := s.sameSystem(ctx, p, http.MethodGet, "/api/v1/open/shashou/orders", map[string]any{
+		"order_no": orderNo,
+		"page":     1,
+		"limit":    10,
+	})
+	if err != nil {
+		return "", err
+	}
+	for _, row := range payloadRows(payload, "data", "list", "orders") {
+		if strings.TrimSpace(asString(row["order_no"])) != orderNo {
+			continue
+		}
+		if id := strings.TrimSpace(asString(row["id"])); isPositiveIntString(id) {
+			return id, nil
+		}
+		if id := strings.TrimSpace(asString(row["order_id"])); isPositiveIntString(id) {
+			return id, nil
+		}
+	}
+	return "", fmt.Errorf("未找到上游订单ID")
 }
 
 func (s *Service) upstream29OrderID(ctx context.Context, p Project, orderNo string) (string, error) {
@@ -137,6 +220,16 @@ func (s *Service) upstream29OrderID(ctx context.Context, p Project, orderNo stri
 		}
 	}
 	return "", fmt.Errorf("未找到上游订单ID")
+}
+
+func ensureUpstreamOrderID(payload map[string]any) map[string]any {
+	if payload == nil {
+		return payload
+	}
+	if id := extractUpstreamOrderID(payload); id != "" {
+		payload["upstream_order_id"] = id
+	}
+	return payload
 }
 
 func (s *Service) VersionInfoPayload(ctx context.Context) map[string]any {
@@ -271,6 +364,42 @@ func (s *Service) source29(ctx context.Context, p Project, act string, payload m
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("User-Agent", "Shashou-Go-Plugin/1.0")
+	return s.doJSON(req)
+}
+
+func (s *Service) sameSystem(ctx context.Context, p Project, method, path string, payload any) (map[string]any, error) {
+	if strings.TrimSpace(p.APIURL) == "" || strings.TrimSpace(p.APIKey) == "" || strings.TrimSpace(p.UserID) == "" {
+		return nil, fmt.Errorf("同系统上游配置不完整")
+	}
+	values := url.Values{}
+	values.Set("uid", p.UserID)
+	values.Set("key", p.APIKey)
+	endpoint := strings.TrimRight(p.APIURL, "/") + path
+	var body io.Reader
+	if method == http.MethodGet {
+		if m, ok := payload.(map[string]any); ok {
+			for key, raw := range m {
+				if value := strings.TrimSpace(asString(raw)); value != "" && value != "<nil>" {
+					values.Set(key, value)
+				}
+			}
+		}
+	} else if payload != nil {
+		data, err := json.Marshal(payload)
+		if err != nil {
+			return nil, err
+		}
+		body = bytes.NewReader(data)
+	}
+	req, err := http.NewRequestWithContext(timeoutContext(ctx, p.Timeout), method, endpoint+"?"+values.Encode(), body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Shashou-Go-Plugin/1.0")
+	if method != http.MethodGet {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	return s.doJSON(req)
 }
 

@@ -51,7 +51,21 @@ func CompatAPI(c *gin.Context) {
 		}
 		result, err := ShaShou().CreateOrder(c.Request.Context(), user.UID, req, "agent", user.UID)
 		compatResult(c, result, err)
-	case "query_order", "query_account":
+	case "query_order":
+		req := QueryOrderRequest{
+			ProjectID: compatInt(c, payload, "project_id", 0),
+			QueryType: compatInt(c, payload, "query_type", OrderTypeQueryNormal),
+			Account:   compatField(c, payload, "account", "query_account"),
+		}
+		result, err := ShaShou().QueryAccount(c.Request.Context(), user.UID, req, "agent", user.UID)
+		compatResult(c, result, err)
+	case "query_account":
+		accountID, _ := strconv.ParseInt(compatField(c, payload, "account_id"), 10, 64)
+		if accountID > 0 {
+			result, err := ShaShou().QueryStoredAccount(c.Request.Context(), user.UID, accountID, compatBool(c, payload, "force_update"), user.UID == 1, "agent", user.UID)
+			compatResult(c, result, err)
+			return
+		}
 		req := QueryOrderRequest{
 			ProjectID: compatInt(c, payload, "project_id", 0),
 			QueryType: compatInt(c, payload, "query_type", OrderTypeQueryNormal),
@@ -68,6 +82,19 @@ func CompatAPI(c *gin.Context) {
 		}
 		result, err := ShaShou().RefundAccount(c.Request.Context(), user.UID, req, user.UID == 1, "agent", user.UID)
 		compatResult(c, result, err)
+	case "get_order_detail":
+		id := compatInt(c, payload, "order_id", 0)
+		if id <= 0 {
+			id = compatInt(c, payload, "id", 0)
+		}
+		order, err := ShaShou().findOrder(user.UID, id, user.UID == 1)
+		if err != nil {
+			compatError(c, -1, err.Error())
+			return
+		}
+		order.AccountDetails, _, _ = ShaShou().ListAccounts(user.UID, user.UID == 1, 1, 200, "", order.OrderNo, "", 0, 0)
+		order = sanitizeOrderResponse(order, false)
+		compatSuccess(c, gin.H{"order": order})
 	case "get_orders":
 		page := intFormValue(firstCompat(c.PostForm("page"), c.Query("page")), 1)
 		limit := intFormValue(firstCompat(c.PostForm("page_size"), c.PostForm("limit"), c.Query("limit")), 20)
@@ -94,6 +121,18 @@ func CompatAPI(c *gin.Context) {
 		}
 		result, err := ShaShou().SyncOrder(c.Request.Context(), user.UID, id, user.UID == 1)
 		compatResult(c, result, err)
+	case "check_query_status":
+		accountID, _ := strconv.ParseInt(compatField(c, payload, "account_id"), 10, 64)
+		result, err := ShaShou().CheckQueryStatus(user.UID, accountID, user.UID == 1)
+		compatResult(c, result, err)
+	case "clear_query_result":
+		accountID, _ := strconv.ParseInt(compatField(c, payload, "account_id"), 10, 64)
+		err := ShaShou().ClearQueryResult(user.UID, accountID, user.UID == 1)
+		if err != nil {
+			compatError(c, -1, err.Error())
+			return
+		}
+		compatSuccess(c, gin.H{"message": "查询结果已清除"})
 	default:
 		compatError(c, -1, "未知接口")
 	}

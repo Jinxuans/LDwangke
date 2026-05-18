@@ -10,7 +10,7 @@ func (s *Service) EnsureTable() {
 		`CREATE TABLE IF NOT EXISTS ss_project (
 			id INT NOT NULL AUTO_INCREMENT,
 			name VARCHAR(100) NOT NULL DEFAULT '鲨兽运动世界' COMMENT '项目名称',
-			type TINYINT NOT NULL DEFAULT 0 COMMENT '0=源台 1=29二开',
+			type TINYINT NOT NULL DEFAULT 0 COMMENT '0=源台 1=29二开 2=同系统',
 			remote_project_id INT NOT NULL DEFAULT 0 COMMENT '上游项目ID，0=使用本地ID',
 			api_url VARCHAR(255) NOT NULL DEFAULT '',
 			api_key VARCHAR(255) NOT NULL DEFAULT '',
