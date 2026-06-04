@@ -31,6 +31,17 @@ var PluginSpecs = map[string]PluginSpec{
 		RuntimeEntry:   "",
 		Notes:          "AppUI product plugin.",
 	},
+	"jiguang": {
+		Name:             "jiguang",
+		Kind:             "plugin",
+		Status:           "active",
+		HasRoutes:        true,
+		HasPluginRuntime: true,
+		RuntimeOwner:     "module",
+		RetirementRule:   "Retire only after routes, OpenAPI compatibility, and product obligations are removed.",
+		RuntimeEntry:     "plugins/jiguang/cron.go:RunCron",
+		Notes:            "Jiguang running plugin with source/same_system/compat29 upstream modes, refund, add-times, logs, sync, and PHP-compatible APIs.",
+	},
 	"paper": {
 		Name:           "paper",
 		Kind:           "plugin",

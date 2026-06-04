@@ -42,6 +42,7 @@ const migratedComponentMap: Record<string, string> = {
   XMIndex: '/plugins/xm/index',
   SXDKIndex: '/plugins/sxdk/index',
   SDXYIndex: '/plugins/sdxy/index',
+  JiguangIndex: '/plugins/jiguang/index',
   ShashouIndex: '/plugins/shashou/index',
   WuxinIndex: '/plugins/wuxin/index',
   YDSJIndex: '/plugins/ydsj/index',

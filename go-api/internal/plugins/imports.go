@@ -4,6 +4,7 @@ package plugins
 
 import (
 	_ "go-api/internal/plugins/appui"
+	_ "go-api/internal/plugins/jiguang"
 	_ "go-api/internal/plugins/paper"
 	_ "go-api/internal/plugins/sdxy"
 	_ "go-api/internal/plugins/shashou"

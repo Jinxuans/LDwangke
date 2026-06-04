@@ -7,6 +7,7 @@ import (
 	"go-api/internal/app"
 	"go-api/internal/autosync"
 	"go-api/internal/pluginruntime"
+	jiguangplugin "go-api/internal/plugins/jiguang"
 	shashouplugin "go-api/internal/plugins/shashou"
 	wuxinplugin "go-api/internal/plugins/wuxin"
 	"go-api/internal/runtimeops"
@@ -22,6 +23,7 @@ var (
 	runXMCronFn           = pluginruntime.RunXMCron
 	runYongyeCronFn       = pluginruntime.RunYongyeCron
 	runSDXYCronFn         = pluginruntime.RunSDXYCron
+	runJiguangCronFn      = jiguangplugin.RunCron
 	runShashouCronFn      = shashouplugin.RunCron
 	runWuxinCronFn        = wuxinplugin.RunCron
 	runLonglongDaemonFn   = pluginruntime.RunLonglongDaemon
@@ -45,6 +47,7 @@ func StartCoreJobs(ctx context.Context, a *app.App) {
 	go runXMCronFn(ctx)
 	go runYongyeCronFn(ctx)
 	go runSDXYCronFn(ctx)
+	go runJiguangCronFn(ctx)
 	go runShashouCronFn(ctx)
 	go runWuxinCronFn(ctx)
 	go runLonglongDaemonFn(ctx)

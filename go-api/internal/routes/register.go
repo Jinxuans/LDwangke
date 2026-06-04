@@ -7,6 +7,7 @@ import (
 	auxmodule "go-api/internal/modules/auxiliary"
 	pushmodule "go-api/internal/modules/push"
 	usermodule "go-api/internal/modules/user"
+	jiguangplugin "go-api/internal/plugins/jiguang"
 	shashouplugin "go-api/internal/plugins/shashou"
 	sxgzplugin "go-api/internal/plugins/sxgz"
 	wuxinplugin "go-api/internal/plugins/wuxin"
@@ -34,6 +35,7 @@ func registerPublicRoutes(r *gin.Engine) {
 	auxmodule.RegisterPublicRoutes(r)
 	pushmodule.RegisterPublicRoutes(r)
 	usermodule.RegisterPublicRoutes(r)
+	jiguangplugin.RegisterCompatRoutes(r)
 	shashouplugin.RegisterCompatRoutes(r)
 	sxgzplugin.RegisterCompatRoutes(r)
 	wuxinplugin.RegisterCompatRoutes(r)
