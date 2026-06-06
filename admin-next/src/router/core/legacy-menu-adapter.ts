@@ -1,4 +1,4 @@
-import type { AppRouteRecord } from '@/types/router'
+﻿import type { AppRouteRecord } from '@/types/router'
 import { RoutesAlias } from '@/router/routesAlias'
 import type { LegacyMenuConfigItem } from '@/types/legacy-contract'
 
@@ -39,6 +39,7 @@ const migratedComponentMap: Record<string, string> = {
   OrderList: '/order/list/index',
   OrderQuality: '/order/quality/index',
   YFDKIndex: '/plugins/yfdk/index',
+  BaitanIndex: '/plugins/baitan/index',
   XMIndex: '/plugins/xm/index',
   SXDKIndex: '/plugins/sxdk/index',
   SDXYIndex: '/plugins/sdxy/index',
@@ -222,3 +223,4 @@ function mapLegacyRoles(authority: string[] = []) {
 
   return authority.map((role) => legacyRoleMap[role] || role)
 }
+

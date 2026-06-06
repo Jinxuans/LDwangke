@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"go-api/internal/middleware"
+	baitanplugin "go-api/internal/plugins/baitan"
 	jiguangplugin "go-api/internal/plugins/jiguang"
 	shashouplugin "go-api/internal/plugins/shashou"
 	sxgzplugin "go-api/internal/plugins/sxgz"
@@ -20,6 +21,7 @@ func RegisterCompatRoutes(r *gin.Engine) {
 func RegisterRoutes(r *gin.Engine) {
 	openapi := r.Group("/api/v1/open", middleware.APIKeyAuth())
 	{
+		baitanplugin.RegisterOpenRoutes(openapi)
 		jiguangplugin.RegisterOpenRoutes(openapi)
 		shashouplugin.RegisterOpenRoutes(openapi)
 		sxgzplugin.RegisterOpenRoutes(openapi)

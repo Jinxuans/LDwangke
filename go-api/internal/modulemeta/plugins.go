@@ -31,6 +31,17 @@ var PluginSpecs = map[string]PluginSpec{
 		RuntimeEntry:   "",
 		Notes:          "AppUI product plugin.",
 	},
+	"baitan": {
+		Name:             "baitan",
+		Kind:             "plugin",
+		Status:           "active",
+		HasRoutes:        true,
+		HasPluginRuntime: true,
+		RuntimeOwner:     "module",
+		RetirementRule:   "Retire only after routes, OpenAPI compatibility, and product obligations are removed.",
+		RuntimeEntry:     "plugins/baitan/cron.go:RunCron",
+		Notes:            "Baitan internship check-in plugin with source and same-system upstream modes; no 29-system upstream mode.",
+	},
 	"jiguang": {
 		Name:             "jiguang",
 		Kind:             "plugin",

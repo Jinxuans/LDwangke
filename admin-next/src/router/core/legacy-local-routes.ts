@@ -1,4 +1,4 @@
-import type { LegacyRouteRecord } from './legacy-menu-adapter'
+﻿import type { LegacyRouteRecord } from './legacy-menu-adapter'
 
 function leaf(
   name: string,
@@ -56,6 +56,7 @@ export const localLegacyRoutes: LegacyRouteRecord[] = [
   ]),
   group('Checkin', '/checkin', '打卡业务', 'lucide:clipboard-check', '/yfdk/index', [
     leaf('YFDKIndex', '/yfdk/index', 'YF打卡', 'lucide:clipboard-check'),
+    leaf('BaitanIndex', '/baitan/index', '摆摊实习打卡', 'lucide:store'),
     leaf('SXDKIndex', '/sxdk/index', '泰山打卡', 'lucide:mountain'),
     leaf('AppuiIndex', '/appui/index', 'Appui打卡', 'lucide:smartphone'),
     leaf('TuZhiIndex', '/tuzhi/index', '凸知打卡', 'lucide:map-pin-check')
@@ -381,3 +382,4 @@ export const localLegacyRoutes: LegacyRouteRecord[] = [
     ]
   }
 ]
+

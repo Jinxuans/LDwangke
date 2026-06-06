@@ -18,6 +18,7 @@ var CoreModules = map[string]bool{
 
 var PluginModules = map[string]bool{
 	"appui":   true,
+	"baitan":  true,
 	"paper":   true,
 	"sdxy":    true,
 	"shashou": true,
