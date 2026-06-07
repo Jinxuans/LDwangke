@@ -12,16 +12,22 @@ const (
 )
 
 type Config struct {
-	UpstreamProtocol string             `json:"upstream_protocol"`
-	UpstreamURL      string             `json:"upstream_url"`
-	UpstreamUID      int                `json:"upstream_uid"`
-	UpstreamKey      string             `json:"upstream_key"`
-	Token            string             `json:"token"`
-	PlatformPrices   map[string]float64 `json:"platform_prices"`
-	BukaUnitPrice    float64            `json:"buka_unit_price"`
-	AutoSync         bool               `json:"auto_sync"`
-	SyncInterval     int                `json:"sync_interval"`
-	Timeout          int                `json:"timeout"`
+	UpstreamProtocol  string             `json:"upstream_protocol"`
+	UpstreamURL       string             `json:"upstream_url"`
+	UpstreamUID       int                `json:"upstream_uid"`
+	UpstreamKey       string             `json:"upstream_key"`
+	Token             string             `json:"token"`
+	PlatformPrices    map[string]float64 `json:"platform_prices"`
+	BukaUnitPrice     float64            `json:"buka_unit_price"`
+	AutoSync          bool               `json:"auto_sync"`
+	SyncInterval      int                `json:"sync_interval"`
+	Timeout           int                `json:"timeout"`
+	UserPageURL       string             `json:"user_page_url"`
+	UserPageText      string             `json:"user_page_text"`
+	UserPageIntro     string             `json:"user_page_intro"`
+	NoticeRefreshText string             `json:"notice_refresh_text"`
+	NoticeEnabled     bool               `json:"notice_enabled"`
+	NoticeContent     string             `json:"notice_content"`
 }
 
 func defaultConfig() Config {
@@ -30,12 +36,18 @@ func defaultConfig() Config {
 		prices[item.Value] = 1
 	}
 	return Config{
-		UpstreamProtocol: UpstreamProtocolSource,
-		PlatformPrices:   prices,
-		BukaUnitPrice:    0.1,
-		AutoSync:         true,
-		SyncInterval:     300,
-		Timeout:          30,
+		UpstreamProtocol:  UpstreamProtocolSource,
+		PlatformPrices:    prices,
+		BukaUnitPrice:     0.1,
+		AutoSync:          true,
+		SyncInterval:      300,
+		Timeout:           30,
+		UserPageURL:       "https://phone.mmalbasa.net.eu.org/",
+		UserPageText:      "用户页面",
+		UserPageIntro:     "可发给用户进行图片上传、立即执行、开启暂停。",
+		NoticeRefreshText: "刷新公告",
+		NoticeEnabled:     false,
+		NoticeContent:     "",
 	}
 }
 
@@ -67,6 +79,27 @@ func normalizeConfig(cfg Config) Config {
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = def.Timeout
 	}
+	if strings.TrimSpace(cfg.UserPageURL) == "" {
+		cfg.UserPageURL = def.UserPageURL
+	} else {
+		cfg.UserPageURL = strings.TrimSpace(cfg.UserPageURL)
+	}
+	if strings.TrimSpace(cfg.UserPageText) == "" {
+		cfg.UserPageText = def.UserPageText
+	} else {
+		cfg.UserPageText = strings.TrimSpace(cfg.UserPageText)
+	}
+	if strings.TrimSpace(cfg.UserPageIntro) == "" {
+		cfg.UserPageIntro = def.UserPageIntro
+	} else {
+		cfg.UserPageIntro = strings.TrimSpace(cfg.UserPageIntro)
+	}
+	if strings.TrimSpace(cfg.NoticeRefreshText) == "" {
+		cfg.NoticeRefreshText = def.NoticeRefreshText
+	} else {
+		cfg.NoticeRefreshText = strings.TrimSpace(cfg.NoticeRefreshText)
+	}
+	cfg.NoticeContent = strings.TrimSpace(cfg.NoticeContent)
 	return cfg
 }
 

@@ -14,6 +14,7 @@ func RegisterRoutes(api *gin.RouterGroup) {
 	bt := api.Group("/baitan")
 	{
 		bt.GET("/config", GetConfig)
+		bt.GET("/ui-settings", GetUISettings)
 		bt.POST("/config", SaveConfig)
 		bt.GET("/platforms", GetPlatforms)
 		bt.GET("/price", GetPrice)
@@ -53,6 +54,20 @@ func requireAdmin(c *gin.Context) bool {
 	}
 	response.Forbidden(c, "权限不足")
 	return false
+}
+
+func GetUISettings(c *gin.Context) {
+	cfg, err := Baitan().loadConfig()
+	if err != nil {
+		response.ServerErrorf(c, err, "获取界面配置失败")
+		return
+	}
+	response.Success(c, gin.H{
+		"user_page_url":       cfg.UserPageURL,
+		"user_page_text":      cfg.UserPageText,
+		"user_page_intro":     cfg.UserPageIntro,
+		"notice_refresh_text": cfg.NoticeRefreshText,
+	})
 }
 
 func GetConfig(c *gin.Context) {

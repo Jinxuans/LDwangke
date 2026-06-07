@@ -13,6 +13,12 @@ export interface BaitanConfig {
   auto_sync: boolean
   sync_interval: number
   timeout: number
+  user_page_url: string
+  user_page_text: string
+  user_page_intro: string
+  notice_refresh_text: string
+  notice_enabled: boolean
+  notice_content: string
 }
 
 export interface BaitanPlatform {
@@ -20,6 +26,19 @@ export interface BaitanPlatform {
   label: string
   price: number
   dict_key?: string
+}
+
+export interface BaitanNotice {
+  has_notice: boolean
+  content: string
+  raw?: Record<string, any>
+}
+
+export interface BaitanUISettings {
+  user_page_url: string
+  user_page_text: string
+  user_page_intro: string
+  notice_refresh_text: string
 }
 
 export interface BaitanOrder {
@@ -117,6 +136,10 @@ export function fetchBaitanConfig() {
   return request.get<BaitanConfig>({ url: '/baitan/config' })
 }
 
+export function fetchBaitanUISettings() {
+  return request.get<BaitanUISettings>({ url: '/baitan/ui-settings' })
+}
+
 export function saveBaitanConfig(data: BaitanConfig) {
   return request.post<void>({ url: '/baitan/config', params: data })
 }
@@ -161,7 +184,7 @@ export function addBaitanDays(id: number, days: number) {
   })
 }
 
-export function deleteBaitanOrder(id: number) {
+export function refundBaitanOrder(id: number) {
   return request.post<{ message: string; refund: number }>({
     url: `/baitan/orders/${id}/delete`,
     params: {},
@@ -182,7 +205,7 @@ export function fetchBaitanLogs(id: number) {
 }
 
 export function fetchBaitanNotice() {
-  return request.get<any>({ url: '/baitan/notice', timeout: 45000 })
+  return request.get<BaitanNotice>({ url: '/baitan/notice', timeout: 45000 })
 }
 
 export function fetchBaitanSchools(params: { platform?: string; dictKey?: string }) {

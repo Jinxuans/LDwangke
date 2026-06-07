@@ -299,6 +299,9 @@ func (s *Service) AddDays(ctx context.Context, uid, id, days int, isAdmin bool) 
 	if err != nil {
 		return nil, err
 	}
+	if err := ensureOrderOperable(order); err != nil {
+		return nil, err
+	}
 	price, _ := s.PlatformPrice(order.UID, order.Type)
 	amount := round2(price * float64(days))
 	if err := s.requireBalance(order.UID, amount); err != nil {
@@ -343,6 +346,9 @@ func (s *Service) EditOrder(ctx context.Context, uid int, req OrderRequest, isAd
 	if err != nil {
 		return nil, err
 	}
+	if err := ensureOrderOperable(order); err != nil {
+		return nil, err
+	}
 	cfg, _ := s.loadConfig()
 	if _, err := s.upstreamEdit(ctx, cfg, req); err != nil {
 		return nil, err
@@ -360,32 +366,50 @@ func (s *Service) DeleteOrder(ctx context.Context, uid, id int, isAdmin bool) (m
 	if err != nil {
 		return nil, err
 	}
+	if err := ensureOrderOperable(order); err != nil {
+		return nil, err
+	}
 	cfg, _ := s.loadConfig()
-	if _, err := s.upstreamDelete(ctx, cfg, order); err != nil {
+	upstream, err := s.upstreamDelete(ctx, cfg, order)
+	if err != nil {
 		return nil, err
 	}
 	refund := s.refundByEndDate(order)
+	finalCharge := round2(order.PreDeduct - refund)
+	if finalCharge < 0 {
+		finalCharge = 0
+	}
+	raw, _ := json.Marshal(map[string]any{"refund": refund, "upstream": upstream})
 	tx, err := database.DB.Begin()
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec("DELETE FROM qingka_baitan WHERE id=?", order.ID); err != nil {
+	res, err := tx.Exec(`UPDATE qingka_baitan
+		SET status='refunded', code=0, payment_status='refunded', final_charge=?, difference=?, result_data=?, updated_at=NOW()
+		WHERE id=? AND status<>'refunded'`, finalCharge, -refund, string(raw), order.ID)
+	if err != nil {
 		return nil, err
+	}
+	if affected, _ := res.RowsAffected(); affected <= 0 {
+		return nil, fmt.Errorf("订单已退款")
 	}
 	if refund > 0 {
 		_, _ = tx.Exec("UPDATE qingka_wangke_user SET money=money+? WHERE uid=?", refund, order.UID)
-		_, _ = tx.Exec("INSERT INTO qingka_wangke_moneylog (uid,type,money,mark,addtime) VALUES (?,?,?,?,NOW())", order.UID, "baitan_refund", refund, fmt.Sprintf("摆摊打卡删除退款，账号:%s，退款%.2f", order.UserName, refund))
+		_, _ = tx.Exec("INSERT INTO qingka_wangke_moneylog (uid,type,money,mark,addtime) VALUES (?,?,?,?,NOW())", order.UID, "baitan_refund", refund, fmt.Sprintf("摆摊打卡退款，账号:%s，退款%.2f", order.UserName, refund))
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return map[string]any{"message": fmt.Sprintf("删除成功，退款%.2f", refund), "refund": refund}, nil
+	return map[string]any{"message": fmt.Sprintf("退款成功，退款%.2f", refund), "refund": refund}, nil
 }
 
 func (s *Service) QuerySourceOrder(ctx context.Context, uid, id int, isAdmin bool) (map[string]any, error) {
 	order, err := s.findOrder(uid, id, isAdmin)
 	if err != nil {
+		return nil, err
+	}
+	if err := ensureOrderOperable(order); err != nil {
 		return nil, err
 	}
 	cfg, _ := s.loadConfig()
@@ -406,13 +430,24 @@ func (s *Service) Logs(ctx context.Context, uid, id int, isAdmin bool) (map[stri
 	if err != nil {
 		return nil, err
 	}
+	if err := ensureOrderOperable(order); err != nil {
+		return nil, err
+	}
 	cfg, _ := s.loadConfig()
 	return s.upstreamLogs(ctx, cfg, order)
 }
 
 func (s *Service) Notice(ctx context.Context) (map[string]any, error) {
 	cfg, _ := s.loadConfig()
-	return s.upstreamNotice(ctx, cfg)
+	content := strings.TrimSpace(cfg.NoticeContent)
+	if !cfg.NoticeEnabled {
+		content = ""
+	}
+	return map[string]any{
+		"has_notice": content != "",
+		"content":    content,
+		"source":     "local",
+	}, nil
 }
 
 func (s *Service) Schools(ctx context.Context, platform, dictKey string) (map[string]any, error) {
@@ -449,6 +484,9 @@ func (s *Service) SubmitBuka(ctx context.Context, uid int, req BukaRequest, isAd
 	}
 	order, err := s.findOrderByAccount(uid, req.UserName, req.PlatformType, isAdmin)
 	if err != nil {
+		return nil, err
+	}
+	if err := ensureOrderOperable(order); err != nil {
 		return nil, err
 	}
 	est, err := s.BukaEstimate(req)
@@ -511,6 +549,9 @@ func (s *Service) SyncOrders(ctx context.Context, limit int) (int, error) {
 func (s *Service) SyncOne(ctx context.Context, uid, id int, isAdmin bool) (bool, error) {
 	order, err := s.findOrder(uid, id, isAdmin)
 	if err != nil {
+		return false, err
+	}
+	if err := ensureOrderOperable(order); err != nil {
 		return false, err
 	}
 	payload, err := s.QuerySourceOrder(ctx, order.UID, order.ID, true)
@@ -580,8 +621,15 @@ func (s *Service) requireBalance(uid int, amount float64) error {
 
 func (s *Service) accountExists(uid int, account string, excludeID int) (bool, error) {
 	var count int
-	err := database.DB.QueryRow("SELECT COUNT(*) FROM qingka_baitan WHERE uid=? AND userName=? AND id<>?", uid, account, excludeID).Scan(&count)
+	err := database.DB.QueryRow("SELECT COUNT(*) FROM qingka_baitan WHERE uid=? AND userName=? AND id<>? AND status NOT IN ('deleted','refunded')", uid, account, excludeID).Scan(&count)
 	return count > 0, err
+}
+
+func ensureOrderOperable(order Order) error {
+	if order.Status == "refunded" || order.Status == "deleted" || order.PaymentStatus == "refunded" {
+		return fmt.Errorf("订单已退款，不能继续操作")
+	}
+	return nil
 }
 
 func (s *Service) findOrder(uid, id int, isAdmin bool) (Order, error) {

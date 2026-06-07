@@ -19,14 +19,17 @@
         <template #left>
           <div class="baitan-toolbar">
             <h4 class="baitan-title">摆摊实习打卡</h4>
-            <ElButton type="primary" @click="openOrderDrawer()">提交订单</ElButton>
-            <ElButton plain :loading="noticeLoading" @click="openNotice">公告</ElButton>
-            <ElButton plain :loading="loading" @click="loadOrders(pagination.page)">刷新订单</ElButton>
-            <ElButton v-if="isAdmin" plain @click="openConfig">配置接入</ElButton>
-            <ElButton v-if="isAdmin" plain :loading="syncLoading" @click="syncAll">同步订单</ElButton>
+            <ElButton type="primary" :icon="Plus" @click="openOrderDrawer()">提交订单</ElButton>
+            <ElButton plain :icon="Link" @click="openUserPage">{{ uiSettings.user_page_text }}</ElButton>
+            <ElButton plain :icon="Bell" :loading="noticeLoading" @click="openNotice(true)">{{ uiSettings.notice_refresh_text }}</ElButton>
+            <ElButton plain :icon="Refresh" :loading="loading" @click="loadOrders(pagination.page)">刷新订单</ElButton>
+            <ElButton v-if="isAdmin" plain :icon="Setting" @click="openConfig">配置接入</ElButton>
+            <ElButton v-if="isAdmin" plain :icon="Refresh" :loading="syncLoading" @click="syncAll">同步订单</ElButton>
           </div>
         </template>
       </ArtTableHeader>
+
+      <div v-if="noticeHtml" class="bt-notice" v-html="noticeHtml"></div>
 
       <ElTable :data="orders" border v-loading="loading" class="mt-4" row-key="id">
         <ElTableColumn prop="id" label="ID" width="80" />
@@ -74,20 +77,23 @@
         <ElTableColumn prop="createTime" label="创建时间" width="170" />
         <ElTableColumn label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <ElButton link type="primary" @click="openOrderDrawer(row)">编辑</ElButton>
-            <ElButton link type="primary" @click="syncOne(row)">同步</ElButton>
-            <ElDropdown trigger="click" @command="(cmd: string) => handleCommand(row, cmd)">
-              <ElButton link type="primary">更多</ElButton>
-              <template #dropdown>
-                <ElDropdownMenu>
-                  <ElDropdownItem command="logs">日志</ElDropdownItem>
-                  <ElDropdownItem command="addDays">加天数</ElDropdownItem>
-                  <ElDropdownItem command="buka">补签</ElDropdownItem>
-                  <ElDropdownItem command="source">源台信息</ElDropdownItem>
-                  <ElDropdownItem command="delete" divided>删除退款</ElDropdownItem>
-                </ElDropdownMenu>
-              </template>
-            </ElDropdown>
+            <span v-if="isRefunded(row)" class="bt-muted-action">已退款</span>
+            <template v-else>
+              <ElButton link type="primary" @click="openOrderDrawer(row)">编辑</ElButton>
+              <ElButton link type="primary" @click="syncOne(row)">同步</ElButton>
+              <ElDropdown trigger="click" @command="(cmd: string) => handleCommand(row, cmd)">
+                <ElButton link type="primary">更多</ElButton>
+                <template #dropdown>
+                  <ElDropdownMenu>
+                    <ElDropdownItem command="logs">日志</ElDropdownItem>
+                    <ElDropdownItem command="addDays">加天数</ElDropdownItem>
+                    <ElDropdownItem command="buka">补签</ElDropdownItem>
+                    <ElDropdownItem command="source">源台信息</ElDropdownItem>
+                    <ElDropdownItem command="delete" divided>退款</ElDropdownItem>
+                  </ElDropdownMenu>
+                </template>
+              </ElDropdown>
+            </template>
           </template>
         </ElTableColumn>
       </ElTable>
@@ -107,6 +113,14 @@
 
     <ElDrawer v-model="orderDrawer" :title="orderForm.id ? '编辑订单' : '提交订单'" size="min(900px, 100vw)" class="baitan-drawer">
       <div class="drawer-body">
+        <ElAlert
+          v-if="orderInfoLoading"
+          title="正在同步源台信息"
+          type="info"
+          show-icon
+          :closable="false"
+          class="mb-4"
+        />
         <section class="rounded-custom-sm border-full-d bg-box p-4">
           <h3 class="bt-section-title">账号与期限</h3>
           <div class="mt-4 grid gap-4 md:grid-cols-3">
@@ -134,10 +148,6 @@
                 :disabled-date="disablePastDate"
                 @change="updateOrderDays"
               />
-            </div>
-            <div v-if="!orderForm.id">
-              <label>预计扣费</label>
-              <div class="bt-estimate">{{ money(estimatedAmount) }}</div>
             </div>
             <div v-if="!orderForm.id" class="bt-action-field">
               <label>查询</label>
@@ -273,9 +283,13 @@
         </section>
       </div>
       <template #footer>
-        <div class="flex items-center justify-between gap-3">
-          <span class="text-sm text-g-500">预计扣费 {{ money(estimatedAmount) }}</span>
-          <div class="flex gap-2">
+        <div class="bt-drawer-footer">
+          <span class="bt-footer-estimate">
+            预计扣费
+            <strong>{{ money(estimatedAmount) }}</strong>
+            <em>{{ estimateHint }}</em>
+          </span>
+          <div class="bt-footer-actions">
             <ElButton @click="orderDrawer = false">取消</ElButton>
             <ElButton type="primary" :loading="saving" @click="saveOrder">{{ orderForm.id ? '修改' : '添加' }}</ElButton>
           </div>
@@ -284,51 +298,112 @@
     </ElDrawer>
 
     <ElDialog v-model="configVisible" title="摆摊打卡配置" width="980px">
-      <div class="grid gap-5 lg:grid-cols-[1fr_1fr]">
-        <section class="rounded-custom-sm border-full-d bg-box p-4">
-          <h3 class="bt-section-title">上游接入</h3>
-          <div class="mt-4 space-y-4">
+      <ElTabs class="bt-config-tabs">
+        <ElTabPane label="上游接入">
+          <section class="bt-config-panel">
             <div>
               <label>对接类型</label>
               <ElSegmented v-model="configForm.upstream_protocol" :options="protocolOptions" />
             </div>
             <div>
-              <label>上游地址</label>
-              <ElInput v-model="configForm.upstream_url" placeholder="https://example.com/prod-api/api/v2 或站点根地址" />
+              <label>{{ upstreamUrlLabel }}</label>
+              <ElInput v-model="configForm.upstream_url" :placeholder="upstreamUrlPlaceholder" />
             </div>
             <div v-if="configForm.upstream_protocol === 'source'">
               <label>源台 Token</label>
-              <ElInput v-model="configForm.token" show-password />
+              <ElInput v-model="configForm.token" show-password placeholder="源台 api.php 中配置的 token" />
             </div>
             <div v-else class="grid gap-4 md:grid-cols-2">
               <div>
                 <label>同系统 UID</label>
-                <ElInputNumber v-model="configForm.upstream_uid" class="w-full" :min="0" />
+                <ElInputNumber v-model="configForm.upstream_uid" class="w-full" :min="0" placeholder="对方系统开放 UID" />
               </div>
               <div>
                 <label>同系统 Key</label>
-                <ElInput v-model="configForm.upstream_key" show-password />
+                <ElInput v-model="configForm.upstream_key" show-password placeholder="对方系统开放 Key" />
               </div>
             </div>
-            <div class="grid gap-4 md:grid-cols-3">
+            <div class="bt-config-grid">
               <div>
                 <label>补签单价</label>
-                <ElInputNumber v-model="configForm.buka_unit_price" class="w-full" :min="0.01" :precision="2" :step="0.01" />
+                <div class="bt-number-field">
+                  <ElInputNumber
+                    v-model="configForm.buka_unit_price"
+                    class="bt-number-input"
+                    controls-position="right"
+                    :min="0.01"
+                    :precision="2"
+                    :step="0.01"
+                  />
+                  <span>元/次</span>
+                </div>
               </div>
               <div>
                 <label>同步间隔</label>
-                <ElInputNumber v-model="configForm.sync_interval" class="w-full" :min="60" :step="30" />
+                <div class="bt-number-field">
+                  <ElInputNumber
+                    v-model="configForm.sync_interval"
+                    class="bt-number-input"
+                    controls-position="right"
+                    :min="60"
+                    :step="30"
+                  />
+                  <span>秒</span>
+                </div>
               </div>
-              <div>
+              <div class="bt-switch-field">
                 <label>自动同步</label>
-                <div class="flex h-8 items-center"><ElSwitch v-model="configForm.auto_sync" /></div>
+                <ElSwitch v-model="configForm.auto_sync" active-text="开启" inactive-text="关闭" inline-prompt />
               </div>
             </div>
-          </div>
-        </section>
-        <section class="rounded-custom-sm border-full-d bg-box p-4">
-          <h3 class="bt-section-title">平台价格</h3>
-          <ElTable :data="platforms" height="420" class="mt-4" border>
+          </section>
+        </ElTabPane>
+        <ElTabPane label="界面展示">
+          <section class="bt-config-panel">
+            <div class="grid gap-4 md:grid-cols-2">
+              <div>
+                <label>用户页面按钮</label>
+                <ElInput v-model="configForm.user_page_text" placeholder="用户页面" />
+              </div>
+              <div>
+                <label>公告刷新按钮</label>
+                <ElInput v-model="configForm.notice_refresh_text" placeholder="刷新公告" />
+              </div>
+            </div>
+            <div>
+              <label>用户页面地址</label>
+              <ElInput v-model="configForm.user_page_url" placeholder="https://phone.mmalbasa.net.eu.org/" />
+            </div>
+            <div>
+              <label>用户页面说明</label>
+              <ElInput
+                v-model="configForm.user_page_intro"
+                type="textarea"
+                :rows="3"
+                maxlength="200"
+                show-word-limit
+                placeholder="可发给用户进行图片上传、立即执行、开启暂停。"
+              />
+            </div>
+            <div class="bt-config-notice">
+              <div class="bt-config-notice-head">
+                <label>本地公告</label>
+                <ElSwitch v-model="configForm.notice_enabled" active-text="显示" inactive-text="隐藏" inline-prompt />
+              </div>
+              <ElInput
+                v-model="configForm.notice_content"
+                type="textarea"
+                :rows="4"
+                maxlength="1000"
+                show-word-limit
+                placeholder="填写后展示在订单列表上方，支持简单 HTML"
+              />
+            </div>
+          </section>
+        </ElTabPane>
+        <ElTabPane label="平台价格">
+          <section class="bt-config-panel">
+          <ElTable :data="platforms" height="460" border>
             <ElTableColumn prop="label" label="平台" min-width="150" />
             <ElTableColumn label="基础单价" width="180">
               <template #default="{ row }">
@@ -336,8 +411,9 @@
               </template>
             </ElTableColumn>
           </ElTable>
-        </section>
-      </div>
+          </section>
+        </ElTabPane>
+      </ElTabs>
       <template #footer>
         <ElButton @click="configVisible = false">取消</ElButton>
         <ElButton type="primary" :loading="configSaving" @click="saveConfig">保存配置</ElButton>
@@ -361,38 +437,52 @@
         </div>
         <div>
           <label>开始日期</label>
-          <ElDatePicker v-model="bukaForm.startDate" class="w-full" type="date" value-format="YYYY-MM-DD" :disabled-date="disableFutureDate" @change="loadBukaEstimate" />
+          <ElDatePicker v-model="bukaForm.startDate" class="w-full" type="date" value-format="YYYY-MM-DD" :disabled-date="disableFutureDate" @change="refreshBukaEstimate" />
         </div>
         <div>
           <label>结束日期</label>
-          <ElDatePicker v-model="bukaForm.endDate" class="w-full" type="date" value-format="YYYY-MM-DD" :disabled-date="disableInvalidBukaEndDate" @change="loadBukaEstimate" />
+          <ElDatePicker v-model="bukaForm.endDate" class="w-full" type="date" value-format="YYYY-MM-DD" :disabled-date="disableInvalidBukaEndDate" @change="refreshBukaEstimate" />
         </div>
       </div>
       <div v-if="bukaEstimate" class="bt-summary mt-4">
         <span>{{ bukaEstimate.units }} {{ bukaEstimate.unitLabel }}</span>
         <strong>{{ money(bukaEstimate.money) }}</strong>
       </div>
+      <div v-else class="bt-summary bt-summary-muted mt-4">
+        <span>选择日期后显示预计扣费</span>
+        <strong>{{ money(0) }}</strong>
+      </div>
       <template #footer>
         <ElButton @click="bukaVisible = false">取消</ElButton>
-        <ElButton :loading="bukaEstimating" @click="loadBukaEstimate">估算</ElButton>
+        <ElButton :loading="bukaEstimating" @click="() => loadBukaEstimate()">估算</ElButton>
         <ElButton type="primary" :loading="bukaSaving" @click="submitBuka">提交补签</ElButton>
       </template>
     </ElDialog>
 
-    <ElDialog v-model="textDialog.visible" :title="textDialog.title" width="760px">
-      <pre class="bt-json">{{ textDialog.content }}</pre>
+    <ElDialog v-model="detailDialog.visible" :title="detailDialog.title" width="760px">
+      <div class="bt-detail-grid">
+        <div v-for="item in detailDialog.items" :key="item.label" class="bt-detail-item">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </div>
+      </div>
+      <ElCollapse v-if="detailDialog.raw" class="mt-4">
+        <ElCollapseItem title="原始数据" name="raw">
+          <pre class="bt-json">{{ detailDialog.raw }}</pre>
+        </ElCollapseItem>
+      </ElCollapse>
     </ElDialog>
   </div>
 </template>
 
 <script setup lang="ts">
   import { computed, onMounted, reactive, ref } from 'vue'
+  import { Bell, Link, Plus, Refresh, Setting } from '@element-plus/icons-vue'
   import { ElMessage, ElMessageBox } from 'element-plus'
   import { useUserStore } from '@/store/modules/user'
   import {
     addBaitanDays,
     createBaitanOrder,
-    deleteBaitanOrder,
     editBaitanOrder,
     estimateBaitanBuka,
     fetchBaitanConfig,
@@ -402,16 +492,20 @@
     fetchBaitanPhoneInfo,
     fetchBaitanPlatforms,
     fetchBaitanSchools,
+    fetchBaitanUISettings,
     queryBaitanSourceOrder,
+    refundBaitanOrder,
     saveBaitanConfig,
     submitBaitanBuka,
     syncBaitanOrder,
     syncBaitanOrders,
     type BaitanBukaEstimate,
     type BaitanConfig,
+    type BaitanNotice,
     type BaitanOrder,
     type BaitanOrderForm,
-    type BaitanPlatform
+    type BaitanPlatform,
+    type BaitanUISettings
   } from '@/api/legacy/plugin-baitan'
 
   defineOptions({ name: 'BaitanIndexPage' })
@@ -433,6 +527,7 @@
   const syncLoading = ref(false)
   const schoolLoading = ref(false)
   const noticeLoading = ref(false)
+  const noticeHtml = ref('')
   const phoneInfoLoading = ref(false)
   const orderInfoLoading = ref(false)
   const configSaving = ref(false)
@@ -442,7 +537,7 @@
   const configVisible = ref(false)
   const bukaVisible = ref(false)
   const bukaEstimate = ref<BaitanBukaEstimate | null>(null)
-  const textDialog = reactive({ content: '', title: '', visible: false })
+  const detailDialog = reactive({ items: [] as Array<{ label: string; value: string }>, raw: '', title: '', visible: false })
   const pagination = reactive({ page: 1, limit: 20, total: 0 })
   const query = reactive({ keyword: '', search: '', status: '' })
 
@@ -501,17 +596,57 @@
     sname: '',
     km: '1'
   })
-  const defaultConfig = (): BaitanConfig => ({ upstream_protocol: 'source', upstream_url: '', upstream_uid: 0, upstream_key: '', token: '', platform_prices: {}, buka_unit_price: 0.1, auto_sync: true, sync_interval: 300, timeout: 30 })
+  const defaultConfig = (): BaitanConfig => ({
+    upstream_protocol: 'source',
+    upstream_url: '',
+    upstream_uid: 0,
+    upstream_key: '',
+    token: '',
+    platform_prices: {},
+    buka_unit_price: 0.1,
+    auto_sync: true,
+    sync_interval: 300,
+    timeout: 30,
+    user_page_url: 'https://phone.mmalbasa.net.eu.org/',
+    user_page_text: '用户页面',
+    user_page_intro: '可发给用户进行图片上传、立即执行、开启暂停。',
+    notice_refresh_text: '刷新公告',
+    notice_enabled: false,
+    notice_content: ''
+  })
   const orderForm = reactive<BaitanOrderForm>(defaultOrder())
   const configForm = reactive<BaitanConfig>(defaultConfig())
+  const uiSettings = reactive<BaitanUISettings>({
+    user_page_url: 'https://phone.mmalbasa.net.eu.org/',
+    user_page_text: '用户页面',
+    user_page_intro: '可发给用户进行图片上传、立即执行、开启暂停。',
+    notice_refresh_text: '刷新公告'
+  })
   const bukaForm = reactive({ userName: '', platformType: '', type: '4', startDate: '', endDate: '' })
   const currentPlatform = computed(() => platforms.value.find((item) => item.value === orderForm.type))
+  const upstreamUrlLabel = computed(() => configForm.upstream_protocol === 'same_system' ? '同系统站点地址' : '源台 API 地址')
+  const upstreamUrlPlaceholder = computed(() => {
+    if (configForm.upstream_protocol === 'same_system') return 'https://example.com'
+    return 'https://example.com/prod-api/api/v2'
+  })
   const estimatedAmount = computed(() => {
     if (orderForm.id || !orderForm.endDate) return 0
     return Number(((currentPlatform.value?.price || 0) * Number(orderForm.days || 0)).toFixed(2))
   })
+  const estimateHint = computed(() => {
+    if (orderForm.id) return '编辑订单不重新预估'
+    if (!orderForm.endDate) return '选择到期日期后计算'
+    return `按剩余天数计算：${Number(orderForm.days || 0)} 天 x ${money(currentPlatform.value?.price || 0)}/天`
+  })
 
   const loadPlatforms = async () => { platforms.value = (await fetchBaitanPlatforms()) || [] }
+  const loadUISettings = async () => {
+    try {
+      Object.assign(uiSettings, await fetchBaitanUISettings())
+    } catch {
+      // 使用默认界面文案
+    }
+  }
   const assignQuery = (value: Record<string, string>) => { Object.assign(query, value || {}) }
   const loadOrders = async (page = pagination.page) => {
     loading.value = true; pagination.page = page
@@ -519,7 +654,23 @@
   }
   const loadConfig = async () => { Object.assign(configForm, defaultConfig(), await fetchBaitanConfig()); for (const p of platforms.value) if (!configForm.platform_prices[p.value]) configForm.platform_prices[p.value] = 1 }
   const openConfig = async () => { await loadConfig(); configVisible.value = true }
-  const saveConfig = async () => { configSaving.value = true; try { await saveBaitanConfig({ ...configForm }); ElMessage.success('配置已保存'); configVisible.value = false; await loadPlatforms() } finally { configSaving.value = false } }
+  const saveConfig = async () => {
+    const message = validateConfigForm()
+    if (message) {
+      ElMessage.warning(message)
+      return
+    }
+    configSaving.value = true
+    try {
+      await saveBaitanConfig({ ...configForm })
+      ElMessage.success('配置已保存')
+      configVisible.value = false
+      await loadUISettings()
+      await loadPlatforms()
+    } finally {
+      configSaving.value = false
+    }
+  }
   const resetQuery = () => { query.keyword = ''; query.search = ''; query.status = ''; loadOrders(1) }
   const handleSizeChange = (size: number) => { pagination.limit = size; loadOrders(1) }
   const toggleListValue = (list: string[], value: string, order: string[]) => {
@@ -533,8 +684,13 @@
   const onPlatformChange = () => { schools.value = [] }
   const updateOrderDays = () => { orderForm.days = countOrderDays(orderForm.endDate) }
   const openOrderDrawer = async (row?: BaitanOrder) => {
+    if (row && isRefunded(row)) {
+      ElMessage.warning('订单已退款，不能继续操作')
+      return
+    }
     const base = row ? orderFromRow(row) : {}
     Object.assign(orderForm, defaultOrder(), base)
+    orderDrawer.value = true
     if (row) {
       orderInfoLoading.value = true
       try {
@@ -546,7 +702,6 @@
       }
     }
     if (currentPlatform.value?.dict_key) await loadSchools()
-    orderDrawer.value = true
   }
   const saveOrder = async () => {
     const message = validateOrderForm()
@@ -588,20 +743,104 @@
       phoneInfoLoading.value = false
     }
   }
-  const openNotice = async () => { noticeLoading.value = true; try { const res = await fetchBaitanNotice(); showJSON('公告', res) } finally { noticeLoading.value = false } }
-  const syncOne = async (row: BaitanOrder) => { await syncBaitanOrder(row.id); ElMessage.success('同步完成'); await loadOrders(pagination.page) }
+  const openNotice = async (notify = false) => {
+    noticeLoading.value = true
+    try {
+      const res = await fetchBaitanNotice()
+      const notice = normalizeNotice(res)
+      noticeHtml.value = notice.has_notice ? notice.content : ''
+      if (notify) ElMessage.success(noticeHtml.value ? '公告已更新' : '暂无公告')
+    } catch (error) {
+      if (notify) ElMessage.error('公告获取失败')
+    } finally {
+      noticeLoading.value = false
+    }
+  }
+  const openUserPage = async () => {
+    const url = String(uiSettings.user_page_url || '').trim()
+    if (!isValidHttpUrl(url)) {
+      ElMessage.warning('用户页面地址未配置或格式不正确')
+      return
+    }
+    try {
+      await ElMessageBox.confirm(
+        `${uiSettings.user_page_intro}\n\n${url}`,
+        uiSettings.user_page_text,
+        {
+          confirmButtonText: '打开页面',
+          cancelButtonText: '取消',
+          type: 'info'
+        }
+      )
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch {
+      // 用户取消
+    }
+  }
+  const syncOne = async (row: BaitanOrder) => {
+    if (isRefunded(row)) {
+      ElMessage.warning('订单已退款，不能继续操作')
+      return
+    }
+    await syncBaitanOrder(row.id); ElMessage.success('同步完成'); await loadOrders(pagination.page)
+  }
   const syncAll = async () => { syncLoading.value = true; try { const res = await syncBaitanOrders(100); ElMessage.success(`同步完成，更新 ${res.updated || 0} 条`); await loadOrders(pagination.page) } finally { syncLoading.value = false } }
   const handleCommand = async (row: BaitanOrder, cmd: string) => {
-    if (cmd === 'logs') return showJSON('订单日志', await fetchBaitanLogs(row.id))
-    if (cmd === 'source') return showJSON('源台信息', await queryBaitanSourceOrder(row.id))
+    if (isRefunded(row)) {
+      ElMessage.warning('订单已退款，不能继续操作')
+      return
+    }
+    if (cmd === 'logs') return showDetail('订单日志', await fetchBaitanLogs(row.id))
+    if (cmd === 'source') return showDetail('源台信息', await queryBaitanSourceOrder(row.id))
     if (cmd === 'addDays') { const { value } = await ElMessageBox.prompt('请输入增加天数', '增加天数', { inputValue: '1' }); await addBaitanDays(row.id, Number(value || 0)); ElMessage.success('增加成功'); return loadOrders(pagination.page) }
-    if (cmd === 'delete') { await ElMessageBox.confirm(`确定删除账号 ${row.userName} 并按剩余天数退款吗？`, '删除确认', { type: 'warning' }); await deleteBaitanOrder(row.id); ElMessage.success('删除成功'); return loadOrders(pagination.page) }
+    if (cmd === 'delete') { await ElMessageBox.confirm(`确定为账号 ${row.userName} 按剩余天数退款吗？订单记录会保留。`, '退款确认', { type: 'warning' }); await refundBaitanOrder(row.id); ElMessage.success('退款成功'); return loadOrders(pagination.page) }
     if (cmd === 'buka') { bukaForm.userName = row.userName; bukaForm.platformType = row.type; bukaForm.type = '4'; bukaForm.startDate = ''; bukaForm.endDate = ''; bukaEstimate.value = null; bukaVisible.value = true }
   }
-  const loadBukaEstimate = async () => { if (!bukaForm.startDate || !bukaForm.endDate) return; bukaEstimating.value = true; try { bukaEstimate.value = await estimateBaitanBuka({ ...bukaForm }) } finally { bukaEstimating.value = false } }
-  const submitBuka = async () => { bukaSaving.value = true; try { await submitBaitanBuka({ ...bukaForm }); ElMessage.success('补签已提交'); bukaVisible.value = false } finally { bukaSaving.value = false } }
+  const refreshBukaEstimate = async () => {
+    bukaEstimate.value = null
+    if (bukaForm.startDate && bukaForm.endDate) await loadBukaEstimate(false)
+  }
+  const loadBukaEstimate = async (notify = true) => {
+    const message = validateBukaForm()
+    if (message) {
+      bukaEstimate.value = null
+      if (notify) ElMessage.warning(message)
+      return
+    }
+    bukaEstimating.value = true
+    try { bukaEstimate.value = await estimateBaitanBuka({ ...bukaForm }) } finally { bukaEstimating.value = false }
+  }
+  const submitBuka = async () => {
+    const message = validateBukaForm()
+    if (message) {
+      ElMessage.warning(message)
+      return
+    }
+    if (!bukaEstimate.value) await loadBukaEstimate()
+    if (!bukaEstimate.value || Number(bukaEstimate.value.units || 0) <= 0) {
+      ElMessage.warning('补签日期范围无效')
+      return
+    }
+    await ElMessageBox.confirm(
+      `确认提交补签并扣除 ${money(bukaEstimate.value.money)}？`,
+      '补签确认',
+      { type: 'warning', confirmButtonText: '提交补签', cancelButtonText: '取消' }
+    )
+    bukaSaving.value = true
+    try { await submitBaitanBuka({ ...bukaForm }); ElMessage.success('补签已提交'); bukaVisible.value = false } finally { bukaSaving.value = false }
+  }
 
   const normalizeList = (res: any) => Array.isArray(res?.data) ? res.data : Array.isArray(res?.data?.list) ? res.data.list : Array.isArray(res?.list) ? res.list : Array.isArray(res) ? res : []
+  const normalizeNotice = (res: BaitanNotice | any): BaitanNotice => {
+    const data = res?.data ?? res
+    const content = sanitizeNoticeHtml(String(data?.content ?? data?.notice ?? data?.data ?? '').trim())
+    return { has_notice: Boolean(data?.has_notice ?? content), content, raw: data?.raw ?? data }
+  }
+  const sanitizeNoticeHtml = (raw: string) => raw
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/href\s*=\s*("|')\s*javascript:[\s\S]*?\1/gi, 'href="#"')
   const validateOrderForm = () => {
     const required: Array<[keyof BaitanOrderForm, string]> = [
       ['type', '请选择打卡平台'],
@@ -619,6 +858,24 @@
       updateOrderDays()
       if (Number(orderForm.days || 0) <= 0) return '下单天数必须大于0'
     }
+    return ''
+  }
+  const validateConfigForm = () => {
+    if (!String(configForm.upstream_url || '').trim()) return configForm.upstream_protocol === 'same_system' ? '请填写同系统站点地址' : '请填写源台 API 地址'
+    if (configForm.upstream_protocol === 'source' && !String(configForm.token || '').trim()) return '请填写源台 Token'
+    if (configForm.upstream_protocol === 'same_system') {
+      if (!Number(configForm.upstream_uid || 0)) return '请填写同系统 UID'
+      if (!String(configForm.upstream_key || '').trim()) return '请填写同系统 Key'
+    }
+    return ''
+  }
+  const validateBukaForm = () => {
+    if (!bukaForm.userName) return '补签账号不能为空'
+    if (!bukaForm.platformType) return '补签平台不能为空'
+    if (!bukaForm.type) return '请选择补签类型'
+    if (!bukaForm.startDate) return '请选择开始日期'
+    if (!bukaForm.endDate) return '请选择结束日期'
+    if (new Date(bukaForm.endDate).getTime() < new Date(bukaForm.startDate).getTime()) return '结束日期不能早于开始日期'
     return ''
   }
   const orderFromRow = (row: BaitanOrder): Partial<BaitanOrderForm> => ({ id: row.id, type: row.type, userName: row.userName, passWord: row.passWord, nikeName: row.nikeName, sid: row.sid, endDate: row.endDate, days: 1, weeks: normalizeStringList(row.weeks || row.week), report: normalizeStringList(row.reports || row.report), address: row.address, lon: row.lon, lat: row.lat, version: row.version, weekNum: row.weekNum || 6, monthNum: row.monthNum || 25 })
@@ -678,12 +935,48 @@
   const diffClass = (v: unknown) => Number(v || 0) > 0 ? 'text-danger' : Number(v || 0) < 0 ? 'text-success' : 'text-g-500'
   const statusLabel = (v: string) => ({ active: '正常', pending: '待处理', settled: '已结算', error: '异常', refunded: '已退款' })[String(v || '')] || v || '-'
   const statusType = (v: string) => ['active', 'settled'].includes(v) ? 'success' : ['error', 'refunded'].includes(v) ? 'danger' : 'info'
+  const isRefunded = (row: BaitanOrder) => row.status === 'refunded' || row.payment_status === 'refunded'
   const platformLabel = (v: string) => platforms.value.find((item) => item.value === v)?.label || v
   const formatWeeks = (v: any) => (Array.isArray(v) ? v : String(v || '').split(',')).filter(Boolean).map((x: string) => `周${weekOptions.find((i) => i.value === x)?.label || x}`).join('、') || '-'
   const formatReports = (v: any) => (Array.isArray(v) ? v : String(v || '').split(',')).filter(Boolean).map((x: string) => reportOptions.find((i) => i.value === x)?.label || x).join('、') || '-'
-  const showJSON = (title: string, data: any) => { textDialog.title = title; textDialog.content = typeof data === 'string' ? data : JSON.stringify(data, null, 2); textDialog.visible = true }
+  const isValidHttpUrl = (raw: string) => {
+    try {
+      const url = new URL(raw)
+      return url.protocol === 'http:' || url.protocol === 'https:'
+    } catch {
+      return false
+    }
+  }
+  const showDetail = (title: string, data: any) => {
+    const row = unwrapSourceRow(data)
+    detailDialog.title = title
+    detailDialog.items = buildDetailItems(row)
+    detailDialog.raw = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
+    detailDialog.visible = true
+  }
+  const buildDetailItems = (row: Record<string, any>) => {
+    const fields = [
+      ['状态', row.status || row.order_status || row.code],
+      ['消息', row.msg || row.message || row.error],
+      ['订单ID', row.id || row.order_id || row.sxdkId],
+      ['账号', row.userName || row.username || row.phone],
+      ['姓名', row.nikeName || row.name],
+      ['学校', row.sid || row.schoolName || row.school],
+      ['到期时间', row.endDate || row.end_time],
+      ['更新时间', row.updateTime || row.updated_at || row.time]
+    ]
+    const items = fields
+      .map(([label, value]) => ({ label: String(label), value: formatDetailValue(value) }))
+      .filter((item) => item.value && item.value !== '-')
+    return items.length ? items : [{ label: '结果', value: '已返回数据，详情见原始数据' }]
+  }
+  const formatDetailValue = (value: any) => {
+    if (value === undefined || value === null || value === '') return '-'
+    if (typeof value === 'object') return JSON.stringify(value)
+    return String(value)
+  }
 
-  onMounted(async () => { await loadPlatforms(); await loadOrders(1) })
+  onMounted(async () => { await Promise.all([loadPlatforms(), loadUISettings()]); await Promise.all([loadOrders(1), openNotice(false)]) })
 </script>
 
 <style scoped>
@@ -695,8 +988,12 @@
   .bt-cell span, .bt-money span { color: var(--el-text-color-secondary); font-size: 12px; }
   .bt-money { display: grid; gap: 2px; }
   .bt-money strong { color: var(--el-color-danger); }
+  .bt-muted-action { color: var(--el-text-color-secondary); font-size: 13px; }
+  .bt-notice { margin-top: 12px; border: 1px solid var(--el-color-warning-light-7); border-radius: 6px; background: var(--el-color-warning-light-9); padding: 10px 12px; color: var(--el-text-color-primary); font-size: 13px; line-height: 1.7; }
+  .bt-notice :deep(p) { margin: 0 0 6px; }
+  .bt-notice :deep(p:last-child) { margin-bottom: 0; }
+  .bt-notice :deep(a) { color: var(--el-color-primary); }
   .drawer-body label, .baitan-page label { display: block; margin-bottom: 8px; color: var(--el-text-color-primary); font-size: 14px; font-weight: 500; }
-  .bt-estimate { display: flex; height: 32px; align-items: center; color: var(--el-color-danger); font-weight: 700; }
   .bt-week-grid { display: grid; grid-template-columns: repeat(7, minmax(42px, 1fr)); gap: 8px; }
   .bt-report-grid { display: grid; grid-template-columns: repeat(3, minmax(78px, 1fr)); gap: 8px; }
   .bt-choice {
@@ -720,12 +1017,40 @@
   .bt-choice:focus-visible { outline: 2px solid var(--el-color-primary-light-5); outline-offset: 2px; }
   .bt-report-choice { min-height: 38px; }
   .bt-section-title { margin: 0; color: var(--el-text-color-primary); font-size: 15px; font-weight: 700; }
+  .bt-config-grid { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) minmax(120px, auto); gap: 16px; align-items: end; }
+  .bt-config-panel { display: grid; gap: 16px; padding: 4px 0 0; }
+  .bt-number-field { display: flex; align-items: center; gap: 8px; }
+  .bt-number-field span { flex: none; color: var(--el-text-color-secondary); font-size: 13px; }
+  .bt-number-input { width: 148px; }
+  .bt-switch-field { min-width: 120px; }
+  .bt-switch-field label { margin-bottom: 10px; }
+  .bt-config-notice { margin-top: 16px; }
+  .bt-config-notice-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .bt-config-notice-head label { margin-bottom: 0; }
   .bt-summary { display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--art-border-color); border-radius: 6px; padding: 12px 14px; }
   .bt-summary strong { color: var(--el-color-danger); }
+  .bt-summary-muted { color: var(--el-text-color-secondary); }
+  .bt-summary-muted strong { color: var(--el-text-color-secondary); }
+  .bt-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .bt-detail-item { display: grid; gap: 4px; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; padding: 10px 12px; }
+  .bt-detail-item span { color: var(--el-text-color-secondary); font-size: 12px; }
+  .bt-detail-item strong { min-width: 0; overflow-wrap: anywhere; color: var(--el-text-color-primary); font-size: 13px; font-weight: 600; }
+  .bt-drawer-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; }
+  .bt-footer-estimate { display: flex; min-width: 0; align-items: baseline; gap: 8px; color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.5; }
+  .bt-footer-estimate strong { flex: none; color: var(--el-color-danger); font-size: 15px; }
+  .bt-footer-estimate em { min-width: 0; overflow: hidden; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+  .bt-footer-actions { display: flex; flex: none; gap: 8px; }
   .bt-json { max-height: 60vh; overflow: auto; margin: 0; border: 1px solid var(--art-border-color); border-radius: 6px; background: var(--art-main-bg-color); padding: 14px; color: var(--el-text-color-regular); font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
   @media (max-width: 640px) {
+    .bt-config-grid { grid-template-columns: 1fr; align-items: stretch; }
+    .bt-detail-grid { grid-template-columns: 1fr; }
+    .bt-number-input { width: 100%; }
     .bt-week-grid { grid-template-columns: repeat(4, minmax(54px, 1fr)); }
     .bt-report-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .bt-drawer-footer { align-items: stretch; flex-direction: column; }
+    .bt-footer-estimate { display: grid; justify-items: start; gap: 2px; }
+    .bt-footer-estimate em { white-space: normal; }
+    .bt-footer-actions { justify-content: flex-end; }
   }
   :global(.baitan-drawer .el-drawer__header) { margin-bottom: 0; padding: 18px 20px; border-bottom: 1px solid var(--el-border-color-lighter); }
   :global(.baitan-drawer .el-drawer__body) { padding: 16px; background: var(--art-main-bg-color); }

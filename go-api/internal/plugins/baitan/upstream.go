@@ -70,13 +70,6 @@ func (s *Service) upstreamLogs(ctx context.Context, cfg Config, order Order) (ma
 	return s.source(ctx, cfg, "getLog", payload)
 }
 
-func (s *Service) upstreamNotice(ctx context.Context, cfg Config) (map[string]any, error) {
-	if cfg.UpstreamProtocol == UpstreamProtocolSameSystem {
-		return s.sameSystem(ctx, cfg, http.MethodGet, "/api/v1/open/baitan/notice", nil)
-	}
-	return s.source(ctx, cfg, "getNotice", map[string]any{})
-}
-
 func (s *Service) upstreamSchools(ctx context.Context, cfg Config, dictKey string) (map[string]any, error) {
 	if cfg.UpstreamProtocol == UpstreamProtocolSameSystem {
 		return s.sameSystem(ctx, cfg, http.MethodGet, "/api/v1/open/baitan/schools", map[string]any{"dictKey": dictKey})
