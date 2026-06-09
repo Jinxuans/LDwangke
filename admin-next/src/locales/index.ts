@@ -23,6 +23,7 @@
 
 import { createI18n } from 'vue-i18n'
 import type { I18n, I18nOptions } from 'vue-i18n'
+import { watch } from 'vue'
 import { LanguageEnum } from '@/enums/appEnum'
 import { getSystemStorage } from '@/utils/storage'
 import { StorageKeyManager } from '@/utils/storage/storage-key-manager'
@@ -61,7 +62,7 @@ const getDefaultLanguage = (): LanguageEnum => {
   // 尝试从版本化的存储中获取语言设置
   try {
     const storageKey = storageKeyManager.getStorageKey('user')
-    const userStore = localStorage.getItem(storageKey)
+    const userStore = sessionStorage.getItem(storageKey) ?? localStorage.getItem(storageKey)
 
     if (userStore) {
       const { language } = JSON.parse(userStore)
@@ -106,6 +107,18 @@ const i18nOptions: I18nOptions = {
  * i18n 实例
  */
 const i18n: I18n = createI18n(i18nOptions)
+
+const setHtmlLang = (lang: unknown) => {
+  if (typeof document === 'undefined') return
+  document.documentElement.lang = lang === LanguageEnum.EN ? 'en' : 'zh-CN'
+}
+
+const localeRef = i18n.global.locale
+if (typeof localeRef === 'object' && 'value' in localeRef) {
+  watch(localeRef, setHtmlLang, { immediate: true })
+} else {
+  setHtmlLang(localeRef)
+}
 
 /**
  * 翻译函数类型

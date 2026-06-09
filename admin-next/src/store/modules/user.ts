@@ -42,6 +42,35 @@ import { setPageTitle } from '@/utils/router'
 import { resetRouterState } from '@/router/guards/beforeEach'
 import { useMenuStore } from './menu'
 import { StorageConfig } from '@/utils/storage/storage-config'
+import { StorageKeyManager } from '@/utils/storage/storage-key-manager'
+
+const storageKeyManager = new StorageKeyManager()
+
+const shouldKeepUserSession = (serializedState: string): boolean => {
+  try {
+    const state = JSON.parse(serializedState) as { staySignedIn?: boolean }
+    return state.staySignedIn !== false
+  } catch {
+    return true
+  }
+}
+
+const userPersistStorage = {
+  getItem(key: string) {
+    return sessionStorage.getItem(key) ?? localStorage.getItem(key)
+  },
+  setItem(key: string, value: string) {
+    const targetStorage = shouldKeepUserSession(value) ? localStorage : sessionStorage
+    const staleStorage = targetStorage === localStorage ? sessionStorage : localStorage
+
+    staleStorage.removeItem(key)
+    targetStorage.setItem(key, value)
+  },
+  removeItem(key: string) {
+    localStorage.removeItem(key)
+    sessionStorage.removeItem(key)
+  }
+}
 
 /**
  * 用户状态管理
@@ -54,6 +83,8 @@ export const useUserStore = defineStore(
     const language = ref(LanguageEnum.ZH)
     // 登录状态
     const isLogin = ref(false)
+    // 是否在浏览器会话结束后继续保留登录状态
+    const staySignedIn = ref(true)
     // 锁屏状态
     const isLock = ref(false)
     // 锁屏密码
@@ -88,6 +119,14 @@ export const useUserStore = defineStore(
      */
     const setLoginStatus = (status: boolean) => {
       isLogin.value = status
+    }
+
+    /**
+     * 设置是否保持登录
+     * @param status 保持登录状态
+     */
+    const setStaySignedIn = (status: boolean) => {
+      staySignedIn.value = status
     }
 
     /**
@@ -151,6 +190,8 @@ export const useUserStore = defineStore(
       info.value = {}
       // 重置登录状态
       isLogin.value = false
+      // 重置保持登录状态
+      staySignedIn.value = true
       // 重置锁屏状态
       isLock.value = false
       // 清空锁屏密码
@@ -168,7 +209,7 @@ export const useUserStore = defineStore(
       resetRouterState(500)
       // 跳转到登录页，携带当前路由作为 redirect 参数
       const currentRoute = router.currentRoute.value
-      const redirect = currentRoute.path !== '/login' ? currentRoute.fullPath : undefined
+      const redirect = currentRoute.name !== 'Login' ? currentRoute.fullPath : undefined
       router.push({
         name: 'Login',
         query: redirect ? { redirect } : undefined
@@ -206,6 +247,7 @@ export const useUserStore = defineStore(
     return {
       language,
       isLogin,
+      staySignedIn,
       isLock,
       lockPassword,
       info,
@@ -217,6 +259,7 @@ export const useUserStore = defineStore(
       getWorktabState,
       setUserInfo,
       setLoginStatus,
+      setStaySignedIn,
       setLanguage,
       setSearchHistory,
       setLockStatus,
@@ -228,8 +271,8 @@ export const useUserStore = defineStore(
   },
   {
     persist: {
-      key: 'user',
-      storage: localStorage
+      key: storageKeyManager.getStorageKey('user'),
+      storage: userPersistStorage
     }
   }
 )

@@ -5,13 +5,20 @@
   >
     <div class="flex-cc !hidden max-[1180px]:!flex ml-2 max-sm:ml-6">
       <ArtLogo class="icon" size="46" />
-      <h1 class="text-xl ont-mediumf ml-2">{{ systemName }}</h1>
+      <h1 class="text-xl font-medium ml-2">{{ systemName }}</h1>
     </div>
 
     <div class="flex-cc gap-1.5 mr-2 max-sm:mr-5">
-      <div class="color-picker-expandable relative flex-c max-sm:!hidden">
+      <div
+        class="color-picker-expandable relative flex-c max-sm:!hidden"
+        @mouseenter="isColorPickerOpen = true"
+        @mouseleave="isColorPickerOpen = false"
+        @focusin="isColorPickerOpen = true"
+        @focusout="handleColorPickerFocusOut"
+      >
         <div
           class="color-dots absolute right-0 rounded-full flex-c gap-2 rounded-5 px-2.5 py-2 pr-9 pl-2.5 opacity-0"
+          :aria-hidden="!isColorPickerOpen"
         >
           <div
             v-for="(color, index) in mainColors"
@@ -19,12 +26,25 @@
             class="color-dot relative size-5 c-p flex-cc rounded-full opacity-0"
             :class="{ active: color === systemThemeColor }"
             :style="{ background: color, '--index': index }"
+            role="button"
+            :tabindex="isColorPickerOpen ? 0 : -1"
+            :aria-hidden="!isColorPickerOpen"
+            :aria-label="`${$t('common.changeThemeColor')} ${color}`"
+            :title="`${$t('common.changeThemeColor')} ${color}`"
             @click="changeThemeColor(color)"
+            @keydown.enter.prevent="changeThemeColor(color)"
+            @keydown.space.prevent="changeThemeColor(color)"
           >
             <ArtSvgIcon v-if="color === systemThemeColor" icon="ri:check-fill" class="text-white" />
           </div>
         </div>
-        <div class="btn palette-btn relative z-[2] h-8 w-8 c-p flex-cc tad-300">
+        <div
+          class="btn palette-btn relative z-[2] h-8 w-8 c-p flex-cc tad-300"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('common.changeThemeColor')"
+          :title="$t('common.changeThemeColor')"
+        >
           <ArtSvgIcon
             icon="ri:palette-line"
             class="text-xl text-g-800 transition-colors duration-300"
@@ -36,7 +56,11 @@
         @command="changeLanguage"
         popper-class="langDropDownStyle"
       >
-        <div class="btn language-btn h-8 w-8 c-p flex-cc tad-300">
+        <div
+          class="btn language-btn h-8 w-8 c-p flex-cc tad-300"
+          :aria-label="$t('common.changeLanguage')"
+          :title="$t('common.changeLanguage')"
+        >
           <ArtSvgIcon
             icon="ri:translate-2"
             class="text-[19px] text-g-800 transition-colors duration-300"
@@ -59,7 +83,13 @@
       <div
         v-if="shouldShowThemeToggle"
         class="btn theme-btn h-8 w-8 c-p flex-cc tad-300"
+        role="button"
+        tabindex="0"
+        :aria-label="$t('common.toggleTheme')"
+        :title="$t('common.toggleTheme')"
         @click="themeAnimation"
+        @keydown.enter.prevent="themeAnimation"
+        @keydown.space.prevent="themeAnimation"
       >
         <ArtSvgIcon
           :icon="isDark ? 'ri:sun-fill' : 'ri:moon-line'"
@@ -93,6 +123,7 @@
 
   const mainColors = AppConfig.systemMainColor
   const color = systemThemeColor // css v-bind 使用
+  const isColorPickerOpen = ref(false)
 
   const changeLanguage = (lang: LanguageEnum) => {
     if (locale.value === lang) return
@@ -104,6 +135,15 @@
     if (systemThemeColor.value === color) return
     settingStore.setElementTheme(color)
     settingStore.reload()
+  }
+
+  const handleColorPickerFocusOut = (event: FocusEvent) => {
+    const currentTarget = event.currentTarget as HTMLElement | null
+    const relatedTarget = event.relatedTarget as Node | null
+
+    if (!currentTarget?.contains(relatedTarget)) {
+      isColorPickerOpen.value = false
+    }
   }
 </script>
 
@@ -130,13 +170,15 @@
     transform: translateX(0) scale(1.1);
   }
 
-  .color-picker-expandable:hover .color-dots {
+  .color-picker-expandable:hover .color-dots,
+  .color-picker-expandable:focus-within .color-dots {
     pointer-events: auto;
     opacity: 1;
     transform: translateX(0);
   }
 
-  .color-picker-expandable:hover .color-dot {
+  .color-picker-expandable:hover .color-dot,
+  .color-picker-expandable:focus-within .color-dot {
     opacity: 1;
     transform: translateX(0) scale(1);
   }
@@ -146,7 +188,8 @@
     box-shadow: none;
   }
 
-  .color-picker-expandable:hover .palette-btn :deep(.art-svg-icon) {
+  .color-picker-expandable:hover .palette-btn :deep(.art-svg-icon),
+  .color-picker-expandable:focus-within .palette-btn :deep(.art-svg-icon) {
     color: v-bind(color);
   }
 </style>

@@ -11,8 +11,8 @@
     </div>
 
     <div class="text-wrap">
-      <h1> {{ $t('login.leftView.title') }} </h1>
-      <p> {{ $t('login.leftView.subTitle') }} </p>
+      <h2> {{ $t('login.leftView.title') }} </h2>
+      <p v-if="$t('login.leftView.subTitle')"> {{ $t('login.leftView.subTitle') }} </p>
     </div>
 
     <!-- 几何装饰元素 -->
@@ -135,7 +135,7 @@
       text-align: center;
       animation: slideInLeft 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 
-      h1 {
+      h2 {
         font-size: 24px;
         font-weight: 400;
         color: var(--art-gray-900) !important;

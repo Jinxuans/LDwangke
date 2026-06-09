@@ -32,8 +32,18 @@
       :class="{ goFirst: isOk }"
       @mousedown="dragStart"
       @touchstart="dragStart"
+      @keydown.enter.prevent="passVerify"
+      @keydown.space.prevent="passVerify"
+      @keydown.right.prevent="passVerify"
       ref="handler"
       :style="handlerStyle"
+      role="slider"
+      tabindex="0"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      :aria-valuenow="value ? 100 : 0"
+      :aria-valuetext="message"
+      :aria-label="message"
     >
       <ArtSvgIcon :icon="value ? successIcon : handlerIcon" class="text-g-600"></ArtSvgIcon>
     </div>
@@ -298,6 +308,7 @@
    * 验证通过处理函数
    */
   const passVerify = () => {
+    if (props.value) return
     emit('update:value', true)
     state.isMoving = false
     // 更新样式为成功状态
@@ -349,6 +360,11 @@
       align-items: center;
       justify-content: center;
       cursor: move;
+
+      &:focus-visible {
+        outline: 2px solid var(--el-color-primary);
+        outline-offset: -2px;
+      }
 
       i {
         padding-left: 0;

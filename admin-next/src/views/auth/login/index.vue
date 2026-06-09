@@ -8,7 +8,7 @@
 
       <div class="auth-right-wrap">
         <div class="form">
-          <h3 class="title">{{ $t('login.title') }}</h3>
+          <h2 class="title">{{ $t('login.title') }}</h2>
           <p class="sub-title">{{ $t('login.subTitle') }}</p>
           <ElForm
             ref="formRef"
@@ -54,7 +54,7 @@
                 />
               </div>
               <p
-                class="absolute top-0 z-[1] px-px mt-2 text-xs text-[var(--el-color-danger)] tad-300"
+                class="slider-error absolute top-0 z-[1] px-px mt-2 text-xs tad-300"
                 :class="{ 'translate-y-10': !isPassing && isClickPass }"
               >
                 {{ $t('login.placeholder.slider') }}
@@ -62,17 +62,17 @@
             </div>
 
             <div class="flex-cb mt-2 text-sm">
-              <ElCheckbox v-model="formData.rememberPassword">{{
+              <ElCheckbox v-model="formData.staySignedIn">{{
                 $t('login.rememberPwd')
               }}</ElCheckbox>
-              <RouterLink class="text-theme" :to="{ name: 'ForgetPassword' }">{{
+              <RouterLink class="auth-link" :to="{ name: 'ForgetPassword' }">{{
                 $t('login.forgetPwd')
               }}</RouterLink>
             </div>
 
             <div style="margin-top: 30px">
               <ElButton
-                class="w-full custom-height"
+                class="w-full custom-height login-submit"
                 type="primary"
                 @click="handleSubmit"
                 :loading="loading"
@@ -82,9 +82,9 @@
               </ElButton>
             </div>
 
-            <div class="mt-5 text-sm text-gray-600">
+            <div class="mt-5 text-sm text-g-700">
               <span>{{ $t('login.noAccount') }}</span>
-              <RouterLink class="text-theme" :to="{ name: 'Register' }">{{
+              <RouterLink class="auth-link auth-inline-link" :to="{ name: 'Register' }">{{
                 $t('login.register')
               }}</RouterLink>
             </div>
@@ -137,7 +137,7 @@
   const formData = reactive({
     username: '',
     password: '',
-    rememberPassword: true
+    staySignedIn: true
   })
 
   const rules = computed<FormRules>(() => ({
@@ -219,6 +219,7 @@
       }
 
       // 存储 token 和登录状态
+      userStore.setStaySignedIn(formData.staySignedIn)
       userStore.setToken(result.accessToken, result.refreshToken)
       userStore.setLoginStatus(true)
 
@@ -269,5 +270,27 @@
 <style lang="scss" scoped>
   :deep(.el-select__wrapper) {
     height: 40px !important;
+  }
+
+  :deep(.login-submit.el-button--primary) {
+    --el-button-bg-color: var(--auth-accent);
+    --el-button-border-color: var(--auth-accent);
+    --el-button-hover-bg-color: var(--auth-accent-hover);
+    --el-button-hover-border-color: var(--auth-accent-hover);
+    --el-button-active-bg-color: var(--auth-accent-active);
+    --el-button-active-border-color: var(--auth-accent-active);
+  }
+
+  :deep(.el-checkbox__input.is-checked + .el-checkbox__label) {
+    color: var(--auth-link);
+  }
+
+  :deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+    background-color: var(--auth-accent);
+    border-color: var(--auth-accent);
+  }
+
+  :deep(.el-form-item__error) {
+    color: var(--auth-danger);
   }
 </style>

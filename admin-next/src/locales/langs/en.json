@@ -36,7 +36,10 @@
     "tips": "Prompt",
     "cancel": "Cancel",
     "confirm": "Confirm",
-    "logOutTips": "Do you want to log out?"
+    "logOutTips": "Do you want to log out?",
+    "changeLanguage": "Change language",
+    "changeThemeColor": "Change theme color",
+    "toggleTheme": "Toggle color scheme"
   },
   "search": {
     "placeholder": "Search page",
@@ -150,8 +153,8 @@
   },
   "login": {
     "leftView": {
-      "title": "A backend system of beauty and efficiency",
-      "subTitle": "A sleek and practical interface for a great user experience"
+      "title": "Taixue Course Operations",
+      "subTitle": ""
     },
     "title": "Welcome back",
     "subTitle": "Please enter your account and password to login",
@@ -167,7 +170,7 @@
     },
     "sliderText": "Please slide to verify",
     "sliderSuccessText": "Verification successful",
-    "rememberPwd": "Remember password",
+    "rememberPwd": "Stay signed in",
     "forgetPwd": "Forgot password",
     "btnText": "Login",
     "noAccount": "No account yet?",
