@@ -1,4 +1,7 @@
 import request from '@/utils/http'
+import type { BaseResponse } from '@/types'
+
+type LegacyMessageResponse = BaseResponse<undefined>
 
 export interface LegacyAgentListItem {
   uuid: number
@@ -45,9 +48,10 @@ export function createLegacyAgent(params: {
   gradeId: number
   type?: number
 }) {
-  return request.post<Record<string, any>>({
+  return request.post<LegacyMessageResponse>({
     url: '/agent/create',
-    params
+    params,
+    rawResponse: true
   })
 }
 
@@ -66,9 +70,10 @@ export function deductLegacyAgent(uid: number, money: number) {
 }
 
 export function changeLegacyAgentGrade(uid: number, gradeId: number, type = 0) {
-  return request.post<Record<string, any>>({
+  return request.post<LegacyMessageResponse>({
     url: '/agent/change-grade',
-    params: { uid, gradeId, type }
+    params: { uid, gradeId, type },
+    rawResponse: true
   })
 }
 
@@ -80,9 +85,10 @@ export function changeLegacyAgentStatus(uid: number, active: number) {
 }
 
 export function resetLegacyAgentPassword(uid: number) {
-  return request.post<Record<string, any>>({
+  return request.post<LegacyMessageResponse>({
     url: '/agent/reset-password',
-    params: { uid }
+    params: { uid },
+    rawResponse: true
   })
 }
 

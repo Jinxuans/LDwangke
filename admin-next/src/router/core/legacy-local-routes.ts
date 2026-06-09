@@ -44,9 +44,7 @@ function group(
 }
 
 export const localLegacyRoutes: LegacyRouteRecord[] = [
-  group('Dashboard', '/dashboard', '首页', 'lucide:layout-dashboard', '/dashboard/console', [
-    leaf('Home', '/dashboard/console', '仪表盘', 'lucide:area-chart')
-  ]),
+  leaf('Home', '/dashboard/console', '仪表盘', 'lucide:layout-dashboard'),
   group('Order', '/order', '网课订单', 'mdi:book-education-outline', '/order/list', [
     leaf('OrderAdd', '/order/add', '查课交单', 'mdi:file-search-outline'),
     leaf('OrderMobileAdd', '/order/mobile-add', '手机下单', 'lucide:smartphone'),
