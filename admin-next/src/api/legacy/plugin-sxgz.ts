@@ -185,10 +185,10 @@ export function fetchLegacySXGZCompanies(params?: { search?: string }) {
   })
 }
 
-export function refreshLegacySXGZCompanies() {
+export function refreshLegacySXGZCompanies(data?: LegacySXGZConfig) {
   return request.post<LegacySXGZCompany[]>({
     url: '/sxgz/companies/refresh',
-    params: {}
+    data: data || {}
   })
 }
 

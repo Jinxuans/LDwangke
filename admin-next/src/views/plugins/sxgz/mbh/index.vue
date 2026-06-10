@@ -2258,9 +2258,23 @@
   const handleRefreshCompanies = async () => {
     refreshCompanyLoading.value = true
     try {
-      await refreshLegacySXGZCompanies()
-      await loadCompanies({ quote: false })
-      ElMessage.success('上游公司已刷新')
+      await saveLegacySXGZConfig({
+        ...configForm,
+        delivery_options: cloneConfigValue(configForm.delivery_options),
+        print_options: cloneConfigValue(configForm.print_options),
+        print_pricing: { ...configForm.print_pricing }
+      })
+      const refreshed = await refreshLegacySXGZCompanies({
+        ...configForm,
+        delivery_options: cloneConfigValue(configForm.delivery_options),
+        print_options: cloneConfigValue(configForm.print_options),
+        print_pricing: { ...configForm.print_pricing }
+      })
+      companies.value = Array.isArray(refreshed) ? refreshed : []
+      const licenseList = await fetchLegacySXGZLicenseCompanies()
+      licenseCompanies.value = Array.isArray(licenseList) ? licenseList : companies.value
+      await refreshQuote()
+      ElMessage.success('配置已保存，上游公司已刷新')
     } finally {
       refreshCompanyLoading.value = false
     }
