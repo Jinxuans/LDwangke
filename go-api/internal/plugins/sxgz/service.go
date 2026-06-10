@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -169,10 +170,22 @@ func (s *SxgzService) saveConfig(cfg SxgzConfig) error {
 	if err != nil {
 		return err
 	}
-	_, err = database.DB.Exec(
-		"INSERT INTO qingka_wangke_config (v, k) VALUES (?, ?) ON DUPLICATE KEY UPDATE k = VALUES(k)",
-		"sxgz_config", raw,
-	)
+	result, err := database.DB.Exec("UPDATE qingka_wangke_config SET k = ? WHERE v = ?", raw, "sxgz_config")
+	if err != nil {
+		return err
+	}
+	affected, _ := result.RowsAffected()
+	if affected > 0 {
+		return nil
+	}
+	var count int
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_config WHERE v = ?", "sxgz_config").Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	_, err = database.DB.Exec("INSERT INTO qingka_wangke_config (v, k) VALUES (?, ?)", "sxgz_config", raw)
 	return err
 }
 
@@ -190,7 +203,7 @@ func (s *SxgzService) getUserRate(uid int) (float64, error) {
 func (s *SxgzService) getCompanyByID(companyID int, allowRefresh bool) (*SxgzCompany, error) {
 	var company SxgzCompany
 	err := database.DB.QueryRow(
-		"SELECT cid, name, COALESCE(price, 0), COALESCE(license_price, 0), COALESCE(content, ''), COALESCE(status, 0), COALESCE(raw_json, ''), DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), COALESCE(source, 'upstream') FROM fd_sxgz_company_cache WHERE cid = ? LIMIT 1",
+		"SELECT cid, name, COALESCE(price, 0), COALESCE(license_price, 0), COALESCE(content, ''), COALESCE(status, 0), COALESCE(raw_json, ''), DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), COALESCE(source, 'upstream') FROM fd_sxgz_company_cache WHERE cid = ? ORDER BY updated_at DESC LIMIT 1",
 		companyID,
 	).Scan(&company.CID, &company.Name, &company.Price, &company.LicensePrice, &company.Content, &company.Status, &company.RawJSON, &company.UpdatedAt, &company.Source)
 	if err == nil {
@@ -217,7 +230,7 @@ func (s *SxgzService) listCompanies(search string, onlyLicense bool) ([]SxgzComp
 	}
 
 	rows, err := database.DB.Query(
-		"SELECT cid, name, COALESCE(price,0), COALESCE(license_price,0), COALESCE(content,''), COALESCE(status,0), COALESCE(raw_json,''), DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), COALESCE(source,'upstream') FROM fd_sxgz_company_cache WHERE "+where+" ORDER BY status DESC, cid ASC",
+		"SELECT cid, name, COALESCE(price,0), COALESCE(license_price,0), COALESCE(content,''), COALESCE(status,0), COALESCE(raw_json,''), DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), COALESCE(source,'upstream') FROM fd_sxgz_company_cache WHERE "+where+" ORDER BY cid ASC, updated_at DESC",
 		args...,
 	)
 	if err != nil {
@@ -226,13 +239,24 @@ func (s *SxgzService) listCompanies(search string, onlyLicense bool) ([]SxgzComp
 	defer rows.Close()
 
 	out := make([]SxgzCompany, 0)
+	seen := map[int]struct{}{}
 	for rows.Next() {
 		var c SxgzCompany
 		if err := rows.Scan(&c.CID, &c.Name, &c.Price, &c.LicensePrice, &c.Content, &c.Status, &c.RawJSON, &c.UpdatedAt, &c.Source); err != nil {
 			continue
 		}
+		if _, ok := seen[c.CID]; ok {
+			continue
+		}
+		seen[c.CID] = struct{}{}
 		out = append(out, c)
 	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Status != out[j].Status {
+			return out[i].Status > out[j].Status
+		}
+		return out[i].CID < out[j].CID
+	})
 	if out == nil {
 		out = []SxgzCompany{}
 	}
@@ -240,27 +264,78 @@ func (s *SxgzService) listCompanies(search string, onlyLicense bool) ([]SxgzComp
 }
 
 func (s *SxgzService) upsertCompanies(companies []SxgzCompany) error {
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := deleteStaleUpstreamCompanies(tx, companies); err != nil {
+		return err
+	}
+
 	for _, company := range companies {
-		raw, _ := json.Marshal(company)
-		_, err := database.DB.Exec(
+		raw := company.RawJSON
+		if len(raw) == 0 {
+			raw, _ = json.Marshal(company)
+		}
+		result, err := tx.Exec(
+			`UPDATE fd_sxgz_company_cache
+			 SET name = ?, price = ?, license_price = ?, content = ?, status = ?, raw_json = ?, source = ?, updated_at = NOW()
+			 WHERE cid = ?`,
+			company.Name, company.Price, company.LicensePrice, company.Content, company.Status, string(raw), company.Source, company.CID,
+		)
+		if err != nil {
+			return err
+		}
+		affected, _ := result.RowsAffected()
+		if affected > 0 {
+			continue
+		}
+		var exists int
+		if err := tx.QueryRow("SELECT COUNT(*) FROM fd_sxgz_company_cache WHERE cid = ?", company.CID).Scan(&exists); err != nil {
+			return err
+		}
+		if exists > 0 {
+			continue
+		}
+		_, err = tx.Exec(
 			`INSERT INTO fd_sxgz_company_cache (cid, name, price, license_price, content, status, raw_json, source, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-			 ON DUPLICATE KEY UPDATE
-			   name = VALUES(name),
-			   price = VALUES(price),
-			   license_price = VALUES(license_price),
-			   content = VALUES(content),
-			   status = VALUES(status),
-			   raw_json = VALUES(raw_json),
-			   source = VALUES(source),
-			   updated_at = VALUES(updated_at)`,
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
 			company.CID, company.Name, company.Price, company.LicensePrice, company.Content, company.Status, string(raw), company.Source,
 		)
 		if err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
+}
+
+func deleteStaleUpstreamCompanies(tx *sql.Tx, companies []SxgzCompany) error {
+	seen := make(map[int]struct{}, len(companies))
+	args := make([]any, 0, len(companies))
+	for _, company := range companies {
+		if company.CID <= 0 {
+			continue
+		}
+		if _, ok := seen[company.CID]; ok {
+			continue
+		}
+		seen[company.CID] = struct{}{}
+		args = append(args, company.CID)
+	}
+	if len(args) == 0 {
+		return nil
+	}
+
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(args)), ",")
+	_, err := tx.Exec(
+		`DELETE FROM fd_sxgz_company_cache
+		 WHERE (source IS NULL OR source = '' OR source = 'upstream')
+		   AND cid NOT IN (`+placeholders+`)`,
+		args...,
+	)
+	return err
 }
 
 func applyConfigMultiplierToCompanies(companies []SxgzCompany, multiplier float64) []SxgzCompany {
@@ -291,13 +366,21 @@ func (s *SxgzService) applyUserRateToCompanies(uid int, companies []SxgzCompany)
 }
 
 func (s *SxgzService) RefreshCompanies(ctx context.Context) ([]SxgzCompany, error) {
-	sxgzCompaniesRefreshMu.Lock()
-	defer sxgzCompaniesRefreshMu.Unlock()
-
 	cfg, err := s.loadConfig()
 	if err != nil {
 		return nil, err
 	}
+	return s.refreshCompanies(ctx, cfg)
+}
+
+func (s *SxgzService) RefreshCompaniesWithConfig(ctx context.Context, cfg SxgzConfig) ([]SxgzCompany, error) {
+	return s.refreshCompanies(ctx, normalizeSxgzConfig(cfg))
+}
+
+func (s *SxgzService) refreshCompanies(ctx context.Context, cfg SxgzConfig) ([]SxgzCompany, error) {
+	sxgzCompaniesRefreshMu.Lock()
+	defer sxgzCompaniesRefreshMu.Unlock()
+
 	if !cfg.UpstreamEnabled() {
 		return nil, fmt.Errorf("upstream is not configured")
 	}
@@ -494,6 +577,9 @@ func decodeCompaniesSlice(items []any) []SxgzCompany {
 			Content:      asString(row["content"]),
 			Status:       asInt(row["status"]),
 			Source:       asString(row["source"]),
+		}
+		if raw, err := json.Marshal(row); err == nil {
+			company.RawJSON = raw
 		}
 		out = append(out, company)
 	}

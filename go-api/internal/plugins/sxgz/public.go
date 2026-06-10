@@ -107,12 +107,41 @@ func RefreshCompanies(c *gin.Context) {
 	if !requireAdmin(c) {
 		return
 	}
-	list, err := Sxgz().RefreshCompanies(c.Request.Context())
+	var refreshCfg *SxgzConfig
+	if c.Request.ContentLength != 0 {
+		var cfg SxgzConfig
+		if err := c.ShouldBindJSON(&cfg); err == nil && hasRefreshConfigPayload(cfg) {
+			normalized := normalizeSxgzConfig(cfg)
+			if err := Sxgz().saveConfig(normalized); err != nil {
+				response.ServerErrorf(c, err, "保存配置失败")
+				return
+			}
+			refreshCfg = &normalized
+		}
+	}
+	var err error
+	if refreshCfg != nil {
+		_, err = Sxgz().RefreshCompaniesWithConfig(c.Request.Context(), *refreshCfg)
+	} else {
+		_, err = Sxgz().RefreshCompanies(c.Request.Context())
+	}
 	if err != nil {
 		response.BusinessError(c, 1001, err.Error())
 		return
 	}
+	list, err := Sxgz().GetCompanies(c.GetInt("uid"), "")
+	if err != nil {
+		response.ServerErrorf(c, err, "获取公司列表失败")
+		return
+	}
 	response.Success(c, list)
+}
+
+func hasRefreshConfigPayload(cfg SxgzConfig) bool {
+	return strings.TrimSpace(cfg.UpstreamURL) != "" ||
+		cfg.UpstreamUID > 0 ||
+		strings.TrimSpace(cfg.UpstreamKey) != "" ||
+		cfg.PriceMultiplier > 0
 }
 
 func GetLicenseCompanies(c *gin.Context) {
