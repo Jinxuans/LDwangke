@@ -176,10 +176,12 @@
                   </article>
                 </div>
 
-                <div>
-                  <label class="mb-2 block text-sm font-medium text-g-800">代理开户费</label>
-                  <ElInput v-model="businessForm.user_ktmoney" placeholder="留空则沿用旧默认值" />
-                  <p class="mt-2 text-sm text-g-500">填写正数后覆盖后端默认开户费；留空时走旧默认值。</p>
+                <div class="grid gap-4 md:grid-cols-2">
+                  <div v-for="item in agentNumericItems" :key="item.key">
+                    <label class="mb-2 block text-sm font-medium text-g-800">{{ item.label }}</label>
+                    <ElInput v-model="businessForm[item.key]" :placeholder="item.placeholder" />
+                    <p class="mt-2 text-sm text-g-500">{{ item.desc }}</p>
+                  </div>
                 </div>
 
                 <div>
@@ -743,6 +745,9 @@
   }
 
   type NumericSettingKey =
+    | 'agent_grade_change_fee'
+    | 'api_key_free_balance'
+    | 'api_key_open_fee'
     | 'checkin_max_reward'
     | 'checkin_max_users'
     | 'checkin_min_balance'
@@ -820,6 +825,9 @@
     checkin_min_reward: '',
     checkin_max_reward: '',
     user_ktmoney: '',
+    agent_grade_change_fee: '',
+    api_key_open_fee: '',
+    api_key_free_balance: '',
     djfl: '',
     zdpay: ''
   })
@@ -970,6 +978,24 @@
       label: '代理开户费',
       placeholder: '留空则沿用旧默认值',
       desc: '填写正数后覆盖后端默认开户费；留空时走旧默认值。'
+    },
+    {
+      key: 'agent_grade_change_fee',
+      label: '修改等级手续费',
+      placeholder: '默认 3',
+      desc: '代理修改下级等级或费率时收取，填 0 可免收。'
+    },
+    {
+      key: 'api_key_open_fee',
+      label: '接口密钥开通费',
+      placeholder: '默认 5',
+      desc: '代理给下级开通接口、用户自助开通接口时共用。'
+    },
+    {
+      key: 'api_key_free_balance',
+      label: '自助开通免扣余额',
+      placeholder: '默认 100',
+      desc: '用户自己开通接口时，余额达到该值免扣开通费；填 0 关闭免扣。'
     }
   ]
 

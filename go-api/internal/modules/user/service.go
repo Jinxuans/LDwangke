@@ -660,25 +660,37 @@ func (s *Service) ChangeSecretKey(uid int, keyType int, money float64) (string, 
 	if len(newKey) > 16 {
 		newKey = newKey[:16]
 	}
+	openFee := commonmodule.GetAdminConfigFloat("api_key_open_fee", 5)
+	if openFee < 0 {
+		openFee = 0
+	}
+	freeBalance := commonmodule.GetAdminConfigFloat("api_key_free_balance", 100)
+	if freeBalance < 0 {
+		freeBalance = 0
+	}
 
 	if keyType == 1 {
 		var currentKey string
 		database.DB.QueryRow("SELECT COALESCE(`key`,'') FROM qingka_wangke_user WHERE uid = ?", uid).Scan(&currentKey)
 
-		if money >= 100 {
+		if freeBalance > 0 && money >= freeBalance {
 			database.DB.Exec("UPDATE qingka_wangke_user SET `key` = ? WHERE uid = ?", newKey, uid)
 			return newKey, nil
 		}
-		if money >= 5 {
-			database.DB.Exec("UPDATE qingka_wangke_user SET `key` = ?, money = money - 5 WHERE uid = ?", newKey, uid)
-			now := time.Now().Format("2006-01-02 15:04:05")
-			database.DB.Exec(
-				"INSERT INTO qingka_wangke_moneylog (uid, type, money, balance, remark, addtime) VALUES (?, '扣费', -5, (SELECT money FROM qingka_wangke_user WHERE uid = ?), '开通接口扣费5元', ?)",
-				uid, uid, now,
-			)
+		if money >= openFee {
+			if openFee > 0 {
+				database.DB.Exec("UPDATE qingka_wangke_user SET `key` = ?, money = money - ? WHERE uid = ?", newKey, openFee, uid)
+				now := time.Now().Format("2006-01-02 15:04:05")
+				database.DB.Exec(
+					"INSERT INTO qingka_wangke_moneylog (uid, type, money, balance, remark, addtime) VALUES (?, '扣费', ?, (SELECT money FROM qingka_wangke_user WHERE uid = ?), ?, ?)",
+					uid, -openFee, uid, fmt.Sprintf("开通接口扣费%.2f元", openFee), now,
+				)
+			} else {
+				database.DB.Exec("UPDATE qingka_wangke_user SET `key` = ? WHERE uid = ?", newKey, uid)
+			}
 			return newKey, nil
 		}
-		return "", errors.New("余额不足，需要5元开通费用")
+		return "", fmt.Errorf("余额不足，需要%.2f元开通费用", openFee)
 	}
 	if keyType == 3 {
 		var currentKey string

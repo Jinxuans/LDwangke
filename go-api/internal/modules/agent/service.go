@@ -17,6 +17,11 @@ type agentService struct{}
 
 var agents = &agentService{}
 
+const (
+	defaultAgentGradeChangeFee = 3.0
+	defaultAPIKeyOpenFee       = 5.0
+)
+
 type AgentListItem struct {
 	UUID     int     `json:"uuid"`
 	Active   int     `json:"active"`
@@ -53,6 +58,14 @@ func getAdminConfig() map[string]string {
 		return map[string]string{}
 	}
 	return conf
+}
+
+func getNonNegativeConfigFloat(key string, fallback float64) float64 {
+	value := commonmodule.GetAdminConfigFloat(key, fallback)
+	if value < 0 {
+		return 0
+	}
+	return value
 }
 
 func splitCSV(s string) []string {
@@ -357,28 +370,31 @@ func (s *agentService) AgentChangeGrade(operatorUID int, operatorGrade string, o
 	}
 
 	kochu := math.Round(cost*(operatorAddPrice/newRate)*100) / 100
+	changeFee := getNonNegativeConfigFloat("agent_grade_change_fee", defaultAgentGradeChangeFee)
+	totalCost := kochu + changeFee
 	if req.Confirm != 1 {
-		msg := fmt.Sprintf("改价手续费3元，并自动给下级[UID:%d]充值%.0f元，将扣除%.2f余额", req.UID, cost, kochu)
+		msg := fmt.Sprintf("改价手续费%.2f元，并自动给下级[UID:%d]充值%.0f元，充值实际扣费%.2f元，合计扣除%.2f元", changeFee, req.UID, cost, kochu, totalCost)
 		return msg, nil
 	}
 
-	totalCost := kochu + 3
 	if operatorUID != 1 && operatorMoney < totalCost {
-		return "", fmt.Errorf("余额不足,改价需扣3元手续费,及余额%.2f元", kochu)
+		return "", fmt.Errorf("余额不足，改价手续费%.2f元，充值实际扣费%.2f元，合计需要%.2f元", changeFee, kochu, totalCost)
 	}
 
 	newMoney := math.Round(targetMoney/targetAddPrice*newRate*100) / 100
 	moneyChange := newMoney - targetMoney
 
-	if operatorUID != 1 {
-		database.DB.Exec("UPDATE qingka_wangke_user SET money = money - 3 WHERE uid = ?", operatorUID)
+	operatorFee := 0.0
+	if operatorUID != 1 && changeFee > 0 {
+		operatorFee = changeFee
+		database.DB.Exec("UPDATE qingka_wangke_user SET money = money - ? WHERE uid = ?", operatorFee, operatorUID)
 	}
 	database.DB.Exec("UPDATE qingka_wangke_user SET money = ?, grade_id = ?, addprice = ? WHERE uid = ?", newMoney, req.GradeID, newRate, req.UID)
 
 	var operatorName string
 	database.DB.QueryRow("SELECT COALESCE(name,'') FROM qingka_wangke_user WHERE uid = ?", operatorUID).Scan(&operatorName)
 
-	wlog(operatorUID, "修改费率", fmt.Sprintf("修改代理%s,费率：%.2f,扣除手续费3元", targetName, newRate), -3)
+	wlog(operatorUID, "修改费率", fmt.Sprintf("修改代理%s,费率：%.2f,手续费%.2f元", targetName, newRate, operatorFee), -operatorFee)
 	wlog(req.UID, "修改费率", fmt.Sprintf("%s修改你的费率为：%.2f,系统根据比例自动调整价格", operatorName, newRate), moneyChange)
 
 	if cost > 0 {
@@ -470,8 +486,9 @@ func (s *agentService) AgentOpenSecretKey(operatorUID int, operatorMoney float64
 	if targetKey != "" && targetKey != "0" {
 		return errors.New("该用户已开通密钥")
 	}
-	if operatorUID != 1 && operatorMoney < 5 {
-		return errors.New("余额不足以开通，需要5元")
+	openFee := getNonNegativeConfigFloat("api_key_open_fee", defaultAPIKeyOpenFee)
+	if operatorUID != 1 && operatorMoney < openFee {
+		return fmt.Errorf("余额不足以开通，需要%.2f元", openFee)
 	}
 
 	newKey := fmt.Sprintf("%x", time.Now().UnixNano())
@@ -480,9 +497,9 @@ func (s *agentService) AgentOpenSecretKey(operatorUID int, operatorMoney float64
 	}
 
 	database.DB.Exec("UPDATE qingka_wangke_user SET `key` = ? WHERE uid = ?", newKey, targetUID)
-	if operatorUID != 1 {
-		database.DB.Exec("UPDATE qingka_wangke_user SET money = money - 5 WHERE uid = ?", operatorUID)
-		wlog(operatorUID, "开通接口", fmt.Sprintf("给下级代理UID%d开通接口成功!扣费5积分", targetUID), -5)
+	if operatorUID != 1 && openFee > 0 {
+		database.DB.Exec("UPDATE qingka_wangke_user SET money = money - ? WHERE uid = ?", openFee, operatorUID)
+		wlog(operatorUID, "开通接口", fmt.Sprintf("给下级代理UID%d开通接口成功!扣费%.2f元", targetUID, openFee), -openFee)
 	}
 	wlog(targetUID, "开通接口", "你上级给你开通API接口成功!", 0)
 	return nil

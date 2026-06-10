@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"time"
 
@@ -47,6 +48,22 @@ func GetAdminConfigMap() (map[string]string, error) {
 		configMap[key] = value
 	}
 	return configMap, nil
+}
+
+func GetAdminConfigFloat(key string, fallback float64) float64 {
+	configMap, err := GetAdminConfigMap()
+	if err != nil || configMap == nil {
+		return fallback
+	}
+	raw := strings.TrimSpace(configMap[key])
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return fallback
+	}
+	return value
 }
 
 func SendEmail(to, subject, htmlBody string) error {
