@@ -36,6 +36,14 @@ export interface LegacySupplierBalanceResult {
   raw: any
 }
 
+export interface LegacySupplierBatchStatusResult {
+  total: number
+  changed: number
+  status: number
+  dry_run: boolean
+  msg: string
+}
+
 export function fetchLegacyAdminSuppliers() {
   return request.get<LegacyAdminSupplier[]>({
     url: '/admin/suppliers'
@@ -72,6 +80,17 @@ export function syncLegacySupplierStatus(hid: number) {
   return request.get<{ count: number; msg: string }>({
     url: '/admin/supplier/sync-status',
     params: { hid }
+  })
+}
+
+export function batchUpdateLegacySupplierClassStatus(
+  hid: number,
+  status: number,
+  dryRun = false
+) {
+  return request.post<LegacySupplierBatchStatusResult>({
+    url: '/admin/supplier/batch-status',
+    params: { hid, status, dry_run: dryRun }
   })
 }
 

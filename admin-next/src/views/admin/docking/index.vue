@@ -67,6 +67,22 @@
             </ElButton>
             <ElButton plain :disabled="!selectedSupplierId" @click="openSyncPreview">同步预览</ElButton>
             <ElButton plain :disabled="!selectedSupplierId" @click="handleSyncStatus">检查失效商品</ElButton>
+            <ElDropdown
+              trigger="click"
+              :disabled="!selectedSupplierId || statusBatching"
+              @command="handleSupplierStatusCommand"
+            >
+              <ElButton plain :loading="statusBatching" :disabled="!selectedSupplierId">
+                批量状态
+                <ElIcon class="el-icon--right"><ArrowDown /></ElIcon>
+              </ElButton>
+              <template #dropdown>
+                <ElDropdownMenu>
+                  <ElDropdownItem command="up">本货源全部上架</ElDropdownItem>
+                  <ElDropdownItem command="down" divided>本货源全部下架</ElDropdownItem>
+                </ElDropdownMenu>
+              </template>
+            </ElDropdown>
             <ElButton plain :disabled="!selectedSupplierId" @click="openImportDialog">一键对接</ElButton>
             <ElButton
               type="primary"
@@ -585,6 +601,7 @@
     type LegacyAdminCategory
   } from '@/api/legacy/admin-categories'
   import {
+    batchUpdateLegacySupplierClassStatus,
     fetchLegacyAdminSuppliers,
     importLegacySupplier,
     syncLegacySupplierStatus,
@@ -597,11 +614,13 @@
     type LegacySyncPreviewResult
   } from '@/api/legacy/admin-sync'
   import { ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { ArrowDown } from '@element-plus/icons-vue'
 
   defineOptions({ name: 'AdminDockingPage' })
 
   type BatchScope = 'all' | 'cate' | 'docking'
   type CategoryAssignTarget = 'single' | 'batch' | 'import'
+  type SupplierStatusCommand = 'up' | 'down'
 
   const tableRef = ref()
   const loading = ref(false)
@@ -611,6 +630,7 @@
   const replaceLoading = ref(false)
   const prefixLoading = ref(false)
   const categorySaving = ref(false)
+  const statusBatching = ref(false)
   const batchProgress = ref(0)
 
   const previewLoading = ref(false)
@@ -936,6 +956,61 @@
       await reloadProducts()
     } finally {
       executeLoading.value = false
+    }
+  }
+
+  const supplierStatusActions: Record<
+    SupplierStatusCommand,
+    { status: number; label: string; title: string }
+  > = {
+    up: { status: 1, label: '上架', title: '本货源全部上架' },
+    down: { status: 0, label: '下架', title: '本货源全部下架' }
+  }
+
+  const handleSupplierStatusCommand = async (command: string | number | object) => {
+    if (!selectedSupplierId.value) {
+      ElMessage.warning('请先选择货源')
+      return
+    }
+    const action = supplierStatusActions[String(command) as SupplierStatusCommand]
+    if (!action) return
+
+    statusBatching.value = true
+    try {
+      const preview = await batchUpdateLegacySupplierClassStatus(
+        selectedSupplierId.value,
+        action.status,
+        true
+      )
+      const total = Number(preview.total || 0)
+      const changed = Number(preview.changed || 0)
+      if (total <= 0) {
+        ElMessage.warning('当前货源没有本地商品')
+        return
+      }
+      if (changed <= 0) {
+        ElMessage.info(`当前货源下 ${total} 个商品已全部${action.label}`)
+        return
+      }
+
+      const supplierName = currentSupplier.value?.name || `HID ${selectedSupplierId.value}`
+      await ElMessageBox.confirm(
+        `将把「${supplierName}」下 ${total} 个本地商品设为${action.label}，其中 ${changed} 个需要变更。是否继续？`,
+        action.title,
+        {
+          type: action.status === 1 ? 'warning' : 'error',
+          confirmButtonText: action.title,
+          cancelButtonText: '取消'
+        }
+      )
+
+      const result = await batchUpdateLegacySupplierClassStatus(
+        selectedSupplierId.value,
+        action.status
+      )
+      ElMessage.success(result.msg || `${action.title}完成`)
+    } finally {
+      statusBatching.value = false
     }
   }
 

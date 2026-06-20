@@ -140,3 +140,33 @@ func AdminSupplierSyncStatus(c *gin.Context) {
 		"msg":   msg,
 	})
 }
+
+func AdminSupplierBatchStatus(c *gin.Context) {
+	var req struct {
+		HID    int  `json:"hid" binding:"required"`
+		Status *int `json:"status"`
+		DryRun bool `json:"dry_run"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.HID <= 0 {
+		response.BadRequest(c, "请选择供应商")
+		return
+	}
+	if req.Status == nil || (*req.Status != 0 && *req.Status != 1) {
+		response.BadRequest(c, "状态参数错误")
+		return
+	}
+
+	total, changed, msg, err := supplierService.SetSupplierClassStatus(req.HID, *req.Status, req.DryRun)
+	if err != nil {
+		response.ServerErrorf(c, err, err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"total":   total,
+		"changed": changed,
+		"status":  *req.Status,
+		"dry_run": req.DryRun,
+		"msg":     msg,
+	})
+}

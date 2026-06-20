@@ -212,6 +212,7 @@
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import { useTableColumns } from '@/hooks/core/useTableColumns'
   import {
+    batchUpdateLegacySupplierClassStatus,
     deleteLegacyAdminSupplier,
     fetchLegacyAdminSuppliers,
     fetchLegacyPlatformNames,
@@ -221,7 +222,8 @@
     syncLegacySupplierStatus,
     type LegacyAdminSupplier
   } from '@/api/legacy/admin-suppliers'
-  import { ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { ElButton, ElDropdown, ElDropdownItem, ElDropdownMenu, ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { ArrowDown } from '@element-plus/icons-vue'
 
   defineOptions({ name: 'AdminSuppliersPage' })
 
@@ -234,6 +236,9 @@
   const platformNames = ref<Record<string, string>>({})
   const balanceLoadingMap = reactive<Record<number, boolean>>({})
   const syncLoadingMap = reactive<Record<number, boolean>>({})
+  const batchStatusLoadingMap = reactive<Record<number, boolean>>({})
+
+  type SupplierStatusCommand = 'up' | 'down'
 
   const searchForm = ref<{
     keyword?: string
@@ -392,7 +397,7 @@
     {
       prop: 'operation',
       label: '操作',
-      minWidth: 260,
+      minWidth: 340,
       fixed: 'right',
       formatter: (row) =>
         h('div', { class: 'flex flex-wrap items-center gap-2' }, [
@@ -417,6 +422,33 @@
               onClick: () => handleSyncStatus(row)
             },
             syncLoadingMap[row.hid] ? '同步中' : '同步状态'
+          ),
+          h(
+            ElDropdown,
+            {
+              trigger: 'click',
+              disabled: batchStatusLoadingMap[row.hid],
+              onCommand: (command: string | number | object) =>
+                handleBatchStatusCommand(row, String(command) as SupplierStatusCommand)
+            },
+            {
+              default: () =>
+                h(
+                  ElButton,
+                  {
+                    plain: true,
+                    size: 'small',
+                    loading: batchStatusLoadingMap[row.hid],
+                    icon: ArrowDown
+                  },
+                  () => '商品状态'
+                ),
+              dropdown: () =>
+                h(ElDropdownMenu, null, () => [
+                  h(ElDropdownItem, { command: 'up' }, () => '本货源全部上架'),
+                  h(ElDropdownItem, { command: 'down', divided: true }, () => '本货源全部下架')
+                ])
+            }
           ),
           h(ArtButtonTable, {
             type: 'delete',
@@ -541,6 +573,52 @@
       ElMessage.success(result.msg || '同步完成')
     } finally {
       syncLoadingMap[record.hid] = false
+    }
+  }
+
+  const supplierStatusActions: Record<
+    SupplierStatusCommand,
+    { status: number; label: string; title: string }
+  > = {
+    up: { status: 1, label: '上架', title: '本货源全部上架' },
+    down: { status: 0, label: '下架', title: '本货源全部下架' }
+  }
+
+  const handleBatchStatusCommand = async (
+    record: LegacyAdminSupplier,
+    command: SupplierStatusCommand
+  ) => {
+    const action = supplierStatusActions[command]
+    if (!action) return
+
+    batchStatusLoadingMap[record.hid] = true
+    try {
+      const preview = await batchUpdateLegacySupplierClassStatus(record.hid, action.status, true)
+      const total = Number(preview.total || 0)
+      const changed = Number(preview.changed || 0)
+      if (total <= 0) {
+        ElMessage.warning('当前货源没有本地商品')
+        return
+      }
+      if (changed <= 0) {
+        ElMessage.info(`当前货源下 ${total} 个商品已全部${action.label}`)
+        return
+      }
+
+      await ElMessageBox.confirm(
+        `将把「${record.name || `HID ${record.hid}`}」下 ${total} 个本地商品设为${action.label}，其中 ${changed} 个需要变更。是否继续？`,
+        action.title,
+        {
+          type: action.status === 1 ? 'warning' : 'error',
+          confirmButtonText: action.title,
+          cancelButtonText: '取消'
+        }
+      )
+
+      const result = await batchUpdateLegacySupplierClassStatus(record.hid, action.status)
+      ElMessage.success(result.msg || `${action.title}完成`)
+    } finally {
+      batchStatusLoadingMap[record.hid] = false
     }
   }
 

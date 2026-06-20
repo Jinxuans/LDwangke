@@ -31,6 +31,7 @@ func registerSupplierRoutes(admin *gin.RouterGroup) {
 	admin.GET("/supplier/balance", suppliermodule.AdminSupplierBalance)
 	admin.GET("/supplier/import", suppliermodule.AdminSupplierImport)
 	admin.GET("/supplier/sync-status", suppliermodule.AdminSupplierSyncStatus)
+	admin.POST("/supplier/batch-status", suppliermodule.AdminSupplierBatchStatus)
 	admin.GET("/supplier/products", suppliermodule.AdminSupplierProducts)
 
 	admin.POST("/clone/execute", AdminCloneExecute)
