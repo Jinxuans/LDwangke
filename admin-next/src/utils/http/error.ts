@@ -129,19 +129,41 @@ export function handleError(error: AxiosError<ErrorResponse>): never {
     throw new HttpError($t('httpMsg.requestCancelled'), ApiStatus.error)
   }
 
+  const requestConfig = error.config
+  const requestMeta = {
+    url: requestConfig?.url,
+    method: requestConfig?.method?.toUpperCase()
+  }
   const statusCode = error.response?.status
   const errorMessage =
     error.response?.data?.error ||
     error.response?.data?.message ||
     error.response?.data?.msg ||
     error.message
-  const requestConfig = error.config
+
+  // Axios 超时通常不会带 response，之前会被误报成“网络连接异常”
+  if (
+    error.code === 'ECONNABORTED' ||
+    error.code === 'ETIMEDOUT' ||
+    /timeout/i.test(error.message)
+  ) {
+    throw new HttpError($t('httpMsg.requestTimeout'), ApiStatus.requestTimeout, {
+      ...requestMeta,
+      data: {
+        axiosCode: error.code,
+        originalMessage: error.message
+      }
+    })
+  }
 
   // 处理网络错误
   if (!error.response) {
     throw new HttpError($t('httpMsg.networkError'), ApiStatus.error, {
-      url: requestConfig?.url,
-      method: requestConfig?.method?.toUpperCase()
+      ...requestMeta,
+      data: {
+        axiosCode: error.code,
+        originalMessage: error.message
+      }
     })
   }
 
@@ -150,8 +172,7 @@ export function handleError(error: AxiosError<ErrorResponse>): never {
     errorMessage || (statusCode ? getErrorMessage(statusCode) : $t('httpMsg.requestFailed'))
   throw new HttpError(message, statusCode || ApiStatus.error, {
     data: error.response.data,
-    url: requestConfig?.url,
-    method: requestConfig?.method?.toUpperCase()
+    ...requestMeta
   })
 }
 

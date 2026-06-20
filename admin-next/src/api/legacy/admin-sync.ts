@@ -338,7 +338,7 @@ export function fetchLegacyOrderProgressSyncStatus() {
   })
 }
 
-export function fetchLegacyOrderProgressSyncLogs(limit = 20) {
+export function fetchLegacyOrderProgressSyncLogs(limit = 50) {
   return request.get<LegacyOrderProgressSyncLog[]>({
     url: '/admin/order-progress-sync/logs',
     params: { limit }

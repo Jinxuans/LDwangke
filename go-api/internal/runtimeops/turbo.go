@@ -96,6 +96,8 @@ type OrderProgressSyncLogEntry struct {
 	Lines            []string       `json:"lines"`
 }
 
+const orderProgressLogRetention = 200
+
 var (
 	turboMu       sync.RWMutex
 	turboEnabled  int32
@@ -525,8 +527,9 @@ func UpdateOrderProgressSyncConfig(cfg OrderProgressSyncConfig) (OrderProgressSy
 		return GetOrderProgressSyncStatus(), err
 	}
 	applyOrderProgressSyncConfig(cfg)
+	now := time.Now().Format("2006-01-02 15:04:05")
 	appendOrderProgressLog(OrderProgressSyncLogEntry{
-		Time:             time.Now().Format("2006-01-02 15:04:05"),
+		Time:             now,
 		Mode:             "config",
 		Trigger:          "config",
 		IntervalSec:      cfg.IntervalSec,
@@ -535,6 +538,19 @@ func UpdateOrderProgressSyncConfig(cfg OrderProgressSyncConfig) (OrderProgressSy
 		ExcludedStatuses: append([]string(nil), cfg.ExcludedStatuses...),
 		RuleHits:         summarizeRuleHits(cfg.Rules),
 		SampleErrors:     []string{},
+		Lines: []string{
+			fmt.Sprintf(
+				"%s [config] 主订单同步配置已更新：逐单 %s / %d 秒，批量 %s / %d 秒，货源 %s，排除 %s，规则 %s",
+				now,
+				boolLabel(cfg.Enabled),
+				cfg.IntervalSec,
+				boolLabel(cfg.BatchEnabled),
+				cfg.BatchIntervalSec,
+				describeSupplierScope(cfg.SupplierIDs),
+				describeExcludedStatuses(cfg.ExcludedStatuses),
+				describeEnabledRules(cfg.Rules),
+			),
+		},
 	})
 	updateSyncTickers(cfg)
 	return GetOrderProgressSyncStatus(), nil
@@ -576,10 +592,11 @@ func InitSyncTicker(interval time.Duration) {
 
 	syncTickerStop = make(chan struct{})
 	batchSyncTickerStop = make(chan struct{})
-	obslogger.L().Info("AutoSync 主订单自动同步已启动", "interval", time.Duration(cfg.IntervalSec)*time.Second, "rules", len(cfg.Rules))
+	obslogger.L().Info("AutoSync 主订单逐单同步已启动", "interval", time.Duration(cfg.IntervalSec)*time.Second, "rules", len(cfg.Rules))
 	obslogger.L().Info("AutoSync 主订单批量进度同步已启动", "interval", time.Duration(cfg.BatchIntervalSec)*time.Second)
+	now := time.Now().Format("2006-01-02 15:04:05")
 	appendOrderProgressLog(OrderProgressSyncLogEntry{
-		Time:             time.Now().Format("2006-01-02 15:04:05"),
+		Time:             now,
 		Mode:             "single",
 		Trigger:          "system",
 		IntervalSec:      cfg.IntervalSec,
@@ -588,9 +605,20 @@ func InitSyncTicker(interval time.Duration) {
 		ExcludedStatuses: append([]string(nil), cfg.ExcludedStatuses...),
 		RuleHits:         summarizeRuleHits(cfg.Rules),
 		SampleErrors:     []string{},
+		Lines: []string{
+			fmt.Sprintf(
+				"%s [system] 逐单同步已加载：%s，间隔 %d 秒，货源 %s，排除 %s，规则 %s",
+				now,
+				boolLabel(cfg.Enabled),
+				cfg.IntervalSec,
+				describeSupplierScope(cfg.SupplierIDs),
+				describeExcludedStatuses(cfg.ExcludedStatuses),
+				describeEnabledRules(cfg.Rules),
+			),
+		},
 	})
 	appendOrderProgressLog(OrderProgressSyncLogEntry{
-		Time:             time.Now().Format("2006-01-02 15:04:05"),
+		Time:             now,
 		Mode:             "batch",
 		Trigger:          "system",
 		IntervalSec:      cfg.BatchIntervalSec,
@@ -599,6 +627,16 @@ func InitSyncTicker(interval time.Duration) {
 		ExcludedStatuses: append([]string(nil), cfg.ExcludedStatuses...),
 		RuleHits:         map[string]int{},
 		SampleErrors:     []string{},
+		Lines: []string{
+			fmt.Sprintf(
+				"%s [system] 批量同步已加载：%s，间隔 %d 秒，货源 %s，排除 %s",
+				now,
+				boolLabel(cfg.BatchEnabled),
+				cfg.BatchIntervalSec,
+				describeSupplierScope(cfg.SupplierIDs),
+				describeExcludedStatuses(cfg.ExcludedStatuses),
+			),
+		},
 	})
 	go runSyncTicker(time.Duration(cfg.IntervalSec)*time.Second, syncTickerStop, cfg.Enabled, "single")
 	go runSyncTicker(time.Duration(cfg.BatchIntervalSec)*time.Second, batchSyncTickerStop, cfg.BatchEnabled, "batch")
@@ -663,7 +701,7 @@ func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 	default:
 		if orderProgressStatus.Running {
 			orderProgressMu.Unlock()
-			obslogger.L().Warn("AutoSync 跳过执行：单条同步已在进行中")
+			obslogger.L().Warn("AutoSync 跳过执行：逐单同步已在进行中")
 			return
 		}
 		orderProgressStatus.Running = true
@@ -685,7 +723,7 @@ func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 	if mode == "batch" {
 		obslogger.L().Info("AutoSync 开始执行主订单批量进度同步")
 	} else {
-		obslogger.L().Info("AutoSync 开始执行主订单自动同步")
+		obslogger.L().Info("AutoSync 开始执行主订单逐单同步")
 	}
 	orderProgressMu.RLock()
 	opts := ordermodule.AutoSyncOptions{SupplierHIDs: append([]int(nil), orderProgressConfig.SupplierIDs...), ExcludedStatuses: append([]string(nil), orderProgressConfig.ExcludedStatuses...)}
@@ -712,7 +750,7 @@ func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 	if mode == "batch" {
 		collectedLines = append(collectedLines, logTime+" [AutoSync] 开始执行主订单批量进度同步")
 	} else {
-		collectedLines = append(collectedLines, logTime+" [AutoSync] 开始执行主订单自动同步")
+		collectedLines = append(collectedLines, logTime+" [AutoSync] 开始执行主订单逐单同步")
 	}
 	opts.LogCollector = func(line string) {
 		collectedMu.Lock()
@@ -750,13 +788,13 @@ func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 		if mode == "batch" {
 			collectedLines = append(collectedLines, finishTime+" [AutoSync] 批量进度同步失败: "+err.Error())
 		} else {
-			collectedLines = append(collectedLines, finishTime+" [AutoSync] 查询进行中订单失败: "+err.Error())
+			collectedLines = append(collectedLines, finishTime+" [AutoSync] 逐单同步失败: "+err.Error())
 		}
 	} else {
 		if mode == "batch" {
 			collectedLines = append(collectedLines, fmt.Sprintf("%s [AutoSync] 批量进度同步完成，更新 %d 个订单，失败 %d 个", finishTime, updated, failed))
 		} else {
-			collectedLines = append(collectedLines, fmt.Sprintf("%s [AutoSync] 同步完成，更新 %d 个订单，失败 %d 个", finishTime, updated, failed))
+			collectedLines = append(collectedLines, fmt.Sprintf("%s [AutoSync] 逐单同步完成，更新 %d 个订单，失败 %d 个", finishTime, updated, failed))
 		}
 	}
 
@@ -780,14 +818,14 @@ func syncPendingOrderProgress(trigger string, mode string, ignoreRules bool) {
 		if mode == "batch" {
 			obslogger.L().Warn("AutoSync 批量进度同步失败", "error", err)
 		} else {
-			obslogger.L().Warn("AutoSync 查询进行中订单失败", "error", err)
+			obslogger.L().Warn("AutoSync 逐单同步失败", "error", err)
 		}
 		return
 	}
 	if mode == "batch" {
 		obslogger.L().Info("AutoSync 批量进度同步完成", "updated", updated, "failed", failed)
 	} else {
-		obslogger.L().Info("AutoSync 同步完成", "updated", updated, "failed", failed)
+		obslogger.L().Info("AutoSync 逐单同步完成", "updated", updated, "failed", failed)
 	}
 }
 
@@ -815,10 +853,10 @@ func updateSyncTickers(cfg OrderProgressSyncConfig) {
 	syncTickerStop = make(chan struct{})
 	batchSyncTickerStop = make(chan struct{})
 	if !cfg.Enabled {
-		obslogger.L().Info("AutoSync 主订单自动同步已停用")
+		obslogger.L().Info("AutoSync 主订单逐单同步已停用")
 		setOrderProgressNextRun("single", "")
 	} else {
-		obslogger.L().Info("AutoSync 主订单自动同步间隔已更新", "interval", time.Duration(cfg.IntervalSec)*time.Second)
+		obslogger.L().Info("AutoSync 主订单逐单同步间隔已更新", "interval", time.Duration(cfg.IntervalSec)*time.Second)
 		go runSyncTicker(time.Duration(cfg.IntervalSec)*time.Second, syncTickerStop, true, "single")
 	}
 	if !cfg.BatchEnabled {
@@ -840,9 +878,43 @@ func appendOrderProgressLog(entry OrderProgressSyncLogEntry) {
 		entry.Time = time.Now().Format("2006-01-02 15:04:05")
 	}
 	orderProgressLogs = append(orderProgressLogs, entry)
-	if len(orderProgressLogs) > 50 {
-		orderProgressLogs = append([]OrderProgressSyncLogEntry(nil), orderProgressLogs[len(orderProgressLogs)-50:]...)
+	if len(orderProgressLogs) > orderProgressLogRetention {
+		orderProgressLogs = append([]OrderProgressSyncLogEntry(nil), orderProgressLogs[len(orderProgressLogs)-orderProgressLogRetention:]...)
 	}
+}
+
+func boolLabel(enabled bool) string {
+	if enabled {
+		return "启用"
+	}
+	return "停用"
+}
+
+func describeSupplierScope(supplierIDs []int) string {
+	if len(supplierIDs) == 0 {
+		return "全部货源"
+	}
+	return fmt.Sprintf("%d 个货源", len(supplierIDs))
+}
+
+func describeExcludedStatuses(statuses []string) string {
+	if len(statuses) == 0 {
+		return "无"
+	}
+	return strings.Join(statuses, "、")
+}
+
+func describeEnabledRules(rules []ordermodule.AutoSyncRule) string {
+	enabled := 0
+	for _, rule := range rules {
+		if rule.Enabled {
+			enabled++
+		}
+	}
+	if enabled == 0 {
+		return "0 条"
+	}
+	return fmt.Sprintf("%d/%d 条", enabled, len(rules))
 }
 
 func errorToString(err error) string {

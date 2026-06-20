@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-order-progress-sync-page art-full-height">
+  <div class="admin-order-progress-sync-page art-full-height overflow-y-auto pr-1">
     <ElCard class="art-table-card mb-4">
       <ArtTableHeader :loading="loading" layout="refresh" @refresh="loadData">
         <template #left>
@@ -155,6 +155,12 @@
         <p class="mt-1.5 text-sm leading-6 text-g-500">
           日志按后端返回顺序展示，优先保留原始信息，便于排查规则命中和失败样本。
         </p>
+        <ElSpace wrap class="mt-3">
+          <ElTag effect="plain">最近 {{ logs.length }} 轮</ElTag>
+          <ElTag type="success" effect="plain">逐单 {{ logModeStats.single }}</ElTag>
+          <ElTag type="warning" effect="plain">批量 {{ logModeStats.batch }}</ElTag>
+          <ElTag type="info" effect="plain">配置 {{ logModeStats.config }}</ElTag>
+        </ElSpace>
       </div>
 
       <div class="px-5 pb-5 pt-4">
@@ -180,6 +186,7 @@
 
   defineOptions({ name: 'AdminOrderProgressSyncPage' })
 
+  const ORDER_PROGRESS_LOG_LIMIT = 50
   const loading = ref(false)
   const saving = ref(false)
   const running = ref(false)
@@ -198,15 +205,51 @@
 
   const statusOptions = ['已完成', '已退款', '已取消', '失败', '异常']
 
+  const logModeLabel = (mode?: string) => {
+    if (mode === 'batch') return '批量同步'
+    if (mode === 'config') return '配置'
+    if (mode === 'system') return '系统'
+    return '逐单同步'
+  }
+
+  const formatFallbackLogLines = (item: LegacyOrderProgressSyncLog) => {
+    const prefix = `${item.time} [${logModeLabel(item.mode)}]`
+    if (item.mode === 'config') {
+      const singleState = item.interval_sec > 0 ? `逐单间隔 ${item.interval_sec} 秒` : '逐单间隔未设置'
+      return [`${prefix} 已更新主订单同步配置，${singleState}`]
+    }
+    if (item.trigger === 'system') {
+      return [`${prefix} 已加载同步配置`]
+    }
+    const lines = [`${prefix} 更新 ${item.updated} 个订单，失败 ${item.failed} 个（${item.duration_ms}ms）`]
+    if (item.error) {
+      lines.push(`${item.time} [error] ${item.error}`)
+    }
+    return lines
+  }
+
+  const logModeStats = computed(() =>
+    logs.value.reduce(
+      (acc, item) => {
+        if (item.mode === 'batch') {
+          acc.batch += 1
+        } else if (item.mode === 'config') {
+          acc.config += 1
+        } else {
+          acc.single += 1
+        }
+        return acc
+      },
+      { single: 0, batch: 0, config: 0 }
+    )
+  )
+
   const logText = computed(() =>
     [...logs.value]
       .reverse()
       .flatMap((item) => {
         if (item.lines?.length) return item.lines
-        return [
-          `${item.time} [${item.mode}] 更新 ${item.updated} 个订单，失败 ${item.failed} 个（${item.duration_ms}ms）`,
-          ...(item.error ? [`${item.time} [error] ${item.error}`] : [])
-        ]
+        return formatFallbackLogLines(item)
       })
       .join('\n')
   )
@@ -216,7 +259,7 @@
     try {
       const [statusResult, logsResult, suppliers] = await Promise.all([
         fetchLegacyOrderProgressSyncStatus(),
-        fetchLegacyOrderProgressSyncLogs(20),
+        fetchLegacyOrderProgressSyncLogs(ORDER_PROGRESS_LOG_LIMIT),
         fetchLegacyAdminSuppliers().catch(() => [])
       ])
       status.value = statusResult
@@ -248,7 +291,7 @@
         excluded_statuses: excludedStatuses.value,
         rules: rules.value
       })
-      logs.value = await fetchLegacyOrderProgressSyncLogs(20)
+      logs.value = await fetchLegacyOrderProgressSyncLogs(ORDER_PROGRESS_LOG_LIMIT)
       ElMessage.success('主订单同步配置已保存')
     } finally {
       saving.value = false
@@ -259,7 +302,7 @@
     running.value = true
     try {
       status.value = await runLegacyOrderProgressSyncNow()
-      logs.value = await fetchLegacyOrderProgressSyncLogs(20)
+      logs.value = await fetchLegacyOrderProgressSyncLogs(ORDER_PROGRESS_LOG_LIMIT)
       ElMessage.success('已触发主订单同步')
     } finally {
       running.value = false
@@ -318,6 +361,10 @@
 </script>
 
 <style scoped>
+  .admin-order-progress-sync-page > .art-table-card {
+    flex: none;
+  }
+
   .order-progress-log {
     max-height: 420px;
     margin: 0;

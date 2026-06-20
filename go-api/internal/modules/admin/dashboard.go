@@ -113,7 +113,7 @@ func AdminOrderProgressSyncStats(c *gin.Context) {
 }
 
 func AdminOrderProgressSyncLogs(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	response.Success(c, runtimeops.GetOrderProgressSyncLogs(limit))
 }
 

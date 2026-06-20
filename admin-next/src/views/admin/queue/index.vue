@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-queue-page art-full-height">
+  <div class="admin-queue-page art-full-height overflow-y-auto pr-1">
     <section class="art-card-sm p-5">
       <div class="flex flex-wrap items-center justify-between gap-3 border-b-d pb-4">
         <div class="flex flex-wrap items-center gap-3">
@@ -240,3 +240,9 @@
     loadData()
   })
 </script>
+
+<style scoped>
+  .admin-queue-page > .art-table-card {
+    flex: none;
+  }
+</style>
