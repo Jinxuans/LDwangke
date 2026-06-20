@@ -10,6 +10,9 @@ export interface LegacyPagination {
 export interface LegacyOrderListParams {
   page?: number
   limit?: number
+  addtime_range?: string[]
+  start_time?: string
+  end_time?: string
   user?: string
   pass?: string
   school?: string
@@ -49,6 +52,7 @@ export interface LegacyOrderItem {
   showdoc_push_url: string
   pushShowdocStatus: string
   supplier_pt: string
+  can_pup_login?: boolean
 }
 
 export interface LegacyOrderStats {

@@ -26,11 +26,14 @@ type Order struct {
 	ShowdocPushURL    string `json:"showdoc_push_url"`
 	PushShowdocStatus string `json:"pushShowdocStatus"`
 	SupplierPT        string `json:"supplier_pt"`
+	CanPupLogin       bool   `json:"can_pup_login,omitempty"`
 }
 
 type OrderListRequest struct {
 	Page       int    `json:"page" form:"page"`
 	Limit      int    `json:"limit" form:"limit"`
+	StartTime  string `json:"start_time" form:"start_time"`
+	EndTime    string `json:"end_time" form:"end_time"`
 	User       string `json:"user" form:"user"`
 	Pass       string `json:"pass" form:"pass"`
 	School     string `json:"school" form:"school"`

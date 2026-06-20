@@ -15,15 +15,46 @@ type OrderRepo struct{}
 
 const orderColumns = "oid, uid, cid, hid, COALESCE(ptname,''), COALESCE(school,''), COALESCE(name,''), COALESCE(user,''), COALESCE(pass,''), COALESCE(kcname,''), COALESCE(kcid,''), COALESCE(status,'待处理'), COALESCE(fees,'0'), COALESCE(process,''), COALESCE(remarks,''), COALESCE(dockstatus,'0'), COALESCE(yid,''), COALESCE(addtime,''), COALESCE(pushUid,''), COALESCE(pushStatus,''), COALESCE(pushEmail,''), COALESCE(pushEmailStatus,'0'), COALESCE(showdoc_push_url,''), COALESCE(pushShowdocStatus,'0'), COALESCE((SELECT pt FROM qingka_wangke_huoyuan WHERE hid=qingka_wangke_order.hid LIMIT 1),'')"
 
+func canViewSensitiveOrderFields(grade string) bool {
+	return grade == "2" || grade == "3"
+}
+
+func sanitizeOrderForRole(order *model.Order, canViewSensitive bool) {
+	hasUpstreamOrder := strings.TrimSpace(order.YID) != "" && strings.TrimSpace(order.YID) != "0"
+	order.CanPupLogin = hasUpstreamOrder && strings.EqualFold(strings.TrimSpace(order.SupplierPT), "pup")
+	if canViewSensitive {
+		return
+	}
+
+	order.UID = 0
+	order.HID = 0
+	order.YID = ""
+	order.SupplierPT = ""
+	order.DockStatus = ""
+}
+
 func NewOrderRepo() *OrderRepo {
 	return &OrderRepo{}
+}
+
+func normalizeOrderListTime(value string, isEnd bool) string {
+	value = strings.TrimSpace(value)
+	if len(value) == 10 && value[4] == '-' && value[7] == '-' {
+		if isEnd {
+			return value + " 23:59:59"
+		}
+		return value + " 00:00:00"
+	}
+	return value
 }
 
 func (r *OrderRepo) List(uid int, grade string, req model.OrderListRequest) ([]model.Order, int64, error) {
 	where := []string{"1=1"}
 	args := []interface{}{}
 
-	if grade != "2" && grade != "3" {
+	canViewSensitive := canViewSensitiveOrderFields(grade)
+
+	if !canViewSensitive {
 		where = append(where, "uid = ?")
 		args = append(args, uid)
 	} else if req.UID != "" {
@@ -73,9 +104,17 @@ func (r *OrderRepo) List(uid int, grade string, req model.OrderListRequest) ([]m
 		args = append(args, s, s, s, s, s, s, s, s)
 	}
 
-	cutoff := time.Now().AddDate(0, 0, -100).Format("2006-01-02")
+	startTime := normalizeOrderListTime(req.StartTime, false)
+	endTime := normalizeOrderListTime(req.EndTime, true)
+	if startTime == "" {
+		startTime = time.Now().AddDate(0, 0, -100).Format("2006-01-02")
+	}
 	where = append(where, "addtime >= ?")
-	args = append(args, cutoff)
+	args = append(args, startTime)
+	if endTime != "" {
+		where = append(where, "addtime <= ?")
+		args = append(args, endTime)
+	}
 
 	whereStr := strings.Join(where, " AND ")
 
@@ -111,6 +150,7 @@ func (r *OrderRepo) List(uid int, grade string, req model.OrderListRequest) ([]m
 		if err != nil {
 			continue
 		}
+		sanitizeOrderForRole(&o, canViewSensitive)
 		orders = append(orders, o)
 	}
 	if orders == nil {
@@ -121,10 +161,11 @@ func (r *OrderRepo) List(uid int, grade string, req model.OrderListRequest) ([]m
 }
 
 func (r *OrderRepo) Detail(uid int, grade string, oid int) (*model.Order, error) {
+	canViewSensitive := canViewSensitiveOrderFields(grade)
 	querySQL := fmt.Sprintf("SELECT %s FROM qingka_wangke_order WHERE oid = ?", orderColumns)
 	args := []interface{}{oid}
 
-	if grade != "2" && grade != "3" {
+	if !canViewSensitive {
 		querySQL += " AND uid = ?"
 		args = append(args, uid)
 	}
@@ -143,6 +184,7 @@ func (r *OrderRepo) Detail(uid int, grade string, oid int) (*model.Order, error)
 	if err != nil {
 		return nil, err
 	}
+	sanitizeOrderForRole(&order, canViewSensitive)
 	return &order, nil
 }
 

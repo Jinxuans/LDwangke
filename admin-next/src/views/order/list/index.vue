@@ -205,7 +205,7 @@
               <template #dropdown>
                 <ElDropdownMenu>
                   <ElDropdownItem command="chat">聊天</ElDropdownItem>
-                  <ElDropdownItem v-if="row.yid" command="login">登录</ElDropdownItem>
+                  <ElDropdownItem v-if="row.can_pup_login" command="login">Pup 登录</ElDropdownItem>
                 </ElDropdownMenu>
               </template>
             </ElDropdown>
@@ -253,13 +253,17 @@
             <article class="rounded-custom-sm border-full-d bg-box p-5">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <h3 class="text-lg font-semibold text-g-900">附加信息</h3>
-                <ElTag v-if="currentOrder.yid" effect="plain">上游单号 {{ currentOrder.yid }}</ElTag>
+                <ElTag v-if="isAdmin && currentOrder.yid" effect="plain">
+                  上游单号 {{ currentOrder.yid }}
+                </ElTag>
               </div>
               <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                <div class="text-sm text-g-600">
+                <div v-if="isAdmin" class="text-sm text-g-600">
                   处理状态：{{ dockStatusLabelMap[currentOrder.dockstatus] || '未知' }}
                 </div>
-                <div class="text-sm text-g-600">货源类型：{{ currentOrder.supplier_pt || '-' }}</div>
+                <div v-if="isAdmin" class="text-sm text-g-600">
+                  货源类型：{{ currentOrder.supplier_pt || '-' }}
+                </div>
                 <div class="text-sm text-g-600">
                   微信推送：{{ currentOrder.pushUid ? currentOrder.pushStatus || '已绑定' : '未绑定' }}
                 </div>
@@ -314,14 +318,14 @@
                   暂停 / 恢复
                 </ElButton>
                 <ElButton
-                  v-if="currentOrder.yid && currentOrder.supplier_pt === 'pup'"
+                  v-if="currentOrder.can_pup_login"
                   plain
                   @click="handlePupLogin(currentOrder.oid)"
                 >
                   Pup 登录
                 </ElButton>
                 <ElButton
-                  v-if="currentOrder.yid && currentOrder.supplier_pt === 'pup'"
+                  v-if="currentOrder.can_pup_login"
                   plain
                   @click="openPupResetDialog(currentOrder.oid, 'score')"
                 >
@@ -529,6 +533,7 @@
   const filters = reactive<LegacyOrderListParams>({
     page: 1,
     limit: 20,
+    addtime_range: [],
     user: '',
     pass: '',
     school: '',
@@ -775,6 +780,24 @@
       }
     },
     {
+      label: '提交时间',
+      key: 'addtime_range',
+      type: 'datetimerange',
+      span: 8,
+      props: {
+        type: 'datetimerange',
+        clearable: true,
+        valueFormat: 'YYYY-MM-DD HH:mm:ss',
+        startPlaceholder: '开始时间',
+        endPlaceholder: '结束时间',
+        rangeSeparator: '至',
+        defaultTime: [
+          new Date(2000, 0, 1, 0, 0, 0),
+          new Date(2000, 0, 1, 23, 59, 59)
+        ]
+      }
+    },
+    {
       label: '任务状态',
       key: 'status_text',
       type: 'select',
@@ -894,11 +917,17 @@
     try {
       filters.page = pagination.current
       filters.limit = pagination.size
-      const result = await fetchLegacyOrderList({
+      const [startTime, endTime] = filters.addtime_range || []
+      const params: LegacyOrderListParams = {
         ...filters,
         page: pagination.current,
         limit: pagination.size
-      })
+      }
+      delete params.addtime_range
+      if (startTime) params.start_time = startTime
+      if (endTime) params.end_time = endTime
+
+      const result = await fetchLegacyOrderList(params)
       orders.value = result.list || []
       pagination.total = Number(result.pagination?.total || 0)
       pagination.current = Number(result.pagination?.page || page)
@@ -916,6 +945,7 @@
     Object.assign(filters, {
       page: 1,
       limit: 20,
+      addtime_range: [],
       user: '',
       pass: '',
       school: '',
