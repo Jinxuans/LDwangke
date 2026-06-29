@@ -190,8 +190,9 @@
 
               <div class="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label class="mb-2 block text-sm font-medium text-g-800">密价倍率</label>
+                  <label class="mb-2 block text-sm font-medium text-g-800">同步保密价倍率</label>
                   <ElInputNumber v-model="syncConfig.secret_price_rate" class="w-full" :min="0" :step="0.1" :precision="2" />
+                  <p class="mt-1.5 text-xs text-g-500">写入商品保密价，不影响用户密价规则</p>
                 </div>
                 <div>
                   <label class="mb-2 block text-sm font-medium text-g-800">自动同步间隔（分钟）</label>

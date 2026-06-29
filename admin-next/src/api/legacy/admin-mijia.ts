@@ -4,11 +4,14 @@ export interface LegacyMiJiaItem {
   mid: number
   uid: number
   cid: number
+  scope_type: 'product' | 'category' | string
+  scope_id: number
   mode: string
   price: string
   addtime: string
   username: string
   classname: string
+  category_name: string
 }
 
 export interface LegacyMiJiaClassOption {
@@ -41,16 +44,25 @@ export function fetchLegacyMiJiaList(params: {
   })
 }
 
-export function fetchLegacyMiJiaClassOptions() {
+export function fetchLegacyMiJiaClassOptions(params?: {
+  keyword?: string
+  cid?: number
+  fenlei?: number
+  limit?: number
+}) {
   return request.get<LegacyMiJiaClassOption[]>({
-    url: '/admin/class/dropdown'
+    url: '/admin/class/dropdown',
+    params
   })
 }
 
 export function saveLegacyMiJia(data: {
   mid?: number
   uid: number
-  cid: number
+  cid?: number
+  scope_type?: 'product' | 'category'
+  scope_id?: number
+  fenlei?: number
   mode: string
   price: string
 }) {

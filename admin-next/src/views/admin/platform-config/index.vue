@@ -341,15 +341,9 @@
                   <p class="text-base font-semibold text-g-900">{{ section.title }}</p>
                   <p v-if="section.help" class="mt-1 text-xs leading-5 text-g-500">{{ section.help }}</p>
                   <div class="mt-4 grid gap-4">
-                    <div class="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label class="mb-2 block text-sm font-medium text-g-800">接口路径</label>
-                        <ElInput v-model="editForm[`${section.key}_path`]" :placeholder="section.pathPlaceholder" />
-                      </div>
-                      <div v-if="section.extraFieldKey">
-                        <label class="mb-2 block text-sm font-medium text-g-800">{{ section.extraFieldLabel }}</label>
-                        <ElInput v-model="editForm[section.extraFieldKey]" :placeholder="section.extraFieldPlaceholder" />
-                      </div>
+                    <div>
+                      <label class="mb-2 block text-sm font-medium text-g-800">接口路径</label>
+                      <ElInput v-model="editForm[`${section.key}_path`]" :placeholder="section.pathPlaceholder" />
                     </div>
                     <div class="grid gap-4 md:grid-cols-2">
                       <div>
@@ -363,12 +357,6 @@
                         <ElSelect v-model="editForm[`${section.key}_body_type`]" class="w-full" clearable placeholder="自动">
                           <ElOption v-for="item in bodyTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
                         </ElSelect>
-                      </div>
-                    </div>
-                    <div v-if="section.idFieldKey" class="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label class="mb-2 block text-sm font-medium text-g-800">{{ section.idFieldLabel }}</label>
-                        <ElInput v-model="editForm[section.idFieldKey]" :placeholder="section.idFieldPlaceholder" />
                       </div>
                     </div>
                     <div>
@@ -823,10 +811,7 @@
       key: 'pause',
       title: '暂停订单',
       pathPlaceholder: '/api.php?act=zt',
-      example: pauseParamMapExample,
-      idFieldKey: 'pause_id_param',
-      idFieldLabel: '订单 ID 参数',
-      idFieldPlaceholder: 'id'
+      example: pauseParamMapExample
     },
     {
       key: 'resume',
@@ -839,31 +824,19 @@
       title: '修改密码',
       pathPlaceholder: '/api.php?act=gaimi',
       example: changePassParamMapExample,
-      help: changePassParamHelp,
-      extraFieldKey: 'change_pass_param',
-      extraFieldLabel: '密码参数名',
-      extraFieldPlaceholder: 'newPwd',
-      idFieldKey: 'change_pass_id_param',
-      idFieldLabel: '订单 ID 参数',
-      idFieldPlaceholder: 'id'
+      help: changePassParamHelp
     },
     {
       key: 'resubmit',
       title: '补单',
       pathPlaceholder: '/api.php?act=budan',
-      example: resubmitParamMapExample,
-      idFieldKey: 'resubmit_id_param',
-      idFieldLabel: '订单 ID 参数',
-      idFieldPlaceholder: 'id'
+      example: resubmitParamMapExample
     },
     {
       key: 'log',
       title: '日志查询',
       pathPlaceholder: '/api.php?act=xq',
       example: logParamMapExample,
-      idFieldKey: 'log_id_param',
-      idFieldLabel: '日志 ID 参数',
-      idFieldPlaceholder: 'id',
       help: actionParamHelp
     }
   ]
@@ -936,7 +909,6 @@
       pause_method: '',
       pause_body_type: '',
       pause_param_map: '',
-      pause_id_param: '',
       resume_path: '',
       resume_method: '',
       resume_body_type: '',
@@ -945,18 +917,14 @@
       change_pass_method: '',
       change_pass_body_type: '',
       change_pass_param_map: '',
-      change_pass_param: '',
-      change_pass_id_param: '',
       resubmit_path: '',
       resubmit_method: '',
       resubmit_body_type: '',
       resubmit_param_map: '',
-      resubmit_id_param: '',
       log_path: '',
       log_method: '',
       log_body_type: '',
       log_param_map: '',
-      log_id_param: '',
       balance_path: '',
       balance_money_field: '',
       balance_method: '',
@@ -1182,17 +1150,15 @@
       class_list_method: 'POST',
       pause_path: firstPath(result.pause_path, '/api.php?act=zt'),
       pause_method: 'POST',
-      pause_id_param: result.pause_id_param || 'id',
       change_pass_path: firstPath(result.change_pass_path, '/api.php?act=gaimi'),
       change_pass_method: 'POST',
-      change_pass_param: result.change_pass_param || 'newPwd',
-      change_pass_id_param: result.change_pass_id_param || 'id',
+      change_pass_param_map: result.change_pass_param_map || '',
       resubmit_path: '/api.php?act=budan',
       resubmit_method: 'POST',
-      resubmit_id_param: 'id',
+      resubmit_param_map: result.resubmit_param_map || '',
       log_path: firstPath(result.log_path, '/api.php?act=xq'),
       log_method: 'POST',
-      log_id_param: result.log_id_param || 'id',
+      log_param_map: result.log_param_map || '',
       returns_yid: result.returns_yid,
       balance_path: firstPath(result.balance_path, '/api.php?act=getmoney'),
       balance_money_field: result.balance_money_field || 'money',
@@ -1282,7 +1248,6 @@
       pause_method: config.pause_method || 'POST',
       pause_body_type: config.pause_body_type || '',
       pause_param_map: config.pause_param_map || '',
-      pause_id_param: config.pause_id_param || 'id',
       resume_path: firstPath(config.resume_path),
       resume_method: config.resume_method || 'POST',
       resume_body_type: config.resume_body_type || '',
@@ -1291,18 +1256,14 @@
       change_pass_method: config.change_pass_method || 'POST',
       change_pass_body_type: config.change_pass_body_type || '',
       change_pass_param_map: config.change_pass_param_map || '',
-      change_pass_param: config.change_pass_param || 'newPwd',
-      change_pass_id_param: config.change_pass_id_param || 'id',
       resubmit_path: firstPath(config.resubmit_path, '/api.php?act=budan'),
       resubmit_method: config.resubmit_method || 'POST',
       resubmit_body_type: config.resubmit_body_type || '',
       resubmit_param_map: config.resubmit_param_map || '',
-      resubmit_id_param: config.resubmit_id_param || 'id',
       log_path: firstPath(config.log_path, '/api.php?act=xq'),
       log_method: config.log_method || 'POST',
       log_body_type: config.log_body_type || '',
       log_param_map: config.log_param_map || '',
-      log_id_param: config.log_id_param || 'id',
       returns_yid: config.returns_yid === 'true',
       balance_path: firstPath(config.balance_path, '/api.php?act=getmoney'),
       balance_money_field: config.balance_money_field || 'money',

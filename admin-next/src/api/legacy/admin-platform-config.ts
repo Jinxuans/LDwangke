@@ -45,7 +45,6 @@ export interface LegacyPlatformConfig {
   pause_method: string
   pause_body_type: string
   pause_param_map: string
-  pause_id_param: string
   resume_path: string
   resume_method: string
   resume_body_type: string
@@ -54,18 +53,14 @@ export interface LegacyPlatformConfig {
   change_pass_method: string
   change_pass_body_type: string
   change_pass_param_map: string
-  change_pass_param: string
-  change_pass_id_param: string
   resubmit_path: string
   resubmit_method: string
   resubmit_body_type: string
   resubmit_param_map: string
-  resubmit_id_param: string
   log_path: string
   log_method: string
   log_body_type: string
   log_param_map: string
-  log_id_param: string
   balance_path: string
   balance_money_field: string
   balance_method: string
@@ -104,14 +99,14 @@ export interface LegacyParsedPHPResult {
   progress_method: string
   pause_act: string
   pause_path: string
-  pause_id_param?: string
+  pause_param_map: string
   change_pass_act: string
   change_pass_path: string
-  change_pass_param: string
-  change_pass_id_param: string
+  change_pass_param_map: string
+  resubmit_param_map: string
   log_act: string
   log_path: string
-  log_id_param: string
+  log_param_map: string
   returns_yid: boolean
   balance_act: string
   balance_path: string
