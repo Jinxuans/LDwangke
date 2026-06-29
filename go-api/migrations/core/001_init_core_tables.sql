@@ -235,13 +235,16 @@ CREATE TABLE IF NOT EXISTS `qingka_wangke_mijia` (
   `mid` int(11) NOT NULL AUTO_INCREMENT,
   `uid` int(11) NOT NULL,
   `cid` int(11) NOT NULL,
+  `scope_type` varchar(20) NOT NULL DEFAULT 'product' COMMENT '密价范围: product/category',
+  `scope_id` int(11) NOT NULL DEFAULT 0 COMMENT '范围ID: 商品CID或分类ID',
   `mode` int(11) NOT NULL DEFAULT 2 COMMENT '0.价格的基础上扣除 1.倍数的基础上扣除 2.直接定价 3.按倍率定价',
   `price` varchar(100) NOT NULL DEFAULT '0',
   `addtime` varchar(100) NOT NULL DEFAULT '',
   `expire_time` datetime DEFAULT NULL COMMENT '到期时间',
   `endtime` datetime DEFAULT NULL COMMENT '密价到期时间',
   PRIMARY KEY (`mid`),
-  UNIQUE KEY `uq_uid_cid` (`uid`,`cid`)
+  UNIQUE KEY `uq_uid_scope` (`uid`,`scope_type`,`scope_id`),
+  KEY `idx_mijia_uid_cid` (`uid`,`cid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- 10. 支付订单表
