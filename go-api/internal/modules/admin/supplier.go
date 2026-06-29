@@ -15,12 +15,13 @@ import (
 var adminSupplierToolService = suppliermodule.SharedService()
 
 type CloneRequest struct {
-	HID             int               `json:"hid"`
-	PriceRate       float64           `json:"price_rate"`
-	CloneCategory   bool              `json:"clone_category"`
-	SkipCategories  []string          `json:"skip_categories"`
-	NameReplace     map[string]string `json:"name_replace"`
-	SecretPriceRate float64           `json:"secret_price_rate"`
+	HID            int               `json:"hid"`
+	PriceRate      float64           `json:"price_rate"`
+	CloneCategory  bool              `json:"clone_category"`
+	SkipCategories []string          `json:"skip_categories"`
+	NameReplace    map[string]string `json:"name_replace"`
+	// Keep the legacy field name for compatibility with existing payloads.
+	SecretPriceRate float64 `json:"secret_price_rate"`
 }
 
 func registerSupplierRoutes(admin *gin.RouterGroup) {

@@ -34,7 +34,6 @@ type PlatformConfig struct {
 	PauseMethod           string
 	PauseBodyType         string
 	PauseParamMap         string
-	PauseIDParam          string
 	ChangePassMethod      string
 	ChangePassBodyType    string
 	ChangePassParamMap    string
@@ -49,14 +48,10 @@ type PlatformConfig struct {
 	LogMethod             string
 	LogBodyType           string
 	LogParamMap           string
-	LogIDParam            string
-	ChangePassParam       string
-	ChangePassIDParam     string
 	ResubmitPath          string
 	ResubmitMethod        string
 	ResubmitBodyType      string
 	ResubmitParamMap      string
-	ResubmitIDParam       string
 	BalancePath           string
 	BalanceMoneyField     string
 	BalanceMethod         string
@@ -115,12 +110,11 @@ func loadDBPlatformConfigs() {
 		COALESCE(batch_progress_body_type,''), COALESCE(batch_progress_param_map,''), yid_in_data_array,
 		COALESCE(category_path,''), COALESCE(category_method,''), COALESCE(category_body_type,''), COALESCE(category_param_map,''),
 		COALESCE(class_list_path,''), COALESCE(class_list_method,''), COALESCE(class_list_body_type,''), COALESCE(class_list_param_map,''),
-		COALESCE(pause_path,''), COALESCE(pause_method,''), COALESCE(pause_body_type,''), COALESCE(pause_param_map,''), COALESCE(pause_id_param,''),
+		COALESCE(pause_path,''), COALESCE(pause_method,''), COALESCE(pause_body_type,''), COALESCE(pause_param_map,''),
 		COALESCE(resume_path,''), COALESCE(resume_method,''), COALESCE(resume_body_type,''), COALESCE(resume_param_map,''),
-		COALESCE(change_pass_param,''), COALESCE(change_pass_id_param,''),
 		COALESCE(change_pass_path,''), COALESCE(change_pass_method,''), COALESCE(change_pass_body_type,''), COALESCE(change_pass_param_map,''),
-		COALESCE(resubmit_path,''), COALESCE(resubmit_method,''), COALESCE(resubmit_body_type,''), COALESCE(resubmit_param_map,''), COALESCE(resubmit_id_param,''),
-		COALESCE(log_path,''), COALESCE(log_method,''), COALESCE(log_body_type,''), COALESCE(log_param_map,''), COALESCE(log_id_param,''), use_json,
+		COALESCE(resubmit_path,''), COALESCE(resubmit_method,''), COALESCE(resubmit_body_type,''), COALESCE(resubmit_param_map,''),
+		COALESCE(log_path,''), COALESCE(log_method,''), COALESCE(log_body_type,''), COALESCE(log_param_map,''), use_json,
 		COALESCE(balance_path,''), COALESCE(balance_money_field,''),
 		COALESCE(balance_method,''), COALESCE(balance_body_type,''), COALESCE(balance_param_map,''), COALESCE(balance_auth_type,''),
 		COALESCE(report_param_style,''), COALESCE(report_auth_type,''),
@@ -149,12 +143,11 @@ func loadDBPlatformConfigs() {
 			&cfg.BatchProgressPath, &cfg.BatchProgressMethod, &cfg.BatchProgressBodyType, &cfg.BatchProgressParamMap, &cfg.YIDInDataArray,
 			&cfg.CategoryPath, &cfg.CategoryMethod, &cfg.CategoryBodyType, &cfg.CategoryParamMap,
 			&cfg.ClassListPath, &cfg.ClassListMethod, &cfg.ClassListBodyType, &cfg.ClassListParamMap,
-			&cfg.PausePath, &cfg.PauseMethod, &cfg.PauseBodyType, &cfg.PauseParamMap, &cfg.PauseIDParam,
+			&cfg.PausePath, &cfg.PauseMethod, &cfg.PauseBodyType, &cfg.PauseParamMap,
 			&cfg.ResumePath, &cfg.ResumeMethod, &cfg.ResumeBodyType, &cfg.ResumeParamMap,
-			&cfg.ChangePassParam, &cfg.ChangePassIDParam,
 			&cfg.ChangePassPath, &cfg.ChangePassMethod, &cfg.ChangePassBodyType, &cfg.ChangePassParamMap,
-			&cfg.ResubmitPath, &cfg.ResubmitMethod, &cfg.ResubmitBodyType, &cfg.ResubmitParamMap, &cfg.ResubmitIDParam,
-			&cfg.LogPath, &cfg.LogMethod, &cfg.LogBodyType, &cfg.LogParamMap, &cfg.LogIDParam, &cfg.UseJSON,
+			&cfg.ResubmitPath, &cfg.ResubmitMethod, &cfg.ResubmitBodyType, &cfg.ResubmitParamMap,
+			&cfg.LogPath, &cfg.LogMethod, &cfg.LogBodyType, &cfg.LogParamMap, &cfg.UseJSON,
 			&cfg.BalancePath, &cfg.BalanceMoneyField, &cfg.BalanceMethod, &cfg.BalanceBodyType, &cfg.BalanceParamMap, &cfg.BalanceAuthType,
 			&cfg.ReportParamStyle, &cfg.ReportAuthType,
 			&cfg.ReportPath, &cfg.ReportMethod, &cfg.ReportBodyType, &cfg.ReportParamMap,

@@ -55,13 +55,12 @@ func loadClassesWithPricing(uid int, query string, args ...interface{}) ([]model
 	}
 	defer rows.Close()
 
-	type classWithYunsuan struct {
-		c       model.Class
-		yunsuan string
+	type classWithPricing struct {
+		c model.Class
 	}
 
-	var tempList []classWithYunsuan
-	var cids []int
+	var tempList []classWithPricing
+	var pricingInputs []PricingInput
 
 	for rows.Next() {
 		var c model.Class
@@ -69,28 +68,20 @@ func loadClassesWithPricing(uid int, query string, args ...interface{}) ([]model
 		if err := rows.Scan(&c.CID, &c.Name, &c.Noun, &c.Price, &c.Docking, &c.Fenlei, &c.Status, &c.Sort, &c.Content, &yunsuan); err != nil {
 			continue
 		}
-		tempList = append(tempList, classWithYunsuan{c: c, yunsuan: yunsuan})
-		cids = append(cids, c.CID)
+		tempList = append(tempList, classWithPricing{c: c})
+		basePrice, _ := strconv.ParseFloat(c.Price, 64)
+		pricingInputs = append(pricingInputs, PricingInput{CID: c.CID, BasePrice: basePrice, Yunsuan: yunsuan})
 	}
 
-	mijiaMap := map[int]MiJiaRule{}
-	if len(cids) > 0 {
-		if loaded, err := LoadMiJiaMap(uid, cids); err == nil {
-			mijiaMap = loaded
-		}
-	}
+	pricingResults, _ := ResolveClassPrices(uid, pricingInputs, addprice, 4)
 
 	var list []model.Class
 	for _, item := range tempList {
 		c := item.c
-		basePrice, _ := strconv.ParseFloat(c.Price, 64)
-
-		price := ComputeClassBasePrice(basePrice, addprice, item.yunsuan, 4)
-
-		if mj, ok := mijiaMap[c.CID]; ok {
-			adjustedPrice, _, applied := ApplyMiJia(basePrice, addprice, item.yunsuan, mj.Mode, mj.Price, 4)
-			price = adjustedPrice
-			if applied {
+		price := 0.0
+		if pricing, ok := pricingResults[c.CID]; ok {
+			price = pricing.Price
+			if pricing.MiJiaApplied {
 				c.Name = "【密价】" + c.Name
 			}
 		}

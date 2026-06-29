@@ -1,7 +1,6 @@
 package supplier
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -93,26 +92,14 @@ func buildBatchProgressActionFields(refs []model.SupplierBatchProgressRef) map[s
 }
 
 func parseConfiguredProgressResponse(body []byte) ([]model.SupplierProgressItem, error) {
-	var raw map[string]interface{}
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("解析响应失败：%s", string(body))
+	resp, err := parseActionJSONResponse(body)
+	if err != nil {
+		return nil, err
 	}
 
-	codeVal := ""
-	if codeRaw, ok := raw["code"]; ok {
-		switch v := codeRaw.(type) {
-		case string:
-			codeVal = v
-		case float64:
-			codeVal = fmt.Sprintf("%.0f", v)
-		case int:
-			codeVal = fmt.Sprintf("%d", v)
-		default:
-			codeVal = fmt.Sprintf("%v", v)
-		}
-	}
+	codeVal := resp.code()
 	if codeVal != "0" && codeVal != "1" {
-		msg := toString(raw["msg"])
+		msg := resp.msg()
 		if isNoBatchProgressUpdateMessage(msg) {
 			return []model.SupplierProgressItem{}, nil
 		}
@@ -123,17 +110,8 @@ func parseConfiguredProgressResponse(body []byte) ([]model.SupplierProgressItem,
 	}
 
 	items := make([]model.SupplierProgressItem, 0)
-	switch data := raw["data"].(type) {
-	case []interface{}:
-		for _, item := range data {
-			row, ok := item.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			items = append(items, supplierProgressItemFromMap(row))
-		}
-	case map[string]interface{}:
-		items = append(items, supplierProgressItemFromMap(data))
+	for _, row := range resp.dataRows() {
+		items = append(items, supplierProgressItemFromMap(row))
 	}
 
 	return items, nil
@@ -159,27 +137,18 @@ func isNoBatchProgressUpdateMessage(msg string) bool {
 }
 
 func supplierProgressItemFromMap(data map[string]interface{}) model.SupplierProgressItem {
-	firstValue := func(keys ...string) string {
-		for _, key := range keys {
-			if value := toString(data[key]); strings.TrimSpace(value) != "" {
-				return value
-			}
-		}
-		return ""
-	}
-
 	return model.SupplierProgressItem{
-		YID:             firstValue("id", "yid", "uuid"),
-		Noun:            firstValue("cid", "noun", "courseid", "course_id"),
-		KCName:          firstValue("kcname", "course", "course_name", "courseName"),
-		User:            firstValue("user", "username", "account"),
-		Status:          firstValue("status", "state"),
-		StatusText:      firstValue("status_text", "statusText", "status_msg"),
-		Process:         firstValue("process", "progress"),
-		Remarks:         firstValue("remarks", "message", "msg"),
-		CourseStartTime: firstValue("courseStartTime", "kcks"),
-		CourseEndTime:   firstValue("courseEndTime", "kcjs"),
-		ExamStartTime:   firstValue("examStartTime", "ksks"),
-		ExamEndTime:     firstValue("examEndTime", "ksjs"),
+		YID:             firstActionValue(data, "id", "yid", "uuid"),
+		Noun:            firstActionValue(data, "cid", "noun", "courseid", "course_id"),
+		KCName:          firstActionValue(data, "kcname", "course", "course_name", "courseName"),
+		User:            firstActionValue(data, "user", "username", "account"),
+		Status:          firstActionValue(data, "status", "state"),
+		StatusText:      firstActionValue(data, "status_text", "statusText", "status_msg"),
+		Process:         firstActionValue(data, "process", "progress"),
+		Remarks:         firstActionValue(data, "remarks", "message", "msg"),
+		CourseStartTime: firstActionValue(data, "courseStartTime", "kcks"),
+		CourseEndTime:   firstActionValue(data, "courseEndTime", "kcjs"),
+		ExamStartTime:   firstActionValue(data, "examStartTime", "ksks"),
+		ExamEndTime:     firstActionValue(data, "examEndTime", "ksjs"),
 	}
 }

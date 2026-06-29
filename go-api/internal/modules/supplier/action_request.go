@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"go-api/internal/model"
@@ -21,8 +20,6 @@ type actionExecutionResult struct {
 	ContentType string
 	Payload     string
 }
-
-var actionTemplatePattern = regexp.MustCompile(`\{\{\s*([^{}]+?)\s*\}\}`)
 
 func hasExplicitActionConfig(values ...string) bool {
 	for _, value := range values {
@@ -46,44 +43,6 @@ func requireExplicitActionConfig(actionName, path, method, paramMap string) erro
 	return nil
 }
 
-func buildActionTemplateVars(sup *model.SupplierFull, fields map[string]string) map[string]string {
-	vars := map[string]string{
-		"supplier.uid":    sup.User,
-		"supplier.key":    sup.Pass,
-		"supplier.pass":   sup.Pass,
-		"supplier.token":  getSupplierToken(sup),
-		"supplier.cookie": sup.Cookie,
-		"supplier.url":    sup.URL,
-		"supplier.pt":     sup.PT,
-	}
-
-	for k, v := range fields {
-		if k == "" || !strings.Contains(k, ".") {
-			continue
-		}
-		vars[k] = v
-	}
-
-	return vars
-}
-
-func renderActionTemplate(raw string, vars map[string]string) string {
-	if raw == "" {
-		return ""
-	}
-	return actionTemplatePattern.ReplaceAllStringFunc(raw, func(match string) string {
-		submatch := actionTemplatePattern.FindStringSubmatch(match)
-		if len(submatch) != 2 {
-			return ""
-		}
-		key := strings.TrimSpace(submatch[1])
-		if val, ok := vars[key]; ok {
-			return val
-		}
-		return ""
-	})
-}
-
 func buildActionParams(paramMapRaw string, sup *model.SupplierFull, fields map[string]string, defaults map[string]string) (map[string]string, error) {
 	if strings.TrimSpace(paramMapRaw) == "" {
 		result := map[string]string{}
@@ -100,13 +59,16 @@ func buildActionParams(paramMapRaw string, sup *model.SupplierFull, fields map[s
 		return nil, fmt.Errorf("参数映射 JSON 格式错误: %v", err)
 	}
 
-	vars := buildActionTemplateVars(sup, fields)
+	ctx := newActionTemplateContext(sup, fields)
 	result := map[string]string{}
 	for k, tmpl := range templateMap {
 		if strings.TrimSpace(k) == "" {
 			continue
 		}
-		value := renderActionTemplate(tmpl, vars)
+		value, err := ctx.render(tmpl)
+		if err != nil {
+			return nil, err
+		}
 		if strings.TrimSpace(value) == "" {
 			continue
 		}

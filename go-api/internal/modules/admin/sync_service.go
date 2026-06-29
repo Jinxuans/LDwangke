@@ -25,7 +25,7 @@ type SyncDiffItem struct {
 	FullOldValue   string  `json:"-"`
 	FullNewValue   string  `json:"-"`
 	UpstreamCID    string  `json:"upstream_cid"`
-	SecretPrice    float64 `json:"-"`
+	ProtectedPrice float64 `json:"-"`
 	UpstreamFenlei string  `json:"-"`
 }
 
@@ -293,17 +293,14 @@ func adminSyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, er
 					}
 				}
 				newPrice := math.Round(up.Price*calcRate*100) / 100
-				secretPrice := 0.0
-				if cfg.SecretPriceRate > 0 {
-					secretPrice = math.Round(newPrice*cfg.SecretPriceRate*100) / 100
-				}
+				protectedPrice := cfg.SyncProtectedPrice(newPrice)
 				diffs = append(diffs, SyncDiffItem{
 					Action:         "克隆上架",
 					Name:           displayName,
 					NewValue:       fmt.Sprintf("%.2f", newPrice),
 					UpstreamCID:    up.CID,
 					Category:       up.CategoryName,
-					SecretPrice:    secretPrice,
+					ProtectedPrice: protectedPrice,
 					UpstreamFenlei: up.Fenlei,
 					FullNewValue:   up.Content,
 				})
@@ -322,38 +319,35 @@ func adminSyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, er
 		newPrice := math.Round(up.Price*calcRate*100) / 100
 		categoryName := categoryNames[local.Fenlei]
 
-		secretPrice := 0.0
-		if cfg.SecretPriceRate > 0 {
-			secretPrice = math.Round(newPrice*cfg.SecretPriceRate*100) / 100
-		}
+		protectedPrice := cfg.SyncProtectedPrice(newPrice)
 
 		if cfg.SyncPrice {
 			if cfg.ForcePriceUp {
 				if newPrice > local.Price {
 					diffs = append(diffs, SyncDiffItem{
-						Action:      "更新价格",
-						CID:         local.CID,
-						Name:        local.Name,
-						Category:    categoryName,
-						CategoryID:  local.Fenlei,
-						OldValue:    fmt.Sprintf("%.2f", local.Price),
-						NewValue:    fmt.Sprintf("%.2f", newPrice),
-						UpstreamCID: up.CID,
-						SecretPrice: secretPrice,
+						Action:         "更新价格",
+						CID:            local.CID,
+						Name:           local.Name,
+						Category:       categoryName,
+						CategoryID:     local.Fenlei,
+						OldValue:       fmt.Sprintf("%.2f", local.Price),
+						NewValue:       fmt.Sprintf("%.2f", newPrice),
+						UpstreamCID:    up.CID,
+						ProtectedPrice: protectedPrice,
 					})
 					summary["更新价格"]++
 				}
 			} else if math.Abs(newPrice-local.Price) > 0.001 {
 				diffs = append(diffs, SyncDiffItem{
-					Action:      "更新价格",
-					CID:         local.CID,
-					Name:        local.Name,
-					Category:    categoryName,
-					CategoryID:  local.Fenlei,
-					OldValue:    fmt.Sprintf("%.2f", local.Price),
-					NewValue:    fmt.Sprintf("%.2f", newPrice),
-					UpstreamCID: up.CID,
-					SecretPrice: secretPrice,
+					Action:         "更新价格",
+					CID:            local.CID,
+					Name:           local.Name,
+					Category:       categoryName,
+					CategoryID:     local.Fenlei,
+					OldValue:       fmt.Sprintf("%.2f", local.Price),
+					NewValue:       fmt.Sprintf("%.2f", newPrice),
+					UpstreamCID:    up.CID,
+					ProtectedPrice: protectedPrice,
 				})
 				summary["更新价格"]++
 			}
@@ -489,10 +483,10 @@ func adminSyncExecute(hid int, customCfg ...*SyncConfig) (*SyncExecuteResult, er
 				}
 			}
 		case "更新价格":
-			if diff.SecretPrice > 0 {
+			if diff.ProtectedPrice > 0 {
 				_, execErr = database.DB.Exec(
 					"UPDATE qingka_wangke_class SET price = ?, secret_price = ? WHERE cid = ?",
-					diff.NewValue, fmt.Sprintf("%.2f", diff.SecretPrice), diff.CID,
+					diff.NewValue, fmt.Sprintf("%.2f", diff.ProtectedPrice), diff.CID,
 				)
 			} else {
 				_, execErr = database.DB.Exec(
@@ -544,12 +538,12 @@ func adminSyncExecute(hid int, customCfg ...*SyncConfig) (*SyncExecuteResult, er
 			}
 
 			content := diff.FullNewValue
-			if diff.SecretPrice > 0 {
+			if diff.ProtectedPrice > 0 {
 				_, execErr = database.DB.Exec(
 					`INSERT INTO qingka_wangke_class (name, noun, getnoun, docking, queryplat, price, secret_price, yunsuan, content, fenlei, status, addtime)
 					 VALUES (?, ?, ?, ?, ?, ?, ?, '*', ?, ?, 1, ?)`,
 					diff.Name, diff.UpstreamCID, diff.UpstreamCID, hid, hid, diff.NewValue,
-					fmt.Sprintf("%.2f", diff.SecretPrice), content, fenlei, now,
+					fmt.Sprintf("%.2f", diff.ProtectedPrice), content, fenlei, now,
 				)
 			} else {
 				_, execErr = database.DB.Exec(

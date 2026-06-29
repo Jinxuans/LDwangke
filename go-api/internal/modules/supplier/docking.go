@@ -42,14 +42,14 @@ func (s *Service) CallSupplierOrder(sup *model.SupplierFull, cls *model.ClassFul
 	defaultParams["pass"] = pass
 	defaultParams["kcid"] = kcid
 	defaultParams["kcname"] = kcname
-	actionFields := map[string]string{
-		"order.school": school,
-		"order.user":   user,
-		"order.pass":   pass,
-		"order.kcid":   kcid,
-		"order.kcname": kcname,
-		"order.noun":   cls.Noun,
-	}
+	actionFields := orderActionFields(map[string]string{
+		"school": school,
+		"user":   user,
+		"pass":   pass,
+		"kcid":   kcid,
+		"kcname": kcname,
+		"noun":   cls.Noun,
+	})
 
 	if cfg.ExtraParams && extraFields != nil {
 		for k, v := range extraFields {
@@ -206,22 +206,7 @@ func (s *Service) QueryOrderProgress(sup *model.SupplierFull, yid string, userna
 	}
 
 	cfg := GetPlatformConfig(sup.PT)
-	actionFields := map[string]string{}
-	if username != "" {
-		actionFields["order.user"] = username
-	}
-	if yid != "" {
-		actionFields["order.yid"] = yid
-	}
-
-	if orderExtra != nil {
-		for k, v := range orderExtra {
-			if v == "" {
-				continue
-			}
-			actionFields["order."+k] = v
-		}
-	}
+	actionFields := orderProgressActionFields(yid, username, orderExtra)
 
 	// 进度查询现在始终只走同一套 endpoint 配置。
 	if err := requireExplicitActionConfig("进度接口", cfg.ProgressPath, cfg.ProgressMethod, cfg.ProgressParamMap); err != nil {
@@ -279,11 +264,6 @@ func (s *Service) PauseOrder(sup *model.SupplierFull, yid string) (int, string, 
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.PausePath)
 	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
 	fallbackBodyType := "form"
-	idParam := cfg.PauseIDParam
-	if idParam == "" {
-		idParam = "id"
-	}
-	defaultParams[idParam] = yid
 	execResult, err := s.executeConfiguredAction(
 		sup,
 		apiURL,
@@ -293,7 +273,7 @@ func (s *Service) PauseOrder(sup *model.SupplierFull, yid string) (int, string, 
 		http.MethodPost,
 		fallbackBodyType,
 		defaultParams,
-		map[string]string{"order.yid": yid},
+		orderActionFields(map[string]string{"yid": yid}),
 	)
 	if err != nil {
 		return -1, "", fmt.Errorf("请求上游失败：%v", err)
@@ -324,16 +304,6 @@ func (s *Service) ChangePassword(sup *model.SupplierFull, yid, newPwd string) (i
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.ChangePassPath)
 	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
 	fallbackBodyType := "form"
-	idParam := cfg.ChangePassIDParam
-	if idParam == "" {
-		idParam = "id"
-	}
-	pwdParam := cfg.ChangePassParam
-	if pwdParam == "" {
-		pwdParam = "newPwd"
-	}
-	defaultParams[idParam] = yid
-	defaultParams[pwdParam] = newPwd
 	execResult, err := s.executeConfiguredAction(
 		sup,
 		apiURL,
@@ -374,11 +344,6 @@ func (s *Service) ResubmitOrder(sup *model.SupplierFull, yid string) (int, strin
 	apiURL := resolveConfiguredActionURL(sup.URL, cfg.ResubmitPath)
 	defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
 	fallbackBodyType := "form"
-	idParam := cfg.ResubmitIDParam
-	if idParam == "" {
-		idParam = "id"
-	}
-	defaultParams[idParam] = yid
 	execResult, err := s.executeConfiguredAction(
 		sup,
 		apiURL,
@@ -388,7 +353,7 @@ func (s *Service) ResubmitOrder(sup *model.SupplierFull, yid string) (int, strin
 		http.MethodPost,
 		fallbackBodyType,
 		defaultParams,
-		map[string]string{"order.yid": yid},
+		orderActionFields(map[string]string{"yid": yid}),
 	)
 	if err != nil {
 		return -1, "", fmt.Errorf("请求上游失败：%v", err)
@@ -520,28 +485,23 @@ func (s *Service) QueryOrderLogs(sup *model.SupplierFull, yid string, orderExtra
 		return nil, err
 	}
 	if cfg.LogPath != "" {
-		fields := map[string]string{}
-		if yid != "" {
-			fields["order.yid"] = yid
-		}
-		defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
+		var extra map[string]string
 		if len(orderExtra) > 0 {
-			for k, v := range orderExtra[0] {
-				if v == "" {
-					continue
-				}
-				fields["order."+k] = v
-			}
-			if v := orderExtra[0]["user"]; v != "" {
+			extra = orderExtra[0]
+		}
+		fields := orderLogActionFields(yid, extra)
+		defaultParams := defaultSupplierAuthParams(sup, cfg.AuthType)
+		if extra != nil {
+			if v := extra["user"]; v != "" {
 				defaultParams["account"] = v
 			}
-			if v := orderExtra[0]["pass"]; v != "" {
+			if v := extra["pass"]; v != "" {
 				defaultParams["password"] = v
 			}
-			if v := orderExtra[0]["kcname"]; v != "" {
+			if v := extra["kcname"]; v != "" {
 				defaultParams["course"] = v
 			}
-			if v := orderExtra[0]["kcid"]; v != "" {
+			if v := extra["kcid"]; v != "" {
 				defaultParams["courseId"] = v
 			}
 		}

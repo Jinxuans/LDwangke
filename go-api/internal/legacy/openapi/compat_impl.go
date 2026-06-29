@@ -172,26 +172,26 @@ func compatClass(c *gin.Context) {
 	}
 
 	var items []compatClassItem
-	var cids []int
+	var pricingInputs []classmodule.PricingInput
 	for rows.Next() {
 		var item compatClassItem
 		var priceStr string
 		rows.Scan(&item.cid, &item.sort, &item.name, &item.content, &item.status, &priceStr, &item.yunsuan)
 		item.basePrice, _ = strconv.ParseFloat(priceStr, 64)
 		items = append(items, item)
-		cids = append(cids, item.cid)
+		pricingInputs = append(pricingInputs, classmodule.PricingInput{CID: item.cid, BasePrice: item.basePrice, Yunsuan: item.yunsuan})
 	}
 
-	mijiaMap := map[int]classmodule.MiJiaRule{}
-	if loaded, err := classmodule.LoadMiJiaMap(uid, cids); err == nil {
-		mijiaMap = loaded
+	pricingResults, err := classmodule.ResolveClassPrices(uid, pricingInputs, addprice, 4)
+	if err != nil {
+		pricingResults = map[int]classmodule.PricingResult{}
 	}
 
 	var data []gin.H
 	for _, item := range items {
-		userPrice := classmodule.ComputeClassBasePrice(item.basePrice, addprice, item.yunsuan, 4)
-		if mj, ok := mijiaMap[item.cid]; ok {
-			userPrice, _, _ = classmodule.ApplyMiJia(item.basePrice, addprice, item.yunsuan, mj.Mode, mj.Price, 4)
+		userPrice := 0.0
+		if pricing, ok := pricingResults[item.cid]; ok {
+			userPrice = pricing.Price
 		}
 
 		data = append(data, gin.H{
@@ -654,26 +654,26 @@ func compatGetClass(c *gin.Context) {
 	}
 
 	var items []compatGetClassItem
-	var cids []int
+	var pricingInputs []classmodule.PricingInput
 	for rows.Next() {
 		var item compatGetClassItem
 		var priceStr string
 		rows.Scan(&item.cid, &item.name, &priceStr, &item.yunsuan, &item.fenlei, &item.status)
 		item.basePrice, _ = strconv.ParseFloat(priceStr, 64)
 		items = append(items, item)
-		cids = append(cids, item.cid)
+		pricingInputs = append(pricingInputs, classmodule.PricingInput{CID: item.cid, BasePrice: item.basePrice, Yunsuan: item.yunsuan})
 	}
 
-	mijiaMap := map[int]classmodule.MiJiaRule{}
-	if loaded, err := classmodule.LoadMiJiaMap(uid, cids); err == nil {
-		mijiaMap = loaded
+	pricingResults, err := classmodule.ResolveClassPrices(uid, pricingInputs, addprice, 4)
+	if err != nil {
+		pricingResults = map[int]classmodule.PricingResult{}
 	}
 
 	var data []gin.H
 	for _, item := range items {
-		userPrice := classmodule.ComputeClassBasePrice(item.basePrice, addprice, item.yunsuan, 4)
-		if mj, ok := mijiaMap[item.cid]; ok {
-			userPrice, _, _ = classmodule.ApplyMiJia(item.basePrice, addprice, item.yunsuan, mj.Mode, mj.Price, 4)
+		userPrice := 0.0
+		if pricing, ok := pricingResults[item.cid]; ok {
+			userPrice = pricing.Price
 		}
 
 		data = append(data, gin.H{

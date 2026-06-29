@@ -48,7 +48,6 @@ type PlatformConfigDB struct {
 	PauseMethod           string    `json:"pause_method" db:"pause_method"`
 	PauseBodyType         string    `json:"pause_body_type" db:"pause_body_type"`
 	PauseParamMap         string    `json:"pause_param_map" db:"pause_param_map"`
-	PauseIDParam          string    `json:"pause_id_param" db:"pause_id_param"`
 	ResumePath            string    `json:"resume_path" db:"resume_path"`
 	ResumeMethod          string    `json:"resume_method" db:"resume_method"`
 	ResumeBodyType        string    `json:"resume_body_type" db:"resume_body_type"`
@@ -57,18 +56,14 @@ type PlatformConfigDB struct {
 	ChangePassMethod      string    `json:"change_pass_method" db:"change_pass_method"`
 	ChangePassBodyType    string    `json:"change_pass_body_type" db:"change_pass_body_type"`
 	ChangePassParamMap    string    `json:"change_pass_param_map" db:"change_pass_param_map"`
-	ChangePassParam       string    `json:"change_pass_param" db:"change_pass_param"`
-	ChangePassIDParam     string    `json:"change_pass_id_param" db:"change_pass_id_param"`
 	ResubmitPath          string    `json:"resubmit_path" db:"resubmit_path"`
 	ResubmitMethod        string    `json:"resubmit_method" db:"resubmit_method"`
 	ResubmitBodyType      string    `json:"resubmit_body_type" db:"resubmit_body_type"`
 	ResubmitParamMap      string    `json:"resubmit_param_map" db:"resubmit_param_map"`
-	ResubmitIDParam       string    `json:"resubmit_id_param" db:"resubmit_id_param"`
 	LogPath               string    `json:"log_path" db:"log_path"`
 	LogMethod             string    `json:"log_method" db:"log_method"`
 	LogBodyType           string    `json:"log_body_type" db:"log_body_type"`
 	LogParamMap           string    `json:"log_param_map" db:"log_param_map"`
-	LogIDParam            string    `json:"log_id_param" db:"log_id_param"`
 	BalancePath           string    `json:"balance_path" db:"balance_path"`
 	BalanceMoneyField     string    `json:"balance_money_field" db:"balance_money_field"`
 	BalanceMethod         string    `json:"balance_method" db:"balance_method"`
@@ -137,7 +132,6 @@ type PlatformConfigSaveRequest struct {
 	PauseMethod           string `json:"pause_method"`
 	PauseBodyType         string `json:"pause_body_type"`
 	PauseParamMap         string `json:"pause_param_map"`
-	PauseIDParam          string `json:"pause_id_param"`
 	ResumePath            string `json:"resume_path"`
 	ResumeMethod          string `json:"resume_method"`
 	ResumeBodyType        string `json:"resume_body_type"`
@@ -146,18 +140,14 @@ type PlatformConfigSaveRequest struct {
 	ChangePassMethod      string `json:"change_pass_method"`
 	ChangePassBodyType    string `json:"change_pass_body_type"`
 	ChangePassParamMap    string `json:"change_pass_param_map"`
-	ChangePassParam       string `json:"change_pass_param"`
-	ChangePassIDParam     string `json:"change_pass_id_param"`
 	ResubmitPath          string `json:"resubmit_path"`
 	ResubmitMethod        string `json:"resubmit_method"`
 	ResubmitBodyType      string `json:"resubmit_body_type"`
 	ResubmitParamMap      string `json:"resubmit_param_map"`
-	ResubmitIDParam       string `json:"resubmit_id_param"`
 	LogPath               string `json:"log_path"`
 	LogMethod             string `json:"log_method"`
 	LogBodyType           string `json:"log_body_type"`
 	LogParamMap           string `json:"log_param_map"`
-	LogIDParam            string `json:"log_id_param"`
 	BalancePath           string `json:"balance_path"`
 	BalanceMoneyField     string `json:"balance_money_field"`
 	BalanceMethod         string `json:"balance_method"`

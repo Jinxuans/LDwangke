@@ -110,6 +110,8 @@ type autoSyncItem struct {
 	HID        int
 	PT         string
 	User       string
+	Pass       string
+	School     string
 	KCName     string
 	Noun       string
 	KCID       string
@@ -260,16 +262,8 @@ func (r *legacyRepository) AddOrders(uid int, req model.OrderAddRequest) (*model
 		return nil, errors.New("用户不存在")
 	}
 
-	var unitPrice float64
-	if cls.Yunsuan == "+" {
-		unitPrice = math.Round((clsPrice+addprice)*10000) / 10000
-	} else {
-		unitPrice = math.Round((clsPrice*addprice)*10000) / 10000
-	}
-
-	if mijia, ok, err := classmodule.LoadMiJia(uid, req.CID); err == nil && ok {
-		unitPrice, _, _ = classmodule.ApplyMiJia(clsPrice, addprice, cls.Yunsuan, mijia.Mode, mijia.Price, 4)
-	}
+	pricing, err := classmodule.ResolveClassPrice(uid, classmodule.PricingInput{CID: req.CID, BasePrice: clsPrice, Yunsuan: cls.Yunsuan}, addprice, 4)
+	unitPrice := pricing.Price
 
 	var pledgeDiscount float64
 	err = database.DB.QueryRow(`
@@ -409,12 +403,8 @@ func (r *legacyRepository) AddOrdersForMall(bUID, tid, cUID int, retailPrice flo
 		return nil, errors.New("商家账户异常")
 	}
 
-	var supplyPrice float64
-	if cls.Yunsuan == "+" {
-		supplyPrice = math.Round((clsPrice+addprice)*10000) / 10000
-	} else {
-		supplyPrice = math.Round((clsPrice*addprice)*10000) / 10000
-	}
+	pricing, err := classmodule.ResolveClassPrice(bUID, classmodule.PricingInput{CID: req.CID, BasePrice: clsPrice, Yunsuan: cls.Yunsuan}, addprice, 4)
+	supplyPrice := pricing.Price
 	if supplyPrice <= 0 {
 		return nil, errors.New("供货价异常，请联系平台")
 	}
@@ -714,11 +704,11 @@ func (r *legacyRepository) SyncOrderProgress(oids []int) (int, error) {
 		// yid/hid 用于定位上游订单和供应商，
 		// user/kcname/noun 用于那些要求附带账号、课程名、上游商品ID 的平台做回退匹配。
 		var yidStr, hidStr string
-		var user, kcname, kcid, noun, status string
+		var user, pass, school, kcname, kcid, noun, status string
 		err := database.DB.QueryRow(
-			"SELECT COALESCE(yid,''), COALESCE(hid,'0'), COALESCE(user,''), COALESCE(kcname,''), COALESCE(kcid,''), COALESCE(noun,''), COALESCE(status,'') FROM qingka_wangke_order WHERE oid = ?",
+			"SELECT COALESCE(yid,''), COALESCE(hid,'0'), COALESCE(user,''), COALESCE(pass,''), COALESCE(school,''), COALESCE(kcname,''), COALESCE(kcid,''), COALESCE(noun,''), COALESCE(status,'') FROM qingka_wangke_order WHERE oid = ?",
 			oid,
-		).Scan(&yidStr, &hidStr, &user, &kcname, &kcid, &noun, &status)
+		).Scan(&yidStr, &hidStr, &user, &pass, &school, &kcname, &kcid, &noun, &status)
 		hid, _ := strconv.Atoi(hidStr)
 		if err != nil || hid == 0 {
 			continue
@@ -741,6 +731,8 @@ func (r *legacyRepository) SyncOrderProgress(oids []int) (int, error) {
 			"kcname":       kcname,
 			"kcid":         kcid,
 			"noun":         noun,
+			"pass":         pass,
+			"school":       school,
 			"__debug_http": "1",
 			"__debug_oid":  strconv.Itoa(oid),
 		}
@@ -794,7 +786,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 	query := `
 		SELECT oid, COALESCE(yid,''), COALESCE(hid,'0'),
 			COALESCE((SELECT pt FROM qingka_wangke_huoyuan WHERE hid = qingka_wangke_order.hid LIMIT 1),''),
-			COALESCE(user,''), COALESCE(kcname,''), COALESCE(noun,''), COALESCE(kcid,''), COALESCE(status,''), COALESCE(addtime,''), COALESCE(updatetime,'')
+			COALESCE(user,''), COALESCE(pass,''), COALESCE(school,''), COALESCE(kcname,''), COALESCE(noun,''), COALESCE(kcid,''), COALESCE(status,''), COALESCE(addtime,''), COALESCE(updatetime,'')
 		FROM qingka_wangke_order
 		WHERE dockstatus = 1`
 	args := make([]interface{}, 0, 8)
@@ -845,7 +837,7 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 	for rows.Next() {
 		var item autoSyncItem
 		var hidStr string
-		if err := rows.Scan(&item.OID, &item.YID, &hidStr, &item.PT, &item.User, &item.KCName, &item.Noun, &item.KCID, &item.Status, &item.AddTime, &item.UpdateTime); err != nil {
+		if err := rows.Scan(&item.OID, &item.YID, &hidStr, &item.PT, &item.User, &item.Pass, &item.School, &item.KCName, &item.Noun, &item.KCID, &item.Status, &item.AddTime, &item.UpdateTime); err != nil {
 			continue
 		}
 		item.HID, _ = strconv.Atoi(hidStr)
@@ -1038,6 +1030,8 @@ func (r *legacyRepository) AutoSyncAllProgress(opts AutoSyncOptions) (int, int, 
 				orderExtra := map[string]string{
 					"kcname": item.KCName,
 					"noun":   item.Noun,
+					"pass":   item.Pass,
+					"school": item.School,
 				}
 				if item.KCID != "" {
 					orderExtra["kcid"] = item.KCID

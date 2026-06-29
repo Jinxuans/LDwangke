@@ -23,7 +23,7 @@ type SyncDiffItem struct {
 	FullOldValue   string  `json:"-"`
 	FullNewValue   string  `json:"-"`
 	UpstreamCID    string  `json:"upstream_cid"`
-	SecretPrice    float64 `json:"-"`
+	ProtectedPrice float64 `json:"-"`
 	UpstreamFenlei string  `json:"-"`
 }
 
@@ -262,17 +262,14 @@ func SyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, error) 
 					}
 				}
 				newPrice := roundPrice(up.Price * calcRate)
-				secretPrice := 0.0
-				if cfg.SecretPriceRate > 0 {
-					secretPrice = roundPrice(newPrice * cfg.SecretPriceRate)
-				}
+				protectedPrice := cfg.SyncProtectedPrice(newPrice)
 				diffs = append(diffs, SyncDiffItem{
 					Action:         "克隆上架",
 					Name:           displayName,
 					NewValue:       fmt.Sprintf("%.2f", newPrice),
 					UpstreamCID:    up.CID,
 					Category:       up.CategoryName,
-					SecretPrice:    secretPrice,
+					ProtectedPrice: protectedPrice,
 					UpstreamFenlei: up.Fenlei,
 					FullNewValue:   up.Content,
 				})
@@ -290,10 +287,7 @@ func SyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, error) 
 		}
 		newPrice := roundPrice(up.Price * calcRate)
 		categoryName := categoryNames[local.Fenlei]
-		secretPrice := 0.0
-		if cfg.SecretPriceRate > 0 {
-			secretPrice = roundPrice(newPrice * cfg.SecretPriceRate)
-		}
+		protectedPrice := cfg.SyncProtectedPrice(newPrice)
 
 		if cfg.SyncPrice {
 			shouldUpdatePrice := newPrice > local.Price
@@ -302,15 +296,15 @@ func SyncPreview(hid int, customCfg ...*SyncConfig) (*SyncPreviewResult, error) 
 			}
 			if shouldUpdatePrice {
 				diffs = append(diffs, SyncDiffItem{
-					Action:      "更新价格",
-					CID:         local.CID,
-					Name:        local.Name,
-					Category:    categoryName,
-					CategoryID:  local.Fenlei,
-					OldValue:    fmt.Sprintf("%.2f", local.Price),
-					NewValue:    fmt.Sprintf("%.2f", newPrice),
-					UpstreamCID: up.CID,
-					SecretPrice: secretPrice,
+					Action:         "更新价格",
+					CID:            local.CID,
+					Name:           local.Name,
+					Category:       categoryName,
+					CategoryID:     local.Fenlei,
+					OldValue:       fmt.Sprintf("%.2f", local.Price),
+					NewValue:       fmt.Sprintf("%.2f", newPrice),
+					UpstreamCID:    up.CID,
+					ProtectedPrice: protectedPrice,
 				})
 				summary["更新价格"]++
 			}
@@ -505,10 +499,10 @@ func createCategory(diff SyncDiffItem, createdCategories map[string]int) error {
 }
 
 func updatePrice(diff SyncDiffItem) error {
-	if diff.SecretPrice > 0 {
+	if diff.ProtectedPrice > 0 {
 		_, err := database.DB.Exec(
 			"UPDATE qingka_wangke_class SET price = ?, secret_price = ? WHERE cid = ?",
-			diff.NewValue, fmt.Sprintf("%.2f", diff.SecretPrice), diff.CID,
+			diff.NewValue, fmt.Sprintf("%.2f", diff.ProtectedPrice), diff.CID,
 		)
 		return err
 	}
@@ -536,12 +530,12 @@ func cloneProduct(hid int, diff SyncDiffItem, createdCategories map[string]int, 
 	}
 
 	content := diff.FullNewValue
-	if diff.SecretPrice > 0 {
+	if diff.ProtectedPrice > 0 {
 		_, err := database.DB.Exec(
 			`INSERT INTO qingka_wangke_class (name, noun, getnoun, docking, queryplat, price, secret_price, yunsuan, content, fenlei, status, addtime)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, '*', ?, ?, 1, ?)`,
 			diff.Name, diff.UpstreamCID, diff.UpstreamCID, hid, hid, diff.NewValue,
-			fmt.Sprintf("%.2f", diff.SecretPrice), content, fenlei, now,
+			fmt.Sprintf("%.2f", diff.ProtectedPrice), content, fenlei, now,
 		)
 		return err
 	}

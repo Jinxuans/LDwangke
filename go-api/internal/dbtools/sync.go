@@ -210,7 +210,7 @@ var (
 			name:         "qingka_wangke_mijia",
 			label:        "密价",
 			aliases:      []string{"love_learn_mijia"},
-			matchRules:   []syncMatchRule{{name: "uid-cid", columns: []string{"uid", "cid"}}},
+			matchRules:   []syncMatchRule{{name: "uid-scope", columns: []string{"uid", "scope_type", "scope_id"}}, {name: "uid-cid", columns: []string{"uid", "cid"}}},
 			mergeByMatch: true,
 			remapRefs: []syncReferenceDef{
 				{column: "uid", refTable: "qingka_wangke_user"},

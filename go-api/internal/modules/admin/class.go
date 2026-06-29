@@ -381,7 +381,35 @@ func AdminCategoryBatchToggle(c *gin.Context) {
 }
 
 func AdminClassDropdown(c *gin.Context) {
-	rows, err := database.DB.Query("SELECT cid, COALESCE(name,''), COALESCE(price,'0'), COALESCE(fenlei,'') FROM qingka_wangke_class WHERE status >= 0 ORDER BY sort ASC, cid ASC")
+	keyword := c.Query("keyword")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	cid, _ := strconv.Atoi(c.Query("cid"))
+	fenlei, _ := strconv.Atoi(c.Query("fenlei"))
+
+	where := "status >= 0"
+	args := []interface{}{}
+	if cid > 0 {
+		where += " AND cid = ?"
+		args = append(args, cid)
+	} else {
+		if fenlei > 0 {
+			where += " AND fenlei = ?"
+			args = append(args, fenlei)
+		}
+		if keyword != "" {
+			where += " AND (name LIKE ? OR cid = ?)"
+			args = append(args, "%"+keyword+"%", keyword)
+		}
+	}
+	args = append(args, limit)
+
+	rows, err := database.DB.Query("SELECT cid, COALESCE(name,''), COALESCE(price,'0'), COALESCE(fenlei,'') FROM qingka_wangke_class WHERE "+where+" ORDER BY sort ASC, cid ASC LIMIT ?", args...)
 	if err != nil {
 		response.ServerErrorf(c, err, "查询失败")
 		return
@@ -464,5 +492,5 @@ func AdminMiJiaBatch(c *gin.Context) {
 		response.ServerErrorf(c, err, "批量设置失败")
 		return
 	}
-	response.Success(c, gin.H{"count": count, "msg": fmt.Sprintf("成功为 %d 个商品设置密价", count)})
+	response.Success(c, gin.H{"count": count, "msg": fmt.Sprintf("分类密价规则已保存，当前命中 %d 个商品", count)})
 }

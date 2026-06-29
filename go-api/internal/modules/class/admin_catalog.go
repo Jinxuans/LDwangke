@@ -320,23 +320,29 @@ func (s *classService) MiJiaList(req model.MiJiaListRequest) ([]model.MiJia, int
 
 	where := "1=1"
 	args := []interface{}{}
+	if req.ScopeType != "" {
+		where += " AND m.scope_type = ?"
+		args = append(args, req.ScopeType)
+	}
 	if req.UID > 0 {
 		where += " AND m.uid = ?"
 		args = append(args, req.UID)
 	}
 	if req.CID > 0 {
-		where += " AND m.cid = ?"
+		where += " AND (m.cid = ? OR m.scope_id = ? )"
+		args = append(args, req.CID)
 		args = append(args, req.CID)
 	}
 	if req.Keyword != "" {
-		where += " AND c.name LIKE ?"
+		where += " AND (c.name LIKE ? OR f.name LIKE ?)"
+		args = append(args, "%"+req.Keyword+"%")
 		args = append(args, "%"+req.Keyword+"%")
 	}
 
 	var total int64
 	countArgs := make([]interface{}, len(args))
 	copy(countArgs, args)
-	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_mijia m LEFT JOIN qingka_wangke_class c ON m.cid=c.cid WHERE "+where, countArgs...).Scan(&total)
+	database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_mijia m LEFT JOIN qingka_wangke_class c ON m.cid=c.cid LEFT JOIN qingka_wangke_fenlei f ON m.scope_type = 'category' AND m.scope_id = f.id WHERE "+where, countArgs...).Scan(&total)
 
 	offset := (req.Page - 1) * req.Limit
 	queryArgs := make([]interface{}, len(args))
@@ -344,7 +350,7 @@ func (s *classService) MiJiaList(req model.MiJiaListRequest) ([]model.MiJia, int
 	queryArgs = append(queryArgs, req.Limit, offset)
 
 	rows, err := database.DB.Query(
-		"SELECT m.mid, m.uid, m.cid, COALESCE(m.mode,'0'), COALESCE(m.price,'0'), COALESCE(DATE_FORMAT(m.addtime,'%Y-%m-%d %H:%i:%s'),''), COALESCE(u.user,''), COALESCE(c.name,'') FROM qingka_wangke_mijia m LEFT JOIN qingka_wangke_user u ON m.uid=u.uid LEFT JOIN qingka_wangke_class c ON m.cid=c.cid WHERE "+where+" ORDER BY m.mid DESC LIMIT ? OFFSET ?",
+		"SELECT m.mid, m.uid, m.cid, COALESCE(m.scope_type,'product'), COALESCE(m.scope_id,m.cid), COALESCE(m.mode,'0'), COALESCE(m.price,'0'), COALESCE(DATE_FORMAT(m.addtime,'%Y-%m-%d %H:%i:%s'),''), COALESCE(u.user,''), COALESCE(c.name,''), COALESCE(f.name,'') FROM qingka_wangke_mijia m LEFT JOIN qingka_wangke_user u ON m.uid=u.uid LEFT JOIN qingka_wangke_class c ON m.cid=c.cid LEFT JOIN qingka_wangke_fenlei f ON m.scope_type = 'category' AND m.scope_id = f.id WHERE "+where+" ORDER BY m.mid DESC LIMIT ? OFFSET ?",
 		queryArgs...,
 	)
 	if err != nil {
@@ -354,7 +360,7 @@ func (s *classService) MiJiaList(req model.MiJiaListRequest) ([]model.MiJia, int
 	var list []model.MiJia
 	for rows.Next() {
 		var mj model.MiJia
-		rows.Scan(&mj.MID, &mj.UID, &mj.CID, &mj.Mode, &mj.Price, &mj.AddTime, &mj.UserName, &mj.ClassName)
+		rows.Scan(&mj.MID, &mj.UID, &mj.CID, &mj.ScopeType, &mj.ScopeID, &mj.Mode, &mj.Price, &mj.AddTime, &mj.UserName, &mj.ClassName, &mj.CategoryName)
 		list = append(list, mj)
 	}
 	if list == nil {
@@ -383,10 +389,25 @@ func (s *classService) MiJiaSave(req model.MiJiaSaveRequest) error {
 	if err != nil {
 		return err
 	}
-	if req.MID > 0 {
-		return updateMiJiaRecord(req.MID, req.UID, req.CID, mode, req.Price)
+	scopeType := strings.ToLower(strings.TrimSpace(req.ScopeType))
+	if scopeType == "" {
+		if req.Fenlei > 0 {
+			scopeType = "category"
+		} else {
+			scopeType = "product"
+		}
 	}
-	return saveMiJiaRecord(req.UID, req.CID, mode, req.Price)
+	scopeID := req.ScopeID
+	if scopeType == "category" && scopeID <= 0 {
+		scopeID = req.Fenlei
+	}
+	if scopeType == "product" && scopeID <= 0 {
+		scopeID = req.CID
+	}
+	if req.MID > 0 {
+		return updateMiJiaScopeRecord(req.MID, req.UID, req.CID, scopeType, scopeID, mode, req.Price)
+	}
+	return saveMiJiaScopeRecord(req.UID, req.CID, scopeType, scopeID, mode, req.Price)
 }
 
 func (s *classService) MiJiaDelete(mids []int) error {
@@ -408,33 +429,15 @@ func (s *classService) MiJiaBatch(req model.MiJiaBatchRequest) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	rows, err := database.DB.Query("SELECT cid FROM qingka_wangke_class WHERE fenlei = ?", req.Fenlei)
-	if err != nil {
+	if req.Fenlei <= 0 {
+		return 0, errors.New("未指定分类")
+	}
+	if err := saveMiJiaScopeRecord(req.UID, 0, "category", req.Fenlei, mode, req.Price); err != nil {
 		return 0, err
 	}
-	defer rows.Close()
-
-	var cids []int
-	for rows.Next() {
-		var cid int
-		rows.Scan(&cid)
-		cids = append(cids, cid)
-	}
-
-	tx, err := database.DB.Begin()
-	if err != nil {
+	var count int
+	if err := database.DB.QueryRow("SELECT COUNT(*) FROM qingka_wangke_class WHERE fenlei = ?", req.Fenlei).Scan(&count); err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
-
-	for _, cid := range cids {
-		if err := upsertMiJiaRecordTx(tx, req.UID, cid, mode, req.Price); err != nil {
-			return 0, err
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return 0, err
-	}
-	return len(cids), nil
+	return count, nil
 }

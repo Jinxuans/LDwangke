@@ -53,31 +53,32 @@ type DetectResult struct {
 }
 
 type ParsedPHPConfig struct {
-	PT              string   `json:"pt"`
-	Name            string   `json:"name"`
-	AuthType        string   `json:"auth_type"`
-	APIPathStyle    string   `json:"api_path_style"`
-	SuccessCodes    string   `json:"success_codes"`
-	UseJSON         bool     `json:"use_json"`
-	QueryAct        string   `json:"query_act"`
-	QueryPath       string   `json:"query_path"`
-	OrderAct        string   `json:"order_act"`
-	OrderPath       string   `json:"order_path"`
-	ProgressAct     string   `json:"progress_act"`
-	ProgressPath    string   `json:"progress_path"`
-	ProgressMethod  string   `json:"progress_method"`
-	PauseAct        string   `json:"pause_act"`
-	PausePath       string   `json:"pause_path"`
-	ChangePassAct   string   `json:"change_pass_act"`
-	ChangePassPath  string   `json:"change_pass_path"`
-	ChangePassParam string   `json:"change_pass_param"`
-	ChangePassID    string   `json:"change_pass_id_param"`
-	LogAct          string   `json:"log_act"`
-	LogPath         string   `json:"log_path"`
-	LogIDParam      string   `json:"log_id_param"`
-	ReturnsYID      bool     `json:"returns_yid"`
-	Confidence      int      `json:"confidence"`
-	Warnings        []string `json:"warnings"`
+	PT                 string   `json:"pt"`
+	Name               string   `json:"name"`
+	AuthType           string   `json:"auth_type"`
+	APIPathStyle       string   `json:"api_path_style"`
+	SuccessCodes       string   `json:"success_codes"`
+	UseJSON            bool     `json:"use_json"`
+	QueryAct           string   `json:"query_act"`
+	QueryPath          string   `json:"query_path"`
+	OrderAct           string   `json:"order_act"`
+	OrderPath          string   `json:"order_path"`
+	ProgressAct        string   `json:"progress_act"`
+	ProgressPath       string   `json:"progress_path"`
+	ProgressMethod     string   `json:"progress_method"`
+	PauseAct           string   `json:"pause_act"`
+	PausePath          string   `json:"pause_path"`
+	PauseParamMap      string   `json:"pause_param_map"`
+	ChangePassAct      string   `json:"change_pass_act"`
+	ChangePassPath     string   `json:"change_pass_path"`
+	ChangePassParamMap string   `json:"change_pass_param_map"`
+	ResubmitParamMap   string   `json:"resubmit_param_map"`
+	LogAct             string   `json:"log_act"`
+	LogPath            string   `json:"log_path"`
+	LogParamMap        string   `json:"log_param_map"`
+	ReturnsYID         bool     `json:"returns_yid"`
+	Confidence         int      `json:"confidence"`
+	Warnings           []string `json:"warnings"`
 }
 
 type moneyExtract struct {
@@ -413,15 +414,10 @@ func BuildConfigFromDetection(result *DetectResult, pt, name string) *model.Plat
 	req.ProgressMethod = getOr(cfg, "progress_method", "POST")
 	req.ProgressParamMap = strings.TrimSpace(cfg["progress_param_map"])
 	req.PausePath = getOr(cfg, "pause_path", "/api.php?act=zt")
-	req.PauseIDParam = getOr(cfg, "pause_id_param", "id")
 	req.ChangePassPath = getOr(cfg, "change_pass_path", "/api.php?act=gaimi")
-	req.ChangePassParam = getOr(cfg, "change_pass_param", "newPwd")
-	req.ChangePassIDParam = getOr(cfg, "change_pass_id_param", "id")
 	req.ResubmitPath = cfg["resubmit_path"]
-	req.ResubmitIDParam = getOr(cfg, "resubmit_id_param", "id")
 	req.LogPath = getOr(cfg, "log_path", "/api.php?act=xq")
 	req.LogMethod = getOr(cfg, "log_method", "POST")
-	req.LogIDParam = getOr(cfg, "log_id_param", "id")
 	req.BalancePath = getOr(cfg, "balance_path", "/api.php?act=getmoney")
 	req.BalanceMoneyField = getOr(cfg, "balance_money_field", "money")
 	req.BalanceMethod = getOr(cfg, "balance_method", "POST")
@@ -441,19 +437,20 @@ func BuildConfigFromDetection(result *DetectResult, pt, name string) *model.Plat
 
 func ParsePHPCode(code string) *ParsedPHPConfig {
 	cfg := &ParsedPHPConfig{
-		AuthType:        "uid_key",
-		SuccessCodes:    "0",
-		QueryPath:       "/api.php?act=get",
-		OrderPath:       "/api.php?act=add",
-		ProgressPath:    "/api.php?act=chadan2",
-		ProgressMethod:  "POST",
-		PausePath:       "/api.php?act=zt",
-		ChangePassPath:  "/api.php?act=gaimi",
-		ChangePassParam: "newPwd",
-		ChangePassID:    "id",
-		LogPath:         "/api.php?act=xq",
-		LogIDParam:      "id",
-		Warnings:        []string{},
+		AuthType:           "uid_key",
+		SuccessCodes:       "0",
+		QueryPath:          "/api.php?act=get",
+		OrderPath:          "/api.php?act=add",
+		ProgressPath:       "/api.php?act=chadan2",
+		ProgressMethod:     "POST",
+		PausePath:          "/api.php?act=zt",
+		PauseParamMap:      `{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","id":"{{order.yid}}"}`,
+		ChangePassPath:     "/api.php?act=gaimi",
+		ChangePassParamMap: `{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","id":"{{order.yid}}","newPwd":"{{action.new_password}}"}`,
+		ResubmitParamMap:   `{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","id":"{{order.yid}}"}`,
+		LogPath:            "/api.php?act=xq",
+		LogParamMap:        `{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","id":"{{order.yid}}"}`,
+		Warnings:           []string{},
 	}
 
 	ptRe := regexp.MustCompile(`\$type\s*==\s*["']([^"']+)["']`)
@@ -569,13 +566,14 @@ func ParsePHPCode(code string) *ParsedPHPConfig {
 
 	passParamRe := regexp.MustCompile(`["'](newPwd|xgmm|newpwd|new_password|odpwd)["']\s*=>`)
 	if m := passParamRe.FindStringSubmatch(code); len(m) > 1 {
-		cfg.ChangePassParam = m[1]
+		cfg.ChangePassParamMap = fmt.Sprintf(`{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","id":"{{order.yid}}","%s":"{{action.new_password}}"}`, m[1])
 		cfg.Confidence += 5
 	}
 
 	idParamRe := regexp.MustCompile(`["'](oid|id|ids)["']\s*=>\s*\$(?:d\["yid"\]|yid|order)`)
 	if m := idParamRe.FindStringSubmatch(code); len(m) > 1 {
-		cfg.ChangePassID = m[1]
+		cfg.PauseParamMap = fmt.Sprintf(`{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","%s":"{{order.yid}}"}`, m[1])
+		cfg.LogParamMap = fmt.Sprintf(`{"uid":"{{supplier.uid}}","key":"{{supplier.key}}","%s":"{{order.yid}}"}`, m[1])
 		cfg.Confidence += 5
 	}
 

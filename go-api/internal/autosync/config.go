@@ -3,6 +3,7 @@ package autosync
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -11,22 +12,39 @@ import (
 )
 
 type SyncConfig struct {
-	ID               int                           `json:"id"`
-	SupplierIDs      string                        `json:"supplier_ids"`
-	PriceRates       map[string]float64            `json:"price_rates"`
-	CategoryRates    map[string]map[string]float64 `json:"category_rates"`
-	SyncPrice        bool                          `json:"sync_price"`
-	SyncStatus       bool                          `json:"sync_status"`
-	SyncContent      bool                          `json:"sync_content"`
-	SyncName         bool                          `json:"sync_name"`
-	CloneEnabled     bool                          `json:"clone_enabled"`
-	ForcePriceUp     bool                          `json:"force_price_up"`
-	CloneCategory    bool                          `json:"clone_category"`
-	SkipCategories   []string                      `json:"skip_categories"`
-	NameReplace      map[string]string             `json:"name_replace"`
-	SecretPriceRate  float64                       `json:"secret_price_rate"`
-	AutoSyncEnabled  bool                          `json:"auto_sync_enabled"`
-	AutoSyncInterval int                           `json:"auto_sync_interval"`
+	ID             int                           `json:"id"`
+	SupplierIDs    string                        `json:"supplier_ids"`
+	PriceRates     map[string]float64            `json:"price_rates"`
+	CategoryRates  map[string]map[string]float64 `json:"category_rates"`
+	SyncPrice      bool                          `json:"sync_price"`
+	SyncStatus     bool                          `json:"sync_status"`
+	SyncContent    bool                          `json:"sync_content"`
+	SyncName       bool                          `json:"sync_name"`
+	CloneEnabled   bool                          `json:"clone_enabled"`
+	ForcePriceUp   bool                          `json:"force_price_up"`
+	CloneCategory  bool                          `json:"clone_category"`
+	SkipCategories []string                      `json:"skip_categories"`
+	NameReplace    map[string]string             `json:"name_replace"`
+	// SecretPriceRate keeps the legacy JSON/DB field name. In sync it means the rate used
+	// to write qingka_wangke_class.secret_price, not a user MiJia pricing rule.
+	SecretPriceRate  float64 `json:"secret_price_rate"`
+	AutoSyncEnabled  bool    `json:"auto_sync_enabled"`
+	AutoSyncInterval int     `json:"auto_sync_interval"`
+}
+
+func (c *SyncConfig) ProtectedPriceRate() float64 {
+	if c == nil {
+		return 0
+	}
+	return c.SecretPriceRate
+}
+
+func (c *SyncConfig) SyncProtectedPrice(sellPrice float64) float64 {
+	rate := c.ProtectedPriceRate()
+	if rate <= 0 {
+		return 0
+	}
+	return math.Round(sellPrice*rate*100) / 100
 }
 
 func ensureSyncConfigColumns() error {
@@ -41,7 +59,7 @@ func ensureSyncConfigColumns() error {
 		{"clone_category", "ADD COLUMN `clone_category` tinyint(1) NOT NULL DEFAULT 0 COMMENT '克隆时同步分类' AFTER `clone_enabled`"},
 		{"skip_categories", "ADD COLUMN `skip_categories` text COMMENT '跳过分类ID JSON数组，如[\"3\",\"5\"]' AFTER `clone_category`"},
 		{"name_replace", "ADD COLUMN `name_replace` text COMMENT '名称替换规则JSON，如{\"旧词\":\"新词\"}' AFTER `skip_categories`"},
-		{"secret_price_rate", "ADD COLUMN `secret_price_rate` decimal(10,4) NOT NULL DEFAULT 0 COMMENT '密价倍率，0表示不设密价' AFTER `name_replace`"},
+		{"secret_price_rate", "ADD COLUMN `secret_price_rate` decimal(10,4) NOT NULL DEFAULT 0 COMMENT '同步保密价倍率/上游成本展示倍率，0表示不写入商品保密价' AFTER `name_replace`"},
 		{"auto_sync_enabled", "ADD COLUMN `auto_sync_enabled` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否开启自动定时同步' AFTER `secret_price_rate`"},
 		{"auto_sync_interval", "ADD COLUMN `auto_sync_interval` int(11) NOT NULL DEFAULT 30 COMMENT '自动同步间隔（分钟）' AFTER `auto_sync_enabled`"},
 	}

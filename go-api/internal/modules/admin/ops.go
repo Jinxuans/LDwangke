@@ -347,11 +347,11 @@ func AdminPlatformConfigList(c *gin.Context) {
 		COALESCE(batch_progress_body_type,''), COALESCE(batch_progress_param_map,''),
 		COALESCE(category_path,''), COALESCE(category_method,''), COALESCE(category_body_type,''), COALESCE(category_param_map,''),
 		COALESCE(class_list_path,''), COALESCE(class_list_method,''), COALESCE(class_list_body_type,''), COALESCE(class_list_param_map,''),
-		COALESCE(pause_path,''), COALESCE(pause_method,''), COALESCE(pause_body_type,''), COALESCE(pause_param_map,''), COALESCE(pause_id_param,''),
+		COALESCE(pause_path,''), COALESCE(pause_method,''), COALESCE(pause_body_type,''), COALESCE(pause_param_map,''),
 		COALESCE(resume_path,''), COALESCE(resume_method,''), COALESCE(resume_body_type,''), COALESCE(resume_param_map,''),
-		COALESCE(change_pass_path,''), COALESCE(change_pass_method,''), COALESCE(change_pass_body_type,''), COALESCE(change_pass_param_map,''), COALESCE(change_pass_param,''), COALESCE(change_pass_id_param,''),
-		COALESCE(resubmit_path,''), COALESCE(resubmit_method,''), COALESCE(resubmit_body_type,''), COALESCE(resubmit_param_map,''), COALESCE(resubmit_id_param,''),
-		COALESCE(log_path,''), COALESCE(log_method,''), COALESCE(log_body_type,''), COALESCE(log_param_map,''), COALESCE(log_id_param,''),
+		COALESCE(change_pass_path,''), COALESCE(change_pass_method,''), COALESCE(change_pass_body_type,''), COALESCE(change_pass_param_map,''),
+		COALESCE(resubmit_path,''), COALESCE(resubmit_method,''), COALESCE(resubmit_body_type,''), COALESCE(resubmit_param_map,''),
+		COALESCE(log_path,''), COALESCE(log_method,''), COALESCE(log_body_type,''), COALESCE(log_param_map,''),
 		COALESCE(balance_path,''), COALESCE(balance_money_field,''),
 		COALESCE(balance_method,''), COALESCE(balance_body_type,''), COALESCE(balance_param_map,''), COALESCE(balance_auth_type,''),
 		COALESCE(report_param_style,''), COALESCE(report_auth_type,''), COALESCE(report_path,''), COALESCE(report_method,''), COALESCE(report_body_type,''), COALESCE(report_param_map,''),
@@ -376,11 +376,11 @@ func AdminPlatformConfigList(c *gin.Context) {
 			&cfg.BatchProgressPath, &cfg.BatchProgressMethod, &cfg.BatchProgressBodyType, &cfg.BatchProgressParamMap,
 			&cfg.CategoryPath, &cfg.CategoryMethod, &cfg.CategoryBodyType, &cfg.CategoryParamMap,
 			&cfg.ClassListPath, &cfg.ClassListMethod, &cfg.ClassListBodyType, &cfg.ClassListParamMap,
-			&cfg.PausePath, &cfg.PauseMethod, &cfg.PauseBodyType, &cfg.PauseParamMap, &cfg.PauseIDParam,
+			&cfg.PausePath, &cfg.PauseMethod, &cfg.PauseBodyType, &cfg.PauseParamMap,
 			&cfg.ResumePath, &cfg.ResumeMethod, &cfg.ResumeBodyType, &cfg.ResumeParamMap,
-			&cfg.ChangePassPath, &cfg.ChangePassMethod, &cfg.ChangePassBodyType, &cfg.ChangePassParamMap, &cfg.ChangePassParam, &cfg.ChangePassIDParam,
-			&cfg.ResubmitPath, &cfg.ResubmitMethod, &cfg.ResubmitBodyType, &cfg.ResubmitParamMap, &cfg.ResubmitIDParam,
-			&cfg.LogPath, &cfg.LogMethod, &cfg.LogBodyType, &cfg.LogParamMap, &cfg.LogIDParam,
+			&cfg.ChangePassPath, &cfg.ChangePassMethod, &cfg.ChangePassBodyType, &cfg.ChangePassParamMap,
+			&cfg.ResubmitPath, &cfg.ResubmitMethod, &cfg.ResubmitBodyType, &cfg.ResubmitParamMap,
+			&cfg.LogPath, &cfg.LogMethod, &cfg.LogBodyType, &cfg.LogParamMap,
 			&cfg.BalancePath, &cfg.BalanceMoneyField, &cfg.BalanceMethod, &cfg.BalanceBodyType, &cfg.BalanceParamMap, &cfg.BalanceAuthType,
 			&cfg.ReportParamStyle, &cfg.ReportAuthType, &cfg.ReportPath, &cfg.ReportMethod, &cfg.ReportBodyType, &cfg.ReportParamMap, &cfg.GetReportPath, &cfg.GetReportMethod, &cfg.GetReportBodyType, &cfg.GetReportParamMap, &cfg.RefreshPath,
 			&cfg.SourceCode, &cfg.CreatedAt, &cfg.UpdatedAt,
@@ -481,19 +481,14 @@ func normalizePlatformConfigSaveRequest(req *model.PlatformConfigSaveRequest) {
 	req.ClassListMethod = strings.ToUpper(strings.TrimSpace(req.ClassListMethod))
 	req.PausePath = firstNonEmpty(req.PausePath)
 	req.PauseMethod = strings.ToUpper(strings.TrimSpace(req.PauseMethod))
-	req.PauseIDParam = strings.TrimSpace(req.PauseIDParam)
 	req.ResumePath = firstNonEmpty(req.ResumePath)
 	req.ResumeMethod = strings.ToUpper(strings.TrimSpace(req.ResumeMethod))
 	req.ChangePassPath = firstNonEmpty(req.ChangePassPath)
 	req.ChangePassMethod = strings.ToUpper(strings.TrimSpace(req.ChangePassMethod))
-	req.ChangePassParam = strings.TrimSpace(req.ChangePassParam)
-	req.ChangePassIDParam = strings.TrimSpace(req.ChangePassIDParam)
 	req.ResubmitMethod = strings.ToUpper(strings.TrimSpace(req.ResubmitMethod))
-	req.ResubmitIDParam = strings.TrimSpace(req.ResubmitIDParam)
 	req.ResubmitPath = firstNonEmpty(req.ResubmitPath)
 	req.LogPath = firstNonEmpty(req.LogPath)
 	req.LogMethod = strings.ToUpper(strings.TrimSpace(req.LogMethod))
-	req.LogIDParam = strings.TrimSpace(req.LogIDParam)
 	req.BalancePath = firstNonEmpty(req.BalancePath)
 	req.BalanceMoneyField = strings.TrimSpace(req.BalanceMoneyField)
 	req.BalanceMethod = strings.ToUpper(strings.TrimSpace(req.BalanceMethod))
@@ -589,11 +584,11 @@ func upsertAdminPlatformConfig(req model.PlatformConfigSaveRequest) error {
 		req.BatchProgressPath, req.BatchProgressMethod, req.BatchProgressBodyType, req.BatchProgressParamMap,
 		req.CategoryPath, req.CategoryMethod, req.CategoryBodyType, req.CategoryParamMap,
 		req.ClassListPath, req.ClassListMethod, req.ClassListBodyType, req.ClassListParamMap,
-		req.PausePath, req.PauseMethod, req.PauseBodyType, req.PauseParamMap, req.PauseIDParam,
+		req.PausePath, req.PauseMethod, req.PauseBodyType, req.PauseParamMap,
 		req.ResumePath, req.ResumeMethod, req.ResumeBodyType, req.ResumeParamMap,
-		req.ChangePassPath, req.ChangePassMethod, req.ChangePassBodyType, req.ChangePassParamMap, req.ChangePassParam, req.ChangePassIDParam,
-		req.ResubmitPath, req.ResubmitMethod, req.ResubmitBodyType, req.ResubmitParamMap, req.ResubmitIDParam,
-		req.LogPath, req.LogMethod, req.LogBodyType, req.LogParamMap, req.LogIDParam,
+		req.ChangePassPath, req.ChangePassMethod, req.ChangePassBodyType, req.ChangePassParamMap,
+		req.ResubmitPath, req.ResubmitMethod, req.ResubmitBodyType, req.ResubmitParamMap,
+		req.LogPath, req.LogMethod, req.LogBodyType, req.LogParamMap,
 		req.BalancePath, req.BalanceMoneyField, req.BalanceMethod, req.BalanceBodyType, req.BalanceParamMap, req.BalanceAuthType,
 		req.ReportParamStyle, req.ReportAuthType, req.ReportPath, req.ReportMethod, req.ReportBodyType, req.ReportParamMap,
 		req.GetReportPath, req.GetReportMethod, req.GetReportBodyType, req.GetReportParamMap, req.RefreshPath,
@@ -609,11 +604,11 @@ func upsertAdminPlatformConfig(req model.PlatformConfigSaveRequest) error {
 		batch_progress_path, batch_progress_method, batch_progress_body_type, batch_progress_param_map,
 		category_path, category_method, category_body_type, category_param_map,
 		class_list_path, class_list_method, class_list_body_type, class_list_param_map,
-		pause_path, pause_method, pause_body_type, pause_param_map, pause_id_param,
+		pause_path, pause_method, pause_body_type, pause_param_map,
 		resume_path, resume_method, resume_body_type, resume_param_map,
-		change_pass_path, change_pass_method, change_pass_body_type, change_pass_param_map, change_pass_param, change_pass_id_param,
-		resubmit_path, resubmit_method, resubmit_body_type, resubmit_param_map, resubmit_id_param,
-		log_path, log_method, log_body_type, log_param_map, log_id_param,
+		change_pass_path, change_pass_method, change_pass_body_type, change_pass_param_map,
+		resubmit_path, resubmit_method, resubmit_body_type, resubmit_param_map,
+		log_path, log_method, log_body_type, log_param_map,
 		balance_path, balance_money_field, balance_method, balance_body_type, balance_param_map, balance_auth_type,
 		report_param_style, report_auth_type, report_path, report_method, report_body_type, report_param_map,
 		get_report_path, get_report_method, get_report_body_type, get_report_param_map, refresh_path,
@@ -638,16 +633,15 @@ func upsertAdminPlatformConfig(req model.PlatformConfigSaveRequest) error {
 		class_list_path=VALUES(class_list_path), class_list_method=VALUES(class_list_method),
 		class_list_body_type=VALUES(class_list_body_type), class_list_param_map=VALUES(class_list_param_map),
 		pause_path=VALUES(pause_path), pause_method=VALUES(pause_method),
-		pause_body_type=VALUES(pause_body_type), pause_param_map=VALUES(pause_param_map), pause_id_param=VALUES(pause_id_param),
+		pause_body_type=VALUES(pause_body_type), pause_param_map=VALUES(pause_param_map),
 		resume_path=VALUES(resume_path), resume_method=VALUES(resume_method),
 		resume_body_type=VALUES(resume_body_type), resume_param_map=VALUES(resume_param_map),
 		change_pass_path=VALUES(change_pass_path), change_pass_method=VALUES(change_pass_method),
 		change_pass_body_type=VALUES(change_pass_body_type), change_pass_param_map=VALUES(change_pass_param_map),
-		change_pass_param=VALUES(change_pass_param), change_pass_id_param=VALUES(change_pass_id_param),
 		resubmit_path=VALUES(resubmit_path), resubmit_method=VALUES(resubmit_method), resubmit_body_type=VALUES(resubmit_body_type),
-		resubmit_param_map=VALUES(resubmit_param_map), resubmit_id_param=VALUES(resubmit_id_param),
+		resubmit_param_map=VALUES(resubmit_param_map),
 		log_path=VALUES(log_path), log_method=VALUES(log_method),
-		log_body_type=VALUES(log_body_type), log_param_map=VALUES(log_param_map), log_id_param=VALUES(log_id_param),
+		log_body_type=VALUES(log_body_type), log_param_map=VALUES(log_param_map),
 		balance_path=VALUES(balance_path), balance_money_field=VALUES(balance_money_field), balance_method=VALUES(balance_method),
 		balance_body_type=VALUES(balance_body_type), balance_param_map=VALUES(balance_param_map),
 		balance_auth_type=VALUES(balance_auth_type),

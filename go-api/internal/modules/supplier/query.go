@@ -1,11 +1,9 @@
 package supplier
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"go-api/internal/model"
@@ -186,41 +184,32 @@ func (s *Service) callSupplierQuery(sup *model.SupplierFull, cls *model.ClassFul
 		http.MethodPost,
 		"form",
 		defaultParams,
-		map[string]string{
-			"action.school":   school,
-			"action.user":     user,
-			"action.password": pass,
-			"action.platform": cls.Noun,
-		},
+		queryActionFields(school, user, pass, cls.Noun),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("请求上游失败：%v", err)
 	}
 
-	var raw map[string]interface{}
-	if err := json.Unmarshal(result.Body, &raw); err != nil {
-		return nil, fmt.Errorf("解析响应失败：%s", string(result.Body))
+	resp, err := parseActionJSONResponse(result.Body)
+	if err != nil {
+		return nil, err
 	}
 
-	msg, _ := raw["msg"].(string)
-	userName, _ := raw["userName"].(string)
+	msg := resp.msg()
+	userName := resp.stringValue("userName")
 
 	var items []model.CourseItem
-	if dataArr, ok := raw["data"].([]interface{}); ok {
-		for _, item := range dataArr {
-			if m, ok := item.(map[string]interface{}); ok {
-				items = append(items, model.CourseItem{
-					ID:             toString(m["id"]),
-					Name:           toString(m["name"]),
-					KCJS:           toString(m["kcjs"]),
-					StudyStartTime: toString(m["studyStartTime"]),
-					StudyEndTime:   toString(m["studyEndTime"]),
-					ExamStartTime:  toString(m["examStartTime"]),
-					ExamEndTime:    toString(m["examEndTime"]),
-					Complete:       toString(m["complete"]),
-				})
-			}
-		}
+	for _, m := range resp.dataRows() {
+		items = append(items, model.CourseItem{
+			ID:             firstActionValue(m, "id", "cid"),
+			Name:           firstActionValue(m, "name", "course_name"),
+			KCJS:           firstActionValue(m, "kcjs"),
+			StudyStartTime: firstActionValue(m, "studyStartTime"),
+			StudyEndTime:   firstActionValue(m, "studyEndTime"),
+			ExamStartTime:  firstActionValue(m, "examStartTime"),
+			ExamEndTime:    firstActionValue(m, "examEndTime"),
+			Complete:       firstActionValue(m, "complete"),
+		})
 	}
 
 	return &model.SupplierQueryResult{
@@ -228,17 +217,4 @@ func (s *Service) callSupplierQuery(sup *model.SupplierFull, cls *model.ClassFul
 		UserName: userName,
 		Data:     items,
 	}, nil
-}
-
-func toString(v interface{}) string {
-	if v == nil {
-		return ""
-	}
-	if val, ok := v.(float64); ok {
-		if val == float64(int64(val)) {
-			return strconv.FormatInt(int64(val), 10)
-		}
-		return strconv.FormatFloat(val, 'f', -1, 64)
-	}
-	return fmt.Sprintf("%v", v)
 }

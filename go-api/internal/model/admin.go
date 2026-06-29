@@ -146,30 +146,37 @@ type GradeSaveRequest struct {
 
 // ===== 密价设置 =====
 type MiJia struct {
-	MID       int    `json:"mid"`
-	UID       int    `json:"uid"`
-	CID       int    `json:"cid"`
-	Mode      string `json:"mode"`
-	Price     string `json:"price"`
-	AddTime   string `json:"addtime"`
-	UserName  string `json:"username"`
-	ClassName string `json:"classname"`
+	MID          int    `json:"mid"`
+	UID          int    `json:"uid"`
+	CID          int    `json:"cid"`
+	ScopeType    string `json:"scope_type"`
+	ScopeID      int    `json:"scope_id"`
+	Mode         string `json:"mode"`
+	Price        string `json:"price"`
+	AddTime      string `json:"addtime"`
+	UserName     string `json:"username"`
+	ClassName    string `json:"classname"`
+	CategoryName string `json:"category_name"`
 }
 
 type MiJiaListRequest struct {
-	Page    int    `json:"page" form:"page"`
-	Limit   int    `json:"limit" form:"limit"`
-	UID     int    `json:"uid" form:"uid"`
-	CID     int    `json:"cid" form:"cid"`
-	Keyword string `json:"keyword" form:"keyword"`
+	Page      int    `json:"page" form:"page"`
+	Limit     int    `json:"limit" form:"limit"`
+	UID       int    `json:"uid" form:"uid"`
+	CID       int    `json:"cid" form:"cid"`
+	ScopeType string `json:"scope_type" form:"scope_type"`
+	Keyword   string `json:"keyword" form:"keyword"`
 }
 
 type MiJiaSaveRequest struct {
-	MID   int    `json:"mid"`
-	UID   int    `json:"uid" binding:"required"`
-	CID   int    `json:"cid" binding:"required"`
-	Mode  string `json:"mode"`
-	Price string `json:"price" binding:"required"`
+	MID       int    `json:"mid"`
+	UID       int    `json:"uid" binding:"required"`
+	CID       int    `json:"cid"`
+	ScopeType string `json:"scope_type"`
+	ScopeID   int    `json:"scope_id"`
+	Fenlei    int    `json:"fenlei"`
+	Mode      string `json:"mode"`
+	Price     string `json:"price" binding:"required"`
 }
 
 type MiJiaBatchRequest struct {
